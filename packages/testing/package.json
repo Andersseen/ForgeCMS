@@ -1,0 +1,32 @@
+{
+  "name": "@devflare-cms/testing",
+  "version": "0.0.0",
+  "description": "Shared testing helpers for Devflare CMS packages.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run --dir .",
+    "test:watch": "vitest --dir .",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist coverage"
+  },
+  "dependencies": {
+    "@devflare-cms/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@devflare-cms/core": ["packages/core/dist/index.d.ts"],
+      "@devflare-cms/db": ["packages/db/dist/index.d.ts"],
+      "@devflare-cms/auth": ["packages/auth/dist/index.d.ts"],
+      "@devflare-cms/storage": ["packages/storage/dist/index.d.ts"],
+      "@devflare-cms/api": ["packages/api/dist/index.d.ts"],
+      "@devflare-cms/admin": ["packages/admin/dist/index.d.ts"],
+      "@devflare-cms/testing": ["packages/testing/dist/index.d.ts"]
+    }
+  }
+}

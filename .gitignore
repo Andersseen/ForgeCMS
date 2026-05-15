@@ -1,38 +1,32 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # Dependencies
-node_modules
-.pnp
-.pnp.js
+node_modules/
 
-# Local env files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Builds
+dist/
+.analog/
+.output/
+.angular/
 
-# Testing
-coverage
+# Turborepo
+.turbo/
 
-# Turbo
-.turbo
+# Tests
+coverage/
 
-# Vercel
-.vercel
-
-# Build Outputs
-.next/
-out/
-build
-dist
-
-
-# Debug
+# Logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# Misc
+# Environment
+.env
+.env.*
+!.env.example
+
+# OS and editors
 .DS_Store
-*.pem
+.idea/
+.vscode/*
+!.vscode/extensions.json

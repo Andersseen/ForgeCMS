@@ -1,0 +1,29 @@
+{
+  "name": "@devflare-cms/auth",
+  "version": "0.0.0",
+  "description": "Authentication adapter contracts for Devflare CMS.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run --dir .",
+    "test:watch": "vitest --dir .",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist coverage"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

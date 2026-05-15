@@ -1,0 +1,6 @@
+node_modules
+dist
+coverage
+.analog
+.turbo
+pnpm-lock.yaml
