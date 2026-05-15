@@ -1,7 +1,7 @@
 {
-  "name": "@devflare-cms/db",
+  "name": "@forge-cms/db",
   "version": "0.0.0",
-  "description": "Database adapter contracts for Devflare CMS.",
+  "description": "Database adapter contracts for ForgeCMS.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

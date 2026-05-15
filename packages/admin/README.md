@@ -1,4 +1,4 @@
-# @devflare-cms/admin
+# @forge-cms/admin
 
 Placeholder package for the future Angular admin panel.
 

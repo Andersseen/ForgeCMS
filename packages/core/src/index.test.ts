@@ -15,7 +15,7 @@ describe('core schema DSL', () => {
     });
 
     const example: CollectionData<typeof posts> = {
-      title: 'Hello Devflare',
+      title: 'Hello ForgeCMS',
       views: 1,
       published: true,
       publishedAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -24,6 +24,6 @@ describe('core schema DSL', () => {
 
     expect(posts.slug).toBe('posts');
     expect(posts.fields.title.kind).toBe('text');
-    expect(example.title).toBe('Hello Devflare');
+    expect(example.title).toBe('Hello ForgeCMS');
   });
 });

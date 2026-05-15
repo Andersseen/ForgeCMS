@@ -1,9 +1,9 @@
 export interface AdminPackageInfo {
-  name: '@devflare-cms/admin';
+  name: '@forge-cms/admin';
   status: 'placeholder';
 }
 
 export const adminPackage: AdminPackageInfo = {
-  name: '@devflare-cms/admin',
+  name: '@forge-cms/admin',
   status: 'placeholder'
 };

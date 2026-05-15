@@ -1,3 +1,3 @@
-# @devflare-cms/auth
+# @forge-cms/auth
 
-Authentication adapter contracts for future Devflare CMS auth integrations.
+Authentication adapter contracts for future ForgeCMS auth integrations.

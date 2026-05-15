@@ -1,4 +1,4 @@
-import type { CollectionDefinition } from '@devflare-cms/core';
+import type { CollectionDefinition } from '@forge-cms/core';
 
 export interface ApiContext {
   request: Request;

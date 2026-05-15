@@ -1,8 +1,8 @@
 {
-  "name": "@devflare-cms/playground",
+  "name": "@forge-cms/playground",
   "version": "0.0.0",
   "private": true,
-  "description": "Analog.js playground for Devflare CMS.",
+  "description": "Analog.js playground for ForgeCMS.",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -18,7 +18,7 @@
     "@angular/compiler": "^21.2.10",
     "@angular/core": "^21.2.10",
     "@angular/platform-browser": "^21.2.10",
-    "@devflare-cms/core": "workspace:*",
+    "@forge-cms/core": "workspace:*",
     "rxjs": "^7.8.2",
     "tslib": "^2.8.1",
     "zone.js": "^0.15.1"

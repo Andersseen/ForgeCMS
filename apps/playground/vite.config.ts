@@ -5,9 +5,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   resolve: {
     alias: {
-      '@devflare-cms/core': fileURLToPath(
-        new URL('../../packages/core/src/index.ts', import.meta.url)
-      )
+      '@forge-cms/core': fileURLToPath(new URL('../../packages/core/src/index.ts', import.meta.url))
     },
     mainFields: ['module']
   },

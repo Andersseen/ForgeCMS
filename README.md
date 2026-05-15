@@ -1,10 +1,10 @@
-# devflare-cms
+# forge-cms
 
 An experimental Payload-like CMS foundation for Angular and Analog.js developers.
 
 ## Goal
 
-Devflare CMS aims to become a developer-first, TypeScript-native CMS that feels natural in Angular and Analog.js projects. This repository is only the initial monorepo foundation: package boundaries, contracts, testing, and a small schema DSL prototype.
+ForgeCMS aims to become a developer-first, TypeScript-native CMS that feels natural in Angular and Analog.js projects. This repository is only the initial monorepo foundation: package boundaries, contracts, testing, and a small schema DSL prototype.
 
 ## Status
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defineCollection, defineField } from '@devflare-cms/core';
+import { defineCollection, defineField } from '@forge-cms/core';
 import { defineCrudHandlers } from './index';
 
 describe('API helpers', () => {

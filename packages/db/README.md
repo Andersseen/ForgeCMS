@@ -1,3 +1,3 @@
-# @devflare-cms/db
+# @forge-cms/db
 
-Database adapter contracts for future Devflare CMS persistence integrations.
+Database adapter contracts for future ForgeCMS persistence integrations.

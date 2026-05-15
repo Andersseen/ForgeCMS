@@ -1,7 +1,7 @@
 {
-  "name": "@devflare-cms/testing",
+  "name": "@forge-cms/testing",
   "version": "0.0.0",
-  "description": "Shared testing helpers for Devflare CMS packages.",
+  "description": "Shared testing helpers for ForgeCMS packages.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -23,7 +23,7 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
-    "@devflare-cms/core": "workspace:*"
+    "@forge-cms/core": "workspace:*"
   },
   "devDependencies": {
     "typescript": "catalog:",

@@ -7,6 +7,6 @@ describe('testing helpers', () => {
     const request = createTestRequest();
 
     expect(collection.slug).toBe('test-posts');
-    expect(request.url).toBe('https://devflare.test/');
+    expect(request.url).toBe('https://forge.test/');
   });
 });

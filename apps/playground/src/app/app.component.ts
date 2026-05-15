@@ -2,14 +2,14 @@ import { Component } from '@angular/core';
 import { postFields, posts } from './posts.collection';
 
 @Component({
-  selector: 'devflare-playground-root',
+  selector: 'forge-playground-root',
   standalone: true,
   template: `
     <main class="shell">
-      <p class="eyebrow">Devflare CMS</p>
+      <p class="eyebrow">ForgeCMS</p>
       <h1>Analog.js playground</h1>
       <p class="summary">
-        The playground imports <code>@devflare-cms/core</code> and declares an example
+        The playground imports <code>@forge-cms/core</code> and declares an example
         <code>{{ collection.slug }}</code> collection.
       </p>
 

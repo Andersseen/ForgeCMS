@@ -1,7 +1,7 @@
 {
-  "name": "@devflare-cms/admin",
+  "name": "@forge-cms/admin",
   "version": "0.0.0",
-  "description": "Placeholder for the future Angular admin package for Devflare CMS.",
+  "description": "Placeholder for the future Angular admin package for ForgeCMS.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

@@ -1,4 +1,4 @@
-import { defineCollection, defineField } from '@devflare-cms/core';
+import { defineCollection, defineField } from '@forge-cms/core';
 
 export function createTestCollection(slug = 'test-posts') {
   return defineCollection({
@@ -10,6 +10,6 @@ export function createTestCollection(slug = 'test-posts') {
   });
 }
 
-export function createTestRequest(url = 'https://devflare.test'): Request {
+export function createTestRequest(url = 'https://forge.test'): Request {
   return new Request(url);
 }

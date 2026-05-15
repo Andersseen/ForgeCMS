@@ -1,7 +1,7 @@
 {
-  "name": "@devflare-cms/auth",
+  "name": "@forge-cms/auth",
   "version": "0.0.0",
-  "description": "Authentication adapter contracts for Devflare CMS.",
+  "description": "Authentication adapter contracts for ForgeCMS.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

@@ -1,7 +1,7 @@
-# Devflare CMS Playground
+# ForgeCMS Playground
 
-Minimal Analog.js playground used to try future Devflare CMS APIs.
+Minimal Analog.js playground used to try future ForgeCMS APIs.
 
 ```sh
-pnpm --filter @devflare-cms/playground dev
+pnpm --filter @forge-cms/playground dev
 ```

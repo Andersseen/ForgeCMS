@@ -18,13 +18,13 @@
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
-      "@devflare-cms/core": ["packages/core/dist/index.d.ts"],
-      "@devflare-cms/db": ["packages/db/dist/index.d.ts"],
-      "@devflare-cms/auth": ["packages/auth/dist/index.d.ts"],
-      "@devflare-cms/storage": ["packages/storage/dist/index.d.ts"],
-      "@devflare-cms/api": ["packages/api/dist/index.d.ts"],
-      "@devflare-cms/admin": ["packages/admin/dist/index.d.ts"],
-      "@devflare-cms/testing": ["packages/testing/dist/index.d.ts"]
+      "@forge-cms/core": ["packages/core/dist/index.d.ts"],
+      "@forge-cms/db": ["packages/db/dist/index.d.ts"],
+      "@forge-cms/auth": ["packages/auth/dist/index.d.ts"],
+      "@forge-cms/storage": ["packages/storage/dist/index.d.ts"],
+      "@forge-cms/api": ["packages/api/dist/index.d.ts"],
+      "@forge-cms/admin": ["packages/admin/dist/index.d.ts"],
+      "@forge-cms/testing": ["packages/testing/dist/index.d.ts"]
     }
   }
 }

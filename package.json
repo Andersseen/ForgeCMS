@@ -1,18 +1,18 @@
 {
-  "name": "devflare-cms",
+  "name": "forge-cms",
   "version": "0.0.0",
   "private": true,
   "description": "An experimental Payload-like CMS foundation for Angular and Analog.js developers.",
-  "author": "Devflare CMS contributors",
+  "author": "ForgeCMS contributors",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/devflare-cms/devflare-cms.git"
+    "url": "git+https://github.com/forge-cms/forge-cms.git"
   },
   "bugs": {
-    "url": "https://github.com/devflare-cms/devflare-cms/issues"
+    "url": "https://github.com/forge-cms/forge-cms/issues"
   },
-  "homepage": "https://github.com/devflare-cms/devflare-cms#readme",
+  "homepage": "https://github.com/forge-cms/forge-cms#readme",
   "keywords": [
     "cms",
     "angular",
@@ -31,9 +31,12 @@
   },
   "scripts": {
     "dev": "turbo run dev",
+    "dev:playground": "pnpm --filter @forge-cms/playground dev",
     "build": "turbo run build",
+    "build:playground": "pnpm --filter @forge-cms/playground build",
     "test": "turbo run test",
     "test:watch": "turbo run test:watch",
+    "test:playground": "pnpm --filter @forge-cms/playground test",
     "lint": "turbo run lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

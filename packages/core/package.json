@@ -1,7 +1,7 @@
 {
-  "name": "@devflare-cms/core",
+  "name": "@forge-cms/core",
   "version": "0.0.0",
-  "description": "Core schema DSL and base types for Devflare CMS.",
+  "description": "Core schema DSL and base types for ForgeCMS.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

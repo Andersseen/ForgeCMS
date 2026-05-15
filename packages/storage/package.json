@@ -1,7 +1,7 @@
 {
-  "name": "@devflare-cms/storage",
+  "name": "@forge-cms/storage",
   "version": "0.0.0",
-  "description": "Storage adapter contracts for Devflare CMS.",
+  "description": "Storage adapter contracts for ForgeCMS.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

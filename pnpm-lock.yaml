@@ -62,7 +62,7 @@ importers:
       '@angular/platform-browser':
         specifier: ^21.2.10
         version: 21.2.13(@angular/common@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1))
-      '@devflare-cms/core':
+      '@forge-cms/core':
         specifier: workspace:*
         version: link:../../packages/core
       rxjs:
@@ -108,7 +108,7 @@ importers:
 
   packages/api:
     dependencies:
-      '@devflare-cms/core':
+      '@forge-cms/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -157,7 +157,7 @@ importers:
 
   packages/testing:
     dependencies:
-      '@devflare-cms/core':
+      '@forge-cms/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:

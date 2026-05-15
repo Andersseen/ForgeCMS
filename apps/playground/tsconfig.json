@@ -4,7 +4,7 @@
     "types": ["vitest/globals"],
     "moduleResolution": "Bundler",
     "paths": {
-      "@devflare-cms/core": ["../../packages/core/src/index.ts"]
+      "@forge-cms/core": ["../../packages/core/src/index.ts"]
     }
   },
   "angularCompilerOptions": {

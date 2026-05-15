@@ -1,3 +1,3 @@
-# @devflare-cms/testing
+# @forge-cms/testing
 
-Shared helpers for tests across Devflare CMS packages.
+Shared helpers for tests across ForgeCMS packages.
