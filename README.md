@@ -14,8 +14,10 @@ Experimental and not production-ready. The CMS runtime, database adapters, auth 
 
 ```sh
 pnpm install
-pnpm dev
+pnpm dev:www
+pnpm dev:playground
 pnpm build
+pnpm deploy:www
 pnpm test
 pnpm test:watch
 pnpm lint
@@ -29,6 +31,7 @@ pnpm clean
 
 ```txt
 apps/
+  www/          Official Analog.js landing app for ForgeCMS
   playground/   Analog.js playground for trying future CMS APIs
 
 packages/
@@ -44,3 +47,13 @@ packages/
 ## License
 
 MIT
+
+## Cloudflare Pages
+
+The official landing app builds to `apps/www/dist` and is configured for Cloudflare Pages with
+Wrangler.
+
+Required GitHub secrets for deployment:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`

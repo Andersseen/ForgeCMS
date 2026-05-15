@@ -1,0 +1,8 @@
+<svg width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">ForgeCMS logo</title>
+  <desc id="desc">A geometric ForgeCMS mark shaped like a forged F.</desc>
+  <rect width="192" height="192" rx="44" fill="#0A0F1A"/>
+  <path d="M52 48H144V70H78V90H132V112H78V144H52V48Z" fill="white"/>
+  <path d="M78 90H132L116 112H78V90Z" fill="#8B5CF6"/>
+  <path d="M78 48H144L128 70H78V48Z" fill="#22D3EE"/>
+</svg>

@@ -6,12 +6,15 @@ dist/
 .analog/
 .output/
 .angular/
+.wrangler/
 
 # Turborepo
 .turbo/
 
 # Tests
 coverage/
+playwright-report/
+test-results/
 
 # Logs
 *.log

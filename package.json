@@ -1,7 +1,7 @@
 {
   "name": "forge-cms",
   "version": "0.0.0",
-  "private": true,
+  "private": false,
   "description": "An experimental Payload-like CMS foundation for Angular and Analog.js developers.",
   "author": "ForgeCMS contributors",
   "license": "MIT",
@@ -31,11 +31,16 @@
   },
   "scripts": {
     "dev": "turbo run dev",
+    "dev:www": "pnpm --filter @forge-cms/www dev",
     "dev:playground": "pnpm --filter @forge-cms/playground dev",
     "build": "turbo run build",
+    "build:www": "pnpm --filter @forge-cms/www build",
     "build:playground": "pnpm --filter @forge-cms/playground build",
+    "deploy:www": "pnpm build:www && wrangler pages deploy apps/www/dist --project-name=forge-cms",
+    "e2e:www": "pnpm --filter @forge-cms/www e2e",
     "test": "turbo run test",
     "test:watch": "turbo run test:watch",
+    "test:www": "pnpm --filter @forge-cms/www test",
     "test:playground": "pnpm --filter @forge-cms/playground test",
     "lint": "turbo run lint",
     "format": "prettier --write .",
@@ -52,6 +57,7 @@
     "typescript": "5.9.2",
     "typescript-eslint": "^8.33.1",
     "vite": "^7.1.4",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.6",
+    "wrangler": "^4.91.0"
   }
 }
