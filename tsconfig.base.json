@@ -24,7 +24,8 @@
       "@forge-cms/storage": ["packages/storage/dist/index.d.ts"],
       "@forge-cms/api": ["packages/api/dist/index.d.ts"],
       "@forge-cms/admin": ["packages/admin/dist/index.d.ts"],
-      "@forge-cms/testing": ["packages/testing/dist/index.d.ts"]
+      "@forge-cms/testing": ["packages/testing/dist/index.d.ts"],
+      "@forge-cms/testing/contracts": ["packages/testing/src/contracts/index.ts"]
     }
   }
 }

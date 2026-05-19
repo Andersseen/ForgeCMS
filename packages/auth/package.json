@@ -4,6 +4,9 @@
   "description": "Authentication adapter contracts for ForgeCMS.",
   "license": "MIT",
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "sideEffects": false,
   "files": [
     "dist"
@@ -23,6 +26,7 @@
     "clean": "rm -rf dist coverage"
   },
   "devDependencies": {
+    "@forge-cms/testing": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

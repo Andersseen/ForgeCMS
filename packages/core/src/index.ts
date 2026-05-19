@@ -97,3 +97,12 @@ export function defineCollection<TSlug extends string, TFields extends FieldMap>
 ): CollectionDefinition<TSlug, TFields> {
   return config;
 }
+
+// Runtime validation
+export {
+  validateField,
+  validateCollection,
+  type ValidationError,
+  type ValidationErrorCode,
+  type ValidationResult
+} from './validation.js';

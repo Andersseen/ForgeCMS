@@ -4,6 +4,9 @@
   "description": "Placeholder for the future Angular admin package for ForgeCMS.",
   "license": "MIT",
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "sideEffects": false,
   "files": [
     "dist"
