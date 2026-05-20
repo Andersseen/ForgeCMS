@@ -11,9 +11,7 @@ html {
 body {
   min-width: 320px;
   margin: 0;
-  background:
-    radial-gradient(circle at 18% 0%, oklch(0.94 0.05 255 / 0.75), transparent 28rem),
-    linear-gradient(180deg, oklch(0.99 0.004 260), oklch(0.96 0.006 260));
+  background-color: var(--background);
   color: var(--foreground);
   font-family:
     Inter,
@@ -27,4 +25,10 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+.landing-bg {
+  background:
+    radial-gradient(circle at 18% 0%, oklch(0.94 0.05 255 / 0.75), transparent 28rem),
+    linear-gradient(180deg, oklch(0.99 0.004 260), oklch(0.96 0.006 260));
 }

@@ -1,10 +1,11 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { VoltButton } from '@voltui/components';
 
 @Component({
   selector: 'forge-cms-header',
   standalone: true,
-  imports: [VoltButton],
+  imports: [VoltButton, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-5 md:px-8">
@@ -25,9 +26,14 @@ import { VoltButton } from '@voltui/components';
         <a class="transition hover:text-foreground" href="#roadmap">Roadmap</a>
       </nav>
 
-      <a href="https://github.com/forge-cms/forge-cms" rel="noreferrer" target="_blank">
-        <volt-button variant="outline" size="sm">GitHub</volt-button>
-      </a>
+      <div class="flex items-center gap-2">
+        <a routerLink="/admin">
+          <volt-button variant="default" size="sm">Dashboard</volt-button>
+        </a>
+        <a href="https://github.com/forge-cms/forge-cms" rel="noreferrer" target="_blank">
+          <volt-button variant="outline" size="sm">GitHub</volt-button>
+        </a>
+      </div>
     </header>
   `
 })
