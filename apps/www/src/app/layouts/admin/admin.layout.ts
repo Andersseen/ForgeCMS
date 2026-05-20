@@ -27,14 +27,17 @@ import {
   IconImage,
   IconLayout,
   IconMenu,
+  IconMoon,
   IconNewspaper,
   IconSearch,
   IconSettings,
   IconShield,
+  IconSun,
   IconTerminal,
   IconUsers,
   IconZap,
 } from '../../components/icons';
+import { ThemeService } from '../../services/theme.service';
 
 interface BreadcrumbItem {
   label: string;
@@ -75,6 +78,8 @@ interface BreadcrumbItem {
     IconChevronRight,
     IconBell,
     IconTerminal,
+    IconSun,
+    IconMoon,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -190,6 +195,19 @@ interface BreadcrumbItem {
           </div>
           <div class="flex items-center gap-2 ml-auto">
             <volt-input placeholder="Search..." class="w-56 h-8 text-xs" />
+            <volt-button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8"
+              (click)="themeService.toggle()"
+              [attr.aria-label]="themeService.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
+            >
+              @if (themeService.isDark()) {
+                <icon-sun class="h-4 w-4" />
+              } @else {
+                <icon-moon class="h-4 w-4" />
+              }
+            </volt-button>
             <volt-button variant="ghost" size="icon" class="relative">
               <icon-bell class="h-4 w-4" />
               <span class="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive ring-2 ring-background"></span>
@@ -210,6 +228,7 @@ interface BreadcrumbItem {
 })
 export class AdminLayout {
   sidebarService = inject(VoltSidebarService);
+  themeService = inject(ThemeService);
   private router = inject(Router);
   private activatedRoute = inject(ActivatedRoute);
 

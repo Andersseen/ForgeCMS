@@ -5,6 +5,9 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig({
   plugins: [angular(), tailwindcss(), tsconfigPaths()],
+  optimizeDeps: {
+    include: ['@angular/compiler'],
+  },
   test: {
     include: ['src/**/*.test.ts'],
     environment: 'jsdom'
