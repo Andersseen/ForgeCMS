@@ -2,7 +2,23 @@
   "name": "@forge-cms/db",
   "version": "0.0.0",
   "description": "Database adapter contracts for ForgeCMS.",
+  "author": "ForgeCMS contributors",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/forge-cms/forge-cms.git",
+    "directory": "packages/db"
+  },
+  "bugs": {
+    "url": "https://github.com/forge-cms/forge-cms/issues"
+  },
+  "homepage": "https://github.com/forge-cms/forge-cms/tree/main/packages/db#readme",
+  "keywords": [
+    "cms",
+    "database",
+    "adapter",
+    "typescript"
+  ],
   "type": "module",
   "publishConfig": {
     "access": "public"

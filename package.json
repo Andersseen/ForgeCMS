@@ -46,9 +46,13 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "turbo run typecheck",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "release": "changeset publish",
     "clean": "turbo run clean && rm -rf .turbo dist coverage"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "@eslint/js": "^9.28.0",
     "eslint": "^9.28.0",
     "eslint-import-resolver-typescript": "^4.4.4",

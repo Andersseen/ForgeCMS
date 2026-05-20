@@ -2,7 +2,23 @@
   "name": "@forge-cms/testing",
   "version": "0.0.0",
   "description": "Shared testing helpers for ForgeCMS packages.",
+  "author": "ForgeCMS contributors",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/forge-cms/forge-cms.git",
+    "directory": "packages/testing"
+  },
+  "bugs": {
+    "url": "https://github.com/forge-cms/forge-cms/issues"
+  },
+  "homepage": "https://github.com/forge-cms/forge-cms/tree/main/packages/testing#readme",
+  "keywords": [
+    "cms",
+    "testing",
+    "vitest",
+    "typescript"
+  ],
   "type": "module",
   "publishConfig": {
     "access": "public"
@@ -33,7 +49,6 @@
     "@forge-cms/core": "workspace:*"
   },
   "devDependencies": {
-    "@forge-cms/core": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

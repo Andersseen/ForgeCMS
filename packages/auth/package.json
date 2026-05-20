@@ -2,7 +2,24 @@
   "name": "@forge-cms/auth",
   "version": "0.0.0",
   "description": "Authentication adapter contracts for ForgeCMS.",
+  "author": "ForgeCMS contributors",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/forge-cms/forge-cms.git",
+    "directory": "packages/auth"
+  },
+  "bugs": {
+    "url": "https://github.com/forge-cms/forge-cms/issues"
+  },
+  "homepage": "https://github.com/forge-cms/forge-cms/tree/main/packages/auth#readme",
+  "keywords": [
+    "cms",
+    "auth",
+    "authentication",
+    "adapter",
+    "typescript"
+  ],
   "type": "module",
   "publishConfig": {
     "access": "public"

@@ -10,11 +10,30 @@ test('renders the ForgeCMS landing page', async ({ page }) => {
   await expect(page.getByText('@forge-cms/core', { exact: true })).toBeVisible();
 });
 
-test('keeps Volt UI buttons styled', async ({ page }) => {
+test('navigation anchors work', async ({ page }) => {
   await page.goto('/');
 
-  const button = page.getByRole('button', { name: 'Explore architecture' });
-  await expect(button).toBeVisible();
-  await expect(button).toHaveCSS('display', 'inline-flex');
-  await expect(button).toHaveCSS('cursor', 'pointer');
+  const architectureLink = page.getByRole('link', { name: /Architecture/i });
+  await expect(architectureLink).toBeVisible();
+  await expect(architectureLink).toHaveAttribute('href', '#architecture');
+
+  const packagesLink = page.getByRole('link', { name: /Packages/i });
+  await expect(packagesLink).toBeVisible();
+  await expect(packagesLink).toHaveAttribute('href', '#packages');
+
+  const roadmapLink = page.getByRole('link', { name: /Roadmap/i });
+  await expect(roadmapLink).toBeVisible();
+  await expect(roadmapLink).toHaveAttribute('href', '#roadmap');
+});
+
+test('CTA buttons are visible and enabled', async ({ page }) => {
+  await page.goto('/');
+
+  const exploreButton = page.getByRole('button', { name: 'Explore architecture' });
+  await expect(exploreButton).toBeVisible();
+  await expect(exploreButton).toBeEnabled();
+
+  const viewButton = page.getByRole('button', { name: 'View packages' });
+  await expect(viewButton).toBeVisible();
+  await expect(viewButton).toBeEnabled();
 });

@@ -197,12 +197,12 @@
 
 **Objetivo:** Preparar el proyecto para colaboradores externos.
 
-- [ ] Crear `CONTRIBUTING.md` con guia de pnpm + turbo + changesets
-- [ ] Crear `CODE_OF_CONDUCT.md`
-- [ ] Anadir `CHANGELOG.md` (inicialmente vacio o con v0.0.0)
-- [ ] Configurar `@changesets/cli` para versionado semantico automatico
-- [ ] Generar docs con TypeDoc para el API publico de `packages/core`
-- [ ] Actualizar `README.md` con badges de CI y status de cada package
+- [x] Crear `CONTRIBUTING.md` con guia de pnpm + turbo + changesets
+- [x] Crear `CODE_OF_CONDUCT.md`
+- [x] Anadir `CHANGELOG.md` con contenido inicial
+- [x] Configurar `@changesets/cli` para versionado semantico automatico
+- [ ] Generar docs con TypeDoc para el API publico de `packages/core` (opcional, puede hacerse mas adelante)
+- [x] Actualizar `README.md` con badges de CI y status de cada package
 
 **Archivos afectados:**
 - `/CONTRIBUTING.md` (nuevo)
@@ -211,10 +211,13 @@
 - `/.changeset/` (nueva carpeta)
 - `/README.md`
 
-**Criterio de terminacion:**
-- Un nuevo contribuidor puede entender como ejecutar y testear el proyecto
-- Los badges de CI aparecen en el README
-- Changesets esta configurado y funciona
+**Criterio de terminacion (COMPLETADO):**
+- [x] `CONTRIBUTING.md` existe con guia completa de desarrollo
+- [x] `CODE_OF_CONDUCT.md` existe (basado en Contributor Covenant)
+- [x] `CHANGELOG.md` existe con contenido inicial del proyecto
+- [x] `.changeset/config.json` configurado con `access: "public"`
+- [x] Scripts `changeset` y `changeset:version` anadidos a `package.json`
+- [x] `README.md` actualizado con badges CI, tabla de packages, y links a docs
 
 ---
 
@@ -222,11 +225,11 @@
 
 **Objetivo:** Detalles que mejoran robustez y experiencia.
 
-- [ ] Revisar y fortalecer tests de Playwright (evitar checks de CSS inline fragiles)
-- [ ] Verificar configuracion de Wrangler para deploy correcto
+- [x] Revisar y fortalecer tests de Playwright (evitar checks de CSS inline fragiles)
+- [x] Verificar configuracion de Wrangler para deploy correcto
 - [ ] Anadir `husky` + `lint-staged` para pre-commit hooks (opcional)
-- [ ] Anadir `.vscode/settings.json` y `.vscode/extensions.json` recomendados
-- [ ] Revisar que todos los packages tengan `sideEffects: false` (ya estan bien)
+- [x] Anadir `.vscode/settings.json` y `.vscode/extensions.json` recomendados
+- [x] Revisar que todos los packages tengan `sideEffects: false` (ya estan bien)
 
 **Archivos afectados:**
 - `/apps/www/e2e/landing.spec.ts`
@@ -245,11 +248,11 @@
 
 **Objetivo:** Cuando el core este listo, poder publicar a npm facilmente.
 
-- [ ] Configurar `publishConfig` en packages publicables
-- [ ] Verificar que `files` y `exports` sean correctos para npm
-- [ ] Crear script `pnpm release` usando changesets
-- [ ] Documentar proceso de release en `CONTRIBUTING.md`
-- [ ] Publicar version alpha `0.0.1-alpha.0` de `@forge-cms/core`
+- [x] Configurar `publishConfig` en packages publicables
+- [x] Verificar que `files` y `exports` sean correctos para npm
+- [x] Crear script `pnpm release` usando changesets
+- [x] Documentar proceso de release en `CONTRIBUTING.md`
+- [ ] Publicar version alpha `0.0.1-alpha.0` de `@forge-cms/core` (requiere npm auth)
 
 **Archivos afectados:**
 - `/packages/*/package.json`

@@ -1,3 +1,8 @@
 name = "forge-cms"
 compatibility_date = "2026-05-15"
+compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "apps/www/dist"
+
+# Cloudflare Pages configuration
+# Build command is handled by GitHub Actions CI
+# Required secrets: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID

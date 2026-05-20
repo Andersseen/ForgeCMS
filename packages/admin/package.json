@@ -1,8 +1,24 @@
 {
   "name": "@forge-cms/admin",
   "version": "0.0.0",
-  "description": "Placeholder for the future Angular admin package for ForgeCMS.",
+  "description": "Angular admin components and utilities for ForgeCMS.",
+  "author": "ForgeCMS contributors",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/forge-cms/forge-cms.git",
+    "directory": "packages/admin"
+  },
+  "bugs": {
+    "url": "https://github.com/forge-cms/forge-cms/issues"
+  },
+  "homepage": "https://github.com/forge-cms/forge-cms/tree/main/packages/admin#readme",
+  "keywords": [
+    "cms",
+    "angular",
+    "admin",
+    "typescript"
+  ],
   "type": "module",
   "publishConfig": {
     "access": "public"
