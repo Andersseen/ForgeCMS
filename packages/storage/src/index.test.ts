@@ -1,13 +1,4 @@
-import { describe, expect, it } from 'vitest';
-import type { StorageObject } from './index';
+import { runStorageAdapterContractTests } from '@forge-cms/testing/contracts';
+import { InMemoryStorageAdapter } from './in-memory.adapter.js';
 
-describe('StorageAdapter contracts', () => {
-  it('describes stored objects', () => {
-    const object: StorageObject = {
-      key: 'uploads/avatar.png',
-      contentType: 'image/png'
-    };
-
-    expect(object.key).toBe('uploads/avatar.png');
-  });
-});
+runStorageAdapterContractTests(() => new InMemoryStorageAdapter());

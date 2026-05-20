@@ -1,4 +1,4 @@
-name: CI
+name: E2E
 
 on:
   push:
@@ -11,8 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ci:
-    name: Lint, Typecheck, Test & Build
+  e2e:
+    name: Playwright E2E Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -35,14 +35,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run linter
-        run: pnpm lint
+      - name: Install Playwright browsers
+        run: pnpm --filter @forge-cms/www exec playwright install --with-deps chromium
 
-      - name: Run typecheck
-        run: pnpm typecheck
-
-      - name: Run unit tests
-        run: pnpm test
-
-      - name: Build all packages and apps
-        run: pnpm build
+      - name: Run E2E tests
+        run: pnpm e2e:www

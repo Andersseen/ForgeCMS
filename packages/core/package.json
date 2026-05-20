@@ -2,8 +2,29 @@
   "name": "@forge-cms/core",
   "version": "0.0.0",
   "description": "Core schema DSL and base types for ForgeCMS.",
+  "author": "ForgeCMS contributors",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/forge-cms/forge-cms.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/forge-cms/forge-cms/issues"
+  },
+  "homepage": "https://github.com/forge-cms/forge-cms/tree/main/packages/core#readme",
+  "keywords": [
+    "cms",
+    "angular",
+    "typescript",
+    "schema",
+    "dsl",
+    "payload"
+  ],
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "sideEffects": false,
   "files": [
     "dist"

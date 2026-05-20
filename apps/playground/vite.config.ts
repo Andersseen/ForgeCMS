@@ -1,15 +1,9 @@
 import angular from '@analogjs/vite-plugin-angular';
-import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vitest/config';
+import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig({
-  resolve: {
-    alias: {
-      '@forge-cms/core': fileURLToPath(new URL('../../packages/core/src/index.ts', import.meta.url))
-    },
-    mainFields: ['module']
-  },
-  plugins: [angular()],
+  plugins: [angular(), tsconfigPaths()],
   test: {
     include: ['src/**/*.test.ts'],
     environment: 'jsdom'

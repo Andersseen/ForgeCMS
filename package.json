@@ -1,7 +1,7 @@
 {
   "name": "forge-cms",
   "version": "0.0.0",
-  "private": false,
+  "private": true,
   "description": "An experimental Payload-like CMS foundation for Angular and Analog.js developers.",
   "author": "ForgeCMS contributors",
   "license": "MIT",
@@ -46,11 +46,18 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "turbo run typecheck",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "release": "changeset publish",
     "clean": "turbo run clean && rm -rf .turbo dist coverage"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "@eslint/js": "^9.28.0",
     "eslint": "^9.28.0",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-unicorn": "^64.0.0",
     "globals": "^16.2.0",
     "prettier": "^3.7.4",
     "turbo": "^2.9.14",

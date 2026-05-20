@@ -1,0 +1,200 @@
+import type {
+  AnyField,
+  CollectionDefinition,
+  NumberFieldOptions,
+  RelationFieldOptions,
+  TextFieldOptions
+} from './index.js';
+
+export interface ValidationError {
+  field: string;
+  message: string;
+  code: ValidationErrorCode;
+}
+
+export type ValidationErrorCode =
+  | 'required'
+  | 'type_text'
+  | 'type_number'
+  | 'type_boolean'
+  | 'type_date'
+  | 'type_relation'
+  | 'minLength'
+  | 'maxLength'
+  | 'min'
+  | 'max'
+  | 'relation_collection';
+
+export interface ValidationResult {
+  valid: boolean;
+  errors: ValidationError[];
+}
+
+function createError(
+  field: string,
+  code: ValidationErrorCode,
+  message: string
+): ValidationError {
+  return { field, message, code };
+}
+
+export function validateField(field: AnyField, value: unknown, fieldName: string): ValidationError[] {
+  const errors: ValidationError[] = [];
+  const opts = field.options;
+
+  // required check
+  if (opts.required === true) {
+    if (value === undefined || value === null || value === '') {
+      errors.push(createError(fieldName, 'required', `Field "${fieldName}" is required.`));
+      // If required and missing, stop further type checks
+      return errors;
+    }
+  }
+
+  // If value is undefined/null and not required, skip type checks
+  if (value === undefined || value === null) {
+    return errors;
+  }
+
+  switch (field.kind) {
+    case 'text': {
+      if (typeof value !== 'string') {
+        errors.push(createError(fieldName, 'type_text', `Field "${fieldName}" must be a string.`));
+        break;
+      }
+      const textOpts = opts as TextFieldOptions;
+      if (textOpts.minLength !== undefined && value.length < textOpts.minLength) {
+        errors.push(
+          createError(
+            fieldName,
+            'minLength',
+            `Field "${fieldName}" must be at least ${textOpts.minLength} characters.`
+          )
+        );
+      }
+      if (textOpts.maxLength !== undefined && value.length > textOpts.maxLength) {
+        errors.push(
+          createError(
+            fieldName,
+            'maxLength',
+            `Field "${fieldName}" must be at most ${textOpts.maxLength} characters.`
+          )
+        );
+      }
+      break;
+    }
+
+    case 'number': {
+      if (typeof value !== 'number' || Number.isNaN(value)) {
+        errors.push(
+          createError(fieldName, 'type_number', `Field "${fieldName}" must be a number.`)
+        );
+        break;
+      }
+      const numOpts = opts as NumberFieldOptions;
+      if (numOpts.min !== undefined && value < numOpts.min) {
+        errors.push(
+          createError(fieldName, 'min', `Field "${fieldName}" must be at least ${numOpts.min}.`)
+        );
+      }
+      if (numOpts.max !== undefined && value > numOpts.max) {
+        errors.push(
+          createError(fieldName, 'max', `Field "${fieldName}" must be at most ${numOpts.max}.`)
+        );
+      }
+      break;
+    }
+
+    case 'boolean': {
+      if (typeof value !== 'boolean') {
+        errors.push(
+          createError(fieldName, 'type_boolean', `Field "${fieldName}" must be a boolean.`)
+        );
+      }
+      break;
+    }
+
+    case 'date': {
+      let dateValue: Date | null = null;
+
+      if (value instanceof Date) {
+        dateValue = value;
+      } else if (typeof value === 'string') {
+        const parsed = new Date(value);
+        if (!Number.isNaN(parsed.getTime())) {
+          dateValue = parsed;
+        }
+      } else if (typeof value === 'number') {
+        const parsed = new Date(value);
+        if (!Number.isNaN(parsed.getTime())) {
+          dateValue = parsed;
+        }
+      }
+
+      if (!dateValue) {
+        errors.push(
+          createError(fieldName, 'type_date', `Field "${fieldName}" must be a valid date.`)
+        );
+      }
+      break;
+    }
+
+    case 'relation': {
+      const relOpts = opts as RelationFieldOptions;
+      if (relOpts.many === true) {
+        if (!Array.isArray(value)) {
+          errors.push(
+            createError(
+              fieldName,
+              'type_relation',
+              `Field "${fieldName}" must be an array of relation IDs.`
+            )
+          );
+          break;
+        }
+        for (let i = 0; i < value.length; i++) {
+          if (typeof value[i] !== 'string') {
+            errors.push(
+              createError(
+                fieldName,
+                'type_relation',
+                `Field "${fieldName}" item at index ${i} must be a string.`
+              )
+            );
+          }
+        }
+      } else {
+        if (typeof value !== 'string') {
+          errors.push(
+            createError(
+              fieldName,
+              'type_relation',
+              `Field "${fieldName}" must be a relation ID string.`
+            )
+          );
+        }
+      }
+      break;
+    }
+  }
+
+  return errors;
+}
+
+export function validateCollection<TSlug extends string, TFields extends Record<string, AnyField>>(
+  collection: CollectionDefinition<TSlug, TFields>,
+  data: Record<string, unknown>
+): ValidationResult {
+  const errors: ValidationError[] = [];
+
+  for (const [fieldName, fieldDef] of Object.entries(collection.fields)) {
+    const value = data[fieldName];
+    const fieldErrors = validateField(fieldDef, value, fieldName);
+    errors.push(...fieldErrors);
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}

@@ -2,8 +2,27 @@
   "name": "@forge-cms/storage",
   "version": "0.0.0",
   "description": "Storage adapter contracts for ForgeCMS.",
+  "author": "ForgeCMS contributors",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/forge-cms/forge-cms.git",
+    "directory": "packages/storage"
+  },
+  "bugs": {
+    "url": "https://github.com/forge-cms/forge-cms/issues"
+  },
+  "homepage": "https://github.com/forge-cms/forge-cms/tree/main/packages/storage#readme",
+  "keywords": [
+    "cms",
+    "storage",
+    "adapter",
+    "typescript"
+  ],
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "sideEffects": false,
   "files": [
     "dist"
@@ -23,6 +42,7 @@
     "clean": "rm -rf dist coverage"
   },
   "devDependencies": {
+    "@forge-cms/testing": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
