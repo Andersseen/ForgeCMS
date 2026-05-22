@@ -44,7 +44,11 @@ export interface R2Bucket {
   get(key: string): Promise<R2ObjectBody | null>;
   put(
     key: string,
-    value: ReadableStream | ArrayBuffer | ArrayBufferView | string | Blob | null
+    value: ReadableStream | ArrayBuffer | ArrayBufferView | string | Blob | null,
+    options?: {
+      httpMetadata?: R2HTTPMetadata;
+      customMetadata?: Record<string, string>;
+    }
   ): Promise<R2Object>;
   delete(key: string): Promise<void>;
   list(options?: { limit?: number; prefix?: string; cursor?: string }): Promise<R2Objects>;

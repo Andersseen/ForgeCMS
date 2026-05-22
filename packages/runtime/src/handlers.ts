@@ -1,49 +1,216 @@
-import type { ApiContext, CrudHandlers } from '@forge-cms/api';
+import { validateCollection } from '@forge-cms/core';
+import type { ApiContext } from '@forge-cms/api';
 import type { ForgeCmsRuntime } from './runtime.js';
+import type { DatabaseRecord } from '@forge-cms/db';
 
-export interface CreateHandlersOptions<TEnv = unknown> {
+export interface HandlerOptions<TEnv = unknown> {
   runtime: ForgeCmsRuntime<TEnv>;
+  requireAuth?: boolean;
 }
 
-/**
- * Build default CRUD handlers for a collection.
- *
- * This is intentionally a stub — real implementation will come when we wire
- * validation, auth, and database operations together.
- */
-export function createCrudHandlers<TEnv = unknown>(
-  _options: CreateHandlersOptions<TEnv>
-): CrudHandlers<TEnv> {
-  return {
-    list: async (_context: ApiContext<TEnv>) => {
-      return new Response(
-        JSON.stringify({ status: 'not-implemented', handler: 'list' }),
-        { status: 501, headers: { 'content-type': 'application/json' } }
-      );
-    },
-    read: async (_context: ApiContext<TEnv>) => {
-      return new Response(
-        JSON.stringify({ status: 'not-implemented', handler: 'read' }),
-        { status: 501, headers: { 'content-type': 'application/json' } }
-      );
-    },
-    create: async (_context: ApiContext<TEnv>) => {
-      return new Response(
-        JSON.stringify({ status: 'not-implemented', handler: 'create' }),
-        { status: 501, headers: { 'content-type': 'application/json' } }
-      );
-    },
-    update: async (_context: ApiContext<TEnv>) => {
-      return new Response(
-        JSON.stringify({ status: 'not-implemented', handler: 'update' }),
-        { status: 501, headers: { 'content-type': 'application/json' } }
-      );
-    },
-    delete: async (_context: ApiContext<TEnv>) => {
-      return new Response(
-        JSON.stringify({ status: 'not-implemented', handler: 'delete' }),
-        { status: 501, headers: { 'content-type': 'application/json' } }
-      );
+function jsonResponse(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'content-type': 'application/json' }
+  });
+}
+
+function errorResponse(message: string, status = 500): Response {
+  return jsonResponse({ error: message }, status);
+}
+
+async function requireAuth<TEnv>(
+  context: ApiContext<TEnv>,
+  runtime: ForgeCmsRuntime<TEnv>
+): Promise<unknown | null> {
+  try {
+    return await runtime.adapters.auth.requireAuth(context.request);
+  } catch {
+    return null;
+  }
+}
+
+export async function handleList<TEnv = unknown>(
+  context: ApiContext<TEnv>,
+  options: HandlerOptions<TEnv>
+): Promise<Response> {
+  try {
+    const { runtime, requireAuth: requireAuthFlag } = options;
+
+    if (requireAuthFlag) {
+      const user = await requireAuth(context, runtime);
+      if (!user) return errorResponse('Unauthorized', 401);
     }
-  };
+
+    const collectionSlug = context.params?.['collection'];
+    if (!collectionSlug) return errorResponse('Missing collection parameter', 400);
+
+    const collection = runtime.getCollection(collectionSlug);
+    if (!collection) return errorResponse(`Collection '${collectionSlug}' not found`, 404);
+
+    const url = new URL(context.request.url);
+    const limit = url.searchParams.has('limit')
+      ? parseInt(url.searchParams.get('limit')!, 10)
+      : undefined;
+    const offset = url.searchParams.has('offset')
+      ? parseInt(url.searchParams.get('offset')!, 10)
+      : undefined;
+
+    const where: DatabaseRecord = {};
+    url.searchParams.forEach((value, key) => {
+      if (key !== 'limit' && key !== 'offset') {
+        where[key] = value;
+      }
+    });
+
+    const records = await runtime.adapters.database.findMany({
+      collection: collectionSlug,
+      ...(limit !== undefined && { limit }),
+      ...(offset !== undefined && { offset }),
+      ...(Object.keys(where).length > 0 && { where })
+    });
+
+    return jsonResponse({
+      data: records,
+      meta: { collection: collectionSlug, count: records.length, limit, offset }
+    });
+  } catch (err) {
+    return errorResponse(err instanceof Error ? err.message : 'Unknown error', 500);
+  }
+}
+
+export async function handleRead<TEnv = unknown>(
+  context: ApiContext<TEnv>,
+  options: HandlerOptions<TEnv>
+): Promise<Response> {
+  try {
+    const { runtime, requireAuth: requireAuthFlag } = options;
+
+    if (requireAuthFlag) {
+      const user = await requireAuth(context, runtime);
+      if (!user) return errorResponse('Unauthorized', 401);
+    }
+
+    const collectionSlug = context.params?.['collection'];
+    const id = context.params?.['id'];
+    if (!collectionSlug || !id) return errorResponse('Missing collection or id parameter', 400);
+
+    const collection = runtime.getCollection(collectionSlug);
+    if (!collection) return errorResponse(`Collection '${collectionSlug}' not found`, 404);
+
+    const record = await runtime.adapters.database.findById(collectionSlug, id);
+    if (!record) return errorResponse(`Record '${id}' not found in '${collectionSlug}'`, 404);
+
+    return jsonResponse({ data: record });
+  } catch (err) {
+    return errorResponse(err instanceof Error ? err.message : 'Unknown error', 500);
+  }
+}
+
+export async function handleCreate<TEnv = unknown>(
+  context: ApiContext<TEnv>,
+  options: HandlerOptions<TEnv>
+): Promise<Response> {
+  try {
+    const { runtime, requireAuth: requireAuthFlag } = options;
+
+    if (requireAuthFlag) {
+      const user = await requireAuth(context, runtime);
+      if (!user) return errorResponse('Unauthorized', 401);
+    }
+
+    const collectionSlug = context.params?.['collection'];
+    if (!collectionSlug) return errorResponse('Missing collection parameter', 400);
+
+    const collection = runtime.getCollection(collectionSlug);
+    if (!collection) return errorResponse(`Collection '${collectionSlug}' not found`, 404);
+
+    let body: DatabaseRecord;
+    try {
+      body = (await context.request.json()) as DatabaseRecord;
+    } catch {
+      return errorResponse('Invalid JSON body', 400);
+    }
+
+    const validation = validateCollection(collection, body);
+    if (!validation.valid) {
+      return jsonResponse({ error: 'Validation failed', details: validation.errors }, 400);
+    }
+
+    const record = await runtime.adapters.database.create(collectionSlug, body);
+    return jsonResponse({ data: record }, 201);
+  } catch (err) {
+    return errorResponse(err instanceof Error ? err.message : 'Unknown error', 500);
+  }
+}
+
+export async function handleUpdate<TEnv = unknown>(
+  context: ApiContext<TEnv>,
+  options: HandlerOptions<TEnv>
+): Promise<Response> {
+  try {
+    const { runtime, requireAuth: requireAuthFlag } = options;
+
+    if (requireAuthFlag) {
+      const user = await requireAuth(context, runtime);
+      if (!user) return errorResponse('Unauthorized', 401);
+    }
+
+    const collectionSlug = context.params?.['collection'];
+    const id = context.params?.['id'];
+    if (!collectionSlug || !id) return errorResponse('Missing collection or id parameter', 400);
+
+    const collection = runtime.getCollection(collectionSlug);
+    if (!collection) return errorResponse(`Collection '${collectionSlug}' not found`, 404);
+
+    let body: DatabaseRecord;
+    try {
+      body = (await context.request.json()) as DatabaseRecord;
+    } catch {
+      return errorResponse('Invalid JSON body', 400);
+    }
+
+    // For partial updates, we validate only the fields present in the body
+    const partialValidation = validateCollection(collection, { ...body, id });
+    if (!partialValidation.valid) {
+      // Filter to only errors for fields that were actually sent
+      const relevantErrors = partialValidation.errors.filter(
+        (e) => body[e.field] !== undefined || e.code === 'required'
+      );
+      if (relevantErrors.length > 0) {
+        return jsonResponse({ error: 'Validation failed', details: relevantErrors }, 400);
+      }
+    }
+
+    const record = await runtime.adapters.database.update(collectionSlug, id, body);
+    return jsonResponse({ data: record });
+  } catch (err) {
+    return errorResponse(err instanceof Error ? err.message : 'Unknown error', 500);
+  }
+}
+
+export async function handleDelete<TEnv = unknown>(
+  context: ApiContext<TEnv>,
+  options: HandlerOptions<TEnv>
+): Promise<Response> {
+  try {
+    const { runtime, requireAuth: requireAuthFlag } = options;
+
+    if (requireAuthFlag) {
+      const user = await requireAuth(context, runtime);
+      if (!user) return errorResponse('Unauthorized', 401);
+    }
+
+    const collectionSlug = context.params?.['collection'];
+    const id = context.params?.['id'];
+    if (!collectionSlug || !id) return errorResponse('Missing collection or id parameter', 400);
+
+    const collection = runtime.getCollection(collectionSlug);
+    if (!collection) return errorResponse(`Collection '${collectionSlug}' not found`, 404);
+
+    await runtime.adapters.database.delete(collectionSlug, id);
+    return new Response(null, { status: 204 });
+  } catch (err) {
+    return errorResponse(err instanceof Error ? err.message : 'Unknown error', 500);
+  }
 }

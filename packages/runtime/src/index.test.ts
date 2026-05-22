@@ -3,7 +3,7 @@ import { defineCollection, defineField } from '@forge-cms/core';
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
 import { InMemoryAuthAdapter } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
-import { ForgeCmsRuntime, createCrudHandlers } from './index.js';
+import { ForgeCmsRuntime, handleList } from './index.js';
 
 function createTestRuntime() {
   const posts = defineCollection({
@@ -54,22 +54,21 @@ describe('ForgeCmsRuntime', () => {
   });
 });
 
-describe('createCrudHandlers', () => {
-  it('returns stub handlers', async () => {
+describe('runtime exports', () => {
+  it('handleList is a real handler', async () => {
     const runtime = createTestRuntime();
-    const handlers = createCrudHandlers({ runtime });
+    runtime.init();
 
-    expect(handlers.list).toBeTypeOf('function');
-    expect(handlers.read).toBeTypeOf('function');
-    expect(handlers.create).toBeTypeOf('function');
-    expect(handlers.update).toBeTypeOf('function');
-    expect(handlers.delete).toBeTypeOf('function');
-
-    const response = await handlers.list!({
-      request: new Request('https://forge.test'),
+    const context = {
+      request: new Request('https://forge.test/api/posts'),
+      params: { collection: 'posts' },
       env: {}
-    });
+    };
 
-    expect(response.status).toBe(501);
+    const response = await handleList(context, { runtime });
+    expect(response.status).toBe(200);
+
+    const body = await response.json();
+    expect(body.data).toEqual([]);
   });
 });

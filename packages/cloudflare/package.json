@@ -45,6 +45,7 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
+    "@forge-cms/core": "workspace:*",
     "@forge-cms/runtime": "workspace:*"
   },
   "devDependencies": {

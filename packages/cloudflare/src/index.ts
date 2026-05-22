@@ -12,3 +12,6 @@ export type {
   KVNamespace,
   KVListResult
 } from './bindings.js';
+
+export { D1DatabaseAdapter, type D1Env } from './d1.adapter.js';
+export { R2StorageAdapter, type R2Env } from './r2.adapter.js';
