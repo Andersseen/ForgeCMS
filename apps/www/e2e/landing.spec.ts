@@ -13,15 +13,15 @@ test('renders the ForgeCMS landing page', async ({ page }) => {
 test('navigation anchors work', async ({ page }) => {
   await page.goto('/');
 
-  const architectureLink = page.getByRole('link', { name: /Architecture/i });
+  const architectureLink = page.getByRole('link', { name: 'Architecture', exact: true });
   await expect(architectureLink).toBeVisible();
   await expect(architectureLink).toHaveAttribute('href', '#architecture');
 
-  const packagesLink = page.getByRole('link', { name: /Packages/i });
+  const packagesLink = page.getByRole('link', { name: 'Packages', exact: true });
   await expect(packagesLink).toBeVisible();
   await expect(packagesLink).toHaveAttribute('href', '#packages');
 
-  const roadmapLink = page.getByRole('link', { name: /Roadmap/i });
+  const roadmapLink = page.getByRole('link', { name: 'Roadmap', exact: true });
   await expect(roadmapLink).toBeVisible();
   await expect(roadmapLink).toHaveAttribute('href', '#roadmap');
 });
