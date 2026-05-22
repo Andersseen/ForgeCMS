@@ -1,23 +1,26 @@
 {
-  "name": "@forge-cms/api",
+  "name": "@forge-cms/cloudflare",
   "version": "0.0.0",
-  "description": "API route and CRUD handler helpers for ForgeCMS.",
+  "description": "Cloudflare-native adapters and types for ForgeCMS (D1, R2, KV).",
   "author": "ForgeCMS contributors",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/forge-cms/forge-cms.git",
-    "directory": "packages/api"
+    "directory": "packages/cloudflare"
   },
   "bugs": {
     "url": "https://github.com/forge-cms/forge-cms/issues"
   },
-  "homepage": "https://github.com/forge-cms/forge-cms/tree/main/packages/api#readme",
+  "homepage": "https://github.com/forge-cms/forge-cms/tree/main/packages/cloudflare#readme",
   "keywords": [
     "cms",
-    "api",
-    "crud",
-    "typescript"
+    "cloudflare",
+    "d1",
+    "r2",
+    "kv",
+    "edge",
+    "workers"
   ],
   "type": "module",
   "publishConfig": {
@@ -42,7 +45,7 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
-    "@forge-cms/core": "workspace:*"
+    "@forge-cms/runtime": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250514.0",

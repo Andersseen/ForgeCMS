@@ -1,20 +1,38 @@
-import type { AuthAdapter, AuthSession, AuthUser } from './index';
+import type { AuthAdapter, AuthSession, AuthUser } from './index.js';
+import { ForgeAuthError } from './index.js';
 
 export class InMemoryAuthAdapter implements AuthAdapter {
   readonly name = 'in-memory';
   private sessions: Map<string, AuthSession> = new Map();
 
-  async getSession(request: Request): Promise<AuthSession | null> {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '');
-    if (!token) return null;
-    return this.sessions.get(token) ?? null;
+  init(): this {
+    return this;
   }
 
-  async requireUser(request: Request): Promise<AuthUser> {
-    const session = await this.getSession(request);
-    if (!session) {
-      throw new Error('Unauthorized');
+  extractToken(request: Request): string | null {
+    return request.headers.get('authorization')?.replace('Bearer ', '') ?? null;
+  }
+
+  async validateSession(token: string): Promise<AuthSession | null> {
+    if (!token) return null;
+    const session = this.sessions.get(token) ?? null;
+
+    if (session?.expiresAt && session.expiresAt.getTime() < Date.now()) {
+      this.sessions.delete(token);
+      return null;
     }
+
+    return session;
+  }
+
+  async requireAuth(request: Request): Promise<AuthUser> {
+    const token = this.extractToken(request);
+    const session = await this.validateSession(token ?? '');
+
+    if (!session) {
+      throw new ForgeAuthError('Unauthorized', 'unauthorized');
+    }
+
     return session.user;
   }
 

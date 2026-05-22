@@ -6,12 +6,15 @@ interface ContractAuthUser {
 
 interface ContractAuthSession<TUser extends ContractAuthUser = ContractAuthUser> {
   user: TUser;
+  expiresAt?: Date;
 }
 
 interface ContractAuthAdapter<TUser extends ContractAuthUser = ContractAuthUser> {
   readonly name: string;
-  getSession(request: Request): Promise<ContractAuthSession<TUser> | null>;
-  requireUser(request: Request): Promise<TUser>;
+  init(env?: unknown): unknown;
+  extractToken(request: Request): string | null;
+  validateSession(token: string): Promise<ContractAuthSession<TUser> | null>;
+  requireAuth(request: Request): Promise<TUser>;
 }
 
 export function runAuthAdapterContractTests<
@@ -32,25 +35,27 @@ export function runAuthAdapterContractTests<
 
     it('returns null session for unauthenticated request', async () => {
       const request = new Request('https://forge.test');
-      const session = await adapter.getSession(request);
+      const token = adapter.extractToken(request);
+      const session = await adapter.validateSession(token ?? '');
       expect(session).toBeNull();
     });
 
     it('returns session for authenticated request', async () => {
       const request = setupAuthenticatedRequest(adapter);
-      const session = await adapter.getSession(request);
+      const token = adapter.extractToken(request);
+      const session = await adapter.validateSession(token ?? '');
       expect(session).toBeTruthy();
       expect(session?.user).toBeTruthy();
     });
 
-    it('throws for requireUser without auth', async () => {
+    it('throws for requireAuth without auth', async () => {
       const request = new Request('https://forge.test');
-      await expect(adapter.requireUser(request)).rejects.toThrow();
+      await expect(adapter.requireAuth(request)).rejects.toThrow();
     });
 
-    it('returns user for requireUser with auth', async () => {
+    it('returns user for requireAuth with auth', async () => {
       const request = setupAuthenticatedRequest(adapter);
-      const user = await adapter.requireUser(request);
+      const user = await adapter.requireAuth(request);
       expect(user).toBeTruthy();
       expect(user.id).toBeTruthy();
     });

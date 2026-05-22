@@ -41,6 +41,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "rm -rf dist coverage"
   },
+  "dependencies": {
+    "@forge-cms/core": "workspace:*"
+  },
   "devDependencies": {
     "@forge-cms/testing": "workspace:*",
     "typescript": "catalog:",
