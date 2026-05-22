@@ -1,4 +1,6 @@
 export { InMemoryAuthAdapter } from './in-memory.adapter.js';
+export { ExternalAuthAdapter } from './external.adapter.js';
+export type { ExternalAuthConfig } from './external.adapter.js';
 
 export class ForgeAuthError extends Error {
   constructor(

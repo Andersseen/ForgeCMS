@@ -21,9 +21,34 @@ export interface CollectionMeta {
   fields: string[];
 }
 
+export interface AuthUser {
+  id: string;
+  email?: string;
+  name?: string;
+  roles?: string[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class CmsApiService {
   private readonly baseUrl = '/api/v1';
+
+  /** Token de auth — se inyecta desde el microservicio externo */
+  authToken: string | null = null;
+
+  private getHeaders(): Record<string, string> {
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    if (this.authToken) {
+      headers['authorization'] = `Bearer ${this.authToken}`;
+    }
+    return headers;
+  }
+
+  async getCurrentUser(): Promise<AuthUser | null> {
+    const response = await fetch('/api/auth/me', { headers: this.getHeaders() });
+    if (!response.ok) return null;
+    const result = (await response.json()) as { data: AuthUser };
+    return result.data;
+  }
 
   async getCollections(): Promise<CollectionMeta[]> {
     const response = await fetch(`${this.baseUrl}/collections`);
@@ -52,7 +77,7 @@ export class CmsApiService {
   ): Promise<T> {
     const response = await fetch(`${this.baseUrl}/${collection}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: this.getHeaders(),
       body: JSON.stringify(data)
     });
     if (!response.ok) throw new Error(`Failed to create document: ${response.status}`);
@@ -67,7 +92,7 @@ export class CmsApiService {
   ): Promise<T> {
     const response = await fetch(`${this.baseUrl}/${collection}/${id}`, {
       method: 'PUT',
-      headers: { 'content-type': 'application/json' },
+      headers: this.getHeaders(),
       body: JSON.stringify(data)
     });
     if (!response.ok) throw new Error(`Failed to update document: ${response.status}`);
@@ -77,7 +102,8 @@ export class CmsApiService {
 
   async deleteDocument(collection: string, id: string): Promise<void> {
     const response = await fetch(`${this.baseUrl}/${collection}/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: this.getHeaders()
     });
     if (!response.ok) throw new Error(`Failed to delete document: ${response.status}`);
   }

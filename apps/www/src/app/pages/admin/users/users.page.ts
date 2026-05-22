@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, signal, inject } from '@angular/core';
 import {
   VoltAvatar,
   VoltAvatarFallback,
@@ -19,6 +19,7 @@ import {
   IconShield,
   IconUsers
 } from '../../../components/icons';
+import { CmsApiService } from '../../../services/cms-api.service';
 
 interface User {
   id: string;
@@ -76,169 +77,354 @@ interface User {
         </div>
       </div>
 
-      <!-- User Stats -->
-      <div class="grid gap-4 md:grid-cols-4">
-        <volt-card class="p-4">
-          <div class="flex items-center gap-3">
-            <div
-              class="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center"
-            >
-              <icon-users class="h-4 w-4" />
-            </div>
-            <div>
-              <p class="text-2xl font-bold">42</p>
-              <p class="text-xs text-muted-foreground">Total Users</p>
-            </div>
-          </div>
-        </volt-card>
-        <volt-card class="p-4">
-          <div class="flex items-center gap-3">
-            <div
-              class="h-9 w-9 rounded-lg bg-success/10 text-success flex items-center justify-center"
-            >
-              <icon-shield class="h-4 w-4" />
-            </div>
-            <div>
-              <p class="text-2xl font-bold">38</p>
-              <p class="text-xs text-muted-foreground">Active</p>
-            </div>
-          </div>
-        </volt-card>
-        <volt-card class="p-4">
-          <div class="flex items-center gap-3">
-            <div
-              class="h-9 w-9 rounded-lg bg-warning/10 text-warning flex items-center justify-center"
-            >
-              <icon-mail class="h-4 w-4" />
-            </div>
-            <div>
-              <p class="text-2xl font-bold">3</p>
-              <p class="text-xs text-muted-foreground">Invited</p>
-            </div>
-          </div>
-        </volt-card>
-        <volt-card class="p-4">
-          <div class="flex items-center gap-3">
-            <div
-              class="h-9 w-9 rounded-lg bg-muted text-muted-foreground flex items-center justify-center"
-            >
-              <icon-users class="h-4 w-4" />
-            </div>
-            <div>
-              <p class="text-2xl font-bold">1</p>
-              <p class="text-xs text-muted-foreground">Inactive</p>
-            </div>
-          </div>
-        </volt-card>
-      </div>
-
-      <!-- Filters -->
-      <div class="flex items-center gap-3">
-        <volt-input placeholder="Search users..." class="w-72 h-9 text-sm" />
-        <volt-button variant="outline" size="sm">
-          <icon-filter class="h-3.5 w-3.5 mr-1.5" />
-          All Roles
-        </volt-button>
-        <volt-button variant="outline" size="sm">Active</volt-button>
-        <volt-button variant="outline" size="sm">Invited</volt-button>
-      </div>
-
-      <!-- Users Table -->
-      <volt-card class="overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="bg-muted/50">
-              <tr class="border-b border-border">
-                <th class="h-10 px-4 text-left font-medium text-muted-foreground">User</th>
-                <th class="h-10 px-4 text-left font-medium text-muted-foreground">Role</th>
-                <th class="h-10 px-4 text-left font-medium text-muted-foreground">Status</th>
-                <th class="h-10 px-4 text-left font-medium text-muted-foreground">Documents</th>
-                <th class="h-10 px-4 text-left font-medium text-muted-foreground">Last Active</th>
-                <th class="h-10 px-4 text-right font-medium text-muted-foreground">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (user of users; track user.id) {
-                <tr class="border-b border-border hover:bg-muted/30 transition-colors">
-                  <td class="px-4 py-3">
-                    <div class="flex items-center gap-3">
-                      <volt-avatar>
-                        <img [src]="user.avatar" [alt]="user.name" voltAvatarImage />
-                        <volt-avatar-fallback>{{
-                          user.name.slice(0, 2).toUpperCase()
-                        }}</volt-avatar-fallback>
-                      </volt-avatar>
-                      <div>
-                        <p class="font-medium">{{ user.name }}</p>
-                        <p class="text-xs text-muted-foreground">{{ user.email }}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="px-4 py-3">
-                    @switch (user.role) {
-                      @case ('super-admin') {
-                        <volt-badge variant="solid" class="text-[10px]">Super Admin</volt-badge>
-                      }
-                      @case ('admin') {
-                        <volt-badge variant="secondary" class="text-[10px]">Admin</volt-badge>
-                      }
-                      @case ('editor') {
-                        <volt-badge class="text-[10px]">Editor</volt-badge>
-                      }
-                      @case ('developer') {
-                        <volt-badge variant="outline" class="text-[10px]">Developer</volt-badge>
-                      }
-                      @case ('viewer') {
-                        <volt-badge variant="outline" class="text-[10px] text-muted-foreground"
-                          >Viewer</volt-badge
-                        >
-                      }
-                    }
-                  </td>
-                  <td class="px-4 py-3">
-                    @switch (user.status) {
-                      @case ('active') {
-                        <span class="inline-flex items-center gap-1.5">
-                          <span class="h-1.5 w-1.5 rounded-full bg-success"></span>
-                          <span class="text-xs text-muted-foreground">Active</span>
-                        </span>
-                      }
-                      @case ('inactive') {
-                        <span class="inline-flex items-center gap-1.5">
-                          <span class="h-1.5 w-1.5 rounded-full bg-muted-foreground"></span>
-                          <span class="text-xs text-muted-foreground">Inactive</span>
-                        </span>
-                      }
-                      @case ('invited') {
-                        <span class="inline-flex items-center gap-1.5">
-                          <span class="h-1.5 w-1.5 rounded-full bg-warning"></span>
-                          <span class="text-xs text-muted-foreground">Invited</span>
-                        </span>
-                      }
-                    }
-                  </td>
-                  <td class="px-4 py-3">{{ user.documents }}</td>
-                  <td class="px-4 py-3 text-muted-foreground">{{ user.lastActive }}</td>
-                  <td class="px-4 py-3 text-right">
-                    <div class="flex items-center justify-end gap-1">
-                      <volt-button variant="ghost" size="icon" class="h-7 w-7">
-                        <icon-edit class="h-3.5 w-3.5" />
-                      </volt-button>
-                      <volt-button variant="ghost" size="icon" class="h-7 w-7">
-                        <icon-more-vertical class="h-3.5 w-3.5" />
-                      </volt-button>
-                    </div>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
+      @if (loading()) {
+        <div class="grid gap-4 md:grid-cols-4">
+          @for (_ of [1,2,3,4]; track $index) {
+            <volt-card class="p-4">
+              <div class="animate-pulse flex items-center gap-3">
+                <div class="h-9 w-9 rounded-lg bg-muted"></div>
+                <div class="space-y-2">
+                  <div class="h-5 bg-muted rounded w-12"></div>
+                  <div class="h-3 bg-muted rounded w-20"></div>
+                </div>
+              </div>
+            </volt-card>
+          }
         </div>
-      </volt-card>
+        <volt-card class="overflow-hidden p-6">
+          <div class="animate-pulse space-y-3">
+            @for (_ of [1,2,3,4,5]; track $index) {
+              <div class="h-10 bg-muted rounded"></div>
+            }
+          </div>
+        </volt-card>
+      } @else if (error()) {
+        <volt-card class="p-6">
+          <div class="text-center space-y-2">
+            <icon-users class="h-8 w-8 text-muted-foreground mx-auto" />
+            <p class="text-sm font-medium">Users managed externally</p>
+            <p class="text-xs text-muted-foreground max-w-md mx-auto">
+              {{ error() }} Authentication is handled by the external DevFlare auth microservice.
+              User management is not available in the CMS directly.
+            </p>
+          </div>
+        </volt-card>
+
+        <!-- Still show mock users for UI demo -->
+        <div class="grid gap-4 md:grid-cols-4">
+          <volt-card class="p-4">
+            <div class="flex items-center gap-3">
+              <div
+                class="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center"
+              >
+                <icon-users class="h-4 w-4" />
+              </div>
+              <div>
+                <p class="text-2xl font-bold">{{ users.length }}</p>
+                <p class="text-xs text-muted-foreground">Total Users</p>
+              </div>
+            </div>
+          </volt-card>
+          <volt-card class="p-4">
+            <div class="flex items-center gap-3">
+              <div
+                class="h-9 w-9 rounded-lg bg-success/10 text-success flex items-center justify-center"
+              >
+                <icon-shield class="h-4 w-4" />
+              </div>
+              <div>
+                <p class="text-2xl font-bold">{{ activeCount }}</p>
+                <p class="text-xs text-muted-foreground">Active</p>
+              </div>
+            </div>
+          </volt-card>
+          <volt-card class="p-4">
+            <div class="flex items-center gap-3">
+              <div
+                class="h-9 w-9 rounded-lg bg-warning/10 text-warning flex items-center justify-center"
+              >
+                <icon-mail class="h-4 w-4" />
+              </div>
+              <div>
+                <p class="text-2xl font-bold">{{ invitedCount }}</p>
+                <p class="text-xs text-muted-foreground">Invited</p>
+              </div>
+            </div>
+          </volt-card>
+          <volt-card class="p-4">
+            <div class="flex items-center gap-3">
+              <div
+                class="h-9 w-9 rounded-lg bg-muted text-muted-foreground flex items-center justify-center"
+              >
+                <icon-users class="h-4 w-4" />
+              </div>
+              <div>
+                <p class="text-2xl font-bold">{{ inactiveCount }}</p>
+                <p class="text-xs text-muted-foreground">Inactive</p>
+              </div>
+            </div>
+          </volt-card>
+        </div>
+
+        <!-- Users Table -->
+        <volt-card class="overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-muted/50">
+                <tr class="border-b border-border">
+                  <th class="h-10 px-4 text-left font-medium text-muted-foreground">User</th>
+                  <th class="h-10 px-4 text-left font-medium text-muted-foreground">Role</th>
+                  <th class="h-10 px-4 text-left font-medium text-muted-foreground">Status</th>
+                  <th class="h-10 px-4 text-left font-medium text-muted-foreground">Documents</th>
+                  <th class="h-10 px-4 text-left font-medium text-muted-foreground">Last Active</th>
+                  <th class="h-10 px-4 text-right font-medium text-muted-foreground">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (user of users; track user.id) {
+                  <tr class="border-b border-border hover:bg-muted/30 transition-colors">
+                    <td class="px-4 py-3">
+                      <div class="flex items-center gap-3">
+                        <volt-avatar>
+                          <img [src]="user.avatar" [alt]="user.name" voltAvatarImage />
+                          <volt-avatar-fallback>{{
+                            user.name.slice(0, 2).toUpperCase()
+                          }}</volt-avatar-fallback>
+                        </volt-avatar>
+                        <div>
+                          <p class="font-medium">{{ user.name }}</p>
+                          <p class="text-xs text-muted-foreground">{{ user.email }}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="px-4 py-3">
+                      @switch (user.role) {
+                        @case ('super-admin') {
+                          <volt-badge variant="solid" class="text-[10px]">Super Admin</volt-badge>
+                        }
+                        @case ('admin') {
+                          <volt-badge variant="secondary" class="text-[10px]">Admin</volt-badge>
+                        }
+                        @case ('editor') {
+                          <volt-badge class="text-[10px]">Editor</volt-badge>
+                        }
+                        @case ('developer') {
+                          <volt-badge variant="outline" class="text-[10px]">Developer</volt-badge>
+                        }
+                        @case ('viewer') {
+                          <volt-badge variant="outline" class="text-[10px] text-muted-foreground"
+                            >Viewer</volt-badge
+                          >
+                        }
+                      }
+                    </td>
+                    <td class="px-4 py-3">
+                      @switch (user.status) {
+                        @case ('active') {
+                          <span class="inline-flex items-center gap-1.5">
+                            <span class="h-1.5 w-1.5 rounded-full bg-success"></span>
+                            <span class="text-xs text-muted-foreground">Active</span>
+                          </span>
+                        }
+                        @case ('inactive') {
+                          <span class="inline-flex items-center gap-1.5">
+                            <span class="h-1.5 w-1.5 rounded-full bg-muted-foreground"></span>
+                            <span class="text-xs text-muted-foreground">Inactive</span>
+                          </span>
+                        }
+                        @case ('invited') {
+                          <span class="inline-flex items-center gap-1.5">
+                            <span class="h-1.5 w-1.5 rounded-full bg-warning"></span>
+                            <span class="text-xs text-muted-foreground">Invited</span>
+                          </span>
+                        }
+                      }
+                    </td>
+                    <td class="px-4 py-3">{{ user.documents }}</td>
+                    <td class="px-4 py-3 text-muted-foreground">{{ user.lastActive }}</td>
+                    <td class="px-4 py-3 text-right">
+                      <div class="flex items-center justify-end gap-1">
+                        <volt-button variant="ghost" size="icon" class="h-7 w-7">
+                          <icon-edit class="h-3.5 w-3.5" />
+                        </volt-button>
+                        <volt-button variant="ghost" size="icon" class="h-7 w-7">
+                          <icon-more-vertical class="h-3.5 w-3.5" />
+                        </volt-button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </volt-card>
+      } @else {
+        <!-- User Stats -->
+        <div class="grid gap-4 md:grid-cols-4">
+          <volt-card class="p-4">
+            <div class="flex items-center gap-3">
+              <div
+                class="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center"
+              >
+                <icon-users class="h-4 w-4" />
+              </div>
+              <div>
+                <p class="text-2xl font-bold">{{ users.length }}</p>
+                <p class="text-xs text-muted-foreground">Total Users</p>
+              </div>
+            </div>
+          </volt-card>
+          <volt-card class="p-4">
+            <div class="flex items-center gap-3">
+              <div
+                class="h-9 w-9 rounded-lg bg-success/10 text-success flex items-center justify-center"
+              >
+                <icon-shield class="h-4 w-4" />
+              </div>
+              <div>
+                <p class="text-2xl font-bold">{{ activeCount }}</p>
+                <p class="text-xs text-muted-foreground">Active</p>
+              </div>
+            </div>
+          </volt-card>
+          <volt-card class="p-4">
+            <div class="flex items-center gap-3">
+              <div
+                class="h-9 w-9 rounded-lg bg-warning/10 text-warning flex items-center justify-center"
+              >
+                <icon-mail class="h-4 w-4" />
+              </div>
+              <div>
+                <p class="text-2xl font-bold">{{ invitedCount }}</p>
+                <p class="text-xs text-muted-foreground">Invited</p>
+              </div>
+            </div>
+          </volt-card>
+          <volt-card class="p-4">
+            <div class="flex items-center gap-3">
+              <div
+                class="h-9 w-9 rounded-lg bg-muted text-muted-foreground flex items-center justify-center"
+              >
+                <icon-users class="h-4 w-4" />
+              </div>
+              <div>
+                <p class="text-2xl font-bold">{{ inactiveCount }}</p>
+                <p class="text-xs text-muted-foreground">Inactive</p>
+              </div>
+            </div>
+          </volt-card>
+        </div>
+
+        <!-- Filters -->
+        <div class="flex items-center gap-3">
+          <volt-input placeholder="Search users..." class="w-72 h-9 text-sm" />
+          <volt-button variant="outline" size="sm">
+            <icon-filter class="h-3.5 w-3.5 mr-1.5" />
+            All Roles
+          </volt-button>
+          <volt-button variant="outline" size="sm">Active</volt-button>
+          <volt-button variant="outline" size="sm">Invited</volt-button>
+        </div>
+
+        <!-- Users Table -->
+        <volt-card class="overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-muted/50">
+                <tr class="border-b border-border">
+                  <th class="h-10 px-4 text-left font-medium text-muted-foreground">User</th>
+                  <th class="h-10 px-4 text-left font-medium text-muted-foreground">Role</th>
+                  <th class="h-10 px-4 text-left font-medium text-muted-foreground">Status</th>
+                  <th class="h-10 px-4 text-left font-medium text-muted-foreground">Documents</th>
+                  <th class="h-10 px-4 text-left font-medium text-muted-foreground">Last Active</th>
+                  <th class="h-10 px-4 text-right font-medium text-muted-foreground">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (user of users; track user.id) {
+                  <tr class="border-b border-border hover:bg-muted/30 transition-colors">
+                    <td class="px-4 py-3">
+                      <div class="flex items-center gap-3">
+                        <volt-avatar>
+                          <img [src]="user.avatar" [alt]="user.name" voltAvatarImage />
+                          <volt-avatar-fallback>{{
+                            user.name.slice(0, 2).toUpperCase()
+                          }}</volt-avatar-fallback>
+                        </volt-avatar>
+                        <div>
+                          <p class="font-medium">{{ user.name }}</p>
+                          <p class="text-xs text-muted-foreground">{{ user.email }}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="px-4 py-3">
+                      @switch (user.role) {
+                        @case ('super-admin') {
+                          <volt-badge variant="solid" class="text-[10px]">Super Admin</volt-badge>
+                        }
+                        @case ('admin') {
+                          <volt-badge variant="secondary" class="text-[10px]">Admin</volt-badge>
+                        }
+                        @case ('editor') {
+                          <volt-badge class="text-[10px]">Editor</volt-badge>
+                        }
+                        @case ('developer') {
+                          <volt-badge variant="outline" class="text-[10px]">Developer</volt-badge>
+                        }
+                        @case ('viewer') {
+                          <volt-badge variant="outline" class="text-[10px] text-muted-foreground"
+                            >Viewer</volt-badge
+                          >
+                        }
+                      }
+                    </td>
+                    <td class="px-4 py-3">
+                      @switch (user.status) {
+                        @case ('active') {
+                          <span class="inline-flex items-center gap-1.5">
+                            <span class="h-1.5 w-1.5 rounded-full bg-success"></span>
+                            <span class="text-xs text-muted-foreground">Active</span>
+                          </span>
+                        }
+                        @case ('inactive') {
+                          <span class="inline-flex items-center gap-1.5">
+                            <span class="h-1.5 w-1.5 rounded-full bg-muted-foreground"></span>
+                            <span class="text-xs text-muted-foreground">Inactive</span>
+                          </span>
+                        }
+                        @case ('invited') {
+                          <span class="inline-flex items-center gap-1.5">
+                            <span class="h-1.5 w-1.5 rounded-full bg-warning"></span>
+                            <span class="text-xs text-muted-foreground">Invited</span>
+                          </span>
+                        }
+                      }
+                    </td>
+                    <td class="px-4 py-3">{{ user.documents }}</td>
+                    <td class="px-4 py-3 text-muted-foreground">{{ user.lastActive }}</td>
+                    <td class="px-4 py-3 text-right">
+                      <div class="flex items-center justify-end gap-1">
+                        <volt-button variant="ghost" size="icon" class="h-7 w-7">
+                          <icon-edit class="h-3.5 w-3.5" />
+                        </volt-button>
+                        <volt-button variant="ghost" size="icon" class="h-7 w-7">
+                          <icon-more-vertical class="h-3.5 w-3.5" />
+                        </volt-button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </volt-card>
+      }
     </div>
   `
 })
-export class UsersPage {
+export class UsersPage implements OnInit {
+  private api = inject(CmsApiService);
+
   users: User[] = [
     {
       id: '1',
@@ -329,4 +515,26 @@ export class UsersPage {
       joined: 'May 18, 2026'
     }
   ];
+
+  loading = signal(true);
+  error = signal<string | null>(null);
+
+  get activeCount(): number {
+    return this.users.filter(u => u.status === 'active').length;
+  }
+
+  get invitedCount(): number {
+    return this.users.filter(u => u.status === 'invited').length;
+  }
+
+  get inactiveCount(): number {
+    return this.users.filter(u => u.status === 'inactive').length;
+  }
+
+  ngOnInit() {
+    // Auth is external (DevFlare microservice) — CMS does not manage users directly.
+    // The /api/auth/me endpoint returns the current user only.
+    this.loading.set(false);
+    this.error.set('Auth microservice integration required.');
+  }
 }
