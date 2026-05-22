@@ -77,7 +77,7 @@ interface ApiKey {
           <div class="flex items-center justify-between p-3 rounded-lg bg-muted/50">
             <div>
               <p class="text-sm font-medium">REST API</p>
-              <p class="text-xs text-muted-foreground font-mono">/api/v1/{'{collection}'}</p>
+              <p class="text-xs text-muted-foreground font-mono">/api/v1/{{ '{' }}collection{{ '}' }}</p>
             </div>
             <volt-button variant="ghost" size="sm">Docs</volt-button>
           </div>

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 interface ContractDatabaseAdapter {
   readonly name: string;
+  init(env?: unknown): unknown;
   findById(collection: string, id: string): Promise<Record<string, unknown> | null>;
   findMany(options: {
     collection: string;
@@ -16,6 +17,7 @@ interface ContractDatabaseAdapter {
     data: Partial<Record<string, unknown>>
   ): Promise<Record<string, unknown>>;
   delete(collection: string, id: string): Promise<void>;
+  syncSchema(collections: unknown[]): Promise<void>;
 }
 
 export function runDatabaseAdapterContractTests(createAdapter: () => ContractDatabaseAdapter) {
@@ -31,7 +33,15 @@ export function runDatabaseAdapterContractTests(createAdapter: () => ContractDat
       expect(typeof adapter.name).toBe('string');
     });
 
-    it('creates a record', async () => {
+    it('creates a record with auto-generated id', async () => {
+      const data = { title: 'Hello' };
+      const result = await adapter.create('posts', data);
+      expect(result.id).toBeTruthy();
+      expect(typeof result.id).toBe('string');
+      expect(result.title).toBe('Hello');
+    });
+
+    it('creates a record with provided id', async () => {
       const data = { id: '1', title: 'Hello' };
       const result = await adapter.create('posts', data);
       expect(result).toEqual(expect.objectContaining(data));

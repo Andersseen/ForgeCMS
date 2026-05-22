@@ -1,8 +1,13 @@
-import type { DatabaseAdapter, FindManyOptions } from './index';
+import type { CollectionDefinition } from '@forge-cms/core';
+import type { DatabaseAdapter, FindManyOptions } from './index.js';
 
 export class InMemoryDatabaseAdapter implements DatabaseAdapter {
   readonly name = 'in-memory';
   private store: Map<string, Record<string, unknown>[]> = new Map();
+
+  init(): this {
+    return this;
+  }
 
   async findById(collection: string, id: string): Promise<Record<string, unknown> | null> {
     const records = this.store.get(collection) ?? [];
@@ -30,9 +35,10 @@ export class InMemoryDatabaseAdapter implements DatabaseAdapter {
     data: Record<string, unknown>
   ): Promise<Record<string, unknown>> {
     const records = this.store.get(collection) ?? [];
-    records.push(data);
+    const recordWithId = data.id ? data : { ...data, id: crypto.randomUUID() };
+    records.push(recordWithId);
     this.store.set(collection, records);
-    return data;
+    return recordWithId;
   }
 
   async update(
@@ -56,5 +62,10 @@ export class InMemoryDatabaseAdapter implements DatabaseAdapter {
       collection,
       records.filter((r) => r.id !== id)
     );
+  }
+
+  async syncSchema(_collections: CollectionDefinition[]): Promise<void> {
+    // In-memory adapter does not need schema synchronization
+    void _collections;
   }
 }

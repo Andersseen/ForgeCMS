@@ -25,7 +25,9 @@
       "@forge-cms/api": ["packages/api/dist/index.d.ts"],
       "@forge-cms/admin": ["packages/admin/dist/index.d.ts"],
       "@forge-cms/testing": ["packages/testing/dist/index.d.ts"],
-      "@forge-cms/testing/contracts": ["packages/testing/src/contracts/index.ts"]
+      "@forge-cms/testing/contracts": ["packages/testing/src/contracts/index.ts"],
+      "@forge-cms/runtime": ["packages/runtime/dist/index.d.ts"],
+      "@forge-cms/cloudflare": ["packages/cloudflare/dist/index.d.ts"]
     }
   }
 }

@@ -1,22 +1,22 @@
 {
-  "name": "@forge-cms/api",
+  "name": "@forge-cms/runtime",
   "version": "0.0.0",
-  "description": "API route and CRUD handler helpers for ForgeCMS.",
+  "description": "Runtime orchestrator for ForgeCMS — binds schema, adapters, and handlers.",
   "author": "ForgeCMS contributors",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/forge-cms/forge-cms.git",
-    "directory": "packages/api"
+    "directory": "packages/runtime"
   },
   "bugs": {
     "url": "https://github.com/forge-cms/forge-cms/issues"
   },
-  "homepage": "https://github.com/forge-cms/forge-cms/tree/main/packages/api#readme",
+  "homepage": "https://github.com/forge-cms/forge-cms/tree/main/packages/runtime#readme",
   "keywords": [
     "cms",
-    "api",
-    "crud",
+    "runtime",
+    "orchestrator",
     "typescript"
   ],
   "type": "module",
@@ -42,10 +42,13 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
-    "@forge-cms/core": "workspace:*"
+    "@forge-cms/api": "workspace:*",
+    "@forge-cms/auth": "workspace:*",
+    "@forge-cms/core": "workspace:*",
+    "@forge-cms/db": "workspace:*",
+    "@forge-cms/storage": "workspace:*"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250514.0",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

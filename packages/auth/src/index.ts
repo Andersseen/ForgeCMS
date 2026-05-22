@@ -1,3 +1,17 @@
+export { InMemoryAuthAdapter } from './in-memory.adapter.js';
+export { ExternalAuthAdapter } from './external.adapter.js';
+export type { ExternalAuthConfig } from './external.adapter.js';
+
+export class ForgeAuthError extends Error {
+  constructor(
+    message: string,
+    public readonly code: 'unauthorized' | 'forbidden' | 'expired' = 'unauthorized'
+  ) {
+    super(message);
+    this.name = 'ForgeAuthError';
+  }
+}
+
 export interface AuthUser {
   id: string;
   email?: string;
@@ -13,6 +27,8 @@ export interface AuthSession<TUser extends AuthUser = AuthUser> {
 
 export interface AuthAdapter<TUser extends AuthUser = AuthUser> {
   readonly name: string;
-  getSession(request: Request): Promise<AuthSession<TUser> | null>;
-  requireUser(request: Request): Promise<TUser>;
+  init(env?: unknown): this;
+  extractToken(request: Request): string | null;
+  validateSession(token: string): Promise<AuthSession<TUser> | null>;
+  requireAuth(request: Request): Promise<TUser>;
 }
