@@ -1,9 +1,21 @@
-import type { StorageAdapter } from '@forge-cms/storage';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-export function runStorageAdapterContractTests(createAdapter: () => StorageAdapter) {
+interface ContractStorageAdapter {
+  readonly name: string;
+  put(options: {
+    key: string;
+    body: Blob | ArrayBuffer | Uint8Array | ReadableStream<Uint8Array>;
+    contentType?: string;
+    metadata?: Record<string, string>;
+  }): Promise<{ key: string }>;
+  get(key: string): Promise<{ key: string } | null>;
+  delete(key: string): Promise<void>;
+  getPublicUrl(key: string): Promise<string>;
+}
+
+export function runStorageAdapterContractTests(createAdapter: () => ContractStorageAdapter) {
   describe('StorageAdapter contract', () => {
-    let adapter: StorageAdapter;
+    let adapter: ContractStorageAdapter;
 
     beforeEach(() => {
       adapter = createAdapter();

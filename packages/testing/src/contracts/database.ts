@@ -1,9 +1,26 @@
-import type { DatabaseAdapter } from '@forge-cms/db';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-export function runDatabaseAdapterContractTests(createAdapter: () => DatabaseAdapter) {
+interface ContractDatabaseAdapter {
+  readonly name: string;
+  findById(collection: string, id: string): Promise<Record<string, unknown> | null>;
+  findMany(options: {
+    collection: string;
+    limit?: number;
+    offset?: number;
+    where?: Record<string, unknown>;
+  }): Promise<Record<string, unknown>[]>;
+  create(collection: string, data: Record<string, unknown>): Promise<Record<string, unknown>>;
+  update(
+    collection: string,
+    id: string,
+    data: Partial<Record<string, unknown>>
+  ): Promise<Record<string, unknown>>;
+  delete(collection: string, id: string): Promise<void>;
+}
+
+export function runDatabaseAdapterContractTests(createAdapter: () => ContractDatabaseAdapter) {
   describe('DatabaseAdapter contract', () => {
-    let adapter: DatabaseAdapter;
+    let adapter: ContractDatabaseAdapter;
 
     beforeEach(() => {
       adapter = createAdapter();

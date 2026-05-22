@@ -1,9 +1,22 @@
-import type { AuthAdapter, AuthUser } from '@forge-cms/auth';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+interface ContractAuthUser {
+  id: string;
+}
+
+interface ContractAuthSession<TUser extends ContractAuthUser = ContractAuthUser> {
+  user: TUser;
+}
+
+interface ContractAuthAdapter<TUser extends ContractAuthUser = ContractAuthUser> {
+  readonly name: string;
+  getSession(request: Request): Promise<ContractAuthSession<TUser> | null>;
+  requireUser(request: Request): Promise<TUser>;
+}
+
 export function runAuthAdapterContractTests<
-  TUser extends AuthUser = AuthUser,
-  TAdapter extends AuthAdapter<TUser> = AuthAdapter<TUser>
+  TUser extends ContractAuthUser = ContractAuthUser,
+  TAdapter extends ContractAuthAdapter<TUser> = ContractAuthAdapter<TUser>
 >(createAdapter: () => TAdapter, setupAuthenticatedRequest: (adapter: TAdapter) => Request) {
   describe('AuthAdapter contract', () => {
     let adapter: TAdapter;
