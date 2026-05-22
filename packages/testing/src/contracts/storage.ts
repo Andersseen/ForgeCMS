@@ -1,9 +1,7 @@
 import type { StorageAdapter } from '@forge-cms/storage';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-export function runStorageAdapterContractTests(
-  createAdapter: () => StorageAdapter
-) {
+export function runStorageAdapterContractTests(createAdapter: () => StorageAdapter) {
   describe('StorageAdapter contract', () => {
     let adapter: StorageAdapter;
 

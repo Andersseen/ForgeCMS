@@ -7,7 +7,7 @@ import {
   VoltButton,
   VoltCard,
   VoltInput,
-  VoltSeparator,
+  VoltSeparator
 } from '@voltui/components';
 import {
   IconChevronDown,
@@ -17,7 +17,7 @@ import {
   IconMoreVertical,
   IconSearch,
   IconShield,
-  IconUsers,
+  IconUsers
 } from '../../../components/icons';
 
 interface User {
@@ -51,7 +51,7 @@ interface User {
     IconMail,
     IconEdit,
     IconMoreVertical,
-    IconChevronDown,
+    IconChevronDown
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -60,7 +60,9 @@ interface User {
       <div class="flex items-center justify-between">
         <div>
           <h1 class="text-2xl font-bold tracking-tight">Users</h1>
-          <p class="text-sm text-muted-foreground mt-1">Manage team members and their permissions.</p>
+          <p class="text-sm text-muted-foreground mt-1">
+            Manage team members and their permissions.
+          </p>
         </div>
         <div class="flex items-center gap-2">
           <volt-button variant="outline" size="sm">
@@ -78,7 +80,9 @@ interface User {
       <div class="grid gap-4 md:grid-cols-4">
         <volt-card class="p-4">
           <div class="flex items-center gap-3">
-            <div class="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+            <div
+              class="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center"
+            >
               <icon-users class="h-4 w-4" />
             </div>
             <div>
@@ -89,7 +93,9 @@ interface User {
         </volt-card>
         <volt-card class="p-4">
           <div class="flex items-center gap-3">
-            <div class="h-9 w-9 rounded-lg bg-success/10 text-success flex items-center justify-center">
+            <div
+              class="h-9 w-9 rounded-lg bg-success/10 text-success flex items-center justify-center"
+            >
               <icon-shield class="h-4 w-4" />
             </div>
             <div>
@@ -100,7 +106,9 @@ interface User {
         </volt-card>
         <volt-card class="p-4">
           <div class="flex items-center gap-3">
-            <div class="h-9 w-9 rounded-lg bg-warning/10 text-warning flex items-center justify-center">
+            <div
+              class="h-9 w-9 rounded-lg bg-warning/10 text-warning flex items-center justify-center"
+            >
               <icon-mail class="h-4 w-4" />
             </div>
             <div>
@@ -111,7 +119,9 @@ interface User {
         </volt-card>
         <volt-card class="p-4">
           <div class="flex items-center gap-3">
-            <div class="h-9 w-9 rounded-lg bg-muted text-muted-foreground flex items-center justify-center">
+            <div
+              class="h-9 w-9 rounded-lg bg-muted text-muted-foreground flex items-center justify-center"
+            >
               <icon-users class="h-4 w-4" />
             </div>
             <div>
@@ -154,7 +164,9 @@ interface User {
                     <div class="flex items-center gap-3">
                       <volt-avatar>
                         <img [src]="user.avatar" [alt]="user.name" voltAvatarImage />
-                        <volt-avatar-fallback>{{ user.name.slice(0, 2).toUpperCase() }}</volt-avatar-fallback>
+                        <volt-avatar-fallback>{{
+                          user.name.slice(0, 2).toUpperCase()
+                        }}</volt-avatar-fallback>
                       </volt-avatar>
                       <div>
                         <p class="font-medium">{{ user.name }}</p>
@@ -177,7 +189,9 @@ interface User {
                         <volt-badge variant="outline" class="text-[10px]">Developer</volt-badge>
                       }
                       @case ('viewer') {
-                        <volt-badge variant="outline" class="text-[10px] text-muted-foreground">Viewer</volt-badge>
+                        <volt-badge variant="outline" class="text-[10px] text-muted-foreground"
+                          >Viewer</volt-badge
+                        >
                       }
                     }
                   </td>
@@ -222,7 +236,7 @@ interface User {
         </div>
       </volt-card>
     </div>
-  `,
+  `
 })
 export class UsersPage {
   users: User[] = [
@@ -235,7 +249,7 @@ export class UsersPage {
       status: 'active',
       lastActive: 'Just now',
       documents: 245,
-      joined: 'Jan 1, 2024',
+      joined: 'Jan 1, 2024'
     },
     {
       id: '2',
@@ -246,7 +260,7 @@ export class UsersPage {
       status: 'active',
       lastActive: '2h ago',
       documents: 128,
-      joined: 'Mar 15, 2024',
+      joined: 'Mar 15, 2024'
     },
     {
       id: '3',
@@ -257,7 +271,7 @@ export class UsersPage {
       status: 'active',
       lastActive: '5h ago',
       documents: 89,
-      joined: 'Jun 22, 2024',
+      joined: 'Jun 22, 2024'
     },
     {
       id: '4',
@@ -268,7 +282,7 @@ export class UsersPage {
       status: 'active',
       lastActive: '1d ago',
       documents: 34,
-      joined: 'Sep 10, 2024',
+      joined: 'Sep 10, 2024'
     },
     {
       id: '5',
@@ -279,7 +293,7 @@ export class UsersPage {
       status: 'active',
       lastActive: '2d ago',
       documents: 67,
-      joined: 'Nov 5, 2024',
+      joined: 'Nov 5, 2024'
     },
     {
       id: '6',
@@ -290,7 +304,7 @@ export class UsersPage {
       status: 'inactive',
       lastActive: '5d ago',
       documents: 12,
-      joined: 'Dec 20, 2024',
+      joined: 'Dec 20, 2024'
     },
     {
       id: '7',
@@ -301,7 +315,7 @@ export class UsersPage {
       status: 'invited',
       lastActive: '-',
       documents: 0,
-      joined: 'May 18, 2026',
+      joined: 'May 18, 2026'
     },
     {
       id: '8',
@@ -312,7 +326,7 @@ export class UsersPage {
       status: 'invited',
       lastActive: '-',
       documents: 0,
-      joined: 'May 18, 2026',
-    },
+      joined: 'May 18, 2026'
+    }
   ];
 }

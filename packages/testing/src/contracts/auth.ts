@@ -4,10 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 export function runAuthAdapterContractTests<
   TUser extends AuthUser = AuthUser,
   TAdapter extends AuthAdapter<TUser> = AuthAdapter<TUser>
->(
-  createAdapter: () => TAdapter,
-  setupAuthenticatedRequest: (adapter: TAdapter) => Request
-) {
+>(createAdapter: () => TAdapter, setupAuthenticatedRequest: (adapter: TAdapter) => Request) {
   describe('AuthAdapter contract', () => {
     let adapter: TAdapter;
 

@@ -7,14 +7,13 @@ import {
   VoltButton,
   VoltCard,
   VoltProgress,
-  VoltSeparator,
+  VoltSeparator
 } from '@voltui/components';
 import {
   IconAlertCircle,
   IconBarChart,
   IconCheckCircle,
   IconClock,
-  IconDatabase,
   IconEye,
   IconFileText,
   IconGlobe,
@@ -23,7 +22,7 @@ import {
   IconNewspaper,
   IconUsers,
   IconXCircle,
-  IconZap,
+  IconZap
 } from '../../../components/icons';
 
 interface ActivityItem {
@@ -77,7 +76,7 @@ interface CollectionStat {
     IconAlertCircle,
     IconXCircle,
     IconEye,
-    IconZap,
+    IconZap
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -86,7 +85,9 @@ interface CollectionStat {
       <div class="flex items-center justify-between">
         <div>
           <h1 class="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p class="text-sm text-muted-foreground mt-1">Welcome back. Here's what's happening with your CMS.</p>
+          <p class="text-sm text-muted-foreground mt-1">
+            Welcome back. Here's what's happening with your CMS.
+          </p>
         </div>
         <div class="flex items-center gap-2">
           <volt-button variant="outline" size="sm">
@@ -112,7 +113,9 @@ interface CollectionStat {
                 <span class="text-muted-foreground">vs last month</span>
               </div>
             </div>
-            <div class="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+            <div
+              class="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center"
+            >
               <icon-file-text class="h-5 w-5" />
             </div>
           </div>
@@ -128,7 +131,9 @@ interface CollectionStat {
                 <span class="text-muted-foreground">of total</span>
               </div>
             </div>
-            <div class="h-10 w-10 rounded-lg bg-success/10 text-success flex items-center justify-center">
+            <div
+              class="h-10 w-10 rounded-lg bg-success/10 text-success flex items-center justify-center"
+            >
               <icon-check-circle class="h-5 w-5" />
             </div>
           </div>
@@ -144,7 +149,9 @@ interface CollectionStat {
                 <span class="text-muted-foreground">pending review</span>
               </div>
             </div>
-            <div class="h-10 w-10 rounded-lg bg-warning/10 text-warning flex items-center justify-center">
+            <div
+              class="h-10 w-10 rounded-lg bg-warning/10 text-warning flex items-center justify-center"
+            >
               <icon-alert-circle class="h-5 w-5" />
             </div>
           </div>
@@ -180,13 +187,25 @@ interface CollectionStat {
               <volt-card class="p-4 hover:border-primary/50 transition-all cursor-pointer group">
                 <div class="flex items-start justify-between">
                   <div class="flex items-center gap-3">
-                    <div class="h-9 w-9 rounded-lg bg-muted flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                    <div
+                      class="h-9 w-9 rounded-lg bg-muted flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors"
+                    >
                       @switch (col.icon) {
-                        @case ('globe') { <icon-globe class="h-4 w-4" /> }
-                        @case ('newspaper') { <icon-newspaper class="h-4 w-4" /> }
-                        @case ('image') { <icon-image class="h-4 w-4" /> }
-                        @case ('users') { <icon-users class="h-4 w-4" /> }
-                        @default { <icon-file-text class="h-4 w-4" /> }
+                        @case ('globe') {
+                          <icon-globe class="h-4 w-4" />
+                        }
+                        @case ('newspaper') {
+                          <icon-newspaper class="h-4 w-4" />
+                        }
+                        @case ('image') {
+                          <icon-image class="h-4 w-4" />
+                        }
+                        @case ('users') {
+                          <icon-users class="h-4 w-4" />
+                        }
+                        @default {
+                          <icon-file-text class="h-4 w-4" />
+                        }
                       }
                     </div>
                     <div>
@@ -194,7 +213,11 @@ interface CollectionStat {
                       <p class="text-xs text-muted-foreground">{{ col.count }} documents</p>
                     </div>
                   </div>
-                  <volt-button variant="ghost" size="icon" class="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <volt-button
+                    variant="ghost"
+                    size="icon"
+                    class="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
                     <icon-eye class="h-3.5 w-3.5" />
                   </volt-button>
                 </div>
@@ -219,12 +242,16 @@ interface CollectionStat {
                 <div class="flex items-start gap-3">
                   <volt-avatar>
                     <img [src]="draft.authorAvatar" [alt]="draft.author" voltAvatarImage />
-                    <volt-avatar-fallback>{{ draft.author.slice(0, 2).toUpperCase() }}</volt-avatar-fallback>
+                    <volt-avatar-fallback>{{
+                      draft.author.slice(0, 2).toUpperCase()
+                    }}</volt-avatar-fallback>
                   </volt-avatar>
                   <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium truncate">{{ draft.title }}</p>
                     <div class="flex items-center gap-2 mt-1">
-                      <volt-badge variant="outline" class="text-xs py-0">{{ draft.collection }}</volt-badge>
+                      <volt-badge variant="outline" class="text-xs py-0">{{
+                        draft.collection
+                      }}</volt-badge>
                       <span class="text-xs text-muted-foreground">{{ draft.updatedAt }}</span>
                     </div>
                   </div>
@@ -261,27 +288,37 @@ interface CollectionStat {
                     <td class="px-4 py-3">
                       @switch (item.action) {
                         @case ('published') {
-                          <div class="h-6 w-6 rounded-full bg-success/10 text-success flex items-center justify-center">
+                          <div
+                            class="h-6 w-6 rounded-full bg-success/10 text-success flex items-center justify-center"
+                          >
                             <icon-check-circle class="h-3.5 w-3.5" />
                           </div>
                         }
                         @case ('created') {
-                          <div class="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                          <div
+                            class="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center"
+                          >
                             <icon-file-text class="h-3.5 w-3.5" />
                           </div>
                         }
                         @case ('updated') {
-                          <div class="h-6 w-6 rounded-full bg-info/10 text-info flex items-center justify-center">
+                          <div
+                            class="h-6 w-6 rounded-full bg-info/10 text-info flex items-center justify-center"
+                          >
                             <icon-bar-chart class="h-3.5 w-3.5" />
                           </div>
                         }
                         @case ('deleted') {
-                          <div class="h-6 w-6 rounded-full bg-destructive/10 text-destructive flex items-center justify-center">
+                          <div
+                            class="h-6 w-6 rounded-full bg-destructive/10 text-destructive flex items-center justify-center"
+                          >
                             <icon-x-circle class="h-3.5 w-3.5" />
                           </div>
                         }
                         @case ('unpublished') {
-                          <div class="h-6 w-6 rounded-full bg-warning/10 text-warning flex items-center justify-center">
+                          <div
+                            class="h-6 w-6 rounded-full bg-warning/10 text-warning flex items-center justify-center"
+                          >
                             <icon-alert-circle class="h-3.5 w-3.5" />
                           </div>
                         }
@@ -296,12 +333,16 @@ interface CollectionStat {
                       <div class="flex items-center gap-2">
                         <volt-avatar>
                           <img [src]="item.userAvatar" [alt]="item.user" voltAvatarImage />
-                          <volt-avatar-fallback>{{ item.user.slice(0, 2).toUpperCase() }}</volt-avatar-fallback>
+                          <volt-avatar-fallback>{{
+                            item.user.slice(0, 2).toUpperCase()
+                          }}</volt-avatar-fallback>
                         </volt-avatar>
                         <span class="text-sm">{{ item.user }}</span>
                       </div>
                     </td>
-                    <td class="px-4 py-3 text-right text-muted-foreground text-xs">{{ item.time }}</td>
+                    <td class="px-4 py-3 text-right text-muted-foreground text-xs">
+                      {{ item.time }}
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -355,7 +396,7 @@ interface CollectionStat {
         </div>
       </div>
     </div>
-  `,
+  `
 })
 export class DashboardPage {
   collections: CollectionStat[] = [
@@ -364,23 +405,107 @@ export class DashboardPage {
     { name: 'Products', slug: 'products', count: 48, icon: 'file-text', lastModified: '1d ago' },
     { name: 'Media', slug: 'media', count: 3456, icon: 'image', lastModified: '30m ago' },
     { name: 'Users', slug: 'users', count: 42, icon: 'users', lastModified: '3d ago' },
-    { name: 'Categories', slug: 'categories', count: 12, icon: 'file-text', lastModified: '1w ago' },
+    { name: 'Categories', slug: 'categories', count: 12, icon: 'file-text', lastModified: '1w ago' }
   ];
 
   drafts: DraftItem[] = [
-    { id: '1', title: 'Q3 Marketing Strategy', collection: 'Posts', author: 'Sarah Miller', authorAvatar: 'https://i.pravatar.cc/150?u=2', updatedAt: '2h ago' },
-    { id: '2', title: 'New Product Launch Page', collection: 'Pages', author: 'Mike Kim', authorAvatar: 'https://i.pravatar.cc/150?u=3', updatedAt: '5h ago' },
-    { id: '3', title: 'Team Handbook v2', collection: 'Pages', author: 'Anna Lee', authorAvatar: 'https://i.pravatar.cc/150?u=4', updatedAt: '1d ago' },
-    { id: '4', title: 'API Documentation', collection: 'Posts', author: 'John Doe', authorAvatar: 'https://i.pravatar.cc/150?u=1', updatedAt: '1d ago' },
+    {
+      id: '1',
+      title: 'Q3 Marketing Strategy',
+      collection: 'Posts',
+      author: 'Sarah Miller',
+      authorAvatar: 'https://i.pravatar.cc/150?u=2',
+      updatedAt: '2h ago'
+    },
+    {
+      id: '2',
+      title: 'New Product Launch Page',
+      collection: 'Pages',
+      author: 'Mike Kim',
+      authorAvatar: 'https://i.pravatar.cc/150?u=3',
+      updatedAt: '5h ago'
+    },
+    {
+      id: '3',
+      title: 'Team Handbook v2',
+      collection: 'Pages',
+      author: 'Anna Lee',
+      authorAvatar: 'https://i.pravatar.cc/150?u=4',
+      updatedAt: '1d ago'
+    },
+    {
+      id: '4',
+      title: 'API Documentation',
+      collection: 'Posts',
+      author: 'John Doe',
+      authorAvatar: 'https://i.pravatar.cc/150?u=1',
+      updatedAt: '1d ago'
+    }
   ];
 
   activityLog: ActivityItem[] = [
-    { id: '1', action: 'published', user: 'John Doe', userAvatar: 'https://i.pravatar.cc/150?u=1', document: 'Homepage Hero Update', collection: 'Pages', time: '2h ago' },
-    { id: '2', action: 'created', user: 'Sarah Miller', userAvatar: 'https://i.pravatar.cc/150?u=2', document: 'Q3 Marketing Strategy', collection: 'Posts', time: '3h ago' },
-    { id: '3', action: 'updated', user: 'Mike Kim', userAvatar: 'https://i.pravatar.cc/150?u=3', document: 'Pricing Page', collection: 'Pages', time: '5h ago' },
-    { id: '4', action: 'deleted', user: 'Robert Johnson', userAvatar: 'https://i.pravatar.cc/150?u=5', document: 'Old Landing Page', collection: 'Pages', time: '1d ago' },
-    { id: '5', action: 'published', user: 'Anna Lee', userAvatar: 'https://i.pravatar.cc/150?u=4', document: 'Getting Started Guide', collection: 'Posts', time: '1d ago' },
-    { id: '6', action: 'unpublished', user: 'John Doe', userAvatar: 'https://i.pravatar.cc/150?u=1', document: 'Deprecated API Docs', collection: 'Posts', time: '2d ago' },
-    { id: '7', action: 'created', user: 'Sarah Miller', userAvatar: 'https://i.pravatar.cc/150?u=2', document: 'Summer Sale Banner', collection: 'Media', time: '2d ago' },
+    {
+      id: '1',
+      action: 'published',
+      user: 'John Doe',
+      userAvatar: 'https://i.pravatar.cc/150?u=1',
+      document: 'Homepage Hero Update',
+      collection: 'Pages',
+      time: '2h ago'
+    },
+    {
+      id: '2',
+      action: 'created',
+      user: 'Sarah Miller',
+      userAvatar: 'https://i.pravatar.cc/150?u=2',
+      document: 'Q3 Marketing Strategy',
+      collection: 'Posts',
+      time: '3h ago'
+    },
+    {
+      id: '3',
+      action: 'updated',
+      user: 'Mike Kim',
+      userAvatar: 'https://i.pravatar.cc/150?u=3',
+      document: 'Pricing Page',
+      collection: 'Pages',
+      time: '5h ago'
+    },
+    {
+      id: '4',
+      action: 'deleted',
+      user: 'Robert Johnson',
+      userAvatar: 'https://i.pravatar.cc/150?u=5',
+      document: 'Old Landing Page',
+      collection: 'Pages',
+      time: '1d ago'
+    },
+    {
+      id: '5',
+      action: 'published',
+      user: 'Anna Lee',
+      userAvatar: 'https://i.pravatar.cc/150?u=4',
+      document: 'Getting Started Guide',
+      collection: 'Posts',
+      time: '1d ago'
+    },
+    {
+      id: '6',
+      action: 'unpublished',
+      user: 'John Doe',
+      userAvatar: 'https://i.pravatar.cc/150?u=1',
+      document: 'Deprecated API Docs',
+      collection: 'Posts',
+      time: '2d ago'
+    },
+    {
+      id: '7',
+      action: 'created',
+      user: 'Sarah Miller',
+      userAvatar: 'https://i.pravatar.cc/150?u=2',
+      document: 'Summer Sale Banner',
+      collection: 'Media',
+      time: '2d ago'
+    }
   ];
 }

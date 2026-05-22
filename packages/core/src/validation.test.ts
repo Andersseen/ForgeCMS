@@ -86,9 +86,7 @@ describe('runtime validation', () => {
 
     it('passes empty optional text field', () => {
       const result = validateCollection(posts, {});
-      expect(result.errors).not.toContainEqual(
-        expect.objectContaining({ field: 'excerpt' })
-      );
+      expect(result.errors).not.toContainEqual(expect.objectContaining({ field: 'excerpt' }));
     });
   });
 
@@ -134,23 +132,17 @@ describe('runtime validation', () => {
   describe('date field validation', () => {
     it('accepts Date object', () => {
       const result = validateCollection(posts, { publishedAt: new Date() });
-      expect(result.errors).not.toContainEqual(
-        expect.objectContaining({ field: 'publishedAt' })
-      );
+      expect(result.errors).not.toContainEqual(expect.objectContaining({ field: 'publishedAt' }));
     });
 
     it('accepts ISO string', () => {
       const result = validateCollection(posts, { publishedAt: '2026-05-19T10:00:00Z' });
-      expect(result.errors).not.toContainEqual(
-        expect.objectContaining({ field: 'publishedAt' })
-      );
+      expect(result.errors).not.toContainEqual(expect.objectContaining({ field: 'publishedAt' }));
     });
 
     it('accepts timestamp number', () => {
       const result = validateCollection(posts, { publishedAt: Date.now() });
-      expect(result.errors).not.toContainEqual(
-        expect.objectContaining({ field: 'publishedAt' })
-      );
+      expect(result.errors).not.toContainEqual(expect.objectContaining({ field: 'publishedAt' }));
     });
 
     it('fails on invalid string', () => {
@@ -171,9 +163,7 @@ describe('runtime validation', () => {
   describe('relation field validation', () => {
     it('accepts single string relation', () => {
       const result = validateCollection(posts, { author: 'user-1' });
-      expect(result.errors).not.toContainEqual(
-        expect.objectContaining({ field: 'author' })
-      );
+      expect(result.errors).not.toContainEqual(expect.objectContaining({ field: 'author' }));
     });
 
     it('fails on non-string single relation', () => {
@@ -185,9 +175,7 @@ describe('runtime validation', () => {
 
     it('accepts array for many relation', () => {
       const result = validateCollection(posts, { tags: ['tag-1', 'tag-2'] });
-      expect(result.errors).not.toContainEqual(
-        expect.objectContaining({ field: 'tags' })
-      );
+      expect(result.errors).not.toContainEqual(expect.objectContaining({ field: 'tags' }));
     });
 
     it('fails on non-array for many relation', () => {

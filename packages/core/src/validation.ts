@@ -30,15 +30,15 @@ export interface ValidationResult {
   errors: ValidationError[];
 }
 
-function createError(
-  field: string,
-  code: ValidationErrorCode,
-  message: string
-): ValidationError {
+function createError(field: string, code: ValidationErrorCode, message: string): ValidationError {
   return { field, message, code };
 }
 
-export function validateField(field: AnyField, value: unknown, fieldName: string): ValidationError[] {
+export function validateField(
+  field: AnyField,
+  value: unknown,
+  fieldName: string
+): ValidationError[] {
   const errors: ValidationError[] = [];
   const opts = field.options;
 

@@ -1,9 +1,7 @@
 import type { DatabaseAdapter } from '@forge-cms/db';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-export function runDatabaseAdapterContractTests(
-  createAdapter: () => DatabaseAdapter
-) {
+export function runDatabaseAdapterContractTests(createAdapter: () => DatabaseAdapter) {
   describe('DatabaseAdapter contract', () => {
     let adapter: DatabaseAdapter;
 

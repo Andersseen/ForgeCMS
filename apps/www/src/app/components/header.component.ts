@@ -10,13 +10,7 @@ import { VoltButton } from '@voltui/components';
   template: `
     <header class="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-5 md:px-8">
       <a class="flex items-center gap-3 text-sm font-semibold text-foreground" href="#">
-        <img
-          class="size-9 rounded-md"
-          src="/logo.svg"
-          alt="ForgeCMS logo"
-          width="36"
-          height="36"
-        />
+        <img class="size-9 rounded-md" src="/logo.svg" alt="ForgeCMS logo" width="36" height="36" />
         <span>ForgeCMS</span>
       </a>
 

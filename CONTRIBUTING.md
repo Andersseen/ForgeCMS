@@ -25,17 +25,17 @@ pnpm typecheck
 
 This project uses **pnpm workspaces** + **Turborepo**. Key commands:
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start all apps in dev mode |
-| `pnpm dev:www` | Start landing app only |
-| `pnpm build` | Build all packages and apps |
-| `pnpm test` | Run all tests |
-| `pnpm test:watch` | Run tests in watch mode |
-| `pnpm lint` | Lint all packages |
-| `pnpm typecheck` | Type-check all packages |
-| `pnpm format` | Format code with Prettier |
-| `pnpm clean` | Clean all build artifacts |
+| Command           | Description                 |
+| ----------------- | --------------------------- |
+| `pnpm dev`        | Start all apps in dev mode  |
+| `pnpm dev:www`    | Start landing app only      |
+| `pnpm build`      | Build all packages and apps |
+| `pnpm test`       | Run all tests               |
+| `pnpm test:watch` | Run tests in watch mode     |
+| `pnpm lint`       | Lint all packages           |
+| `pnpm typecheck`  | Type-check all packages     |
+| `pnpm format`     | Format code with Prettier   |
+| `pnpm clean`      | Clean all build artifacts   |
 
 ## Making Changes
 
@@ -81,6 +81,7 @@ packages/
 ```
 
 Each package:
+
 - Must have `type: "module"` (ESM only)
 - Must pass `lint`, `typecheck`, and `test`
 - Should have `sideEffects: false`

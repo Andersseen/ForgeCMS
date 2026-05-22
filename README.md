@@ -64,15 +64,15 @@ packages/
 
 ## Packages
 
-| Package | Version | Description |
-|---------|---------|-------------|
-| `@forge-cms/core` | 0.0.0 | Schema DSL with types + runtime validation |
-| `@forge-cms/db` | 0.0.0 | DatabaseAdapter contract |
-| `@forge-cms/auth` | 0.0.0 | AuthAdapter contract |
-| `@forge-cms/storage` | 0.0.0 | StorageAdapter contract |
-| `@forge-cms/api` | 0.0.0 | CRUD/API helpers |
-| `@forge-cms/admin` | 0.0.0 | Angular admin placeholder |
-| `@forge-cms/testing` | 0.0.0 | Shared test utilities |
+| Package              | Version | Description                                |
+| -------------------- | ------- | ------------------------------------------ |
+| `@forge-cms/core`    | 0.0.0   | Schema DSL with types + runtime validation |
+| `@forge-cms/db`      | 0.0.0   | DatabaseAdapter contract                   |
+| `@forge-cms/auth`    | 0.0.0   | AuthAdapter contract                       |
+| `@forge-cms/storage` | 0.0.0   | StorageAdapter contract                    |
+| `@forge-cms/api`     | 0.0.0   | CRUD/API helpers                           |
+| `@forge-cms/admin`   | 0.0.0   | Angular admin placeholder                  |
+| `@forge-cms/testing` | 0.0.0   | Shared test utilities                      |
 
 ## Contributing
 

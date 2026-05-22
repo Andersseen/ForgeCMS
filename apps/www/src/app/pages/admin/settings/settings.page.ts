@@ -8,7 +8,7 @@ import {
   VoltTabs,
   VoltTabsContent,
   VoltTabsList,
-  VoltTabsTrigger,
+  VoltTabsTrigger
 } from '@voltui/components';
 import {
   IconCode,
@@ -18,7 +18,7 @@ import {
   IconMail,
   IconShield,
   IconTerminal,
-  IconZap,
+  IconZap
 } from '../../../components/icons';
 
 @Component({
@@ -41,22 +41,42 @@ import {
     IconMail,
     IconHardDrive,
     IconDatabase,
-    IconTerminal,
+    IconTerminal
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-6">
       <div>
         <h1 class="text-2xl font-bold tracking-tight">Settings</h1>
-        <p class="text-sm text-muted-foreground mt-1">Configure your CMS instance and preferences.</p>
+        <p class="text-sm text-muted-foreground mt-1">
+          Configure your CMS instance and preferences.
+        </p>
       </div>
 
       <volt-tabs [value]="activeTab()" (valueChange)="activeTab.set($event)">
-        <volt-tabs-list class="w-full justify-start border-b border-border rounded-none bg-transparent p-0 h-auto">
-          <volt-tabs-trigger value="general" class="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-sm">General</volt-tabs-trigger>
-          <volt-tabs-trigger value="api" class="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-sm">API</volt-tabs-trigger>
-          <volt-tabs-trigger value="media" class="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-sm">Media</volt-tabs-trigger>
-          <volt-tabs-trigger value="security" class="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-sm">Security</volt-tabs-trigger>
+        <volt-tabs-list
+          class="w-full justify-start border-b border-border rounded-none bg-transparent p-0 h-auto"
+        >
+          <volt-tabs-trigger
+            value="general"
+            class="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-sm"
+            >General</volt-tabs-trigger
+          >
+          <volt-tabs-trigger
+            value="api"
+            class="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-sm"
+            >API</volt-tabs-trigger
+          >
+          <volt-tabs-trigger
+            value="media"
+            class="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-sm"
+            >Media</volt-tabs-trigger
+          >
+          <volt-tabs-trigger
+            value="security"
+            class="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-sm"
+            >Security</volt-tabs-trigger
+          >
         </volt-tabs-list>
 
         <!-- General Tab -->
@@ -64,7 +84,9 @@ import {
           <div class="max-w-2xl space-y-6">
             <volt-card class="p-6 space-y-4">
               <div class="flex items-center gap-3">
-                <div class="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                <div
+                  class="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center"
+                >
                   <icon-globe class="h-5 w-5" />
                 </div>
                 <div>
@@ -80,7 +102,10 @@ import {
                 </div>
                 <div class="space-y-2">
                   <label class="text-sm font-medium">Description</label>
-                  <volt-input value="An experimental CMS foundation for Angular and Analog.js" class="w-full" />
+                  <volt-input
+                    value="An experimental CMS foundation for Angular and Analog.js"
+                    class="w-full"
+                  />
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                   <div class="space-y-2">
@@ -97,7 +122,9 @@ import {
 
             <volt-card class="p-6 space-y-4">
               <div class="flex items-center gap-3">
-                <div class="h-9 w-9 rounded-lg bg-info/10 text-info flex items-center justify-center">
+                <div
+                  class="h-9 w-9 rounded-lg bg-info/10 text-info flex items-center justify-center"
+                >
                   <icon-mail class="h-5 w-5" />
                 </div>
                 <div>
@@ -135,7 +162,9 @@ import {
           <div class="max-w-2xl space-y-6">
             <volt-card class="p-6 space-y-4">
               <div class="flex items-center gap-3">
-                <div class="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                <div
+                  class="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center"
+                >
                   <icon-code class="h-5 w-5" />
                 </div>
                 <div>
@@ -179,7 +208,9 @@ import {
 
             <volt-card class="p-6 space-y-4">
               <div class="flex items-center gap-3">
-                <div class="h-9 w-9 rounded-lg bg-warning/10 text-warning flex items-center justify-center">
+                <div
+                  class="h-9 w-9 rounded-lg bg-warning/10 text-warning flex items-center justify-center"
+                >
                   <icon-zap class="h-5 w-5" />
                 </div>
                 <div>
@@ -213,7 +244,9 @@ import {
           <div class="max-w-2xl space-y-6">
             <volt-card class="p-6 space-y-4">
               <div class="flex items-center gap-3">
-                <div class="h-9 w-9 rounded-lg bg-info/10 text-info flex items-center justify-center">
+                <div
+                  class="h-9 w-9 rounded-lg bg-info/10 text-info flex items-center justify-center"
+                >
                   <icon-hard-drive class="h-5 w-5" />
                 </div>
                 <div>
@@ -255,7 +288,9 @@ import {
           <div class="max-w-2xl space-y-6">
             <volt-card class="p-6 space-y-4">
               <div class="flex items-center gap-3">
-                <div class="h-9 w-9 rounded-lg bg-success/10 text-success flex items-center justify-center">
+                <div
+                  class="h-9 w-9 rounded-lg bg-success/10 text-success flex items-center justify-center"
+                >
                   <icon-shield class="h-5 w-5" />
                 </div>
                 <div>
@@ -284,7 +319,9 @@ import {
 
             <volt-card class="p-6 space-y-4">
               <div class="flex items-center gap-3">
-                <div class="h-9 w-9 rounded-lg bg-destructive/10 text-destructive flex items-center justify-center">
+                <div
+                  class="h-9 w-9 rounded-lg bg-destructive/10 text-destructive flex items-center justify-center"
+                >
                   <icon-database class="h-5 w-5" />
                 </div>
                 <div>
@@ -320,7 +357,7 @@ import {
         <volt-button>Save Changes</volt-button>
       </div>
     </div>
-  `,
+  `
 })
 export class SettingsPage {
   activeTab = signal('general');

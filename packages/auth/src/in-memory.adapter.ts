@@ -1,4 +1,4 @@
-import { type AuthAdapter, type AuthSession, type AuthUser } from '@forge-cms/auth';
+import type { AuthAdapter, AuthSession, AuthUser } from './index';
 
 export class InMemoryAuthAdapter implements AuthAdapter {
   readonly name = 'in-memory';

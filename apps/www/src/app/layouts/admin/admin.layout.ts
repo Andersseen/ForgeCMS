@@ -16,7 +16,7 @@ import {
   VoltSidebarGroup,
   VoltSidebarHeader,
   VoltSidebarItem,
-  VoltSidebarService,
+  VoltSidebarService
 } from '@voltui/components';
 import {
   IconBarChart,
@@ -35,7 +35,7 @@ import {
   IconSun,
   IconTerminal,
   IconUsers,
-  IconZap,
+  IconZap
 } from '../../components/icons';
 import { ThemeService } from '../../services/theme.service';
 
@@ -79,7 +79,7 @@ interface BreadcrumbItem {
     IconBell,
     IconTerminal,
     IconSun,
-    IconMoon,
+    IconMoon
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -110,11 +110,7 @@ interface BreadcrumbItem {
 
         <volt-sidebar-content>
           <volt-sidebar-group label="Content">
-            <volt-sidebar-item
-              routerLink="/admin"
-              [exact]="true"
-              label="Dashboard"
-            >
+            <volt-sidebar-item routerLink="/admin" [exact]="true" label="Dashboard">
               <icon-bar-chart slot="icon" class="h-4 w-4" />
             </volt-sidebar-item>
             <volt-sidebar-item routerLink="/admin/collections" label="Collections">
@@ -168,7 +164,9 @@ interface BreadcrumbItem {
       <!-- Main Content -->
       <div class="flex-1 overflow-auto min-w-0 flex flex-col">
         <!-- Header -->
-        <div class="h-14 border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0">
+        <div
+          class="h-14 border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0"
+        >
           <div class="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
             <button
               volt-button
@@ -186,7 +184,11 @@ interface BreadcrumbItem {
                   <icon-chevron-right class="h-3.5 w-3.5" />
                 }
                 @if (crumb.routerLink) {
-                  <a [routerLink]="crumb.routerLink" class="hover:text-foreground transition-colors">{{ crumb.label }}</a>
+                  <a
+                    [routerLink]="crumb.routerLink"
+                    class="hover:text-foreground transition-colors"
+                    >{{ crumb.label }}</a
+                  >
                 } @else {
                   <span class="text-foreground font-medium">{{ crumb.label }}</span>
                 }
@@ -200,7 +202,9 @@ interface BreadcrumbItem {
               size="icon"
               class="h-8 w-8"
               (click)="themeService.toggle()"
-              [attr.aria-label]="themeService.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
+              [attr.aria-label]="
+                themeService.isDark() ? 'Switch to light mode' : 'Switch to dark mode'
+              "
             >
               @if (themeService.isDark()) {
                 <icon-sun class="h-4 w-4" />
@@ -210,7 +214,9 @@ interface BreadcrumbItem {
             </volt-button>
             <volt-button variant="ghost" size="icon" class="relative">
               <icon-bell class="h-4 w-4" />
-              <span class="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive ring-2 ring-background"></span>
+              <span
+                class="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive ring-2 ring-background"
+              ></span>
             </volt-button>
             <a routerLink="/">
               <volt-button variant="ghost" size="sm">Exit</volt-button>
@@ -224,7 +230,7 @@ interface BreadcrumbItem {
         </div>
       </div>
     </div>
-  `,
+  `
 })
 export class AdminLayout {
   sidebarService = inject(VoltSidebarService);
@@ -234,7 +240,7 @@ export class AdminLayout {
 
   private routeChanges = toSignal(
     this.router.events.pipe(
-      filter(e => e instanceof NavigationEnd),
+      filter((e) => e instanceof NavigationEnd),
       startWith(null),
       map(() => this.buildBreadcrumbs())
     ),
@@ -246,7 +252,7 @@ export class AdminLayout {
   private buildBreadcrumbs(): BreadcrumbItem[] {
     const crumbs: BreadcrumbItem[] = [{ label: 'Admin', routerLink: '/admin' }];
     const url = this.router.url;
-    
+
     if (url === '/admin') {
       crumbs.push({ label: 'Dashboard' });
     } else if (url.startsWith('/admin/collections')) {
@@ -260,7 +266,7 @@ export class AdminLayout {
     } else if (url.startsWith('/admin/settings')) {
       crumbs.push({ label: 'Settings', routerLink: '/admin/settings' });
     }
-    
+
     return crumbs;
   }
 }

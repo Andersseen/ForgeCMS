@@ -1,11 +1,5 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import {
-  VoltBadge,
-  VoltButton,
-  VoltCard,
-  VoltInput,
-  VoltSeparator,
-} from '@voltui/components';
+import { VoltBadge, VoltButton, VoltCard, VoltInput, VoltSeparator } from '@voltui/components';
 import {
   IconCode,
   IconCopy,
@@ -14,7 +8,7 @@ import {
   IconMoreVertical,
   IconPlus,
   IconTrash,
-  IconZap,
+  IconZap
 } from '../../../components/icons';
 
 interface ApiKey {
@@ -44,7 +38,7 @@ interface ApiKey {
     IconCopy,
     IconTrash,
     IconMoreVertical,
-    IconZap,
+    IconZap
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -145,7 +139,7 @@ interface ApiKey {
         }
       </div>
     </div>
-  `,
+  `
 })
 export class ApiPage {
   apiKeys: ApiKey[] = [
@@ -157,7 +151,7 @@ export class ApiPage {
       permissions: ['read:pages', 'read:posts', 'read:products', 'read:media'],
       lastUsed: '2m ago',
       createdAt: 'Jan 15, 2026',
-      status: 'active',
+      status: 'active'
     },
     {
       id: '2',
@@ -167,7 +161,7 @@ export class ApiPage {
       permissions: ['read:pages', 'read:posts', 'read:products', 'read:media', 'write:forms'],
       lastUsed: '1h ago',
       createdAt: 'Feb 3, 2026',
-      status: 'active',
+      status: 'active'
     },
     {
       id: '3',
@@ -177,7 +171,7 @@ export class ApiPage {
       permissions: ['read:pages', 'read:posts', 'read:users'],
       lastUsed: '5h ago',
       createdAt: 'Mar 12, 2026',
-      status: 'active',
+      status: 'active'
     },
     {
       id: '4',
@@ -187,7 +181,7 @@ export class ApiPage {
       permissions: ['read:*', 'write:*'],
       lastUsed: '1d ago',
       createdAt: 'Apr 1, 2026',
-      status: 'revoked',
-    },
+      status: 'revoked'
+    }
   ];
 }

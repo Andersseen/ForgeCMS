@@ -1,4 +1,4 @@
-import { type PutObjectOptions, type StorageAdapter, type StorageObject } from '@forge-cms/storage';
+import type { PutObjectOptions, StorageAdapter, StorageObject } from './index';
 
 export class InMemoryStorageAdapter implements StorageAdapter {
   readonly name = 'in-memory';

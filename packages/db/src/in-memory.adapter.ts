@@ -1,4 +1,4 @@
-import { type DatabaseAdapter, type FindManyOptions } from '@forge-cms/db';
+import type { DatabaseAdapter, FindManyOptions } from './index';
 
 export class InMemoryDatabaseAdapter implements DatabaseAdapter {
   readonly name = 'in-memory';

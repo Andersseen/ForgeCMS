@@ -26,7 +26,7 @@
   "type": "module",
   "packageManager": "pnpm@10.11.0",
   "engines": {
-    "node": ">=20.19.0",
+    "node": ">=22.0.0",
     "pnpm": ">=10.0.0"
   },
   "scripts": {

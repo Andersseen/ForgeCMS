@@ -1,11 +1,5 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import {
-  VoltBadge,
-  VoltButton,
-  VoltCard,
-  VoltInput,
-  VoltProgress,
-} from '@voltui/components';
+import { VoltBadge, VoltButton, VoltCard, VoltInput, VoltProgress } from '@voltui/components';
 import {
   IconClock,
   IconEye,
@@ -15,7 +9,7 @@ import {
   IconMoreVertical,
   IconPlus,
   IconSearch,
-  IconTrash,
+  IconTrash
 } from '../../../components/icons';
 
 interface MediaItem {
@@ -47,7 +41,7 @@ interface MediaItem {
     IconTrash,
     IconImage,
     IconHardDrive,
-    IconClock,
+    IconClock
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -75,7 +69,9 @@ interface MediaItem {
         <div class="flex items-center justify-between mb-2">
           <div>
             <h3 class="text-sm font-medium">Storage Usage</h3>
-            <p class="text-xs text-muted-foreground mt-0.5">You have used 4.2 GB of your 10 GB limit</p>
+            <p class="text-xs text-muted-foreground mt-0.5">
+              You have used 4.2 GB of your 10 GB limit
+            </p>
           </div>
           <span class="text-sm font-medium">42%</span>
         </div>
@@ -109,7 +105,9 @@ interface MediaItem {
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         @for (item of mediaItems; track item.id) {
           <volt-card class="overflow-hidden group cursor-pointer">
-            <div class="aspect-square bg-muted flex items-center justify-center relative overflow-hidden">
+            <div
+              class="aspect-square bg-muted flex items-center justify-center relative overflow-hidden"
+            >
               @if (item.type === 'image') {
                 <img [src]="item.url" [alt]="item.name" class="h-full w-full object-cover" />
               } @else {
@@ -118,7 +116,9 @@ interface MediaItem {
                   <span class="text-xs">{{ item.mimeType }}</span>
                 </div>
               }
-              <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+              <div
+                class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2"
+              >
                 <volt-button variant="secondary" size="icon" class="h-8 w-8">
                   <icon-eye class="h-4 w-4" />
                 </volt-button>
@@ -138,7 +138,9 @@ interface MediaItem {
                 </volt-button>
               </div>
               <div class="flex items-center gap-2 mt-2">
-                <volt-badge variant="outline" class="text-[10px] py-0">{{ item.collection }}</volt-badge>
+                <volt-badge variant="outline" class="text-[10px] py-0">{{
+                  item.collection
+                }}</volt-badge>
                 <span class="text-xs text-muted-foreground">{{ item.uploadedAt }}</span>
               </div>
               @if (item.dimensions) {
@@ -149,7 +151,7 @@ interface MediaItem {
         }
       </div>
     </div>
-  `,
+  `
 })
 export class MediaPage {
   mediaItems: MediaItem[] = [
@@ -162,7 +164,7 @@ export class MediaPage {
       dimensions: '1920 x 1080',
       url: 'https://picsum.photos/seed/forge1/400/400',
       collection: 'Pages',
-      uploadedAt: '2h ago',
+      uploadedAt: '2h ago'
     },
     {
       id: '2',
@@ -173,7 +175,7 @@ export class MediaPage {
       dimensions: '1200 x 800',
       url: 'https://picsum.photos/seed/forge2/400/400',
       collection: 'Products',
-      uploadedAt: '5h ago',
+      uploadedAt: '5h ago'
     },
     {
       id: '3',
@@ -184,7 +186,7 @@ export class MediaPage {
       dimensions: '2400 x 1600',
       url: 'https://picsum.photos/seed/forge3/400/400',
       collection: 'About',
-      uploadedAt: '1d ago',
+      uploadedAt: '1d ago'
     },
     {
       id: '4',
@@ -194,7 +196,7 @@ export class MediaPage {
       size: '45 MB',
       url: '',
       collection: 'Posts',
-      uploadedAt: '2d ago',
+      uploadedAt: '2d ago'
     },
     {
       id: '5',
@@ -204,7 +206,7 @@ export class MediaPage {
       size: '2.1 MB',
       url: '',
       collection: 'Media',
-      uploadedAt: '3d ago',
+      uploadedAt: '3d ago'
     },
     {
       id: '6',
@@ -215,7 +217,7 @@ export class MediaPage {
       dimensions: '1600 x 900',
       url: 'https://picsum.photos/seed/forge4/400/400',
       collection: 'Posts',
-      uploadedAt: '1w ago',
+      uploadedAt: '1w ago'
     },
     {
       id: '7',
@@ -225,7 +227,7 @@ export class MediaPage {
       size: '45 KB',
       url: 'https://picsum.photos/seed/forge5/400/400',
       collection: 'Products',
-      uploadedAt: '1w ago',
+      uploadedAt: '1w ago'
     },
     {
       id: '8',
@@ -235,7 +237,7 @@ export class MediaPage {
       size: '28 MB',
       url: '',
       collection: 'Pages',
-      uploadedAt: '2w ago',
-    },
+      uploadedAt: '2w ago'
+    }
   ];
 }

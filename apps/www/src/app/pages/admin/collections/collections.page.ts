@@ -8,29 +8,24 @@ import {
   VoltCard,
   VoltInput,
   VoltProgress,
-  VoltSeparator,
+  VoltSeparator
 } from '@voltui/components';
 import {
   IconChevronRight,
   IconClock,
-  IconDatabase,
   IconEdit,
   IconEye,
   IconFileText,
   IconFilter,
   IconGlobe,
-  IconHardDrive,
   IconImage,
   IconLayout,
   IconMoreVertical,
   IconNewspaper,
   IconPlus,
   IconSearch,
-  IconSettings,
-  IconShield,
-  IconTerminal,
   IconTrash,
-  IconUsers,
+  IconUsers
 } from '../../../components/icons';
 
 interface Collection {
@@ -74,7 +69,7 @@ interface Collection {
     IconUsers,
     IconLayout,
     IconClock,
-    IconChevronRight,
+    IconChevronRight
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -106,16 +101,34 @@ interface Collection {
           <volt-card class="p-5 hover:border-primary/50 transition-all cursor-pointer group">
             <div class="flex items-start justify-between">
               <div class="flex items-center gap-3">
-                <div class="h-10 w-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                <div
+                  class="h-10 w-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors"
+                >
                   @switch (col.icon) {
-                    @case ('globe') { <icon-globe class="h-5 w-5" /> }
-                    @case ('newspaper') { <icon-newspaper class="h-5 w-5" /> }
-                    @case ('image') { <icon-image class="h-5 w-5" /> }
-                    @case ('users') { <icon-users class="h-5 w-5" /> }
-                    @case ('settings') { <icon-settings class="h-5 w-5" /> }
-                    @case ('shield') { <icon-shield class="h-5 w-5" /> }
-                    @case ('terminal') { <icon-terminal class="h-5 w-5" /> }
-                    @default { <icon-file-text class="h-5 w-5" /> }
+                    @case ('globe') {
+                      <icon-globe class="h-5 w-5" />
+                    }
+                    @case ('newspaper') {
+                      <icon-newspaper class="h-5 w-5" />
+                    }
+                    @case ('image') {
+                      <icon-image class="h-5 w-5" />
+                    }
+                    @case ('users') {
+                      <icon-users class="h-5 w-5" />
+                    }
+                    @case ('settings') {
+                      <icon-settings class="h-5 w-5" />
+                    }
+                    @case ('shield') {
+                      <icon-shield class="h-5 w-5" />
+                    }
+                    @case ('terminal') {
+                      <icon-terminal class="h-5 w-5" />
+                    }
+                    @default {
+                      <icon-file-text class="h-5 w-5" />
+                    }
                   }
                 </div>
                 <div>
@@ -123,7 +136,9 @@ interface Collection {
                   <p class="text-xs text-muted-foreground">/{{ col.slug }}</p>
                 </div>
               </div>
-              <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div
+                class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
                 <volt-button variant="ghost" size="icon" class="h-7 w-7">
                   <icon-eye class="h-3.5 w-3.5" />
                 </volt-button>
@@ -157,7 +172,10 @@ interface Collection {
 
             <div class="mt-4 flex flex-wrap gap-1.5">
               @for (field of col.fields; track field) {
-                <span class="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{{ field }}</span>
+                <span
+                  class="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                  >{{ field }}</span
+                >
               }
             </div>
 
@@ -172,7 +190,9 @@ interface Collection {
                 <span class="text-xs text-muted-foreground">by</span>
                 <volt-avatar>
                   <img [src]="col.modifiedByAvatar" [alt]="col.modifiedBy" voltAvatarImage />
-                  <volt-avatar-fallback>{{ col.modifiedBy.slice(0, 2).toUpperCase() }}</volt-avatar-fallback>
+                  <volt-avatar-fallback>{{
+                    col.modifiedBy.slice(0, 2).toUpperCase()
+                  }}</volt-avatar-fallback>
                 </volt-avatar>
               </div>
             </div>
@@ -180,7 +200,7 @@ interface Collection {
         }
       </div>
     </div>
-  `,
+  `
 })
 export class CollectionsPage {
   collections: Collection[] = [
@@ -195,7 +215,7 @@ export class CollectionsPage {
       fields: ['slug', 'title', 'content', 'seo', 'meta', 'status'],
       lastModified: '2h ago',
       modifiedBy: 'John Doe',
-      modifiedByAvatar: 'https://i.pravatar.cc/150?u=1',
+      modifiedByAvatar: 'https://i.pravatar.cc/150?u=1'
     },
     {
       id: '2',
@@ -208,7 +228,7 @@ export class CollectionsPage {
       fields: ['slug', 'title', 'excerpt', 'body', 'tags', 'category', 'publishedAt', 'author'],
       lastModified: '5h ago',
       modifiedBy: 'Sarah Miller',
-      modifiedByAvatar: 'https://i.pravatar.cc/150?u=2',
+      modifiedByAvatar: 'https://i.pravatar.cc/150?u=2'
     },
     {
       id: '3',
@@ -221,7 +241,7 @@ export class CollectionsPage {
       fields: ['sku', 'name', 'description', 'price', 'inventory', 'images', 'category'],
       lastModified: '1d ago',
       modifiedBy: 'Mike Kim',
-      modifiedByAvatar: 'https://i.pravatar.cc/150?u=3',
+      modifiedByAvatar: 'https://i.pravatar.cc/150?u=3'
     },
     {
       id: '4',
@@ -234,7 +254,7 @@ export class CollectionsPage {
       fields: ['filename', 'alt', 'mimeType', 'size', 'dimensions', 'url'],
       lastModified: '30m ago',
       modifiedBy: 'Anna Lee',
-      modifiedByAvatar: 'https://i.pravatar.cc/150?u=4',
+      modifiedByAvatar: 'https://i.pravatar.cc/150?u=4'
     },
     {
       id: '5',
@@ -247,7 +267,7 @@ export class CollectionsPage {
       fields: ['email', 'name', 'role', 'avatar', 'status', 'lastLogin'],
       lastModified: '3d ago',
       modifiedBy: 'Admin User',
-      modifiedByAvatar: 'https://i.pravatar.cc/150?u=admin',
+      modifiedByAvatar: 'https://i.pravatar.cc/150?u=admin'
     },
     {
       id: '6',
@@ -260,7 +280,7 @@ export class CollectionsPage {
       fields: ['slug', 'name', 'description', 'parent', 'order'],
       lastModified: '1w ago',
       modifiedBy: 'John Doe',
-      modifiedByAvatar: 'https://i.pravatar.cc/150?u=1',
+      modifiedByAvatar: 'https://i.pravatar.cc/150?u=1'
     },
     {
       id: '7',
@@ -273,7 +293,7 @@ export class CollectionsPage {
       fields: ['name', 'fields', 'submissions', 'webhook', 'notifications'],
       lastModified: '2d ago',
       modifiedBy: 'Robert Johnson',
-      modifiedByAvatar: 'https://i.pravatar.cc/150?u=5',
+      modifiedByAvatar: 'https://i.pravatar.cc/150?u=5'
     },
     {
       id: '8',
@@ -286,7 +306,7 @@ export class CollectionsPage {
       fields: ['name', 'items', 'location', 'locale'],
       lastModified: '3d ago',
       modifiedBy: 'Sarah Miller',
-      modifiedByAvatar: 'https://i.pravatar.cc/150?u=2',
-    },
+      modifiedByAvatar: 'https://i.pravatar.cc/150?u=2'
+    }
   ];
 }
