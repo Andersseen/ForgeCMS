@@ -1,8 +1,21 @@
-export type FieldKind = 'text' | 'number' | 'boolean' | 'date' | 'relation';
+export type FieldKind =
+  | 'text'
+  | 'number'
+  | 'boolean'
+  | 'date'
+  | 'relation'
+  | 'json'
+  | 'select'
+  | 'slug'
+  | 'email'
+  | 'textarea';
 
 export interface BaseFieldOptions {
   label?: string;
   required?: boolean;
+  defaultValue?: unknown;
+  unique?: boolean;
+  index?: boolean;
 }
 
 export interface TextFieldOptions extends BaseFieldOptions {
@@ -26,6 +39,21 @@ export interface RelationFieldOptions extends BaseFieldOptions {
   many?: boolean;
 }
 
+export type JsonFieldOptions = BaseFieldOptions;
+
+export interface SelectFieldOptions extends BaseFieldOptions {
+  options: string[];
+}
+
+export interface SlugFieldOptions extends TextFieldOptions {
+  autoGenerate?: boolean;
+  sourceField?: string;
+}
+
+export type EmailFieldOptions = TextFieldOptions;
+
+export type TextareaFieldOptions = TextFieldOptions;
+
 export interface FieldDefinition<
   TKind extends FieldKind = FieldKind,
   TValue = unknown,
@@ -41,8 +69,24 @@ export type NumberField = FieldDefinition<'number', number, NumberFieldOptions>;
 export type BooleanField = FieldDefinition<'boolean', boolean, BooleanFieldOptions>;
 export type DateField = FieldDefinition<'date', Date, DateFieldOptions>;
 export type RelationField = FieldDefinition<'relation', string | string[], RelationFieldOptions>;
+export type JsonField = FieldDefinition<'json', unknown, JsonFieldOptions>;
+export type SelectField = FieldDefinition<'select', string, SelectFieldOptions>;
+export type SlugField = FieldDefinition<'slug', string, SlugFieldOptions>;
+export type EmailField = FieldDefinition<'email', string, EmailFieldOptions>;
+export type TextareaField = FieldDefinition<'textarea', string, TextareaFieldOptions>;
 
-export type AnyField = TextField | NumberField | BooleanField | DateField | RelationField;
+export type AnyField =
+  | TextField
+  | NumberField
+  | BooleanField
+  | DateField
+  | RelationField
+  | JsonField
+  | SelectField
+  | SlugField
+  | EmailField
+  | TextareaField;
+
 export type FieldMap = Record<string, AnyField>;
 
 export interface CollectionDefinition<
@@ -89,6 +133,21 @@ export const defineField = {
   },
   relation(options: RelationFieldOptions): RelationField {
     return createField<'relation', string | string[], RelationFieldOptions>('relation', options);
+  },
+  json(options: JsonFieldOptions = {}): JsonField {
+    return createField<'json', unknown, JsonFieldOptions>('json', options);
+  },
+  select(options: SelectFieldOptions): SelectField {
+    return createField<'select', string, SelectFieldOptions>('select', options);
+  },
+  slug(options: SlugFieldOptions = {}): SlugField {
+    return createField<'slug', string, SlugFieldOptions>('slug', options);
+  },
+  email(options: EmailFieldOptions = {}): EmailField {
+    return createField<'email', string, EmailFieldOptions>('email', options);
+  },
+  textarea(options: TextareaFieldOptions = {}): TextareaField {
+    return createField<'textarea', string, TextareaFieldOptions>('textarea', options);
   }
 } as const;
 

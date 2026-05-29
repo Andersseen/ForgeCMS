@@ -25,6 +25,7 @@
     "@forge-cms/auth": "workspace:*",
     "@forge-cms/storage": "workspace:*",
     "@forge-cms/runtime": "workspace:*",
+    "@forge-cms/angular": "workspace*",
     "@voltui/components": "^0.1.0",
     "h3": "^1.15.0",
     "rxjs": "^7.8.2",

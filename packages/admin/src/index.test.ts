@@ -1,8 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { adminPackage } from './index';
+import {
+  ForgeAdminLayoutComponent,
+  ForgeCollectionListComponent,
+  ForgeCollectionFormComponent
+} from './index';
 
-describe('admin placeholder', () => {
-  it('exports package metadata', () => {
-    expect(adminPackage.status).toBe('placeholder');
+describe('@forge-cms/admin', () => {
+  it('exports layout component', () => {
+    expect(ForgeAdminLayoutComponent).toBeDefined();
+  });
+
+  it('exports collection list component', () => {
+    expect(ForgeCollectionListComponent).toBeDefined();
+  });
+
+  it('exports collection form component', () => {
+    expect(ForgeCollectionFormComponent).toBeDefined();
   });
 });

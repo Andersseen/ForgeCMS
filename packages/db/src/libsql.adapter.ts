@@ -1,32 +1,41 @@
 import type { CollectionDefinition } from '@forge-cms/core';
-import type { DatabaseAdapter, DatabaseRecord, FindManyOptions } from '@forge-cms/db';
+import type { DatabaseAdapter, DatabaseRecord, FindManyOptions } from './index.js';
 import {
+  getOrCreateDrizzleTable,
   generateCreateTableSql,
   toDbValue,
-  fromDbValue
-} from '@forge-cms/db';
-import type { D1Database } from './bindings.js';
+  fromDbValue,
+  clearTableCache
+} from './schema-generator.js';
+import { drizzle } from 'drizzle-orm/libsql';
+import { createClient, type Client } from '@libsql/client';
+import { eq, and, sql } from 'drizzle-orm';
 
-export interface D1Env {
-  DB: D1Database;
+export interface LibSqlEnv {
+  DATABASE_URL?: string;
 }
 
-export class D1DatabaseAdapter implements DatabaseAdapter {
-  readonly name = 'd1';
-  private db?: D1Database;
+export class LibSqlDatabaseAdapter implements DatabaseAdapter {
+  readonly name = 'libsql';
+  private client?: Client;
+  private db?: ReturnType<typeof drizzle>;
   private collections = new Map<string, CollectionDefinition>();
+  private url: string;
 
-  init(env: unknown): this {
-    const d1Env = env as D1Env;
-    if (!d1Env.DB) {
-      throw new Error('D1DatabaseAdapter requires env.DB binding');
-    }
-    this.db = d1Env.DB;
+  constructor(url?: string) {
+    this.url = url ?? 'file:./forge-cms.db';
+  }
+
+  init(env?: unknown): this {
+    const envRecord = env as LibSqlEnv | undefined;
+    const url = envRecord?.DATABASE_URL ?? this.url;
+    this.client = createClient({ url });
+    this.db = drizzle(this.client);
     return this;
   }
 
-  private getDb(): D1Database {
-    if (!this.db) throw new Error('D1DatabaseAdapter not initialized. Call init() first.');
+  private getDb(): ReturnType<typeof drizzle> {
+    if (!this.db) throw new Error('LibSqlDatabaseAdapter not initialized. Call init() first.');
     return this.db;
   }
 
@@ -34,22 +43,28 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     return this.collections.get(collection);
   }
 
+  private getTable(collection: string) {
+    const def = this.getCollectionDef(collection);
+    if (!def) throw new Error(`Collection '${collection}' not registered. Call syncSchema first.`);
+    return getOrCreateDrizzleTable(def);
+  }
+
   async syncSchema(collections: CollectionDefinition[]): Promise<void> {
     const db = this.getDb();
     this.collections.clear();
+    clearTableCache();
 
     for (const collection of collections) {
       this.collections.set(collection.slug, collection);
+      const createSql = generateCreateTableSql(collection);
+      await db.run(sql.raw(createSql));
 
-      const sql = generateCreateTableSql(collection);
-      await db.exec(sql);
-
-      // Create indexes for fields marked with index: true or unique: true
+      // Create indexes for fields marked with index: true
       for (const [fieldName, field] of Object.entries(collection.fields)) {
         if (field.options.index === true || field.options.unique === true) {
           const uniqueClause = field.options.unique === true ? 'UNIQUE' : '';
           const indexSql = `CREATE ${uniqueClause} INDEX IF NOT EXISTS "idx_${collection.slug}_${fieldName}" ON "${collection.slug}" ("${fieldName}")`;
-          await db.exec(indexSql);
+          await db.run(sql.raw(indexSql));
         }
       }
     }
@@ -57,45 +72,46 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
 
   async findById(collection: string, id: string): Promise<DatabaseRecord | null> {
     const db = this.getDb();
-    const stmt = db.prepare(`SELECT * FROM "${collection}" WHERE id = ?`).bind(id);
-    const result = await stmt.first<DatabaseRecord>();
-    if (!result) return null;
-    return this.hydrateRecord(result, collection);
+    const table = this.getTable(collection);
+    const result = await db
+      .select()
+      .from(table)
+      .where(eq((table as any)['id'], id))
+      .limit(1);
+
+    if (result.length === 0) return null;
+    return this.hydrateRecord(result[0] as DatabaseRecord, collection);
   }
 
   async findMany(options: FindManyOptions): Promise<DatabaseRecord[]> {
     const db = this.getDb();
-    let sql = `SELECT * FROM "${options.collection}"`;
-    const bindings: unknown[] = [];
+    const table = this.getTable(options.collection);
+    let query = db.select().from(table);
 
     if (options.where && Object.keys(options.where).length > 0) {
-      const conditions = Object.keys(options.where)
-        .map((key) => `"${key}" = ?`)
-        .join(' AND ');
-      sql += ` WHERE ${conditions}`;
-      bindings.push(...Object.values(options.where));
+      const conditions = Object.entries(options.where).map(([key, value]) =>
+        eq((table as any)[key], value)
+      );
+      query = query.where(and(...conditions)) as typeof query;
     }
 
     if (options.limit !== undefined) {
-      sql += ` LIMIT ?`;
-      bindings.push(options.limit);
+      query = query.limit(options.limit) as typeof query;
     }
 
     if (options.offset !== undefined) {
-      sql += ` OFFSET ?`;
-      bindings.push(options.offset);
+      query = query.offset(options.offset) as typeof query;
     }
 
-    const stmt = db.prepare(sql);
-    const bound = bindings.length > 0 ? stmt.bind(...bindings) : stmt;
-    const { results } = await bound.all<DatabaseRecord>();
-    return results.map((r) => this.hydrateRecord(r, options.collection));
+    const result = (await query) as DatabaseRecord[];
+    return result.map((r) => this.hydrateRecord(r, options.collection));
   }
 
   async create(collection: string, data: DatabaseRecord): Promise<DatabaseRecord> {
     const db = this.getDb();
     const now = new Date().toISOString();
     const collectionDef = this.getCollectionDef(collection);
+    const table = this.getTable(collection);
 
     const record: DatabaseRecord = {
       id: (data.id as string) || crypto.randomUUID(),
@@ -109,12 +125,7 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
       record[key] = field ? toDbValue(value, field.kind) : value;
     }
 
-    const keys = Object.keys(record);
-    const placeholders = keys.map(() => '?').join(', ');
-    const columns = keys.map((k) => `"${k}"`).join(', ');
-    const sql = `INSERT INTO "${collection}" (${columns}) VALUES (${placeholders})`;
-
-    await db.prepare(sql).bind(...Object.values(record)).run();
+    await db.insert(table).values(record as any);
     return this.findById(collection, record.id as string) as Promise<DatabaseRecord>;
   }
 
@@ -126,6 +137,7 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     const db = this.getDb();
     const now = new Date().toISOString();
     const collectionDef = this.getCollectionDef(collection);
+    const table = this.getTable(collection);
 
     const updates: DatabaseRecord = { updated_at: now };
     for (const [key, value] of Object.entries(data)) {
@@ -134,11 +146,7 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
       updates[key] = field ? toDbValue(value, field.kind) : value;
     }
 
-    const keys = Object.keys(updates);
-    const setClause = keys.map((k) => `"${k}" = ?`).join(', ');
-    const sql = `UPDATE "${collection}" SET ${setClause} WHERE id = ?`;
-
-    await db.prepare(sql).bind(...Object.values(updates), id).run();
+    await db.update(table).set(updates as any).where(eq((table as any)['id'], id));
 
     const updated = await this.findById(collection, id);
     if (!updated) throw new Error(`Record ${id} not found in ${collection}`);
@@ -147,7 +155,8 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
 
   async delete(collection: string, id: string): Promise<void> {
     const db = this.getDb();
-    await db.prepare(`DELETE FROM "${collection}" WHERE id = ?`).bind(id).run();
+    const table = this.getTable(collection);
+    await db.delete(table).where(eq((table as any)['id'], id));
   }
 
   private hydrateRecord(row: DatabaseRecord, collection: string): DatabaseRecord {

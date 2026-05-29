@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, OnInit, signal, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal, inject } from '@angular/core';
+import type { OnInit } from '@angular/core';
 import {
   VoltAvatar,
   VoltAvatarFallback,
@@ -19,7 +20,7 @@ import {
   IconShield,
   IconUsers
 } from '../../../components/icons';
-import { CmsApiService } from '../../../services/cms-api.service';
+import { CmsApiService } from '@forge-cms/angular';
 
 interface User {
   id: string;

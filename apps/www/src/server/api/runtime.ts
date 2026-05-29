@@ -1,20 +1,19 @@
 import { defineCollection, defineField } from '@forge-cms/core';
-import { InMemoryDatabaseAdapter } from '@forge-cms/db';
+import { LibSqlDatabaseAdapter } from '@forge-cms/db';
 import { InMemoryAuthAdapter } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import { ForgeCmsRuntime } from '@forge-cms/runtime';
 
-/** Runtime singleton for the www app server */
-export const serverRuntime = (() => {
+async function createRuntime(): Promise<ForgeCmsRuntime> {
   const pages = defineCollection({
     slug: 'pages',
     fields: {
       title: defineField.text({ required: true }),
-      slug: defineField.text({ required: true }),
-      content: defineField.text(),
-      status: defineField.text(),
-      seo: defineField.text(),
-      meta: defineField.text()
+      slug: defineField.slug({ required: true }),
+      content: defineField.textarea(),
+      status: defineField.select({ options: ['draft', 'published'] }),
+      seo: defineField.json(),
+      meta: defineField.json()
     }
   });
 
@@ -22,13 +21,13 @@ export const serverRuntime = (() => {
     slug: 'posts',
     fields: {
       title: defineField.text({ required: true }),
-      slug: defineField.text({ required: true }),
-      excerpt: defineField.text(),
-      body: defineField.text(),
+      slug: defineField.slug({ required: true }),
+      excerpt: defineField.textarea(),
+      body: defineField.textarea(),
       tags: defineField.relation({ collection: 'tags', many: true }),
       category: defineField.text(),
       publishedAt: defineField.date(),
-      author: defineField.text()
+      author: defineField.relation({ collection: 'users' })
     }
   });
 
@@ -37,7 +36,7 @@ export const serverRuntime = (() => {
     fields: {
       sku: defineField.text({ required: true }),
       name: defineField.text({ required: true }),
-      description: defineField.text(),
+      description: defineField.textarea(),
       price: defineField.number(),
       inventory: defineField.number(),
       images: defineField.relation({ collection: 'media', many: true }),
@@ -60,11 +59,11 @@ export const serverRuntime = (() => {
   const users = defineCollection({
     slug: 'users',
     fields: {
-      email: defineField.text({ required: true }),
+      email: defineField.email({ required: true }),
       name: defineField.text(),
-      role: defineField.text(),
+      role: defineField.select({ options: ['admin', 'editor', 'viewer'] }),
       avatar: defineField.text(),
-      status: defineField.text(),
+      status: defineField.select({ options: ['active', 'inactive'] }),
       lastLogin: defineField.date()
     }
   });
@@ -72,10 +71,10 @@ export const serverRuntime = (() => {
   const categories = defineCollection({
     slug: 'categories',
     fields: {
-      slug: defineField.text({ required: true }),
+      slug: defineField.slug({ required: true }),
       name: defineField.text({ required: true }),
-      description: defineField.text(),
-      parent: defineField.text(),
+      description: defineField.textarea(),
+      parent: defineField.relation({ collection: 'categories' }),
       order: defineField.number()
     }
   });
@@ -84,7 +83,7 @@ export const serverRuntime = (() => {
     slug: 'forms',
     fields: {
       name: defineField.text({ required: true }),
-      fields: defineField.text(),
+      fields: defineField.json(),
       submissions: defineField.number(),
       webhook: defineField.text(),
       notifications: defineField.boolean()
@@ -95,7 +94,7 @@ export const serverRuntime = (() => {
     slug: 'navigation',
     fields: {
       name: defineField.text({ required: true }),
-      items: defineField.text(),
+      items: defineField.json(),
       location: defineField.text(),
       locale: defineField.text()
     }
@@ -104,22 +103,25 @@ export const serverRuntime = (() => {
   const runtime = new ForgeCmsRuntime({
     collections: [pages, posts, products, media, users, categories, forms, navigation],
     adapters: {
-      database: new InMemoryDatabaseAdapter(),
+      database: new LibSqlDatabaseAdapter('file:./.data/forge-cms.db'),
       auth: new InMemoryAuthAdapter(),
       storage: new InMemoryStorageAdapter()
     }
   });
 
   runtime.init();
-
-  // Seed mock data for development
-  void seedData(runtime);
+  await runtime.syncSchema();
+  await seedData(runtime);
 
   return runtime;
-})();
+}
 
 async function seedData(runtime: ForgeCmsRuntime) {
   const db = runtime.adapters.database;
+
+  // Check if already seeded
+  const existing = await db.findMany({ collection: 'pages' });
+  if (existing.length > 0) return;
 
   await db.create('pages', {
     title: 'Home',
@@ -169,3 +171,5 @@ async function seedData(runtime: ForgeCmsRuntime) {
     category: 'software'
   });
 }
+
+export const serverRuntimePromise = createRuntime();

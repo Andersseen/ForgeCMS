@@ -39,13 +39,19 @@
     "test:watch": "vitest --dir .",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "clean": "rm -rf dist coverage"
+    "clean": "rm -rf dist coverage",
+    "db:push": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
-    "@forge-cms/core": "workspace:*"
+    "@forge-cms/core": "workspace:*",
+    "@libsql/client": "^0.17.3",
+    "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
     "@forge-cms/testing": "workspace:*",
+    "drizzle-kit": "^0.31.10",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

@@ -28,7 +28,7 @@ import {
   IconTrash,
   IconUsers
 } from '../../../components/icons';
-import { CmsApiService } from '../../../services/cms-api.service';
+import { CmsApiService } from '@forge-cms/angular';
 
 interface CollectionViewModel {
   id: string;

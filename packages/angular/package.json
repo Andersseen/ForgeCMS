@@ -1,22 +1,22 @@
 {
-  "name": "@forge-cms/admin",
+  "name": "@forge-cms/angular",
   "version": "0.0.0",
-  "description": "Angular admin components and utilities for ForgeCMS.",
+  "description": "Angular SDK and services for ForgeCMS.",
   "author": "ForgeCMS contributors",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/forge-cms/forge-cms.git",
-    "directory": "packages/admin"
+    "directory": "packages/angular"
   },
   "bugs": {
     "url": "https://github.com/forge-cms/forge-cms/issues"
   },
-  "homepage": "https://github.com/forge-cms/forge-cms/tree/main/packages/admin#readme",
+  "homepage": "https://github.com/forge-cms/forge-cms/tree/main/packages/angular#readme",
   "keywords": [
     "cms",
     "angular",
-    "admin",
+    "sdk",
     "typescript"
   ],
   "type": "module",
@@ -42,15 +42,10 @@
     "clean": "rm -rf dist coverage"
   },
   "peerDependencies": {
-    "@angular/core": ">=19.0.0",
-    "@angular/router": ">=19.0.0"
-  },
-  "dependencies": {
-    "@forge-cms/angular": "workspace:*"
+    "@angular/core": ">=19.0.0"
   },
   "devDependencies": {
     "@angular/core": "^21.2.10",
-    "@angular/router": "^21.2.10",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

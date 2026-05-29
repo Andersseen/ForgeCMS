@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, OnInit, signal, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal, inject } from '@angular/core';
+import type { OnInit } from '@angular/core';
 import {
   VoltAvatar,
   VoltAvatarFallback,
@@ -24,7 +25,7 @@ import {
   IconXCircle,
   IconZap
 } from '../../../components/icons';
-import { CmsApiService } from '../../../services/cms-api.service';
+import { CmsApiService } from '@forge-cms/angular';
 import { RouterLink } from '@angular/router';
 
 interface ActivityItem {
@@ -37,21 +38,19 @@ interface ActivityItem {
   time: string;
 }
 
-interface DraftItem {
-  id: string;
-  title: string;
-  collection: string;
-  author: string;
-  authorAvatar: string;
-  updatedAt: string;
-}
-
 interface CollectionStat {
   name: string;
   slug: string;
   count: number;
   icon: string;
   lastModified: string;
+}
+
+interface SystemStatus {
+  database: { name: string; records: number };
+  auth: { name: string; configured: boolean };
+  storage: { name: string; files: number };
+  api: { version: string; status: string };
 }
 
 @Component({
@@ -273,91 +272,15 @@ interface CollectionStat {
           </div>
         </div>
 
-        <!-- Activity Log (mock — activity tracking not yet implemented) -->
+        <!-- Activity Log -->
         <div class="space-y-4">
           <div class="flex items-center justify-between">
             <h2 class="text-lg font-semibold">Recent Activity</h2>
-            <volt-button variant="ghost" size="sm">View All Activity</volt-button>
           </div>
-          <volt-card class="overflow-hidden">
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-muted/50">
-                  <tr class="border-b border-border">
-                    <th class="h-10 px-4 text-left font-medium text-muted-foreground w-10"></th>
-                    <th class="h-10 px-4 text-left font-medium text-muted-foreground">Action</th>
-                    <th class="h-10 px-4 text-left font-medium text-muted-foreground">Document</th>
-                    <th class="h-10 px-4 text-left font-medium text-muted-foreground">Collection</th>
-                    <th class="h-10 px-4 text-left font-medium text-muted-foreground">User</th>
-                    <th class="h-10 px-4 text-right font-medium text-muted-foreground">Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (item of activityLog; track item.id) {
-                    <tr class="border-b border-border hover:bg-muted/30 transition-colors">
-                      <td class="px-4 py-3">
-                        @switch (item.action) {
-                          @case ('published') {
-                            <div
-                              class="h-6 w-6 rounded-full bg-success/10 text-success flex items-center justify-center"
-                            >
-                              <icon-check-circle class="h-3.5 w-3.5" />
-                            </div>
-                          }
-                          @case ('created') {
-                            <div
-                              class="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center"
-                            >
-                              <icon-file-text class="h-3.5 w-3.5" />
-                            </div>
-                          }
-                          @case ('updated') {
-                            <div
-                              class="h-6 w-6 rounded-full bg-info/10 text-info flex items-center justify-center"
-                            >
-                              <icon-bar-chart class="h-3.5 w-3.5" />
-                            </div>
-                          }
-                          @case ('deleted') {
-                            <div
-                              class="h-6 w-6 rounded-full bg-destructive/10 text-destructive flex items-center justify-center"
-                            >
-                              <icon-x-circle class="h-3.5 w-3.5" />
-                            </div>
-                          }
-                          @case ('unpublished') {
-                            <div
-                              class="h-6 w-6 rounded-full bg-warning/10 text-warning flex items-center justify-center"
-                            >
-                              <icon-alert-circle class="h-3.5 w-3.5" />
-                            </div>
-                          }
-                        }
-                      </td>
-                      <td class="px-4 py-3">
-                        <span class="capitalize font-medium text-xs">{{ item.action }}</span>
-                      </td>
-                      <td class="px-4 py-3 font-medium">{{ item.document }}</td>
-                      <td class="px-4 py-3 text-muted-foreground">{{ item.collection }}</td>
-                      <td class="px-4 py-3">
-                        <div class="flex items-center gap-2">
-                          <volt-avatar>
-                            <img [src]="item.userAvatar" [alt]="item.user" voltAvatarImage />
-                            <volt-avatar-fallback>{{
-                              item.user.slice(0, 2).toUpperCase()
-                            }}</volt-avatar-fallback>
-                          </volt-avatar>
-                          <span class="text-sm">{{ item.user }}</span>
-                        </div>
-                      </td>
-                      <td class="px-4 py-3 text-right text-muted-foreground text-xs">
-                        {{ item.time }}
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
+          <volt-card class="p-6">
+            <p class="text-sm text-muted-foreground text-center py-8">
+              Activity tracking is not yet implemented.
+            </p>
           </volt-card>
         </div>
 
@@ -371,11 +294,13 @@ interface CollectionStat {
                   <icon-hard-drive class="h-4 w-4 text-muted-foreground" />
                   <h3 class="text-sm font-medium">Storage</h3>
                 </div>
-                <span class="text-xs font-medium text-success">Healthy</span>
+                <span class="text-xs font-medium" [class.text-success]="status()?.storage?.name === 'r2'" [class.text-warning]="status()?.storage?.name !== 'r2'">
+                  {{ status()?.storage?.name === 'r2' ? 'Healthy' : 'Not configured' }}
+                </span>
               </div>
-              <p class="text-xs text-muted-foreground mb-3">R2 bucket connected</p>
+              <p class="text-xs text-muted-foreground mb-3">{{ status()?.storage?.name ?? '—' }}</p>
               <volt-progress [value]="0" />
-              <p class="text-xs text-muted-foreground mt-2">No files stored yet</p>
+              <p class="text-xs text-muted-foreground mt-2">{{ status()?.storage?.files ?? 0 }} files</p>
             </volt-card>
 
             <volt-card class="p-4">
@@ -386,9 +311,9 @@ interface CollectionStat {
                 </div>
                 <span class="text-xs font-medium text-success">Healthy</span>
               </div>
-              <p class="text-xs text-muted-foreground mb-3">{{ totalDocuments() }} records</p>
-              <volt-progress [value]="Math.min(totalDocuments() / 10, 100)" />
-              <p class="text-xs text-muted-foreground mt-2">D1 SQLite (edge)</p>
+              <p class="text-xs text-muted-foreground mb-3">{{ status()?.database?.records ?? totalDocuments() }} records</p>
+              <volt-progress [value]="Math.min((status()?.database?.records ?? totalDocuments()) / 10, 100)" />
+              <p class="text-xs text-muted-foreground mt-2">{{ status()?.database?.name ?? 'in-memory' }}</p>
             </volt-card>
 
             <volt-card class="p-4">
@@ -397,11 +322,11 @@ interface CollectionStat {
                   <icon-globe class="h-4 w-4 text-muted-foreground" />
                   <h3 class="text-sm font-medium">API</h3>
                 </div>
-                <span class="text-xs font-medium text-success">Online</span>
+                <span class="text-xs font-medium text-success">{{ status()?.api?.status ?? 'Online' }}</span>
               </div>
-              <p class="text-xs text-muted-foreground mb-3">REST API v1</p>
+              <p class="text-xs text-muted-foreground mb-3">REST API {{ status()?.api?.version ?? 'v1' }}</p>
               <volt-progress [value]="100" />
-              <p class="text-xs text-muted-foreground mt-2">Edge-ready handlers</p>
+              <p class="text-xs text-muted-foreground mt-2">ForgeCMS runtime</p>
             </volt-card>
           </div>
         </div>
@@ -416,11 +341,24 @@ export class DashboardPage implements OnInit {
   totalDocuments = signal(0);
   loading = signal(true);
   error = signal<string | null>(null);
+  status = signal<SystemStatus | null>(null);
 
   protected readonly Math = Math;
 
-  ngOnInit() {
-    this.loadData();
+  async ngOnInit() {
+    await this.loadData();
+    await this.loadStatus();
+  }
+
+  async loadStatus() {
+    try {
+      const response = await fetch('/api/status');
+      if (!response.ok) return;
+      const result = (await response.json()) as { data: SystemStatus };
+      this.status.set(result.data);
+    } catch {
+      // silently ignore status errors
+    }
   }
 
   async loadData() {
@@ -472,60 +410,5 @@ export class DashboardPage implements OnInit {
     }
   }
 
-  activityLog: ActivityItem[] = [
-    {
-      id: '1',
-      action: 'published',
-      user: 'John Doe',
-      userAvatar: 'https://i.pravatar.cc/150?u=1',
-      document: 'Homepage Hero Update',
-      collection: 'Pages',
-      time: '2h ago'
-    },
-    {
-      id: '2',
-      action: 'created',
-      user: 'Sarah Miller',
-      userAvatar: 'https://i.pravatar.cc/150?u=2',
-      document: 'Q3 Marketing Strategy',
-      collection: 'Posts',
-      time: '3h ago'
-    },
-    {
-      id: '3',
-      action: 'updated',
-      user: 'Mike Kim',
-      userAvatar: 'https://i.pravatar.cc/150?u=3',
-      document: 'Pricing Page',
-      collection: 'Pages',
-      time: '5h ago'
-    },
-    {
-      id: '4',
-      action: 'deleted',
-      user: 'Robert Johnson',
-      userAvatar: 'https://i.pravatar.cc/150?u=5',
-      document: 'Old Landing Page',
-      collection: 'Pages',
-      time: '1d ago'
-    },
-    {
-      id: '5',
-      action: 'published',
-      user: 'Anna Lee',
-      userAvatar: 'https://i.pravatar.cc/150?u=4',
-      document: 'Getting Started Guide',
-      collection: 'Posts',
-      time: '1d ago'
-    },
-    {
-      id: '6',
-      action: 'unpublished',
-      user: 'John Doe',
-      userAvatar: 'https://i.pravatar.cc/150?u=1',
-      document: 'Deprecated API Docs',
-      collection: 'Posts',
-      time: '2d ago'
-    }
-  ];
+  activityLog: ActivityItem[] = []; // Activity tracking not yet implemented
 }

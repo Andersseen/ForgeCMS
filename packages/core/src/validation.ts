@@ -3,6 +3,7 @@ import type {
   CollectionDefinition,
   NumberFieldOptions,
   RelationFieldOptions,
+  SelectFieldOptions,
   TextFieldOptions
 } from './index.js';
 
@@ -19,11 +20,19 @@ export type ValidationErrorCode =
   | 'type_boolean'
   | 'type_date'
   | 'type_relation'
+  | 'type_json'
+  | 'type_select'
+  | 'type_slug'
+  | 'type_email'
+  | 'type_textarea'
   | 'minLength'
   | 'maxLength'
   | 'min'
   | 'max'
-  | 'relation_collection';
+  | 'relation_collection'
+  | 'select_option'
+  | 'slug_format'
+  | 'email_format';
 
 export interface ValidationResult {
   valid: boolean;
@@ -32,6 +41,43 @@ export interface ValidationResult {
 
 function createError(field: string, code: ValidationErrorCode, message: string): ValidationError {
   return { field, message, code };
+}
+
+function validateTextLike(
+  field: AnyField,
+  value: unknown,
+  fieldName: string,
+  typeCode: ValidationErrorCode,
+  typeLabel: string
+): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  if (typeof value !== 'string') {
+    errors.push(createError(fieldName, typeCode, `Field "${fieldName}" must be a ${typeLabel}.`));
+    return errors;
+  }
+
+  const textOpts = field.options as TextFieldOptions;
+  if (textOpts.minLength !== undefined && value.length < textOpts.minLength) {
+    errors.push(
+      createError(
+        fieldName,
+        'minLength',
+        `Field "${fieldName}" must be at least ${textOpts.minLength} characters.`
+      )
+    );
+  }
+  if (textOpts.maxLength !== undefined && value.length > textOpts.maxLength) {
+    errors.push(
+      createError(
+        fieldName,
+        'maxLength',
+        `Field "${fieldName}" must be at most ${textOpts.maxLength} characters.`
+      )
+    );
+  }
+
+  return errors;
 }
 
 export function validateField(
@@ -57,29 +103,38 @@ export function validateField(
   }
 
   switch (field.kind) {
-    case 'text': {
-      if (typeof value !== 'string') {
-        errors.push(createError(fieldName, 'type_text', `Field "${fieldName}" must be a string.`));
-        break;
+    case 'text':
+    case 'textarea': {
+      errors.push(...validateTextLike(field, value, fieldName, 'type_text', 'string'));
+      break;
+    }
+
+    case 'slug': {
+      errors.push(...validateTextLike(field, value, fieldName, 'type_slug', 'slug'));
+      if (typeof value === 'string') {
+        const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+        if (!slugPattern.test(value)) {
+          errors.push(
+            createError(
+              fieldName,
+              'slug_format',
+              `Field "${fieldName}" must be a valid slug (lowercase letters, numbers, hyphens).`
+            )
+          );
+        }
       }
-      const textOpts = opts as TextFieldOptions;
-      if (textOpts.minLength !== undefined && value.length < textOpts.minLength) {
-        errors.push(
-          createError(
-            fieldName,
-            'minLength',
-            `Field "${fieldName}" must be at least ${textOpts.minLength} characters.`
-          )
-        );
-      }
-      if (textOpts.maxLength !== undefined && value.length > textOpts.maxLength) {
-        errors.push(
-          createError(
-            fieldName,
-            'maxLength',
-            `Field "${fieldName}" must be at most ${textOpts.maxLength} characters.`
-          )
-        );
+      break;
+    }
+
+    case 'email': {
+      errors.push(...validateTextLike(field, value, fieldName, 'type_email', 'email'));
+      if (typeof value === 'string') {
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(value)) {
+          errors.push(
+            createError(fieldName, 'email_format', `Field "${fieldName}" must be a valid email.`)
+          );
+        }
       }
       break;
     }
@@ -91,7 +146,7 @@ export function validateField(
         );
         break;
       }
-      const numOpts = opts as NumberFieldOptions;
+      const numOpts = field.options as NumberFieldOptions;
       if (numOpts.min !== undefined && value < numOpts.min) {
         errors.push(
           createError(fieldName, 'min', `Field "${fieldName}" must be at least ${numOpts.min}.`)
@@ -140,7 +195,7 @@ export function validateField(
     }
 
     case 'relation': {
-      const relOpts = opts as RelationFieldOptions;
+      const relOpts = field.options as RelationFieldOptions;
       if (relOpts.many === true) {
         if (!Array.isArray(value)) {
           errors.push(
@@ -173,6 +228,37 @@ export function validateField(
             )
           );
         }
+      }
+      break;
+    }
+
+    case 'json': {
+      if (value === undefined) {
+        errors.push(createError(fieldName, 'type_json', `Field "${fieldName}" must be valid JSON.`));
+      }
+      // Accept any non-null value that can be serialized
+      if (typeof value === 'function' || typeof value === 'symbol') {
+        errors.push(createError(fieldName, 'type_json', `Field "${fieldName}" must be valid JSON.`));
+      }
+      break;
+    }
+
+    case 'select': {
+      if (typeof value !== 'string') {
+        errors.push(
+          createError(fieldName, 'type_select', `Field "${fieldName}" must be a string option.`)
+        );
+        break;
+      }
+      const selOpts = field.options as SelectFieldOptions;
+      if (!selOpts.options.includes(value)) {
+        errors.push(
+          createError(
+            fieldName,
+            'select_option',
+            `Field "${fieldName}" must be one of: ${selOpts.options.join(', ')}.`
+          )
+        );
       }
       break;
     }
