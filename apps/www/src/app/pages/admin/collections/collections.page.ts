@@ -4,15 +4,12 @@ import {
   VoltAvatar,
   VoltAvatarFallback,
   VoltAvatarImage,
-  VoltBadge,
   VoltButton,
   VoltCard,
   VoltInput,
-  VoltProgress,
   VoltSeparator
 } from '@voltui/components';
 import {
-  IconChevronRight,
   IconClock,
   IconEdit,
   IconEye,
@@ -20,12 +17,9 @@ import {
   IconFilter,
   IconGlobe,
   IconImage,
-  IconLayout,
   IconMoreVertical,
   IconNewspaper,
   IconPlus,
-  IconSearch,
-  IconTrash,
   IconUsers
 } from '../../../components/icons';
 import { CmsApiService } from '@forge-cms/angular';
@@ -61,28 +55,22 @@ const ICON_MAP: Record<string, string> = {
   imports: [
     VoltCard,
     VoltButton,
-    VoltBadge,
     VoltAvatar,
     VoltAvatarImage,
     VoltAvatarFallback,
     VoltInput,
-    VoltProgress,
     VoltSeparator,
     IconPlus,
-    IconSearch,
     IconFilter,
     IconMoreVertical,
     IconEdit,
     IconEye,
-    IconTrash,
     IconGlobe,
     IconNewspaper,
     IconFileText,
     IconImage,
     IconUsers,
-    IconLayout,
-    IconClock,
-    IconChevronRight
+    IconClock
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -93,7 +81,7 @@ const ICON_MAP: Record<string, string> = {
           <h1 class="text-2xl font-bold tracking-tight">Collections</h1>
           <p class="text-sm text-muted-foreground mt-1">Manage your content types and schemas.</p>
         </div>
-        <volt-button variant="default" size="sm">
+        <volt-button size="sm">
           <icon-plus class="h-3.5 w-3.5 mr-1.5" />
           New Collection
         </volt-button>

@@ -1,5 +1,5 @@
-import 'zone.js';
 import '@angular/compiler';
+import 'zone.js';
 import './styles.css';
 
 import { bootstrapApplication } from '@angular/platform-browser';

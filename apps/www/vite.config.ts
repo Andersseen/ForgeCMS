@@ -1,12 +1,23 @@
-import angular from '@analogjs/vite-plugin-angular';
+import analog from '@analogjs/platform';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig({
-  plugins: [angular(), tailwindcss(), tsconfigPaths()],
+  plugins: [analog({ ssr: false }), tailwindcss(), tsconfigPaths()],
   optimizeDeps: {
-    include: ['@angular/compiler']
+    include: [
+      '@angular/common',
+      '@angular/core',
+      '@angular/platform-browser',
+      '@angular/router',
+      'zone.js',
+      'rxjs'
+    ],
+    exclude: ['@angular/compiler']
+  },
+  ssr: {
+    noExternal: ['@angular/**', 'zone.js', 'rxjs']
   },
   test: {
     include: ['src/**/*.test.ts'],

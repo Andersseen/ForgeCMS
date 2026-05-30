@@ -22,7 +22,7 @@ import { VoltButton } from '@voltui/components';
 
       <div class="flex items-center gap-2">
         <a routerLink="/admin">
-          <volt-button variant="default" size="sm">Dashboard</volt-button>
+          <volt-button size="sm">Dashboard</volt-button>
         </a>
         <a href="https://github.com/forge-cms/forge-cms" rel="noreferrer" target="_blank">
           <volt-button variant="outline" size="sm">GitHub</volt-button>

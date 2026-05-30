@@ -5,5 +5,5 @@
     "outDir": "dist",
     "noEmit": false
   },
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts", "drizzle.config.ts"]
 }

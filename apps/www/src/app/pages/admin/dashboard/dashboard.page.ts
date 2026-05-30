@@ -1,20 +1,16 @@
 import { ChangeDetectionStrategy, Component, signal, inject } from '@angular/core';
 import type { OnInit } from '@angular/core';
 import {
-  VoltAvatar,
-  VoltAvatarFallback,
-  VoltAvatarImage,
   VoltBadge,
   VoltButton,
   VoltCard,
-  VoltProgress,
-  VoltSeparator
+  VoltProgress
 } from '@voltui/components';
 import {
   IconAlertCircle,
-  IconBarChart,
   IconCheckCircle,
   IconClock,
+  IconDatabase,
   IconEye,
   IconFileText,
   IconGlobe,
@@ -22,7 +18,6 @@ import {
   IconImage,
   IconNewspaper,
   IconUsers,
-  IconXCircle,
   IconZap
 } from '../../../components/icons';
 import { CmsApiService } from '@forge-cms/angular';
@@ -61,12 +56,7 @@ interface SystemStatus {
     VoltCard,
     VoltButton,
     VoltBadge,
-    VoltAvatar,
-    VoltAvatarImage,
-    VoltAvatarFallback,
     VoltProgress,
-    VoltSeparator,
-    IconBarChart,
     IconUsers,
     IconImage,
     IconHardDrive,
@@ -76,7 +66,7 @@ interface SystemStatus {
     IconClock,
     IconCheckCircle,
     IconAlertCircle,
-    IconXCircle,
+    IconDatabase,
     IconEye,
     IconZap
   ],
