@@ -41,7 +41,16 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "rm -rf dist coverage"
   },
+  "peerDependencies": {
+    "@angular/core": ">=19.0.0",
+    "@angular/router": ">=19.0.0"
+  },
+  "dependencies": {
+    "@forge-cms/angular": "workspace:*"
+  },
   "devDependencies": {
+    "@angular/core": "^21.2.10",
+    "@angular/router": "^21.2.10",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

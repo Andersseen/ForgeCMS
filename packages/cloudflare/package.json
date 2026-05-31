@@ -46,10 +46,12 @@
   },
   "dependencies": {
     "@forge-cms/core": "workspace:*",
+    "@forge-cms/db": "workspace:*",
     "@forge-cms/runtime": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250514.0",
+    "drizzle-orm": "^0.45.2",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

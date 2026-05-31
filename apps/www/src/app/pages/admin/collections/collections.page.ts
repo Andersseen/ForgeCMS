@@ -4,15 +4,12 @@ import {
   VoltAvatar,
   VoltAvatarFallback,
   VoltAvatarImage,
-  VoltBadge,
   VoltButton,
   VoltCard,
   VoltInput,
-  VoltProgress,
   VoltSeparator
 } from '@voltui/components';
 import {
-  IconChevronRight,
   IconClock,
   IconEdit,
   IconEye,
@@ -20,15 +17,19 @@ import {
   IconFilter,
   IconGlobe,
   IconImage,
-  IconLayout,
   IconMoreVertical,
   IconNewspaper,
   IconPlus,
-  IconSearch,
-  IconTrash,
   IconUsers
 } from '../../../components/icons';
-import { CmsApiService } from '../../../services/cms-api.service';
+import { CmsApiService } from '@forge-cms/angular';
+import {
+  PageHeaderComponent,
+  LoadingStateComponent,
+  ErrorStateComponent,
+  SearchToolbarComponent,
+  CollectionIconComponent
+} from '../components';
 
 interface CollectionViewModel {
   id: string;
@@ -61,63 +62,58 @@ const ICON_MAP: Record<string, string> = {
   imports: [
     VoltCard,
     VoltButton,
-    VoltBadge,
     VoltAvatar,
     VoltAvatarImage,
     VoltAvatarFallback,
     VoltInput,
-    VoltProgress,
     VoltSeparator,
     IconPlus,
-    IconSearch,
     IconFilter,
     IconMoreVertical,
     IconEdit,
     IconEye,
-    IconTrash,
     IconGlobe,
     IconNewspaper,
     IconFileText,
     IconImage,
     IconUsers,
-    IconLayout,
     IconClock,
-    IconChevronRight
+    CollectionIconComponent,
+    PageHeaderComponent,
+    LoadingStateComponent,
+    ErrorStateComponent,
+    SearchToolbarComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-6">
-      <!-- Header -->
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-2xl font-bold tracking-tight">Collections</h1>
-          <p class="text-sm text-muted-foreground mt-1">Manage your content types and schemas.</p>
+      <forge-page-header title="Collections" subtitle="Manage your content types and schemas.">
+        <div actions>
+          <volt-button size="sm">
+            <icon-plus class="h-3.5 w-3.5 mr-1.5" />
+            New Collection
+          </volt-button>
         </div>
-        <volt-button variant="default" size="sm">
-          <icon-plus class="h-3.5 w-3.5 mr-1.5" />
-          New Collection
-        </volt-button>
-      </div>
+      </forge-page-header>
 
-      <!-- Toolbar -->
-      <div class="flex items-center gap-3">
-        <volt-input placeholder="Search collections..." class="w-72 h-9 text-sm" />
-        <volt-button variant="outline" size="sm">
-          <icon-filter class="h-3.5 w-3.5 mr-1.5" />
-          Filter
-        </volt-button>
-      </div>
+      <forge-search-toolbar placeholder="Search collections...">
+        <div filters>
+          <volt-button variant="outline" size="sm">
+            <icon-filter class="h-3.5 w-3.5 mr-1.5" />
+            Filter
+          </volt-button>
+        </div>
+      </forge-search-toolbar>
 
       @if (loading()) {
-        <div class="flex items-center justify-center py-12">
-          <div class="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-        </div>
+        <forge-loading-state variant="spinner" />
       } @else if (error()) {
-        <div class="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-          {{ error() }}
-        </div>
+        <forge-error-state
+          title="Unable to load collections"
+          [message]="error()"
+          (retry)="ngOnInit()"
+        />
       } @else {
-        <!-- Collections Grid -->
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           @for (col of collections(); track col.id) {
             <volt-card class="p-5 hover:border-primary/50 transition-all cursor-pointer group">
@@ -126,41 +122,14 @@ const ICON_MAP: Record<string, string> = {
                   <div
                     class="h-10 w-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors"
                   >
-                    @switch (col.icon) {
-                      @case ('globe') {
-                        <icon-globe class="h-5 w-5" />
-                      }
-                      @case ('newspaper') {
-                        <icon-newspaper class="h-5 w-5" />
-                      }
-                      @case ('image') {
-                        <icon-image class="h-5 w-5" />
-                      }
-                      @case ('users') {
-                        <icon-users class="h-5 w-5" />
-                      }
-                      @case ('settings') {
-                        <icon-file-text class="h-5 w-5" />
-                      }
-                      @case ('shield') {
-                        <icon-file-text class="h-5 w-5" />
-                      }
-                      @case ('terminal') {
-                        <icon-file-text class="h-5 w-5" />
-                      }
-                      @default {
-                        <icon-file-text class="h-5 w-5" />
-                      }
-                    }
+                    <forge-collection-icon [name]="col.icon" iconClass="h-5 w-5" />
                   </div>
                   <div>
                     <h3 class="font-semibold">{{ col.name }}</h3>
                     <p class="text-xs text-muted-foreground">/{{ col.slug }}</p>
                   </div>
                 </div>
-                <div
-                  class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
+                <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <volt-button variant="ghost" size="icon" class="h-7 w-7">
                     <icon-eye class="h-3.5 w-3.5" />
                   </volt-button>
@@ -194,10 +163,9 @@ const ICON_MAP: Record<string, string> = {
 
               <div class="mt-4 flex flex-wrap gap-1.5">
                 @for (field of col.fields; track field) {
-                  <span
-                    class="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
-                    >{{ field }}</span
-                  >
+                  <span class="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    {{ field }}
+                  </span>
                 }
               </div>
 
@@ -212,9 +180,7 @@ const ICON_MAP: Record<string, string> = {
                   <span class="text-xs text-muted-foreground">by</span>
                   <volt-avatar>
                     <img [src]="col.modifiedByAvatar" [alt]="col.modifiedBy" voltAvatarImage />
-                    <volt-avatar-fallback>{{
-                      col.modifiedBy.slice(0, 2).toUpperCase()
-                    }}</volt-avatar-fallback>
+                    <volt-avatar-fallback>{{ col.modifiedBy.slice(0, 2).toUpperCase() }}</volt-avatar-fallback>
                   </volt-avatar>
                 </div>
               </div>

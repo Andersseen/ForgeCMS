@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { Injectable, InjectionToken, inject } from '@angular/core';
+import type { Provider } from '@angular/core';
 
 export interface ApiListResponse<T> {
   data: T[];
@@ -28,17 +29,36 @@ export interface AuthUser {
   roles?: string[];
 }
 
+export interface ForgeCmsConfig {
+  baseUrl: string;
+  authToken?: string | (() => string | null);
+}
+
+export const FORGE_CMS_CONFIG = new InjectionToken<ForgeCmsConfig>('FORGE_CMS_CONFIG');
+
+export function provideForgeCms(config: ForgeCmsConfig): Provider[] {
+  return [{ provide: FORGE_CMS_CONFIG, useValue: config }];
+}
+
 @Injectable({ providedIn: 'root' })
 export class CmsApiService {
-  private readonly baseUrl = '/api/v1';
+  private readonly config = inject(FORGE_CMS_CONFIG, { optional: true });
 
-  /** Token de auth — se inyecta desde el microservicio externo */
-  authToken: string | null = null;
+  private get baseUrl(): string {
+    return this.config?.baseUrl ?? '/api/v1';
+  }
+
+  private get authToken(): string | null {
+    const token = this.config?.authToken;
+    if (typeof token === 'function') return token();
+    return token ?? null;
+  }
 
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = { 'content-type': 'application/json' };
-    if (this.authToken) {
-      headers['authorization'] = `Bearer ${this.authToken}`;
+    const token = this.authToken;
+    if (token) {
+      headers['authorization'] = `Bearer ${token}`;
     }
     return headers;
   }
@@ -107,4 +127,5 @@ export class CmsApiService {
     });
     if (!response.ok) throw new Error(`Failed to delete document: ${response.status}`);
   }
+
 }

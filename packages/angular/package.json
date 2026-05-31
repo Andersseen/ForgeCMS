@@ -1,0 +1,52 @@
+{
+  "name": "@forge-cms/angular",
+  "version": "0.0.0",
+  "description": "Angular SDK and services for ForgeCMS.",
+  "author": "ForgeCMS contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/forge-cms/forge-cms.git",
+    "directory": "packages/angular"
+  },
+  "bugs": {
+    "url": "https://github.com/forge-cms/forge-cms/issues"
+  },
+  "homepage": "https://github.com/forge-cms/forge-cms/tree/main/packages/angular#readme",
+  "keywords": [
+    "cms",
+    "angular",
+    "sdk",
+    "typescript"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run --dir .",
+    "test:watch": "vitest --dir .",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist coverage"
+  },
+  "peerDependencies": {
+    "@angular/core": ">=19.0.0"
+  },
+  "devDependencies": {
+    "@angular/core": "^21.2.10",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

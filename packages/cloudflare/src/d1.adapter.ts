@@ -1,59 +1,14 @@
-import type { CollectionDefinition, AnyField } from '@forge-cms/core';
+import type { CollectionDefinition } from '@forge-cms/core';
 import type { DatabaseAdapter, DatabaseRecord, FindManyOptions } from '@forge-cms/db';
+import {
+  generateCreateTableSql,
+  toDbValue,
+  fromDbValue
+} from '@forge-cms/db';
 import type { D1Database } from './bindings.js';
 
 export interface D1Env {
   DB: D1Database;
-}
-
-function fieldKindToSqlType(field: AnyField): string {
-  switch (field.kind) {
-    case 'text':
-    case 'relation':
-    case 'date':
-      return 'TEXT';
-    case 'number':
-      return 'REAL';
-    case 'boolean':
-      return 'INTEGER';
-    default:
-      return 'TEXT';
-  }
-}
-
-function toDbValue(value: unknown, kind: AnyField['kind']): unknown {
-  if (value === null || value === undefined) return null;
-  switch (kind) {
-    case 'boolean':
-      return value ? 1 : 0;
-    case 'relation':
-      return Array.isArray(value) ? JSON.stringify(value) : value;
-    case 'date':
-      return value instanceof Date ? value.toISOString() : value;
-    default:
-      return value;
-  }
-}
-
-function fromDbValue(value: unknown, kind: AnyField['kind']): unknown {
-  if (value === null || value === undefined) return null;
-  switch (kind) {
-    case 'boolean':
-      return value === 1 || value === true;
-    case 'relation':
-      if (typeof value === 'string') {
-        try {
-          return JSON.parse(value);
-        } catch {
-          return value;
-        }
-      }
-      return value;
-    case 'date':
-      return typeof value === 'string' ? new Date(value) : value;
-    default:
-      return value;
-  }
 }
 
 export class D1DatabaseAdapter implements DatabaseAdapter {
@@ -86,17 +41,17 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     for (const collection of collections) {
       this.collections.set(collection.slug, collection);
 
-      const fieldColumns = Object.entries(collection.fields)
-        .map(([name, field]) => `"${name}" ${fieldKindToSqlType(field)}`)
-        .join(', ');
-
-      const sql = `CREATE TABLE IF NOT EXISTS "${collection.slug}" (
-        "id" TEXT PRIMARY KEY,
-        "created_at" TEXT,
-        "updated_at" TEXT${fieldColumns ? ', ' + fieldColumns : ''}
-      )`;
-
+      const sql = generateCreateTableSql(collection);
       await db.exec(sql);
+
+      // Create indexes for fields marked with index: true or unique: true
+      for (const [fieldName, field] of Object.entries(collection.fields)) {
+        if (field.options.index === true || field.options.unique === true) {
+          const uniqueClause = field.options.unique === true ? 'UNIQUE' : '';
+          const indexSql = `CREATE ${uniqueClause} INDEX IF NOT EXISTS "idx_${collection.slug}_${fieldName}" ON "${collection.slug}" ("${fieldName}")`;
+          await db.exec(indexSql);
+        }
+      }
     }
   }
 

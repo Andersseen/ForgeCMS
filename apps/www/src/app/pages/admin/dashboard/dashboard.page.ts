@@ -1,50 +1,28 @@
-import { ChangeDetectionStrategy, Component, OnInit, signal, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal, inject } from '@angular/core';
+import type { OnInit } from '@angular/core';
+import { VoltBadge, VoltButton, VoltCard, VoltProgress } from '@voltui/components';
 import {
-  VoltAvatar,
-  VoltAvatarFallback,
-  VoltAvatarImage,
-  VoltBadge,
-  VoltButton,
-  VoltCard,
-  VoltProgress,
-  VoltSeparator
-} from '@voltui/components';
-import {
-  IconAlertCircle,
-  IconBarChart,
   IconCheckCircle,
   IconClock,
+  IconDatabase,
   IconEye,
   IconFileText,
   IconGlobe,
   IconHardDrive,
   IconImage,
   IconNewspaper,
-  IconUsers,
-  IconXCircle,
   IconZap
 } from '../../../components/icons';
-import { CmsApiService } from '../../../services/cms-api.service';
+import { CmsApiService } from '@forge-cms/angular';
 import { RouterLink } from '@angular/router';
-
-interface ActivityItem {
-  id: string;
-  action: 'created' | 'updated' | 'deleted' | 'published' | 'unpublished';
-  user: string;
-  userAvatar: string;
-  document: string;
-  collection: string;
-  time: string;
-}
-
-interface DraftItem {
-  id: string;
-  title: string;
-  collection: string;
-  author: string;
-  authorAvatar: string;
-  updatedAt: string;
-}
+import {
+  PageHeaderComponent,
+  LoadingStateComponent,
+  ErrorStateComponent,
+  StatCardComponent,
+  SectionHeaderComponent,
+  CollectionIconComponent
+} from '../components';
 
 interface CollectionStat {
   name: string;
@@ -52,6 +30,13 @@ interface CollectionStat {
   count: number;
   icon: string;
   lastModified: string;
+}
+
+interface SystemStatus {
+  database: { name: string; records: number };
+  auth: { name: string; configured: boolean };
+  storage: { name: string; files: number };
+  api: { version: string; status: string };
 }
 
 @Component({
@@ -62,37 +47,32 @@ interface CollectionStat {
     VoltCard,
     VoltButton,
     VoltBadge,
-    VoltAvatar,
-    VoltAvatarImage,
-    VoltAvatarFallback,
     VoltProgress,
-    VoltSeparator,
-    IconBarChart,
-    IconUsers,
-    IconImage,
-    IconHardDrive,
-    IconGlobe,
     IconFileText,
-    IconNewspaper,
-    IconClock,
     IconCheckCircle,
-    IconAlertCircle,
-    IconXCircle,
+    IconNewspaper,
+    IconImage,
+    IconClock,
     IconEye,
-    IconZap
+    IconHardDrive,
+    IconDatabase,
+    IconGlobe,
+    IconZap,
+    PageHeaderComponent,
+    LoadingStateComponent,
+    ErrorStateComponent,
+    StatCardComponent,
+    SectionHeaderComponent,
+    CollectionIconComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-6">
-      <!-- Header -->
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p class="text-sm text-muted-foreground mt-1">
-            Welcome back. Here's what's happening with your CMS.
-          </p>
-        </div>
-        <div class="flex items-center gap-2">
+      <forge-page-header
+        title="Dashboard"
+        subtitle="Welcome back. Here's what's happening with your CMS."
+      >
+        <div actions class="flex items-center gap-2">
           <volt-button variant="outline" size="sm">
             <icon-zap class="h-3.5 w-3.5 mr-1.5" />
             Quick Start
@@ -104,110 +84,54 @@ interface CollectionStat {
             </volt-button>
           </a>
         </div>
-      </div>
+      </forge-page-header>
 
       @if (loading()) {
-        <!-- Loading skeleton -->
-        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          @for (_ of [1,2,3,4]; track $index) {
-            <volt-card class="p-4">
-              <div class="animate-pulse space-y-3">
-                <div class="h-4 bg-muted rounded w-24"></div>
-                <div class="h-8 bg-muted rounded w-16"></div>
-                <div class="h-3 bg-muted rounded w-32"></div>
-              </div>
-            </volt-card>
-          }
-        </div>
+        <forge-loading-state variant="stat-grid" />
       } @else if (error()) {
-        <volt-card class="p-6">
-          <div class="text-center space-y-2">
-            <icon-alert-circle class="h-8 w-8 text-destructive mx-auto" />
-            <p class="text-sm font-medium">Failed to load dashboard data</p>
-            <p class="text-xs text-muted-foreground">{{ error() }}</p>
-            <volt-button size="sm" (click)="loadData()">Retry</volt-button>
-          </div>
-        </volt-card>
+        <forge-error-state
+          title="Failed to load dashboard data"
+          [message]="error()"
+          (retry)="loadData()"
+        />
       } @else {
-        <!-- Stats Cards -->
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <volt-card class="p-4">
-            <div class="flex items-center justify-between">
-              <div class="space-y-1">
-                <p class="text-sm text-muted-foreground">Total Documents</p>
-                <p class="text-2xl font-bold">{{ totalDocuments() }}</p>
-                <div class="flex items-center gap-1 text-xs">
-                  <span class="text-muted-foreground">across {{ collections().length }} collections</span>
-                </div>
-              </div>
-              <div
-                class="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center"
-              >
-                <icon-file-text class="h-5 w-5" />
-              </div>
-            </div>
-          </volt-card>
-
-          <volt-card class="p-4">
-            <div class="flex items-center justify-between">
-              <div class="space-y-1">
-                <p class="text-sm text-muted-foreground">Published</p>
-                <p class="text-2xl font-bold">{{ totalDocuments() }}</p>
-                <div class="flex items-center gap-1 text-xs">
-                  <span class="text-success font-medium">100%</span>
-                  <span class="text-muted-foreground">of total</span>
-                </div>
-              </div>
-              <div
-                class="h-10 w-10 rounded-lg bg-success/10 text-success flex items-center justify-center"
-              >
-                <icon-check-circle class="h-5 w-5" />
-              </div>
-            </div>
-          </volt-card>
-
-          <volt-card class="p-4">
-            <div class="flex items-center justify-between">
-              <div class="space-y-1">
-                <p class="text-sm text-muted-foreground">Collections</p>
-                <p class="text-2xl font-bold">{{ collections().length }}</p>
-                <div class="flex items-center gap-1 text-xs">
-                  <span class="text-muted-foreground">configured</span>
-                </div>
-              </div>
-              <div
-                class="h-10 w-10 rounded-lg bg-warning/10 text-warning flex items-center justify-center"
-              >
-                <icon-newspaper class="h-5 w-5" />
-              </div>
-            </div>
-          </volt-card>
-
-          <volt-card class="p-4">
-            <div class="flex items-center justify-between">
-              <div class="space-y-1">
-                <p class="text-sm text-muted-foreground">Media Files</p>
-                <p class="text-2xl font-bold">0</p>
-                <div class="flex items-center gap-1 text-xs">
-                  <span class="text-muted-foreground">via Storage</span>
-                </div>
-              </div>
-              <div class="h-10 w-10 rounded-lg bg-info/10 text-info flex items-center justify-center">
-                <icon-image class="h-5 w-5" />
-              </div>
-            </div>
-          </volt-card>
+          <forge-stat-card
+            [value]="totalDocuments()"
+            label="Total Documents"
+            sublabel="across {{ collections().length }} collections"
+            color="primary"
+          >
+            <icon-file-text icon class="h-5 w-5" />
+          </forge-stat-card>
+          <forge-stat-card
+            [value]="totalDocuments()"
+            label="Published"
+            sublabel="100% of total"
+            color="success"
+          >
+            <icon-check-circle icon class="h-5 w-5" />
+          </forge-stat-card>
+          <forge-stat-card
+            [value]="collections().length"
+            label="Collections"
+            sublabel="configured"
+            color="warning"
+          >
+            <icon-newspaper icon class="h-5 w-5" />
+          </forge-stat-card>
+          <forge-stat-card [value]="0" label="Media Files" sublabel="via Storage" color="info">
+            <icon-image icon class="h-5 w-5" />
+          </forge-stat-card>
         </div>
 
         <div class="grid gap-6 lg:grid-cols-3">
-          <!-- Collections Overview -->
           <div class="lg:col-span-2 space-y-4">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold">Collections</h2>
-              <a routerLink="/admin/collections">
+            <forge-section-header title="Collections">
+              <a actions routerLink="/admin/collections">
                 <volt-button variant="ghost" size="sm">View All</volt-button>
               </a>
-            </div>
+            </forge-section-header>
             <div class="grid gap-3 md:grid-cols-2">
               @for (col of collections(); track col.slug) {
                 <a [routerLink]="['/admin/collections', col.slug]">
@@ -217,23 +141,7 @@ interface CollectionStat {
                         <div
                           class="h-9 w-9 rounded-lg bg-muted flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors"
                         >
-                          @switch (col.icon) {
-                            @case ('globe') {
-                              <icon-globe class="h-4 w-4" />
-                            }
-                            @case ('newspaper') {
-                              <icon-newspaper class="h-4 w-4" />
-                            }
-                            @case ('image') {
-                              <icon-image class="h-4 w-4" />
-                            }
-                            @case ('users') {
-                              <icon-users class="h-4 w-4" />
-                            }
-                            @default {
-                              <icon-file-text class="h-4 w-4" />
-                            }
-                          }
+                          <forge-collection-icon [name]="col.icon" iconClass="h-4 w-4" />
                         </div>
                         <div>
                           <h3 class="font-medium text-sm">{{ col.name }}</h3>
@@ -258,112 +166,28 @@ interface CollectionStat {
             </div>
           </div>
 
-          <!-- Drafts Pending Review -->
           <div class="space-y-4">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold">Pending Review</h2>
-              <volt-badge variant="secondary">0</volt-badge>
-            </div>
+            <forge-section-header title="Pending Review">
+              <volt-badge actions variant="secondary">0</volt-badge>
+            </forge-section-header>
             <div class="space-y-3">
-              <p class="text-sm text-muted-foreground text-center py-8">
-                No pending drafts
-              </p>
+              <p class="text-sm text-muted-foreground text-center py-8">No pending drafts</p>
             </div>
             <volt-button variant="outline" size="sm" class="w-full">View All Drafts</volt-button>
           </div>
         </div>
 
-        <!-- Activity Log (mock — activity tracking not yet implemented) -->
         <div class="space-y-4">
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold">Recent Activity</h2>
-            <volt-button variant="ghost" size="sm">View All Activity</volt-button>
-          </div>
-          <volt-card class="overflow-hidden">
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-muted/50">
-                  <tr class="border-b border-border">
-                    <th class="h-10 px-4 text-left font-medium text-muted-foreground w-10"></th>
-                    <th class="h-10 px-4 text-left font-medium text-muted-foreground">Action</th>
-                    <th class="h-10 px-4 text-left font-medium text-muted-foreground">Document</th>
-                    <th class="h-10 px-4 text-left font-medium text-muted-foreground">Collection</th>
-                    <th class="h-10 px-4 text-left font-medium text-muted-foreground">User</th>
-                    <th class="h-10 px-4 text-right font-medium text-muted-foreground">Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (item of activityLog; track item.id) {
-                    <tr class="border-b border-border hover:bg-muted/30 transition-colors">
-                      <td class="px-4 py-3">
-                        @switch (item.action) {
-                          @case ('published') {
-                            <div
-                              class="h-6 w-6 rounded-full bg-success/10 text-success flex items-center justify-center"
-                            >
-                              <icon-check-circle class="h-3.5 w-3.5" />
-                            </div>
-                          }
-                          @case ('created') {
-                            <div
-                              class="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center"
-                            >
-                              <icon-file-text class="h-3.5 w-3.5" />
-                            </div>
-                          }
-                          @case ('updated') {
-                            <div
-                              class="h-6 w-6 rounded-full bg-info/10 text-info flex items-center justify-center"
-                            >
-                              <icon-bar-chart class="h-3.5 w-3.5" />
-                            </div>
-                          }
-                          @case ('deleted') {
-                            <div
-                              class="h-6 w-6 rounded-full bg-destructive/10 text-destructive flex items-center justify-center"
-                            >
-                              <icon-x-circle class="h-3.5 w-3.5" />
-                            </div>
-                          }
-                          @case ('unpublished') {
-                            <div
-                              class="h-6 w-6 rounded-full bg-warning/10 text-warning flex items-center justify-center"
-                            >
-                              <icon-alert-circle class="h-3.5 w-3.5" />
-                            </div>
-                          }
-                        }
-                      </td>
-                      <td class="px-4 py-3">
-                        <span class="capitalize font-medium text-xs">{{ item.action }}</span>
-                      </td>
-                      <td class="px-4 py-3 font-medium">{{ item.document }}</td>
-                      <td class="px-4 py-3 text-muted-foreground">{{ item.collection }}</td>
-                      <td class="px-4 py-3">
-                        <div class="flex items-center gap-2">
-                          <volt-avatar>
-                            <img [src]="item.userAvatar" [alt]="item.user" voltAvatarImage />
-                            <volt-avatar-fallback>{{
-                              item.user.slice(0, 2).toUpperCase()
-                            }}</volt-avatar-fallback>
-                          </volt-avatar>
-                          <span class="text-sm">{{ item.user }}</span>
-                        </div>
-                      </td>
-                      <td class="px-4 py-3 text-right text-muted-foreground text-xs">
-                        {{ item.time }}
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
+          <forge-section-header title="Recent Activity" />
+          <volt-card class="p-6">
+            <p class="text-sm text-muted-foreground text-center py-8">
+              Activity tracking is not yet implemented.
+            </p>
           </volt-card>
         </div>
 
-        <!-- System Health -->
         <div class="space-y-4">
-          <h2 class="text-lg font-semibold">System Health</h2>
+          <forge-section-header title="System Health" />
           <div class="grid gap-4 md:grid-cols-3">
             <volt-card class="p-4">
               <div class="flex items-center justify-between mb-3">
@@ -371,11 +195,16 @@ interface CollectionStat {
                   <icon-hard-drive class="h-4 w-4 text-muted-foreground" />
                   <h3 class="text-sm font-medium">Storage</h3>
                 </div>
-                <span class="text-xs font-medium text-success">Healthy</span>
+                <span class="text-xs font-medium"
+                  [class.text-success]="status()?.storage?.name === 'r2'"
+                  [class.text-warning]="status()?.storage?.name !== 'r2'"
+                >
+                  {{ status()?.storage?.name === 'r2' ? 'Healthy' : 'Not configured' }}
+                </span>
               </div>
-              <p class="text-xs text-muted-foreground mb-3">R2 bucket connected</p>
+              <p class="text-xs text-muted-foreground mb-3">{{ status()?.storage?.name ?? '—' }}</p>
               <volt-progress [value]="0" />
-              <p class="text-xs text-muted-foreground mt-2">No files stored yet</p>
+              <p class="text-xs text-muted-foreground mt-2">{{ status()?.storage?.files ?? 0 }} files</p>
             </volt-card>
 
             <volt-card class="p-4">
@@ -386,9 +215,11 @@ interface CollectionStat {
                 </div>
                 <span class="text-xs font-medium text-success">Healthy</span>
               </div>
-              <p class="text-xs text-muted-foreground mb-3">{{ totalDocuments() }} records</p>
-              <volt-progress [value]="Math.min(totalDocuments() / 10, 100)" />
-              <p class="text-xs text-muted-foreground mt-2">D1 SQLite (edge)</p>
+              <p class="text-xs text-muted-foreground mb-3">
+                {{ status()?.database?.records ?? totalDocuments() }} records
+              </p>
+              <volt-progress [value]="Math.min((status()?.database?.records ?? totalDocuments()) / 10, 100)" />
+              <p class="text-xs text-muted-foreground mt-2">{{ status()?.database?.name ?? 'in-memory' }}</p>
             </volt-card>
 
             <volt-card class="p-4">
@@ -397,11 +228,11 @@ interface CollectionStat {
                   <icon-globe class="h-4 w-4 text-muted-foreground" />
                   <h3 class="text-sm font-medium">API</h3>
                 </div>
-                <span class="text-xs font-medium text-success">Online</span>
+                <span class="text-xs font-medium text-success">{{ status()?.api?.status ?? 'Online' }}</span>
               </div>
-              <p class="text-xs text-muted-foreground mb-3">REST API v1</p>
+              <p class="text-xs text-muted-foreground mb-3">REST API {{ status()?.api?.version ?? 'v1' }}</p>
               <volt-progress [value]="100" />
-              <p class="text-xs text-muted-foreground mt-2">Edge-ready handlers</p>
+              <p class="text-xs text-muted-foreground mt-2">ForgeCMS runtime</p>
             </volt-card>
           </div>
         </div>
@@ -416,11 +247,24 @@ export class DashboardPage implements OnInit {
   totalDocuments = signal(0);
   loading = signal(true);
   error = signal<string | null>(null);
+  status = signal<SystemStatus | null>(null);
 
   protected readonly Math = Math;
 
-  ngOnInit() {
-    this.loadData();
+  async ngOnInit() {
+    await this.loadData();
+    await this.loadStatus();
+  }
+
+  async loadStatus() {
+    try {
+      const response = await fetch('/api/status');
+      if (!response.ok) return;
+      const result = (await response.json()) as { data: SystemStatus };
+      this.status.set(result.data);
+    } catch {
+      // silently ignore status errors
+    }
   }
 
   async loadData() {
@@ -471,61 +315,4 @@ export class DashboardPage implements OnInit {
       default: return 'file-text';
     }
   }
-
-  activityLog: ActivityItem[] = [
-    {
-      id: '1',
-      action: 'published',
-      user: 'John Doe',
-      userAvatar: 'https://i.pravatar.cc/150?u=1',
-      document: 'Homepage Hero Update',
-      collection: 'Pages',
-      time: '2h ago'
-    },
-    {
-      id: '2',
-      action: 'created',
-      user: 'Sarah Miller',
-      userAvatar: 'https://i.pravatar.cc/150?u=2',
-      document: 'Q3 Marketing Strategy',
-      collection: 'Posts',
-      time: '3h ago'
-    },
-    {
-      id: '3',
-      action: 'updated',
-      user: 'Mike Kim',
-      userAvatar: 'https://i.pravatar.cc/150?u=3',
-      document: 'Pricing Page',
-      collection: 'Pages',
-      time: '5h ago'
-    },
-    {
-      id: '4',
-      action: 'deleted',
-      user: 'Robert Johnson',
-      userAvatar: 'https://i.pravatar.cc/150?u=5',
-      document: 'Old Landing Page',
-      collection: 'Pages',
-      time: '1d ago'
-    },
-    {
-      id: '5',
-      action: 'published',
-      user: 'Anna Lee',
-      userAvatar: 'https://i.pravatar.cc/150?u=4',
-      document: 'Getting Started Guide',
-      collection: 'Posts',
-      time: '1d ago'
-    },
-    {
-      id: '6',
-      action: 'unpublished',
-      user: 'John Doe',
-      userAvatar: 'https://i.pravatar.cc/150?u=1',
-      document: 'Deprecated API Docs',
-      collection: 'Posts',
-      time: '2d ago'
-    }
-  ];
 }

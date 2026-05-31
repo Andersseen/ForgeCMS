@@ -1,7 +1,8 @@
 import { defineEventHandler, getRouterParam, getRequestURL, createError } from 'h3';
-import { serverRuntime } from '../../../api/runtime';
+import { serverRuntimePromise } from '../../../api/runtime';
 
 export default defineEventHandler(async (event) => {
+  const serverRuntime = await serverRuntimePromise;
   const collection = getRouterParam(event, 'collection');
   if (!collection) {
     throw createError({ statusCode: 400, statusMessage: 'Missing collection parameter' });

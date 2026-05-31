@@ -1,6 +1,15 @@
 import type { CollectionDefinition } from '@forge-cms/core';
 
 export { InMemoryDatabaseAdapter } from './in-memory.adapter.js';
+export { LibSqlDatabaseAdapter } from './libsql.adapter.js';
+export {
+  fieldKindToSqlType,
+  toDbValue,
+  fromDbValue,
+  generateCreateTableSql,
+  getOrCreateDrizzleTable,
+  clearTableCache
+} from './schema-generator.js';
 
 export type DatabaseRecord = Record<string, unknown>;
 

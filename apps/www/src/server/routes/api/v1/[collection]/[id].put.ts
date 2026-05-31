@@ -1,8 +1,9 @@
 import { defineEventHandler, getRouterParam, readBody, createError } from 'h3';
 import { validateCollection } from '@forge-cms/core';
-import { serverRuntime } from '../../../../api/runtime';
+import { serverRuntimePromise } from '../../../../api/runtime';
 
 export default defineEventHandler(async (event) => {
+  const serverRuntime = await serverRuntimePromise;
   const collection = getRouterParam(event, 'collection');
   const id = getRouterParam(event, 'id');
 
