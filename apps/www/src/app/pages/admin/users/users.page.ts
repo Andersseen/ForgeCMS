@@ -18,6 +18,13 @@ import {
   IconUsers
 } from '../../../components/icons';
 import { CmsApiService } from '@forge-cms/angular';
+import {
+  PageHeaderComponent,
+  ErrorStateComponent,
+  EmptyStateComponent,
+  StatCardComponent,
+  SearchToolbarComponent
+} from '../components';
 
 @Component({
   selector: 'forge-cms-users',
@@ -35,17 +42,18 @@ import { CmsApiService } from '@forge-cms/angular';
     IconMail,
     IconEdit,
     IconMoreVertical,
-    IconAlertCircle
+    IconAlertCircle,
+    PageHeaderComponent,
+    ErrorStateComponent,
+    EmptyStateComponent,
+    StatCardComponent,
+    SearchToolbarComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-6">
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-2xl font-bold tracking-tight">Users</h1>
-          <p class="text-sm text-muted-foreground mt-1">Manage team members and their permissions.</p>
-        </div>
-        <div class="flex items-center gap-2">
+      <forge-page-header title="Users" subtitle="Manage team members and their permissions.">
+        <div actions class="flex items-center gap-2">
           <volt-button variant="outline" size="sm">
             <icon-mail class="h-3.5 w-3.5 mr-1.5" />
             Invite
@@ -55,7 +63,7 @@ import { CmsApiService } from '@forge-cms/angular';
             New User
           </volt-button>
         </div>
-      </div>
+      </forge-page-header>
 
       @if (loading()) {
         <div class="grid gap-4 md:grid-cols-4">
@@ -79,83 +87,42 @@ import { CmsApiService } from '@forge-cms/angular';
           </div>
         </volt-card>
       } @else if (error()) {
-        <volt-card class="p-8">
-          <div class="text-center space-y-3">
-            <div class="h-12 w-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mx-auto">
-              <icon-alert-circle class="h-6 w-6" />
-            </div>
-            <h3 class="text-sm font-medium">Unable to load users</h3>
-            <p class="text-xs text-muted-foreground max-w-sm mx-auto">{{ error() }}</p>
-            <volt-button size="sm" (click)="loadUsers()">Retry</volt-button>
-          </div>
-        </volt-card>
+        <forge-error-state
+          title="Unable to load users"
+          [message]="error()"
+          (retry)="loadUsers()"
+        />
       } @else if (users().length === 0) {
-        <volt-card class="p-8">
-          <div class="text-center space-y-3">
-            <div class="h-12 w-12 rounded-full bg-muted text-muted-foreground flex items-center justify-center mx-auto">
-              <icon-users class="h-6 w-6" />
-            </div>
-            <h3 class="text-sm font-medium">No users yet</h3>
-            <p class="text-xs text-muted-foreground max-w-sm mx-auto">
-              User management depends on your auth provider. Add users via your authentication microservice.
-            </p>
-          </div>
-        </volt-card>
+        <forge-empty-state
+          title="No users yet"
+          message="User management depends on your auth provider. Add users via your authentication microservice."
+        >
+          <icon-users icon class="h-6 w-6" />
+        </forge-empty-state>
       } @else {
         <div class="grid gap-4 md:grid-cols-4">
-          <volt-card class="p-4">
-            <div class="flex items-center gap-3">
-              <div class="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                <icon-users class="h-4 w-4" />
-              </div>
-              <div>
-                <p class="text-2xl font-bold">{{ users().length }}</p>
-                <p class="text-xs text-muted-foreground">Total Users</p>
-              </div>
-            </div>
-          </volt-card>
-          <volt-card class="p-4">
-            <div class="flex items-center gap-3">
-              <div class="h-9 w-9 rounded-lg bg-success/10 text-success flex items-center justify-center">
-                <icon-shield class="h-4 w-4" />
-              </div>
-              <div>
-                <p class="text-2xl font-bold">{{ activeCount() }}</p>
-                <p class="text-xs text-muted-foreground">Active</p>
-              </div>
-            </div>
-          </volt-card>
-          <volt-card class="p-4">
-            <div class="flex items-center gap-3">
-              <div class="h-9 w-9 rounded-lg bg-warning/10 text-warning flex items-center justify-center">
-                <icon-mail class="h-4 w-4" />
-              </div>
-              <div>
-                <p class="text-2xl font-bold">{{ invitedCount() }}</p>
-                <p class="text-xs text-muted-foreground">Invited</p>
-              </div>
-            </div>
-          </volt-card>
-          <volt-card class="p-4">
-            <div class="flex items-center gap-3">
-              <div class="h-9 w-9 rounded-lg bg-muted text-muted-foreground flex items-center justify-center">
-                <icon-users class="h-4 w-4" />
-              </div>
-              <div>
-                <p class="text-2xl font-bold">{{ inactiveCount() }}</p>
-                <p class="text-xs text-muted-foreground">Inactive</p>
-              </div>
-            </div>
-          </volt-card>
+          <forge-stat-card [value]="users().length" label="Total Users" color="primary" layout="horizontal">
+            <icon-users icon class="h-4 w-4" />
+          </forge-stat-card>
+          <forge-stat-card [value]="activeCount()" label="Active" color="success" layout="horizontal">
+            <icon-shield icon class="h-4 w-4" />
+          </forge-stat-card>
+          <forge-stat-card [value]="invitedCount()" label="Invited" color="warning" layout="horizontal">
+            <icon-mail icon class="h-4 w-4" />
+          </forge-stat-card>
+          <forge-stat-card [value]="inactiveCount()" label="Inactive" color="muted" layout="horizontal">
+            <icon-users icon class="h-4 w-4" />
+          </forge-stat-card>
         </div>
 
-        <div class="flex items-center gap-3">
-          <volt-input placeholder="Search users..." class="w-72 h-9 text-sm" />
-          <volt-button variant="outline" size="sm">
-            <icon-filter class="h-3.5 w-3.5 mr-1.5" />
-            All Roles
-          </volt-button>
-        </div>
+        <forge-search-toolbar placeholder="Search users...">
+          <div filters>
+            <volt-button variant="outline" size="sm">
+              <icon-filter class="h-3.5 w-3.5 mr-1.5" />
+              All Roles
+            </volt-button>
+          </div>
+        </forge-search-toolbar>
 
         <volt-card class="overflow-hidden">
           <div class="overflow-x-auto">
@@ -184,15 +151,20 @@ import { CmsApiService } from '@forge-cms/angular';
                       </div>
                     </td>
                     <td class="px-4 py-3">
-                      <volt-badge variant="secondary" class="text-[10px]">{{ user.role || 'viewer' }}</volt-badge>
+                      <volt-badge class="text-[10px]">{{ user.role || 'viewer' }}</volt-badge>
                     </td>
                     <td class="px-4 py-3">
                       <span class="inline-flex items-center gap-1.5">
-                        <span class="h-1.5 w-1.5 rounded-full" [class.bg-success]="user.status === 'active'" [class.bg-muted-foreground]="user.status !== 'active'"></span>
+                        <span class="h-1.5 w-1.5 rounded-full"
+                          [class.bg-success]="user.status === 'active'"
+                          [class.bg-muted-foreground]="user.status !== 'active'"
+                        ></span>
                         <span class="text-xs text-muted-foreground">{{ user.status || 'active' }}</span>
                       </span>
                     </td>
-                    <td class="px-4 py-3 text-muted-foreground">{{ user.lastLogin ? formatDate(user.lastLogin) : '—' }}</td>
+                    <td class="px-4 py-3 text-muted-foreground">
+                      {{ user.lastLogin ? formatDate(user.lastLogin) : '—' }}
+                    </td>
                     <td class="px-4 py-3 text-right">
                       <div class="flex items-center justify-end gap-1">
                         <volt-button variant="ghost" size="icon" class="h-7 w-7">

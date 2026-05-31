@@ -23,6 +23,12 @@ import {
   IconZap
 } from '../../../components/icons';
 import { CmsApiService } from '@forge-cms/angular';
+import {
+  PageHeaderComponent,
+  LoadingStateComponent,
+  ErrorStateComponent,
+  SettingsCardComponent
+} from '../components';
 
 function bool(value: unknown): boolean {
   return value === true || value === 'true' || value === 1 || value === '1';
@@ -49,32 +55,25 @@ function bool(value: unknown): boolean {
     IconHardDrive,
     IconDatabase,
     IconAlertCircle,
-    IconCheckCircle
+    IconCheckCircle,
+    PageHeaderComponent,
+    LoadingStateComponent,
+    ErrorStateComponent,
+    SettingsCardComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-6">
-      <div>
-        <h1 class="text-2xl font-bold tracking-tight">Settings</h1>
-        <p class="text-sm text-muted-foreground mt-1">Configure your CMS instance and preferences.</p>
-      </div>
+      <forge-page-header title="Settings" subtitle="Configure your CMS instance and preferences." />
 
       @if (loading()) {
-        <div class="animate-pulse space-y-4 max-w-2xl">
-          <div class="h-48 bg-muted rounded-lg"></div>
-          <div class="h-48 bg-muted rounded-lg"></div>
-        </div>
+        <forge-loading-state variant="blocks" />
       } @else if (error()) {
-        <volt-card class="p-8 max-w-2xl">
-          <div class="text-center space-y-3">
-            <div class="h-12 w-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mx-auto">
-              <icon-alert-circle class="h-6 w-6" />
-            </div>
-            <h3 class="text-sm font-medium">Unable to load settings</h3>
-            <p class="text-xs text-muted-foreground">{{ error() }}</p>
-            <volt-button size="sm" (click)="loadSettings()">Retry</volt-button>
-          </div>
-        </volt-card>
+        <forge-error-state
+          title="Unable to load settings"
+          [message]="error()"
+          (retry)="loadSettings()"
+        />
       } @else {
         <volt-tabs [value]="activeTab()" (valueChange)="setTab($event)">
           <volt-tabs-list class="w-full justify-start border-b border-border rounded-none bg-transparent p-0 h-auto">
@@ -84,20 +83,10 @@ function bool(value: unknown): boolean {
             <volt-tabs-trigger value="security" class="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-sm">Security</volt-tabs-trigger>
           </volt-tabs-list>
 
-          <!-- General Tab -->
           <volt-tabs-content value="general" class="mt-6">
             <div class="max-w-2xl space-y-6">
-              <volt-card class="p-6 space-y-4">
-                <div class="flex items-center gap-3">
-                  <div class="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                    <icon-globe class="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h2 class="font-semibold">Site Information</h2>
-                    <p class="text-xs text-muted-foreground">Basic details about your project</p>
-                  </div>
-                </div>
-                <volt-separator />
+              <forge-settings-card title="Site Information" subtitle="Basic details about your project" iconColor="primary">
+                <icon-globe icon class="h-5 w-5" />
                 <div class="space-y-4">
                   <div class="space-y-2">
                     <label class="text-sm font-medium">Site Name</label>
@@ -118,19 +107,10 @@ function bool(value: unknown): boolean {
                     </div>
                   </div>
                 </div>
-              </volt-card>
+              </forge-settings-card>
 
-              <volt-card class="p-6 space-y-4">
-                <div class="flex items-center gap-3">
-                  <div class="h-9 w-9 rounded-lg bg-info/10 text-info flex items-center justify-center">
-                    <icon-mail class="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h2 class="font-semibold">Email Settings</h2>
-                    <p class="text-xs text-muted-foreground">Configure email notifications</p>
-                  </div>
-                </div>
-                <volt-separator />
+              <forge-settings-card title="Email Settings" subtitle="Configure email notifications" iconColor="info">
+                <icon-mail icon class="h-5 w-5" />
                 <div class="space-y-4">
                   <div class="space-y-2">
                     <label class="text-sm font-medium">From Address</label>
@@ -151,24 +131,14 @@ function bool(value: unknown): boolean {
                     <volt-switch [checked]="contentAlerts()" (change)="toggle(contentAlerts, $event)" />
                   </div>
                 </div>
-              </volt-card>
+              </forge-settings-card>
             </div>
           </volt-tabs-content>
 
-          <!-- API Tab -->
           <volt-tabs-content value="api" class="mt-6">
             <div class="max-w-2xl space-y-6">
-              <volt-card class="p-6 space-y-4">
-                <div class="flex items-center gap-3">
-                  <div class="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                    <icon-code class="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h2 class="font-semibold">API Configuration</h2>
-                    <p class="text-xs text-muted-foreground">REST and GraphQL settings</p>
-                  </div>
-                </div>
-                <volt-separator />
+              <forge-settings-card title="API Configuration" subtitle="REST and GraphQL settings" iconColor="primary">
+                <icon-code icon class="h-5 w-5" />
                 <div class="space-y-4">
                   <div class="space-y-2">
                     <label class="text-sm font-medium">GraphQL Endpoint</label>
@@ -200,19 +170,10 @@ function bool(value: unknown): boolean {
                     <volt-switch [checked]="rateLimiting()" (change)="toggle(rateLimiting, $event)" />
                   </div>
                 </div>
-              </volt-card>
+              </forge-settings-card>
 
-              <volt-card class="p-6 space-y-4">
-                <div class="flex items-center gap-3">
-                  <div class="h-9 w-9 rounded-lg bg-warning/10 text-warning flex items-center justify-center">
-                    <icon-zap class="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h2 class="font-semibold">Webhooks</h2>
-                    <p class="text-xs text-muted-foreground">Send events to external services</p>
-                  </div>
-                </div>
-                <volt-separator />
+              <forge-settings-card title="Webhooks" subtitle="Send events to external services" iconColor="warning">
+                <icon-zap icon class="h-5 w-5" />
                 <div class="space-y-4">
                   <div class="flex items-center justify-between">
                     <div>
@@ -229,24 +190,14 @@ function bool(value: unknown): boolean {
                     <volt-switch [checked]="webhooksRetry()" (change)="toggle(webhooksRetry, $event)" />
                   </div>
                 </div>
-              </volt-card>
+              </forge-settings-card>
             </div>
           </volt-tabs-content>
 
-          <!-- Media Tab -->
           <volt-tabs-content value="media" class="mt-6">
             <div class="max-w-2xl space-y-6">
-              <volt-card class="p-6 space-y-4">
-                <div class="flex items-center gap-3">
-                  <div class="h-9 w-9 rounded-lg bg-info/10 text-info flex items-center justify-center">
-                    <icon-hard-drive class="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h2 class="font-semibold">Storage</h2>
-                    <p class="text-xs text-muted-foreground">File upload and storage settings</p>
-                  </div>
-                </div>
-                <volt-separator />
+              <forge-settings-card title="Storage" subtitle="File upload and storage settings" iconColor="info">
+                <icon-hard-drive icon class="h-5 w-5" />
                 <div class="space-y-4">
                   <div class="space-y-2">
                     <label class="text-sm font-medium">Max File Size</label>
@@ -271,24 +222,14 @@ function bool(value: unknown): boolean {
                     <volt-switch [checked]="generateThumbnails()" (change)="toggle(generateThumbnails, $event)" />
                   </div>
                 </div>
-              </volt-card>
+              </forge-settings-card>
             </div>
           </volt-tabs-content>
 
-          <!-- Security Tab -->
           <volt-tabs-content value="security" class="mt-6">
             <div class="max-w-2xl space-y-6">
-              <volt-card class="p-6 space-y-4">
-                <div class="flex items-center gap-3">
-                  <div class="h-9 w-9 rounded-lg bg-success/10 text-success flex items-center justify-center">
-                    <icon-shield class="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h2 class="font-semibold">Authentication</h2>
-                    <p class="text-xs text-muted-foreground">Login and session settings</p>
-                  </div>
-                </div>
-                <volt-separator />
+              <forge-settings-card title="Authentication" subtitle="Login and session settings" iconColor="success">
+                <icon-shield icon class="h-5 w-5" />
                 <div class="space-y-4">
                   <div class="flex items-center justify-between">
                     <div>
@@ -305,19 +246,10 @@ function bool(value: unknown): boolean {
                     <volt-switch [checked]="ssoOAuth()" (change)="toggle(ssoOAuth, $event)" />
                   </div>
                 </div>
-              </volt-card>
+              </forge-settings-card>
 
-              <volt-card class="p-6 space-y-4">
-                <div class="flex items-center gap-3">
-                  <div class="h-9 w-9 rounded-lg bg-destructive/10 text-destructive flex items-center justify-center">
-                    <icon-database class="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h2 class="font-semibold">Danger Zone</h2>
-                    <p class="text-xs text-muted-foreground">Destructive actions</p>
-                  </div>
-                </div>
-                <volt-separator />
+              <forge-settings-card title="Danger Zone" subtitle="Destructive actions" iconColor="destructive">
+                <icon-database icon class="h-5 w-5" />
                 <div class="space-y-4">
                   <div class="flex items-center justify-between">
                     <div>
@@ -334,7 +266,7 @@ function bool(value: unknown): boolean {
                     <volt-button variant="destructive" size="sm" disabled>Reset</volt-button>
                   </div>
                 </div>
-              </volt-card>
+              </forge-settings-card>
             </div>
           </volt-tabs-content>
         </volt-tabs>
@@ -372,7 +304,6 @@ export class SettingsPage implements OnInit {
   saveError = signal<string | null>(null);
   configId = signal<string | null>(null);
 
-  // General
   siteName = signal('');
   description = signal('');
   defaultLanguage = signal('');
@@ -381,7 +312,6 @@ export class SettingsPage implements OnInit {
   newUserNotifications = signal(false);
   contentAlerts = signal(false);
 
-  // API
   graphqlEndpoint = signal('/api/graphql');
   restApiBase = signal('/api/v1');
   graphqlPlayground = signal(true);
@@ -390,13 +320,11 @@ export class SettingsPage implements OnInit {
   webhooksEnabled = signal(false);
   webhooksRetry = signal(true);
 
-  // Media
   maxFileSize = signal('10 MB');
   allowedTypes = signal('jpg, png, gif, svg, mp4, pdf');
   imageOptimization = signal(true);
   generateThumbnails = signal(true);
 
-  // Security
   twoFactorAuth = signal(false);
   ssoOAuth = signal(false);
 

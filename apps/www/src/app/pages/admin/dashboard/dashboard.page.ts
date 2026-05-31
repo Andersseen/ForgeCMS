@@ -1,13 +1,7 @@
 import { ChangeDetectionStrategy, Component, signal, inject } from '@angular/core';
 import type { OnInit } from '@angular/core';
+import { VoltBadge, VoltButton, VoltCard, VoltProgress } from '@voltui/components';
 import {
-  VoltBadge,
-  VoltButton,
-  VoltCard,
-  VoltProgress
-} from '@voltui/components';
-import {
-  IconAlertCircle,
   IconCheckCircle,
   IconClock,
   IconDatabase,
@@ -17,21 +11,18 @@ import {
   IconHardDrive,
   IconImage,
   IconNewspaper,
-  IconUsers,
   IconZap
 } from '../../../components/icons';
 import { CmsApiService } from '@forge-cms/angular';
 import { RouterLink } from '@angular/router';
-
-interface ActivityItem {
-  id: string;
-  action: 'created' | 'updated' | 'deleted' | 'published' | 'unpublished';
-  user: string;
-  userAvatar: string;
-  document: string;
-  collection: string;
-  time: string;
-}
+import {
+  PageHeaderComponent,
+  LoadingStateComponent,
+  ErrorStateComponent,
+  StatCardComponent,
+  SectionHeaderComponent,
+  CollectionIconComponent
+} from '../components';
 
 interface CollectionStat {
   name: string;
@@ -57,31 +48,31 @@ interface SystemStatus {
     VoltButton,
     VoltBadge,
     VoltProgress,
-    IconUsers,
-    IconImage,
-    IconHardDrive,
-    IconGlobe,
     IconFileText,
-    IconNewspaper,
-    IconClock,
     IconCheckCircle,
-    IconAlertCircle,
-    IconDatabase,
+    IconNewspaper,
+    IconImage,
+    IconClock,
     IconEye,
-    IconZap
+    IconHardDrive,
+    IconDatabase,
+    IconGlobe,
+    IconZap,
+    PageHeaderComponent,
+    LoadingStateComponent,
+    ErrorStateComponent,
+    StatCardComponent,
+    SectionHeaderComponent,
+    CollectionIconComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-6">
-      <!-- Header -->
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p class="text-sm text-muted-foreground mt-1">
-            Welcome back. Here's what's happening with your CMS.
-          </p>
-        </div>
-        <div class="flex items-center gap-2">
+      <forge-page-header
+        title="Dashboard"
+        subtitle="Welcome back. Here's what's happening with your CMS."
+      >
+        <div actions class="flex items-center gap-2">
           <volt-button variant="outline" size="sm">
             <icon-zap class="h-3.5 w-3.5 mr-1.5" />
             Quick Start
@@ -93,110 +84,54 @@ interface SystemStatus {
             </volt-button>
           </a>
         </div>
-      </div>
+      </forge-page-header>
 
       @if (loading()) {
-        <!-- Loading skeleton -->
-        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          @for (_ of [1,2,3,4]; track $index) {
-            <volt-card class="p-4">
-              <div class="animate-pulse space-y-3">
-                <div class="h-4 bg-muted rounded w-24"></div>
-                <div class="h-8 bg-muted rounded w-16"></div>
-                <div class="h-3 bg-muted rounded w-32"></div>
-              </div>
-            </volt-card>
-          }
-        </div>
+        <forge-loading-state variant="stat-grid" />
       } @else if (error()) {
-        <volt-card class="p-6">
-          <div class="text-center space-y-2">
-            <icon-alert-circle class="h-8 w-8 text-destructive mx-auto" />
-            <p class="text-sm font-medium">Failed to load dashboard data</p>
-            <p class="text-xs text-muted-foreground">{{ error() }}</p>
-            <volt-button size="sm" (click)="loadData()">Retry</volt-button>
-          </div>
-        </volt-card>
+        <forge-error-state
+          title="Failed to load dashboard data"
+          [message]="error()"
+          (retry)="loadData()"
+        />
       } @else {
-        <!-- Stats Cards -->
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <volt-card class="p-4">
-            <div class="flex items-center justify-between">
-              <div class="space-y-1">
-                <p class="text-sm text-muted-foreground">Total Documents</p>
-                <p class="text-2xl font-bold">{{ totalDocuments() }}</p>
-                <div class="flex items-center gap-1 text-xs">
-                  <span class="text-muted-foreground">across {{ collections().length }} collections</span>
-                </div>
-              </div>
-              <div
-                class="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center"
-              >
-                <icon-file-text class="h-5 w-5" />
-              </div>
-            </div>
-          </volt-card>
-
-          <volt-card class="p-4">
-            <div class="flex items-center justify-between">
-              <div class="space-y-1">
-                <p class="text-sm text-muted-foreground">Published</p>
-                <p class="text-2xl font-bold">{{ totalDocuments() }}</p>
-                <div class="flex items-center gap-1 text-xs">
-                  <span class="text-success font-medium">100%</span>
-                  <span class="text-muted-foreground">of total</span>
-                </div>
-              </div>
-              <div
-                class="h-10 w-10 rounded-lg bg-success/10 text-success flex items-center justify-center"
-              >
-                <icon-check-circle class="h-5 w-5" />
-              </div>
-            </div>
-          </volt-card>
-
-          <volt-card class="p-4">
-            <div class="flex items-center justify-between">
-              <div class="space-y-1">
-                <p class="text-sm text-muted-foreground">Collections</p>
-                <p class="text-2xl font-bold">{{ collections().length }}</p>
-                <div class="flex items-center gap-1 text-xs">
-                  <span class="text-muted-foreground">configured</span>
-                </div>
-              </div>
-              <div
-                class="h-10 w-10 rounded-lg bg-warning/10 text-warning flex items-center justify-center"
-              >
-                <icon-newspaper class="h-5 w-5" />
-              </div>
-            </div>
-          </volt-card>
-
-          <volt-card class="p-4">
-            <div class="flex items-center justify-between">
-              <div class="space-y-1">
-                <p class="text-sm text-muted-foreground">Media Files</p>
-                <p class="text-2xl font-bold">0</p>
-                <div class="flex items-center gap-1 text-xs">
-                  <span class="text-muted-foreground">via Storage</span>
-                </div>
-              </div>
-              <div class="h-10 w-10 rounded-lg bg-info/10 text-info flex items-center justify-center">
-                <icon-image class="h-5 w-5" />
-              </div>
-            </div>
-          </volt-card>
+          <forge-stat-card
+            [value]="totalDocuments()"
+            label="Total Documents"
+            sublabel="across {{ collections().length }} collections"
+            color="primary"
+          >
+            <icon-file-text icon class="h-5 w-5" />
+          </forge-stat-card>
+          <forge-stat-card
+            [value]="totalDocuments()"
+            label="Published"
+            sublabel="100% of total"
+            color="success"
+          >
+            <icon-check-circle icon class="h-5 w-5" />
+          </forge-stat-card>
+          <forge-stat-card
+            [value]="collections().length"
+            label="Collections"
+            sublabel="configured"
+            color="warning"
+          >
+            <icon-newspaper icon class="h-5 w-5" />
+          </forge-stat-card>
+          <forge-stat-card [value]="0" label="Media Files" sublabel="via Storage" color="info">
+            <icon-image icon class="h-5 w-5" />
+          </forge-stat-card>
         </div>
 
         <div class="grid gap-6 lg:grid-cols-3">
-          <!-- Collections Overview -->
           <div class="lg:col-span-2 space-y-4">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold">Collections</h2>
-              <a routerLink="/admin/collections">
+            <forge-section-header title="Collections">
+              <a actions routerLink="/admin/collections">
                 <volt-button variant="ghost" size="sm">View All</volt-button>
               </a>
-            </div>
+            </forge-section-header>
             <div class="grid gap-3 md:grid-cols-2">
               @for (col of collections(); track col.slug) {
                 <a [routerLink]="['/admin/collections', col.slug]">
@@ -206,23 +141,7 @@ interface SystemStatus {
                         <div
                           class="h-9 w-9 rounded-lg bg-muted flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors"
                         >
-                          @switch (col.icon) {
-                            @case ('globe') {
-                              <icon-globe class="h-4 w-4" />
-                            }
-                            @case ('newspaper') {
-                              <icon-newspaper class="h-4 w-4" />
-                            }
-                            @case ('image') {
-                              <icon-image class="h-4 w-4" />
-                            }
-                            @case ('users') {
-                              <icon-users class="h-4 w-4" />
-                            }
-                            @default {
-                              <icon-file-text class="h-4 w-4" />
-                            }
-                          }
+                          <forge-collection-icon [name]="col.icon" iconClass="h-4 w-4" />
                         </div>
                         <div>
                           <h3 class="font-medium text-sm">{{ col.name }}</h3>
@@ -247,26 +166,19 @@ interface SystemStatus {
             </div>
           </div>
 
-          <!-- Drafts Pending Review -->
           <div class="space-y-4">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold">Pending Review</h2>
-              <volt-badge variant="secondary">0</volt-badge>
-            </div>
+            <forge-section-header title="Pending Review">
+              <volt-badge actions variant="secondary">0</volt-badge>
+            </forge-section-header>
             <div class="space-y-3">
-              <p class="text-sm text-muted-foreground text-center py-8">
-                No pending drafts
-              </p>
+              <p class="text-sm text-muted-foreground text-center py-8">No pending drafts</p>
             </div>
             <volt-button variant="outline" size="sm" class="w-full">View All Drafts</volt-button>
           </div>
         </div>
 
-        <!-- Activity Log -->
         <div class="space-y-4">
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold">Recent Activity</h2>
-          </div>
+          <forge-section-header title="Recent Activity" />
           <volt-card class="p-6">
             <p class="text-sm text-muted-foreground text-center py-8">
               Activity tracking is not yet implemented.
@@ -274,9 +186,8 @@ interface SystemStatus {
           </volt-card>
         </div>
 
-        <!-- System Health -->
         <div class="space-y-4">
-          <h2 class="text-lg font-semibold">System Health</h2>
+          <forge-section-header title="System Health" />
           <div class="grid gap-4 md:grid-cols-3">
             <volt-card class="p-4">
               <div class="flex items-center justify-between mb-3">
@@ -284,7 +195,10 @@ interface SystemStatus {
                   <icon-hard-drive class="h-4 w-4 text-muted-foreground" />
                   <h3 class="text-sm font-medium">Storage</h3>
                 </div>
-                <span class="text-xs font-medium" [class.text-success]="status()?.storage?.name === 'r2'" [class.text-warning]="status()?.storage?.name !== 'r2'">
+                <span class="text-xs font-medium"
+                  [class.text-success]="status()?.storage?.name === 'r2'"
+                  [class.text-warning]="status()?.storage?.name !== 'r2'"
+                >
                   {{ status()?.storage?.name === 'r2' ? 'Healthy' : 'Not configured' }}
                 </span>
               </div>
@@ -301,7 +215,9 @@ interface SystemStatus {
                 </div>
                 <span class="text-xs font-medium text-success">Healthy</span>
               </div>
-              <p class="text-xs text-muted-foreground mb-3">{{ status()?.database?.records ?? totalDocuments() }} records</p>
+              <p class="text-xs text-muted-foreground mb-3">
+                {{ status()?.database?.records ?? totalDocuments() }} records
+              </p>
               <volt-progress [value]="Math.min((status()?.database?.records ?? totalDocuments()) / 10, 100)" />
               <p class="text-xs text-muted-foreground mt-2">{{ status()?.database?.name ?? 'in-memory' }}</p>
             </volt-card>
@@ -399,6 +315,4 @@ export class DashboardPage implements OnInit {
       default: return 'file-text';
     }
   }
-
-  activityLog: ActivityItem[] = []; // Activity tracking not yet implemented
 }

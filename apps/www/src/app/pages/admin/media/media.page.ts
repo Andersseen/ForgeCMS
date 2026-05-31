@@ -10,6 +10,12 @@ import {
   IconTrash
 } from '../../../components/icons';
 import { CmsApiService } from '@forge-cms/angular';
+import {
+  PageHeaderComponent,
+  ErrorStateComponent,
+  EmptyStateComponent,
+  SearchToolbarComponent
+} from '../components';
 
 @Component({
   selector: 'forge-cms-media',
@@ -24,17 +30,17 @@ import { CmsApiService } from '@forge-cms/angular';
     IconTrash,
     IconImage,
     IconHardDrive,
-    IconAlertCircle
+    IconAlertCircle,
+    PageHeaderComponent,
+    ErrorStateComponent,
+    EmptyStateComponent,
+    SearchToolbarComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-6">
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-2xl font-bold tracking-tight">Media Library</h1>
-          <p class="text-sm text-muted-foreground mt-1">Manage images, videos, and documents.</p>
-        </div>
-        <div class="flex items-center gap-2">
+      <forge-page-header title="Media Library" subtitle="Manage images, videos, and documents.">
+        <div actions class="flex items-center gap-2">
           <volt-button variant="outline" size="sm">
             <icon-hard-drive class="h-3.5 w-3.5 mr-1.5" />
             Storage
@@ -44,7 +50,7 @@ import { CmsApiService } from '@forge-cms/angular';
             Upload
           </volt-button>
         </div>
-      </div>
+      </forge-page-header>
 
       @if (loading()) {
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -59,28 +65,18 @@ import { CmsApiService } from '@forge-cms/angular';
           }
         </div>
       } @else if (error()) {
-        <volt-card class="p-8">
-          <div class="text-center space-y-3">
-            <div class="h-12 w-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mx-auto">
-              <icon-alert-circle class="h-6 w-6" />
-            </div>
-            <h3 class="text-sm font-medium">Unable to load media</h3>
-            <p class="text-xs text-muted-foreground max-w-sm mx-auto">{{ error() }}</p>
-            <volt-button size="sm" (click)="loadMedia()">Retry</volt-button>
-          </div>
-        </volt-card>
+        <forge-error-state
+          title="Unable to load media"
+          [message]="error()"
+          (retry)="loadMedia()"
+        />
       } @else if (mediaItems().length === 0) {
-        <volt-card class="p-8">
-          <div class="text-center space-y-3">
-            <div class="h-12 w-12 rounded-full bg-muted text-muted-foreground flex items-center justify-center mx-auto">
-              <icon-image class="h-6 w-6" />
-            </div>
-            <h3 class="text-sm font-medium">No media yet</h3>
-            <p class="text-xs text-muted-foreground max-w-sm mx-auto">
-              Upload files to see them here. Media storage uses the StorageAdapter (R2 in production).
-            </p>
-          </div>
-        </volt-card>
+        <forge-empty-state
+          title="No media yet"
+          message="Upload files to see them here. Media storage uses the StorageAdapter (R2 in production)."
+        >
+          <icon-image icon class="h-6 w-6" />
+        </forge-empty-state>
       } @else {
         <volt-card class="p-4">
           <div class="flex items-center justify-between mb-2">
@@ -93,12 +89,13 @@ import { CmsApiService } from '@forge-cms/angular';
           <volt-progress [value]="mediaItems().length > 0 ? 10 : 0" />
         </volt-card>
 
-        <div class="flex items-center gap-3">
-          <volt-input placeholder="Search media..." class="w-72 h-9 text-sm" />
-          <volt-button variant="outline" size="sm">All Types</volt-button>
-          <volt-button variant="outline" size="sm">Images</volt-button>
-          <volt-button variant="outline" size="sm">Videos</volt-button>
-        </div>
+        <forge-search-toolbar placeholder="Search media...">
+          <div filters>
+            <volt-button variant="outline" size="sm">All Types</volt-button>
+            <volt-button variant="outline" size="sm">Images</volt-button>
+            <volt-button variant="outline" size="sm">Videos</volt-button>
+          </div>
+        </forge-search-toolbar>
 
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           @for (item of mediaItems(); track item.id) {

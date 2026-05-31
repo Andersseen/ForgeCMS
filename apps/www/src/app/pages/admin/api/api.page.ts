@@ -1,10 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { VoltButton, VoltCard } from '@voltui/components';
-import {
-  IconCode,
-  IconKey,
-  IconPlus
-} from '../../../components/icons';
+import { IconCode, IconKey, IconPlus } from '../../../components/icons';
+import { PageHeaderComponent, EmptyStateComponent } from '../components';
 
 @Component({
   selector: 'forge-cms-api',
@@ -14,21 +11,21 @@ import {
     VoltButton,
     IconPlus,
     IconKey,
-    IconCode
+    IconCode,
+    PageHeaderComponent,
+    EmptyStateComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-6">
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-2xl font-bold tracking-tight">API Keys</h1>
-          <p class="text-sm text-muted-foreground mt-1">Manage API keys for headless content access.</p>
+      <forge-page-header title="API Keys" subtitle="Manage API keys for headless content access.">
+        <div actions>
+          <volt-button size="sm" disabled>
+            <icon-plus class="h-3.5 w-3.5 mr-1.5" />
+            Generate Key
+          </volt-button>
         </div>
-        <volt-button size="sm" disabled>
-          <icon-plus class="h-3.5 w-3.5 mr-1.5" />
-          Generate Key
-        </volt-button>
-      </div>
+      </forge-page-header>
 
       <volt-card class="p-5">
         <div class="flex items-center gap-3 mb-4">
@@ -65,17 +62,9 @@ import {
         </div>
       </volt-card>
 
-      <volt-card class="p-8">
-        <div class="text-center space-y-3">
-          <div class="h-12 w-12 rounded-full bg-muted text-muted-foreground flex items-center justify-center mx-auto">
-            <icon-key class="h-6 w-6" />
-          </div>
-          <h3 class="text-sm font-medium">API key management not yet implemented</h3>
-          <p class="text-xs text-muted-foreground max-w-sm mx-auto">
-            This feature will allow you to generate and revoke API keys for external access to your CMS content.
-          </p>
-        </div>
-      </volt-card>
+      <forge-empty-state title="API key management not yet implemented">
+        <icon-key icon class="h-6 w-6" />
+      </forge-empty-state>
     </div>
   `
 })
