@@ -6,7 +6,7 @@ import unicorn from 'eslint-plugin-unicorn';
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/.analog/**', '**/.turbo/**', '**/coverage/**', '**/node_modules/**']
+    ignores: ['**/dist/**', '**/.analog/**', '**/.turbo/**', '**/coverage/**', '**/node_modules/**', '**/drizzle.config.js', '**/drizzle.config.d.ts', '**/drizzle.config.js.map', '**/drizzle.config.d.ts.map']
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

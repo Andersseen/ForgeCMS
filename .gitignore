@@ -8,6 +8,12 @@ dist/
 .angular/
 .wrangler/
 
+# Generated drizzle config artifacts
+drizzle.config.js
+drizzle.config.d.ts
+drizzle.config.js.map
+drizzle.config.d.ts.map
+
 # Turborepo
 .turbo/
 

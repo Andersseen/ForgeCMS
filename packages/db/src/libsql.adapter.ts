@@ -76,6 +76,7 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
     const result = await db
       .select()
       .from(table)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .where(eq((table as any)['id'], id))
       .limit(1);
 
@@ -90,6 +91,7 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
 
     if (options.where && Object.keys(options.where).length > 0) {
       const conditions = Object.entries(options.where).map(([key, value]) =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         eq((table as any)[key], value)
       );
       query = query.where(and(...conditions)) as typeof query;
@@ -125,6 +127,7 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
       record[key] = field ? toDbValue(value, field.kind) : value;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await db.insert(table).values(record as any);
     return this.findById(collection, record.id as string) as Promise<DatabaseRecord>;
   }
@@ -146,6 +149,7 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
       updates[key] = field ? toDbValue(value, field.kind) : value;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await db.update(table).set(updates as any).where(eq((table as any)['id'], id));
 
     const updated = await this.findById(collection, id);
@@ -156,6 +160,7 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
   async delete(collection: string, id: string): Promise<void> {
     const db = this.getDb();
     const table = this.getTable(collection);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await db.delete(table).where(eq((table as any)['id'], id));
   }
 
