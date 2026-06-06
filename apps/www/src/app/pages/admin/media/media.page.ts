@@ -54,7 +54,7 @@ import {
 
       @if (loading()) {
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          @for (_ of [1,2,3,4,5,6,7,8]; track $index) {
+          @for (_ of [1, 2, 3, 4, 5, 6, 7, 8]; track $index) {
             <volt-card class="overflow-hidden">
               <div class="aspect-square bg-muted animate-pulse"></div>
               <div class="p-3 space-y-2">
@@ -65,11 +65,7 @@ import {
           }
         </div>
       } @else if (error()) {
-        <forge-error-state
-          title="Unable to load media"
-          [message]="error()"
-          (retry)="loadMedia()"
-        />
+        <forge-error-state title="Unable to load media" [message]="error()" (retry)="loadMedia()" />
       } @else if (mediaItems().length === 0) {
         <forge-empty-state
           title="No media yet"
@@ -100,7 +96,9 @@ import {
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           @for (item of mediaItems(); track item.id) {
             <volt-card class="overflow-hidden group cursor-pointer">
-              <div class="aspect-square bg-muted flex items-center justify-center relative overflow-hidden">
+              <div
+                class="aspect-square bg-muted flex items-center justify-center relative overflow-hidden"
+              >
                 @if (item.url) {
                   <img [src]="item.url" [alt]="item.filename" class="h-full w-full object-cover" />
                 } @else {
@@ -109,7 +107,9 @@ import {
                     <span class="text-xs">{{ item.mimeType || 'file' }}</span>
                   </div>
                 }
-                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                <div
+                  class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2"
+                >
                   <volt-button variant="outline" size="icon" class="h-8 w-8">
                     <icon-eye class="h-4 w-4" />
                   </volt-button>

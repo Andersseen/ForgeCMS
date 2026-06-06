@@ -149,8 +149,12 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
       updates[key] = field ? toDbValue(value, field.kind) : value;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await db.update(table).set(updates as any).where(eq((table as any)['id'], id));
+    await db
+      .update(table)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .set(updates as any)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .where(eq((table as any)['id'], id));
 
     const updated = await this.findById(collection, id);
     if (!updated) throw new Error(`Record ${id} not found in ${collection}`);

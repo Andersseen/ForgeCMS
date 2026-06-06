@@ -107,7 +107,10 @@ export interface R2Checksums {
 
 /** KV Namespace binding — Cloudflare's key-value store */
 export interface KVNamespace {
-  get(key: string, options?: { type?: 'text' | 'json' | 'arrayBuffer' | 'stream' }): Promise<string | null>;
+  get(
+    key: string,
+    options?: { type?: 'text' | 'json' | 'arrayBuffer' | 'stream' }
+  ): Promise<string | null>;
   get(key: string, options: { type: 'text' }): Promise<string | null>;
   get(key: string, options: { type: 'arrayBuffer' }): Promise<ArrayBuffer | null>;
   get(key: string, options: { type: 'json' }): Promise<unknown | null>;

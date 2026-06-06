@@ -213,7 +213,12 @@ describe('CRUD Handlers', () => {
     it('allows authenticated requests', async () => {
       await runtime.adapters.database.create('posts', { title: 'Post 1' });
 
-      const context = createTestContext('GET', 'https://forge.test/api/posts', undefined, 'test-token');
+      const context = createTestContext(
+        'GET',
+        'https://forge.test/api/posts',
+        undefined,
+        'test-token'
+      );
       context.params = { collection: 'posts' };
 
       const response = await handleList(context, { runtime, requireAuth: true });

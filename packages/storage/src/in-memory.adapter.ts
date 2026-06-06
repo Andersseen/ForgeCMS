@@ -34,7 +34,10 @@ async function readBody(
     offset += chunk.length;
   }
 
-  return result.buffer.slice(result.byteOffset, result.byteOffset + result.byteLength) as ArrayBuffer;
+  return result.buffer.slice(
+    result.byteOffset,
+    result.byteOffset + result.byteLength
+  ) as ArrayBuffer;
 }
 
 export class InMemoryStorageAdapter implements StorageAdapter {

@@ -123,7 +123,8 @@ class MockD1PreparedStatement implements D1PreparedStatement {
             for (let j = i + 1; j < parts.length; j++) {
               const innerPart = parts[j]!;
               if (innerPart === 'AND') continue;
-              if (innerPart.toUpperCase() === 'LIMIT' || innerPart.toUpperCase() === 'OFFSET') break;
+              if (innerPart.toUpperCase() === 'LIMIT' || innerPart.toUpperCase() === 'OFFSET')
+                break;
               bindCursor++;
             }
           }
@@ -160,9 +161,7 @@ class MockD1PreparedStatement implements D1PreparedStatement {
     const rows = this.getTableRows(table);
 
     const colMatch = this.query.match(/\(([^)]+)\)/);
-    const cols = colMatch
-      ? colMatch[1]!.split(',').map((c) => c.trim().replace(/"/g, ''))
-      : [];
+    const cols = colMatch ? colMatch[1]!.split(',').map((c) => c.trim().replace(/"/g, '')) : [];
 
     const record: Record<string, unknown> = {};
     cols.forEach((col, i) => {

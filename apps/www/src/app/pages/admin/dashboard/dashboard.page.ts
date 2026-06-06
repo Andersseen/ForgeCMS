@@ -135,7 +135,9 @@ interface SystemStatus {
             <div class="grid gap-3 md:grid-cols-2">
               @for (col of collections(); track col.slug) {
                 <a [routerLink]="['/admin/collections', col.slug]">
-                  <volt-card class="p-4 hover:border-primary/50 transition-all cursor-pointer group">
+                  <volt-card
+                    class="p-4 hover:border-primary/50 transition-all cursor-pointer group"
+                  >
                     <div class="flex items-start justify-between">
                       <div class="flex items-center gap-3">
                         <div
@@ -195,7 +197,8 @@ interface SystemStatus {
                   <icon-hard-drive class="h-4 w-4 text-muted-foreground" />
                   <h3 class="text-sm font-medium">Storage</h3>
                 </div>
-                <span class="text-xs font-medium"
+                <span
+                  class="text-xs font-medium"
                   [class.text-success]="status()?.storage?.name === 'r2'"
                   [class.text-warning]="status()?.storage?.name !== 'r2'"
                 >
@@ -204,7 +207,9 @@ interface SystemStatus {
               </div>
               <p class="text-xs text-muted-foreground mb-3">{{ status()?.storage?.name ?? '—' }}</p>
               <volt-progress [value]="0" />
-              <p class="text-xs text-muted-foreground mt-2">{{ status()?.storage?.files ?? 0 }} files</p>
+              <p class="text-xs text-muted-foreground mt-2">
+                {{ status()?.storage?.files ?? 0 }} files
+              </p>
             </volt-card>
 
             <volt-card class="p-4">
@@ -218,8 +223,12 @@ interface SystemStatus {
               <p class="text-xs text-muted-foreground mb-3">
                 {{ status()?.database?.records ?? totalDocuments() }} records
               </p>
-              <volt-progress [value]="Math.min((status()?.database?.records ?? totalDocuments()) / 10, 100)" />
-              <p class="text-xs text-muted-foreground mt-2">{{ status()?.database?.name ?? 'in-memory' }}</p>
+              <volt-progress
+                [value]="Math.min((status()?.database?.records ?? totalDocuments()) / 10, 100)"
+              />
+              <p class="text-xs text-muted-foreground mt-2">
+                {{ status()?.database?.name ?? 'in-memory' }}
+              </p>
             </volt-card>
 
             <volt-card class="p-4">
@@ -228,9 +237,13 @@ interface SystemStatus {
                   <icon-globe class="h-4 w-4 text-muted-foreground" />
                   <h3 class="text-sm font-medium">API</h3>
                 </div>
-                <span class="text-xs font-medium text-success">{{ status()?.api?.status ?? 'Online' }}</span>
+                <span class="text-xs font-medium text-success">{{
+                  status()?.api?.status ?? 'Online'
+                }}</span>
               </div>
-              <p class="text-xs text-muted-foreground mb-3">REST API {{ status()?.api?.version ?? 'v1' }}</p>
+              <p class="text-xs text-muted-foreground mb-3">
+                REST API {{ status()?.api?.version ?? 'v1' }}
+              </p>
               <volt-progress [value]="100" />
               <p class="text-xs text-muted-foreground mt-2">ForgeCMS runtime</p>
             </volt-card>
@@ -308,11 +321,16 @@ export class DashboardPage implements OnInit {
 
   private inferIcon(slug: string): string {
     switch (slug) {
-      case 'pages': return 'globe';
-      case 'posts': return 'newspaper';
-      case 'media': return 'image';
-      case 'users': return 'users';
-      default: return 'file-text';
+      case 'pages':
+        return 'globe';
+      case 'posts':
+        return 'newspaper';
+      case 'media':
+        return 'image';
+      case 'users':
+        return 'users';
+      default:
+        return 'file-text';
     }
   }
 }

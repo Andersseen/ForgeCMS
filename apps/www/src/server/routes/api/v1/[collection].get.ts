@@ -14,8 +14,12 @@ export default defineEventHandler(async (event) => {
   }
 
   const url = getRequestURL(event);
-  const limit = url.searchParams.has('limit') ? parseInt(url.searchParams.get('limit')!, 10) : undefined;
-  const offset = url.searchParams.has('offset') ? parseInt(url.searchParams.get('offset')!, 10) : undefined;
+  const limit = url.searchParams.has('limit')
+    ? parseInt(url.searchParams.get('limit')!, 10)
+    : undefined;
+  const offset = url.searchParams.has('offset')
+    ? parseInt(url.searchParams.get('offset')!, 10)
+    : undefined;
 
   const records = await serverRuntime.adapters.database.findMany({
     collection,

@@ -32,7 +32,9 @@ export class R2StorageAdapter implements StorageAdapter {
     const bucket = this.getBucket();
     const r2Object = await bucket.put(options.key, options.body, {
       ...(options.metadata !== undefined && { customMetadata: options.metadata }),
-      ...(options.contentType !== undefined && { httpMetadata: { contentType: options.contentType } })
+      ...(options.contentType !== undefined && {
+        httpMetadata: { contentType: options.contentType }
+      })
     });
     return this.toStorageObject(r2Object);
   }

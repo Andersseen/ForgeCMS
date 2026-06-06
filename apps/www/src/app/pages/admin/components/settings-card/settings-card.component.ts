@@ -37,7 +37,5 @@ import { VoltCard, VoltSeparator } from '@voltui/components';
 export class SettingsCardComponent {
   title = input.required<string>();
   subtitle = input.required<string>();
-  iconColor = input<
-    'primary' | 'info' | 'warning' | 'success' | 'destructive'
-  >('primary');
+  iconColor = input<'primary' | 'info' | 'warning' | 'success' | 'destructive'>('primary');
 }

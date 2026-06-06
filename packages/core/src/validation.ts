@@ -234,11 +234,15 @@ export function validateField(
 
     case 'json': {
       if (value === undefined) {
-        errors.push(createError(fieldName, 'type_json', `Field "${fieldName}" must be valid JSON.`));
+        errors.push(
+          createError(fieldName, 'type_json', `Field "${fieldName}" must be valid JSON.`)
+        );
       }
       // Accept any non-null value that can be serialized
       if (typeof value === 'function' || typeof value === 'symbol') {
-        errors.push(createError(fieldName, 'type_json', `Field "${fieldName}" must be valid JSON.`));
+        errors.push(
+          createError(fieldName, 'type_json', `Field "${fieldName}" must be valid JSON.`)
+        );
       }
       break;
     }

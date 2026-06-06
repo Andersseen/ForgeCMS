@@ -10,12 +10,14 @@ import { VoltCard } from '@voltui/components';
     @switch (variant()) {
       @case ('spinner') {
         <div class="flex items-center justify-center py-12">
-          <div class="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+          <div
+            class="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"
+          ></div>
         </div>
       }
       @case ('stat-grid') {
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          @for (_ of [1,2,3,4]; track $index) {
+          @for (_ of [1, 2, 3, 4]; track $index) {
             <volt-card class="p-4">
               <div class="animate-pulse space-y-3">
                 <div class="h-4 bg-muted rounded w-24"></div>
@@ -28,7 +30,7 @@ import { VoltCard } from '@voltui/components';
       }
       @case ('image-grid') {
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          @for (_ of [1,2,3,4,5,6,7,8]; track $index) {
+          @for (_ of [1, 2, 3, 4, 5, 6, 7, 8]; track $index) {
             <volt-card class="overflow-hidden">
               <div class="aspect-square bg-muted animate-pulse"></div>
               <div class="p-3 space-y-2">
@@ -42,7 +44,7 @@ import { VoltCard } from '@voltui/components';
       @case ('table') {
         <volt-card class="overflow-hidden p-6">
           <div class="animate-pulse space-y-3">
-            @for (_ of [1,2,3,4,5]; track $index) {
+            @for (_ of [1, 2, 3, 4, 5]; track $index) {
               <div class="h-10 bg-muted rounded"></div>
             }
           </div>
@@ -56,14 +58,14 @@ import { VoltCard } from '@voltui/components';
       }
       @default {
         <div class="flex items-center justify-center py-12">
-          <div class="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+          <div
+            class="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"
+          ></div>
         </div>
       }
     }
   `
 })
 export class LoadingStateComponent {
-  variant = input<
-    'spinner' | 'stat-grid' | 'image-grid' | 'table' | 'blocks'
-  >('spinner');
+  variant = input<'spinner' | 'stat-grid' | 'image-grid' | 'table' | 'blocks'>('spinner');
 }

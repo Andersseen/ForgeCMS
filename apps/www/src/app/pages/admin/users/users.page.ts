@@ -67,7 +67,7 @@ import {
 
       @if (loading()) {
         <div class="grid gap-4 md:grid-cols-4">
-          @for (_ of [1,2,3,4]; track $index) {
+          @for (_ of [1, 2, 3, 4]; track $index) {
             <volt-card class="p-4">
               <div class="animate-pulse flex items-center gap-3">
                 <div class="h-9 w-9 rounded-lg bg-muted"></div>
@@ -81,17 +81,13 @@ import {
         </div>
         <volt-card class="overflow-hidden p-6">
           <div class="animate-pulse space-y-3">
-            @for (_ of [1,2,3,4,5]; track $index) {
+            @for (_ of [1, 2, 3, 4, 5]; track $index) {
               <div class="h-10 bg-muted rounded"></div>
             }
           </div>
         </volt-card>
       } @else if (error()) {
-        <forge-error-state
-          title="Unable to load users"
-          [message]="error()"
-          (retry)="loadUsers()"
-        />
+        <forge-error-state title="Unable to load users" [message]="error()" (retry)="loadUsers()" />
       } @else if (users().length === 0) {
         <forge-empty-state
           title="No users yet"
@@ -101,16 +97,36 @@ import {
         </forge-empty-state>
       } @else {
         <div class="grid gap-4 md:grid-cols-4">
-          <forge-stat-card [value]="users().length" label="Total Users" color="primary" layout="horizontal">
+          <forge-stat-card
+            [value]="users().length"
+            label="Total Users"
+            color="primary"
+            layout="horizontal"
+          >
             <icon-users icon class="h-4 w-4" />
           </forge-stat-card>
-          <forge-stat-card [value]="activeCount()" label="Active" color="success" layout="horizontal">
+          <forge-stat-card
+            [value]="activeCount()"
+            label="Active"
+            color="success"
+            layout="horizontal"
+          >
             <icon-shield icon class="h-4 w-4" />
           </forge-stat-card>
-          <forge-stat-card [value]="invitedCount()" label="Invited" color="warning" layout="horizontal">
+          <forge-stat-card
+            [value]="invitedCount()"
+            label="Invited"
+            color="warning"
+            layout="horizontal"
+          >
             <icon-mail icon class="h-4 w-4" />
           </forge-stat-card>
-          <forge-stat-card [value]="inactiveCount()" label="Inactive" color="muted" layout="horizontal">
+          <forge-stat-card
+            [value]="inactiveCount()"
+            label="Inactive"
+            color="muted"
+            layout="horizontal"
+          >
             <icon-users icon class="h-4 w-4" />
           </forge-stat-card>
         </div>
@@ -155,11 +171,14 @@ import {
                     </td>
                     <td class="px-4 py-3">
                       <span class="inline-flex items-center gap-1.5">
-                        <span class="h-1.5 w-1.5 rounded-full"
+                        <span
+                          class="h-1.5 w-1.5 rounded-full"
                           [class.bg-success]="user.status === 'active'"
                           [class.bg-muted-foreground]="user.status !== 'active'"
                         ></span>
-                        <span class="text-xs text-muted-foreground">{{ user.status || 'active' }}</span>
+                        <span class="text-xs text-muted-foreground">{{
+                          user.status || 'active'
+                        }}</span>
                       </span>
                     </td>
                     <td class="px-4 py-3 text-muted-foreground">

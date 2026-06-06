@@ -4,11 +4,11 @@ Cloudflare-native adapters and types for ForgeCMS.
 
 ## Target services
 
-| Service | Binding type | Adapter | Status |
-|---------|-------------|---------|--------|
-| **D1** | `D1Database` | `D1DatabaseAdapter` | Implemented (SQL native, Drizzle-ready) |
-| **R2** | `R2Bucket` | `R2StorageAdapter` | Implemented |
-| **KV** | `KVNamespace` | — | Types only |
+| Service | Binding type  | Adapter             | Status                                  |
+| ------- | ------------- | ------------------- | --------------------------------------- |
+| **D1**  | `D1Database`  | `D1DatabaseAdapter` | Implemented (SQL native, Drizzle-ready) |
+| **R2**  | `R2Bucket`    | `R2StorageAdapter`  | Implemented                             |
+| **KV**  | `KVNamespace` | —                   | Types only                              |
 
 ## Preparing for Cloudflare (no real account required yet)
 
@@ -32,6 +32,7 @@ await runtime.syncSchema();
 ```
 
 To activate D1 later:
+
 1. Create a D1 database in the Cloudflare dashboard.
 2. Add the binding to `wrangler.toml`:
    ```toml

@@ -1,4 +1,10 @@
-import { ChangeDetectionStrategy, Component, signal, inject, type WritableSignal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  signal,
+  inject,
+  type WritableSignal
+} from '@angular/core';
 import type { OnInit } from '@angular/core';
 import {
   VoltButton,
@@ -76,59 +82,111 @@ function bool(value: unknown): boolean {
         />
       } @else {
         <volt-tabs [value]="activeTab()" (valueChange)="setTab($event)">
-          <volt-tabs-list class="w-full justify-start border-b border-border rounded-none bg-transparent p-0 h-auto">
-            <volt-tabs-trigger value="general" class="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-sm">General</volt-tabs-trigger>
-            <volt-tabs-trigger value="api" class="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-sm">API</volt-tabs-trigger>
-            <volt-tabs-trigger value="media" class="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-sm">Media</volt-tabs-trigger>
-            <volt-tabs-trigger value="security" class="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-sm">Security</volt-tabs-trigger>
+          <volt-tabs-list
+            class="w-full justify-start border-b border-border rounded-none bg-transparent p-0 h-auto"
+          >
+            <volt-tabs-trigger
+              value="general"
+              class="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-sm"
+              >General</volt-tabs-trigger
+            >
+            <volt-tabs-trigger
+              value="api"
+              class="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-sm"
+              >API</volt-tabs-trigger
+            >
+            <volt-tabs-trigger
+              value="media"
+              class="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-sm"
+              >Media</volt-tabs-trigger
+            >
+            <volt-tabs-trigger
+              value="security"
+              class="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-sm"
+              >Security</volt-tabs-trigger
+            >
           </volt-tabs-list>
 
           <volt-tabs-content value="general" class="mt-6">
             <div class="max-w-2xl space-y-6">
-              <forge-settings-card title="Site Information" subtitle="Basic details about your project" iconColor="primary">
+              <forge-settings-card
+                title="Site Information"
+                subtitle="Basic details about your project"
+                iconColor="primary"
+              >
                 <icon-globe icon class="h-5 w-5" />
                 <div class="space-y-4">
                   <div class="space-y-2">
                     <label class="text-sm font-medium">Site Name</label>
-                    <volt-input [value]="siteName()" (input)="onInput(siteName, $event)" class="w-full" />
+                    <volt-input
+                      [value]="siteName()"
+                      (input)="onInput(siteName, $event)"
+                      class="w-full"
+                    />
                   </div>
                   <div class="space-y-2">
                     <label class="text-sm font-medium">Description</label>
-                    <volt-input [value]="description()" (input)="onInput(description, $event)" class="w-full" />
+                    <volt-input
+                      [value]="description()"
+                      (input)="onInput(description, $event)"
+                      class="w-full"
+                    />
                   </div>
                   <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-2">
                       <label class="text-sm font-medium">Default Language</label>
-                      <volt-input [value]="defaultLanguage()" (input)="onInput(defaultLanguage, $event)" class="w-full" />
+                      <volt-input
+                        [value]="defaultLanguage()"
+                        (input)="onInput(defaultLanguage, $event)"
+                        class="w-full"
+                      />
                     </div>
                     <div class="space-y-2">
                       <label class="text-sm font-medium">Timezone</label>
-                      <volt-input [value]="timezone()" (input)="onInput(timezone, $event)" class="w-full" />
+                      <volt-input
+                        [value]="timezone()"
+                        (input)="onInput(timezone, $event)"
+                        class="w-full"
+                      />
                     </div>
                   </div>
                 </div>
               </forge-settings-card>
 
-              <forge-settings-card title="Email Settings" subtitle="Configure email notifications" iconColor="info">
+              <forge-settings-card
+                title="Email Settings"
+                subtitle="Configure email notifications"
+                iconColor="info"
+              >
                 <icon-mail icon class="h-5 w-5" />
                 <div class="space-y-4">
                   <div class="space-y-2">
                     <label class="text-sm font-medium">From Address</label>
-                    <volt-input [value]="fromAddress()" (input)="onInput(fromAddress, $event)" class="w-full" />
+                    <volt-input
+                      [value]="fromAddress()"
+                      (input)="onInput(fromAddress, $event)"
+                      class="w-full"
+                    />
                   </div>
                   <div class="flex items-center justify-between">
                     <div>
                       <p class="text-sm font-medium">New User Notifications</p>
                       <p class="text-xs text-muted-foreground">Send email when new users join</p>
                     </div>
-                    <volt-switch [checked]="newUserNotifications()" (change)="toggle(newUserNotifications, $event)" />
+                    <volt-switch
+                      [checked]="newUserNotifications()"
+                      (change)="toggle(newUserNotifications, $event)"
+                    />
                   </div>
                   <div class="flex items-center justify-between">
                     <div>
                       <p class="text-sm font-medium">Content Alerts</p>
                       <p class="text-xs text-muted-foreground">Notify on publish and unpublish</p>
                     </div>
-                    <volt-switch [checked]="contentAlerts()" (change)="toggle(contentAlerts, $event)" />
+                    <volt-switch
+                      [checked]="contentAlerts()"
+                      (change)="toggle(contentAlerts, $event)"
+                    />
                   </div>
                 </div>
               </forge-settings-card>
@@ -137,7 +195,11 @@ function bool(value: unknown): boolean {
 
           <volt-tabs-content value="api" class="mt-6">
             <div class="max-w-2xl space-y-6">
-              <forge-settings-card title="API Configuration" subtitle="REST and GraphQL settings" iconColor="primary">
+              <forge-settings-card
+                title="API Configuration"
+                subtitle="REST and GraphQL settings"
+                iconColor="primary"
+              >
                 <icon-code icon class="h-5 w-5" />
                 <div class="space-y-4">
                   <div class="space-y-2">
@@ -153,7 +215,10 @@ function bool(value: unknown): boolean {
                       <p class="text-sm font-medium">GraphQL Playground</p>
                       <p class="text-xs text-muted-foreground">Enable interactive API explorer</p>
                     </div>
-                    <volt-switch [checked]="graphqlPlayground()" (change)="toggle(graphqlPlayground, $event)" />
+                    <volt-switch
+                      [checked]="graphqlPlayground()"
+                      (change)="toggle(graphqlPlayground, $event)"
+                    />
                   </div>
                   <div class="flex items-center justify-between">
                     <div>
@@ -167,12 +232,19 @@ function bool(value: unknown): boolean {
                       <p class="text-sm font-medium">Rate Limiting</p>
                       <p class="text-xs text-muted-foreground">Limit requests per minute</p>
                     </div>
-                    <volt-switch [checked]="rateLimiting()" (change)="toggle(rateLimiting, $event)" />
+                    <volt-switch
+                      [checked]="rateLimiting()"
+                      (change)="toggle(rateLimiting, $event)"
+                    />
                   </div>
                 </div>
               </forge-settings-card>
 
-              <forge-settings-card title="Webhooks" subtitle="Send events to external services" iconColor="warning">
+              <forge-settings-card
+                title="Webhooks"
+                subtitle="Send events to external services"
+                iconColor="warning"
+              >
                 <icon-zap icon class="h-5 w-5" />
                 <div class="space-y-4">
                   <div class="flex items-center justify-between">
@@ -180,14 +252,20 @@ function bool(value: unknown): boolean {
                       <p class="text-sm font-medium">Enable Webhooks</p>
                       <p class="text-xs text-muted-foreground">Trigger on content changes</p>
                     </div>
-                    <volt-switch [checked]="webhooksEnabled()" (change)="toggle(webhooksEnabled, $event)" />
+                    <volt-switch
+                      [checked]="webhooksEnabled()"
+                      (change)="toggle(webhooksEnabled, $event)"
+                    />
                   </div>
                   <div class="flex items-center justify-between">
                     <div>
                       <p class="text-sm font-medium">Retry on Failure</p>
                       <p class="text-xs text-muted-foreground">Auto-retry failed webhook calls</p>
                     </div>
-                    <volt-switch [checked]="webhooksRetry()" (change)="toggle(webhooksRetry, $event)" />
+                    <volt-switch
+                      [checked]="webhooksRetry()"
+                      (change)="toggle(webhooksRetry, $event)"
+                    />
                   </div>
                 </div>
               </forge-settings-card>
@@ -196,30 +274,48 @@ function bool(value: unknown): boolean {
 
           <volt-tabs-content value="media" class="mt-6">
             <div class="max-w-2xl space-y-6">
-              <forge-settings-card title="Storage" subtitle="File upload and storage settings" iconColor="info">
+              <forge-settings-card
+                title="Storage"
+                subtitle="File upload and storage settings"
+                iconColor="info"
+              >
                 <icon-hard-drive icon class="h-5 w-5" />
                 <div class="space-y-4">
                   <div class="space-y-2">
                     <label class="text-sm font-medium">Max File Size</label>
-                    <volt-input [value]="maxFileSize()" (input)="onInput(maxFileSize, $event)" class="w-full" />
+                    <volt-input
+                      [value]="maxFileSize()"
+                      (input)="onInput(maxFileSize, $event)"
+                      class="w-full"
+                    />
                   </div>
                   <div class="space-y-2">
                     <label class="text-sm font-medium">Allowed Types</label>
-                    <volt-input [value]="allowedTypes()" (input)="onInput(allowedTypes, $event)" class="w-full" />
+                    <volt-input
+                      [value]="allowedTypes()"
+                      (input)="onInput(allowedTypes, $event)"
+                      class="w-full"
+                    />
                   </div>
                   <div class="flex items-center justify-between">
                     <div>
                       <p class="text-sm font-medium">Image Optimization</p>
                       <p class="text-xs text-muted-foreground">Auto-compress uploaded images</p>
                     </div>
-                    <volt-switch [checked]="imageOptimization()" (change)="toggle(imageOptimization, $event)" />
+                    <volt-switch
+                      [checked]="imageOptimization()"
+                      (change)="toggle(imageOptimization, $event)"
+                    />
                   </div>
                   <div class="flex items-center justify-between">
                     <div>
                       <p class="text-sm font-medium">Generate Thumbnails</p>
                       <p class="text-xs text-muted-foreground">Create multiple sizes on upload</p>
                     </div>
-                    <volt-switch [checked]="generateThumbnails()" (change)="toggle(generateThumbnails, $event)" />
+                    <volt-switch
+                      [checked]="generateThumbnails()"
+                      (change)="toggle(generateThumbnails, $event)"
+                    />
                   </div>
                 </div>
               </forge-settings-card>
@@ -228,7 +324,11 @@ function bool(value: unknown): boolean {
 
           <volt-tabs-content value="security" class="mt-6">
             <div class="max-w-2xl space-y-6">
-              <forge-settings-card title="Authentication" subtitle="Login and session settings" iconColor="success">
+              <forge-settings-card
+                title="Authentication"
+                subtitle="Login and session settings"
+                iconColor="success"
+              >
                 <icon-shield icon class="h-5 w-5" />
                 <div class="space-y-4">
                   <div class="flex items-center justify-between">
@@ -236,7 +336,10 @@ function bool(value: unknown): boolean {
                       <p class="text-sm font-medium">Two-Factor Authentication</p>
                       <p class="text-xs text-muted-foreground">Require 2FA for admin users</p>
                     </div>
-                    <volt-switch [checked]="twoFactorAuth()" (change)="toggle(twoFactorAuth, $event)" />
+                    <volt-switch
+                      [checked]="twoFactorAuth()"
+                      (change)="toggle(twoFactorAuth, $event)"
+                    />
                   </div>
                   <div class="flex items-center justify-between">
                     <div>
@@ -248,7 +351,11 @@ function bool(value: unknown): boolean {
                 </div>
               </forge-settings-card>
 
-              <forge-settings-card title="Danger Zone" subtitle="Destructive actions" iconColor="destructive">
+              <forge-settings-card
+                title="Danger Zone"
+                subtitle="Destructive actions"
+                iconColor="destructive"
+              >
                 <icon-database icon class="h-5 w-5" />
                 <div class="space-y-4">
                   <div class="flex items-center justify-between">
@@ -279,14 +386,22 @@ function bool(value: unknown): boolean {
             </span>
           }
           @if (saveError()) {
-            <span class="inline-flex items-center gap-1 text-xs text-destructive mr-auto self-center">
+            <span
+              class="inline-flex items-center gap-1 text-xs text-destructive mr-auto self-center"
+            >
               <icon-alert-circle class="h-3.5 w-3.5" />
               {{ saveError() }}
             </span>
           }
-          <volt-button variant="outline" [disabled]="saving()" (click)="reset()">Cancel</volt-button>
+          <volt-button variant="outline" [disabled]="saving()" (click)="reset()"
+            >Cancel</volt-button
+          >
           <volt-button [disabled]="saving()" (click)="save()">
-            @if (saving()) { Saving... } @else { Save Changes }
+            @if (saving()) {
+              Saving...
+            } @else {
+              Save Changes
+            }
           </volt-button>
         </div>
       }

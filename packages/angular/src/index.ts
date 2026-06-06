@@ -127,5 +127,4 @@ export class CmsApiService {
     });
     if (!response.ok) throw new Error(`Failed to delete document: ${response.status}`);
   }
-
 }

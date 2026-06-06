@@ -88,9 +88,7 @@ class MockR2Bucket implements R2Bucket {
     delimitedPrefixes: string[];
   }> {
     const all = Array.from(this.objects.values());
-    const filtered = options?.prefix
-      ? all.filter((o) => o.key.startsWith(options.prefix!))
-      : all;
+    const filtered = options?.prefix ? all.filter((o) => o.key.startsWith(options.prefix!)) : all;
     return {
       objects: filtered.slice(0, options?.limit ?? 1000),
       truncated: false,

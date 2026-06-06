@@ -1,10 +1,6 @@
 import type { CollectionDefinition } from '@forge-cms/core';
 import type { DatabaseAdapter, DatabaseRecord, FindManyOptions } from '@forge-cms/db';
-import {
-  generateCreateTableSql,
-  toDbValue,
-  fromDbValue
-} from '@forge-cms/db';
+import { generateCreateTableSql, toDbValue, fromDbValue } from '@forge-cms/db';
 import type { D1Database } from './bindings.js';
 
 export interface D1Env {
@@ -114,7 +110,10 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     const columns = keys.map((k) => `"${k}"`).join(', ');
     const sql = `INSERT INTO "${collection}" (${columns}) VALUES (${placeholders})`;
 
-    await db.prepare(sql).bind(...Object.values(record)).run();
+    await db
+      .prepare(sql)
+      .bind(...Object.values(record))
+      .run();
     return this.findById(collection, record.id as string) as Promise<DatabaseRecord>;
   }
 
@@ -138,7 +137,10 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     const setClause = keys.map((k) => `"${k}" = ?`).join(', ');
     const sql = `UPDATE "${collection}" SET ${setClause} WHERE id = ?`;
 
-    await db.prepare(sql).bind(...Object.values(updates), id).run();
+    await db
+      .prepare(sql)
+      .bind(...Object.values(updates), id)
+      .run();
 
     const updated = await this.findById(collection, id);
     if (!updated) throw new Error(`Record ${id} not found in ${collection}`);

@@ -29,12 +29,16 @@ import { PageHeaderComponent, EmptyStateComponent } from '../components';
 
       <volt-card class="p-5">
         <div class="flex items-center gap-3 mb-4">
-          <div class="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+          <div
+            class="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center"
+          >
             <icon-code class="h-5 w-5" />
           </div>
           <div>
             <h2 class="font-semibold">API Endpoints</h2>
-            <p class="text-xs text-muted-foreground">Use these endpoints to fetch content from your CMS</p>
+            <p class="text-xs text-muted-foreground">
+              Use these endpoints to fetch content from your CMS
+            </p>
           </div>
         </div>
         <div class="space-y-3">
@@ -48,7 +52,9 @@ import { PageHeaderComponent, EmptyStateComponent } from '../components';
           <div class="flex items-center justify-between p-3 rounded-lg bg-muted/50">
             <div>
               <p class="text-sm font-medium">REST API</p>
-              <p class="text-xs text-muted-foreground font-mono">/api/v1/{{ '{' }}collection{{ '}' }}</p>
+              <p class="text-xs text-muted-foreground font-mono">
+                /api/v1/{{ '{' }}collection{{ '}' }}
+              </p>
             </div>
             <volt-button variant="ghost" size="sm" disabled>Docs</volt-button>
           </div>

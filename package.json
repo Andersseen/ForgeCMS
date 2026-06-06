@@ -34,7 +34,7 @@
     "dev:www": "pnpm --filter @forge-cms/www dev",
     "dev:playground": "pnpm --filter @forge-cms/playground dev",
     "build": "turbo run build",
-    "build:www": "pnpm --filter @forge-cms/www build",
+    "build:www": "turbo run build --filter=@forge-cms/www",
     "build:playground": "pnpm --filter @forge-cms/playground build",
     "deploy:www": "pnpm build:www && wrangler pages deploy apps/www/dist --project-name=forge-cms",
     "e2e:www": "pnpm --filter @forge-cms/www e2e",

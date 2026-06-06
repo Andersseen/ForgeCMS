@@ -16,9 +16,25 @@ import type { ForgeAdminConfig } from './config.js';
     </div>
   `,
   styles: [
-    `.forge-admin-layout { display: flex; flex-direction: column; min-height: 100vh; }`,
-    `.forge-admin-header { padding: 1rem; border-bottom: 1px solid #e5e7eb; }`,
-    `.forge-admin-main { flex: 1; padding: 1rem; }`
+    `
+      .forge-admin-layout {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+    `,
+    `
+      .forge-admin-header {
+        padding: 1rem;
+        border-bottom: 1px solid #e5e7eb;
+      }
+    `,
+    `
+      .forge-admin-main {
+        flex: 1;
+        padding: 1rem;
+      }
+    `
   ]
 })
 export class ForgeAdminLayoutComponent {

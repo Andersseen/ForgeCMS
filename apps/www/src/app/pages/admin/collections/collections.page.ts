@@ -129,7 +129,9 @@ const ICON_MAP: Record<string, string> = {
                     <p class="text-xs text-muted-foreground">/{{ col.slug }}</p>
                   </div>
                 </div>
-                <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div
+                  class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
                   <volt-button variant="ghost" size="icon" class="h-7 w-7">
                     <icon-eye class="h-3.5 w-3.5" />
                   </volt-button>
@@ -156,14 +158,18 @@ const ICON_MAP: Record<string, string> = {
                 <div class="h-1.5 w-full rounded-full bg-muted overflow-hidden">
                   <div
                     class="h-full rounded-full bg-primary transition-all"
-                    [style.width.%]="col.count > 0 ? ((col.count - col.drafts) / col.count) * 100 : 100"
+                    [style.width.%]="
+                      col.count > 0 ? ((col.count - col.drafts) / col.count) * 100 : 100
+                    "
                   ></div>
                 </div>
               </div>
 
               <div class="mt-4 flex flex-wrap gap-1.5">
                 @for (field of col.fields; track field) {
-                  <span class="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  <span
+                    class="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                  >
                     {{ field }}
                   </span>
                 }
@@ -180,7 +186,9 @@ const ICON_MAP: Record<string, string> = {
                   <span class="text-xs text-muted-foreground">by</span>
                   <volt-avatar>
                     <img [src]="col.modifiedByAvatar" [alt]="col.modifiedBy" voltAvatarImage />
-                    <volt-avatar-fallback>{{ col.modifiedBy.slice(0, 2).toUpperCase() }}</volt-avatar-fallback>
+                    <volt-avatar-fallback>{{
+                      col.modifiedBy.slice(0, 2).toUpperCase()
+                    }}</volt-avatar-fallback>
                   </volt-avatar>
                 </div>
               </div>
