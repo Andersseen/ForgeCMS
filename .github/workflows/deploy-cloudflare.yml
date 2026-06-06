@@ -70,14 +70,14 @@ jobs:
         run: pnpm build:www
 
       - name: Verify build output
-        run: test -f apps/www/dist/index.html
+        run: test -f apps/www/dist/client/index.html
 
       - name: Deploy to Cloudflare Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: >
-          pnpm exec wrangler pages deploy apps/www/dist
+          pnpm exec wrangler pages deploy apps/www/dist/client
           --project-name=forge-cms
           --branch=${{ github.ref_name }}
           --commit-hash=${{ github.sha }}
