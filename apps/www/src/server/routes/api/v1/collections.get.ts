@@ -2,8 +2,8 @@ import { defineEventHandler } from 'h3';
 import type { SelectFieldOptions } from '@forge-cms/core';
 import { getServerRuntime } from '../../../api/runtime';
 
-export default defineEventHandler(async () => {
-  const serverRuntime = await getServerRuntime();
+export default defineEventHandler(async (event) => {
+  const serverRuntime = await getServerRuntime(event.context.cloudflare?.env);
   const collections = serverRuntime.getCollections().map((c) => ({
     slug: c.slug,
     name: c.slug.charAt(0).toUpperCase() + c.slug.slice(1),

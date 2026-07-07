@@ -3,7 +3,7 @@ import { validateCollection } from '@forge-cms/core';
 import { getServerRuntime } from '../../../api/runtime';
 
 export default defineEventHandler(async (event) => {
-  const serverRuntime = await getServerRuntime();
+  const serverRuntime = await getServerRuntime(event.context.cloudflare?.env);
   const collection = getRouterParam(event, 'collection');
   if (!collection) {
     throw createError({ statusCode: 400, statusMessage: 'Missing collection parameter' });

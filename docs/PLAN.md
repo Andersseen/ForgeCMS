@@ -106,9 +106,9 @@ Do in this order; P1-2/P1-3 can proceed in parallel with P1-1.
 - **Goal:** hero section button linking to `/admin` ("Explore the admin demo"), plus a one-line
   disclaimer that demo data resets periodically.
 
-> **Demo caveat to accept (fixed in P2-1):** with in-memory adapters on Workers, data lives per
-> isolate and resets on cold starts. Fine for a demo — seed data reappears; created records may
-> vanish. The disclaimer in P1-5 covers this honestly.
+> **Demo caveat, fixed by P2-1 (2026-07-07):** in-memory adapters on Workers used to mean data lived
+> per isolate and reset on cold starts. Now fixed for real — D1 persists. P1-5's disclaimer can be
+> softened/removed once the D1 change is actually deployed (still pending as of this writing).
 
 **After Phase 0 + Phase 1 the project is showable end-to-end. Everything below makes it credible as
 a real product.**
@@ -117,16 +117,53 @@ a real product.**
 
 ## Phase 2 — Make it real
 
-### P2-1 · D1 persistence in production — `L` · **spec required** (depends on P1-1)
+### ~~P2-1 · D1 persistence in production~~ — `L` — done 2026-07-07 (locally verified; not yet deployed)
 
-Real persistence for the deployed demo: create the D1 database, bind it in `wrangler.toml`, select
-`D1DatabaseAdapter` when `env.DB` exists (fallback to in-memory in dev), run `syncSchema` + seed
-once. This is the moment ForgeCMS demonstrably runs on the edge for real.
+- **Spec:** [specs/005-d1-persistence-production.md](specs/005-d1-persistence-production.md) (status:
+  done). D1 database created (`forge-cms`); runtime construction now lazily picks `D1DatabaseAdapter`
+  vs. `InMemoryDatabaseAdapter` from `event.context.cloudflare.env.DB`; seeding is idempotent (won't
+  duplicate rows across cold starts). Verified against a real local D1 binding: persists across
+  restarts, no duplicate seeding, a created document survives a restart.
+- **Found and fixed a real bug**: `@forge-cms/db`'s `generateCreateTableSql` emitted multi-line SQL,
+  which fails against real D1 (`exec()` naively splits on `\n`) — invisible in the existing mocked
+  tests. Fixed + added a regression test (previously nonexistent for this function).
+- **Remaining**: this hasn't gone through an actual deploy yet — confirm `curl
+  https://<production>/api/status` shows `"name": "d1"` after the next merge to `main`.
 
-### P2-2 · Auth: login + protected writes — `L` · **spec required**
+### ~~P2-1.5 · apps/www routes don't delegate to `@forge-cms/runtime`~~ — new, found 2026-07-07, **not yet fixed**
 
-A real `AuthAdapter` (start with signed-token/JWT sessions), login page, `requireAuth: true` on
-write handlers, demo credentials on the login screen. Until then the demo API is intentionally open.
+⚠️ **Significant finding**, not part of any spec above: none of `apps/www`'s 5 HTTP routes actually
+call `@forge-cms/runtime`'s handlers, contradicting ARCHITECTURE.md. Concretely this means **QW-4's
+list-filter fix never reaches the real app** (the list route has no `where` support at all — worse
+than the original bug), the error envelope doesn't match docs, and `handleUpdate`'s partial-validation
+bug is duplicated rather than shared. Full detail in STATE.md known issue #1. Proposing this as its
+own follow-up spec (rewrite the 5 routes to build an `ApiContext` and call the runtime handlers for
+real, reconciling the envelope with what `@forge-cms/angular` now expects) — not done as part of
+Phase 1/2 since it's a cross-cutting change bigger than any single spec's scope, and each spec instead
+verified/worked around the actual (divergent) behavior rather than closing the gap.
+
+### P2-2 · Auth: login + protected writes — `L` · **spec drafted, awaiting approval**
+
+- **Spec:** [specs/006-auth-login-protected-writes.md](specs/006-auth-login-protected-writes.md)
+  (status: draft). A real `SignedTokenAuthAdapter` (HS256-style, Web Crypto only, no new
+  dependency), a login page with published demo credentials, `requireAuth` enforced on the three
+  write routes only (reads stay open). No blocking questions — doesn't touch cloud infra. ⚠️ Note:
+  since the write routes don't delegate to runtime handlers (P2-1.5), `requireAuth` must be added as
+  an explicit call in each of the 3 write routes directly (already how spec 006 is designed — not
+  blocked by P2-1.5, just consistent with it).
+
+### P2-3 · Migrate admin UI into `@forge-cms/admin` — `L` · **spec required** (after P1-3 stabilizes)
+
+Move the schema-driven form + document list + layout into the package (its skeleton components
+already exist). **Decision made**: `@voltui/components` as a peer dependency (matches what's already
+built; don't rewrite everything unstyled). Kills STATE.md known issue #2 (admin package dead code).
+
+### P2-2 · Auth: login + protected writes — `L` · **spec drafted, awaiting approval**
+
+- **Spec:** [specs/006-auth-login-protected-writes.md](specs/006-auth-login-protected-writes.md)
+  (status: draft). A real `SignedTokenAuthAdapter` (HS256-style, Web Crypto only, no new
+  dependency), a login page with published demo credentials, `requireAuth` enforced on the three
+  write routes only (reads stay open). No blocking questions — doesn't touch cloud infra.
 
 ### P2-3 · Migrate admin UI into `@forge-cms/admin` — `L` · **spec required** (after P1-3 stabilizes)
 
@@ -134,10 +171,11 @@ Move the schema-driven form + document list + layout into the package (its skele
 already exist), decide the UI-dependency question (`@voltui/components` as peer dep vs. unstyled),
 and make `apps/www` consume the package. Kills STATE.md known issue #4.
 
-### P2-4 · KV adapter or drop the claim — `S/M`
+### ~~P2-4 · KV adapter or drop the claim~~ — `S/M` — done 2026-07-07
 
-Either implement the KV adapter mentioned in `@forge-cms/cloudflare`'s description (needs a use
-case — e.g. settings/cache), or remove "KV" from the description. Honest > aspirational.
+Dropped the claim: no concrete use case exists today (no caching/settings layer in the runtime), so
+building a KV adapter now would be speculative. Removed "KV" from `@forge-cms/cloudflare`'s
+description, keywords, and README table.
 
 ---
 
@@ -155,15 +193,16 @@ case — e.g. settings/cache), or remove "KV" from the description. Honest > asp
 | ~~QW-1 README~~ | S | — | Done 2026-07-07 |
 | ~~QW-2 status fix~~ | S | — | Done 2026-07-07 |
 | ~~QW-3 English comments~~ | S | — | Done 2026-07-07 |
-| ~~QW-4 filter coercion~~ | M | — | Done 2026-07-07 |
+| ~~QW-4 filter coercion~~ | M | — | Done in `@forge-cms/runtime`, but **has no effect on the real app** — see P2-1.5 |
 | ~~P1-1 deploy API~~ | L | — | Done 2026-07-07 |
 | ~~P1-2 detail page~~ | M | — | Done 2026-07-07 |
 | ~~P1-3 schema-driven CRUD form~~ | L | — | Done 2026-07-07 (not yet visually verified in a browser) |
 | **P1-4 e2e CRUD** | **M** | — | **Locks the demo against regressions — do this next** |
 | P1-5 landing CTA | S | — | Discoverability of the demo |
-| P2-1 D1 in prod | L | spec | Real persistence = real CMS |
-| P2-2 auth | L | spec | Credibility + security |
-| P2-3 admin package | L | spec | Makes the flagship package real |
+| ~~P2-1 D1 in prod~~ | L | — | Done 2026-07-07 (locally verified; not yet deployed) |
+| **P2-1.5 routes → runtime handlers** | **M/L** | — | **Fixes QW-4 for real + the envelope/validation gaps — new, undone** |
+| P2-2 auth | L | spec approval | Credibility + security |
+| P2-3 admin package | L | spec (peer-dep decision made) | Makes the flagship package real |
 
 **Suggested handoff order for a weaker model:** Phase 0 and P1-1/P1-2/P1-3 are done — but do a manual
 browser pass on the new CRUD flow first (see P1-3's caveat above) before trusting it in front of

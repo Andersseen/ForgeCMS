@@ -2,7 +2,12 @@ import { defineCollection, defineField } from '@forge-cms/core';
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
 import { InMemoryAuthAdapter } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
+import { D1DatabaseAdapter, type D1Database } from '@forge-cms/cloudflare';
 import { ForgeCmsRuntime } from '@forge-cms/runtime';
+
+export interface ServerEnv {
+  DB?: D1Database;
+}
 
 const pages = defineCollection({
   slug: 'pages',
@@ -112,33 +117,51 @@ const siteConfig = defineCollection({
   }
 });
 
-const runtime = new ForgeCmsRuntime({
-  collections: [pages, posts, products, media, users, categories, forms, navigation, siteConfig],
-  adapters: {
-    database: new InMemoryDatabaseAdapter(),
-    auth: new InMemoryAuthAdapter(),
-    storage: new InMemoryStorageAdapter()
-  }
-});
+const collections = [pages, posts, products, media, users, categories, forms, navigation, siteConfig];
 
-runtime.init();
-
-let seedPromise: Promise<void> | undefined;
+let runtimePromise: Promise<ForgeCmsRuntime<ServerEnv>> | undefined;
 
 /**
- * Lazily seeds demo data on first call. Must only be invoked from within a request handler —
- * Cloudflare Workers forbids async I/O (including crypto.randomUUID) at module/global scope, so
- * seeding cannot run eagerly at module load time.
+ * Lazily builds (and seeds) the runtime on first call. Must only be invoked from within a request
+ * handler — Cloudflare Workers forbids async I/O (including crypto.randomUUID) at module/global
+ * scope, so both adapter construction and seeding must wait for a real request instead of running
+ * eagerly at module load time.
  */
-export function getServerRuntime(): Promise<ForgeCmsRuntime> {
-  if (!seedPromise) {
-    seedPromise = seedData(runtime);
+export function getServerRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>> {
+  if (!runtimePromise) {
+    runtimePromise = buildRuntime(env);
   }
-  return seedPromise.then(() => runtime);
+  return runtimePromise;
 }
 
-async function seedData(runtime: ForgeCmsRuntime) {
+async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>> {
+  const database = env?.DB ? new D1DatabaseAdapter() : new InMemoryDatabaseAdapter();
+
+  const runtime = new ForgeCmsRuntime<ServerEnv>({
+    collections,
+    adapters: {
+      database,
+      auth: new InMemoryAuthAdapter(),
+      storage: new InMemoryStorageAdapter()
+    },
+    ...(env !== undefined && { env })
+  });
+
+  runtime.init();
+  await runtime.syncSchema();
+  await seedIfEmpty(runtime);
+
+  return runtime;
+}
+
+async function seedIfEmpty(runtime: ForgeCmsRuntime): Promise<void> {
   const db = runtime.adapters.database;
+
+  // site_config is seeded with exactly one record and nothing else creates one, so it's a safe,
+  // cheap sentinel for "has this database already been seeded" — D1 persists across cold starts,
+  // so seeding must not run more than once against the same database.
+  const existing = await db.findMany({ collection: 'site_config', limit: 1 });
+  if (existing.length > 0) return;
 
   await db.create('pages', {
     title: 'Home',

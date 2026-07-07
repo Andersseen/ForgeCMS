@@ -1,8 +1,8 @@
 import { defineEventHandler } from 'h3';
 import { getServerRuntime } from '../../api/runtime';
 
-export default defineEventHandler(async () => {
-  const runtime = await getServerRuntime();
+export default defineEventHandler(async (event) => {
+  const runtime = await getServerRuntime(event.context.cloudflare?.env);
   const db = runtime.adapters.database;
 
   let totalRecords = 0;

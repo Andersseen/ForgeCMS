@@ -4,11 +4,11 @@ import { getServerRuntime } from '../../../api/runtime';
 /**
  * GET /api/auth/me
  *
- * Devuelve el usuario autenticado actual validando el Bearer token
- * contra el auth adapter configurado (InMemory o External).
+ * Returns the current authenticated user by validating the Bearer token
+ * against the configured auth adapter (InMemory or External).
  */
 export default defineEventHandler(async (event) => {
-  const serverRuntime = await getServerRuntime();
+  const serverRuntime = await getServerRuntime(event.context.cloudflare?.env);
   const request = new Request(getRequestURL(event).toString(), {
     headers: event.node.req.headers as Record<string, string>
   });

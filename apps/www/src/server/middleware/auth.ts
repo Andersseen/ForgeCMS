@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const authHeader = event.node.req.headers.authorization;
   if (!authHeader) return;
 
-  const serverRuntime = await getServerRuntime();
+  const serverRuntime = await getServerRuntime(event.context.cloudflare?.env);
 
   try {
     const user = await serverRuntime.adapters.auth.validateSession(

@@ -8,7 +8,8 @@ Cloudflare-native adapters and types for ForgeCMS.
 | ------- | ------------- | ------------------- | --------------------------------------- |
 | **D1**  | `D1Database`  | `D1DatabaseAdapter` | Implemented (SQL native, Drizzle-ready) |
 | **R2**  | `R2Bucket`    | `R2StorageAdapter`  | Implemented                             |
-| **KV**  | `KVNamespace` | —                   | Types only                              |
+
+No KV adapter — nothing in the runtime today needs a key-value store (no caching/settings layer).
 
 ## Preparing for Cloudflare (no real account required yet)
 
@@ -61,7 +62,7 @@ The root `wrangler.toml` is already configured for Cloudflare Pages. Update it w
 name = "forge-cms"
 compatibility_date = "2026-05-15"
 compatibility_flags = ["nodejs_compat"]
-pages_build_output_dir = "apps/www/dist"
+pages_build_output_dir = "apps/www/dist/analog/public"
 
 [[d1_databases]]
 binding = "DB"

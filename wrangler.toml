@@ -6,3 +6,8 @@ pages_build_output_dir = "apps/www/dist/analog/public"
 # Cloudflare Pages configuration
 # Build command is handled by GitHub Actions CI
 # Required secrets: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+
+[[d1_databases]]
+binding = "DB"
+database_name = "forge-cms"
+database_id = "1b95312e-12c4-4d5e-b282-6d5067772754"

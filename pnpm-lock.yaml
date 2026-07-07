@@ -138,6 +138,9 @@ importers:
       '@forge-cms/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@forge-cms/cloudflare':
+        specifier: workspace:*
+        version: link:../../packages/cloudflare
       '@forge-cms/core':
         specifier: workspace:*
         version: link:../../packages/core

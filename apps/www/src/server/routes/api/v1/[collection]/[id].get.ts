@@ -2,7 +2,7 @@ import { defineEventHandler, getRouterParam, createError } from 'h3';
 import { getServerRuntime } from '../../../../api/runtime';
 
 export default defineEventHandler(async (event) => {
-  const serverRuntime = await getServerRuntime();
+  const serverRuntime = await getServerRuntime(event.context.cloudflare?.env);
   const collection = getRouterParam(event, 'collection');
   const id = getRouterParam(event, 'id');
 

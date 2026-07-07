@@ -22,6 +22,7 @@
     "@angular/router": "^21.2.10",
     "@forge-cms/angular": "workspace:*",
     "@forge-cms/auth": "workspace:*",
+    "@forge-cms/cloudflare": "workspace:*",
     "@forge-cms/core": "workspace:*",
     "@forge-cms/db": "workspace:*",
     "@forge-cms/runtime": "workspace:*",
