@@ -6,9 +6,10 @@ ForgeCMS is an experimental, TypeScript-native, Payload-like headless CMS for **
 
 1. This file — commands, hard rules, gotchas.
 2. [docs/STATE.md](docs/STATE.md) — what is implemented **today**. ⚠️ The README's "Status" section is outdated (it claims nothing is implemented — much is). Trust STATE.md and the code, not the README.
-3. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — package graph, data flow, API contracts.
-4. [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — code style and patterns you MUST follow.
-5. [docs/SDD.md](docs/SDD.md) — spec-driven workflow. Non-trivial features need a spec in `docs/specs/` before coding.
+3. [docs/PLAN.md](docs/PLAN.md) — prioritized task list (QW-*/P1-*/P2-* IDs). If you were handed a task ID, it lives here.
+4. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — package graph, data flow, API contracts.
+5. [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — code style and patterns you MUST follow.
+6. [docs/SDD.md](docs/SDD.md) — spec-driven workflow. Non-trivial features need a spec in `docs/specs/` before coding.
 
 ## Environment & commands
 

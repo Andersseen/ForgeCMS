@@ -35,7 +35,7 @@ has never been wired to real Cloudflare bindings end-to-end.
 
 | App | Status | Notes |
 | --- | --- | --- |
-| `apps/www` | ✅ Working demo | Analog.js + Angular 21 + Tailwind 4 + `@voltui/components`. Landing page, `/admin` demo (dashboard, collections, media, users, api, settings), h3 server API. Server runtime at `src/server/api/runtime.ts`: 9 demo collections, in-memory adapters, seed data on module load (resets every reload — intentional). Playwright e2e. Deploys to Cloudflare Pages via GitHub Actions. |
+| `apps/www` | ✅ Working demo (local only) | Analog.js + Angular 21 + Tailwind 4 + `@voltui/components`. Landing page, `/admin` demo (dashboard, collections, media, users, api, settings — read-only except settings; no per-collection detail/CRUD pages yet), h3 server API. Server runtime at `src/server/api/runtime.ts`: 9 demo collections, in-memory adapters, seed data on module load (resets every reload — intentional). Playwright e2e. ⚠️ Deploys to Cloudflare Pages **client-only** (`ssr: false`, uploads `dist/client`) — the deployed site has no `/api/*`, so the online admin can't load data. See PLAN.md P1-1. |
 | `apps/playground` | ✅ Minimal | Analog.js sandbox with a sample `posts` collection + test. |
 
 ## API surface (implemented in apps/www server routes)
@@ -57,19 +57,15 @@ item `{ data }`, error `{ error, details? }`, delete `204`.
 
 ## Known issues / debt (verified 2026-07-07)
 
-1. **README.md is outdated** — its Status/Structure sections predate the runtime, adapters, and admin demo (e.g. omits `runtime`, `cloudflare`, `angular` packages).
-2. `handleList` passes raw query-param strings into `where` — no type coercion, so filtering on number/boolean fields compares against strings.
-3. `handleUpdate` partial validation is approximate (validates merged body, then filters errors to sent fields).
-4. `@forge-cms/admin` is dead code until apps/www's admin migrates to it.
-5. No KV adapter despite the cloudflare package description advertising one.
-6. `apps/www/src/server/routes/api/status.get.ts` has a nonsense expression: `configured: db.name !== 'in-memory' || false`.
-7. Comments in `apps/www/src/server/middleware/auth.ts` are in Spanish while the rest of the codebase is English.
+0. **Production deploy is static-only** — no server/API on the deployed Cloudflare Pages site
+   (`analog({ ssr: false })` + workflow uploads only `apps/www/dist/client`). The online `/admin`
+   cannot fetch data. Fix tracked as PLAN.md **P1-1** (highest priority).
+1. `handleUpdate` partial validation is approximate (validates merged body, then filters errors to sent fields).
+2. `@forge-cms/admin` is dead code until apps/www's admin migrates to it.
+3. No KV adapter despite the cloudflare package description advertising one.
 
-## Suggested next steps (roughly prioritized)
+## What's next
 
-1. Wire `@forge-cms/admin` into apps/www's `/admin` (replace local demo components) so the package becomes real.
-2. Type coercion for list filters (see `docs/specs/001-list-filter-type-coercion.md`).
-3. A deployable example using real Cloudflare bindings (D1 + R2) end-to-end, e.g. in playground.
-4. Auth: a real adapter (JWT or session) + role enforcement in handlers.
-5. Update README.md to reflect reality.
-6. First alpha publish via changesets once the admin package is real.
+The prioritized, task-by-task execution plan lives in **[PLAN.md](PLAN.md)** (phases: quick wins →
+showable demo → make it real → alpha release). Headline priorities: deploy the API to production
+(P1-1), per-collection CRUD UI with schema-driven forms (P1-2/P1-3), then D1 persistence and auth.

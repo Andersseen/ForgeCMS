@@ -2,6 +2,44 @@ import { validateCollection } from '@forge-cms/core';
 import type { ApiContext } from '@forge-cms/api';
 import type { ForgeCmsRuntime } from './runtime.js';
 import type { DatabaseRecord } from '@forge-cms/db';
+import type { CollectionDefinition } from '@forge-cms/core';
+
+class FilterCoercionError extends Error {
+  constructor(readonly field: string) {
+    super(`Invalid filter value for field '${field}'`);
+  }
+}
+
+/** Coerce raw query-param strings to the value types declared by the collection's fields. */
+function coerceWhere(collection: CollectionDefinition, raw: Record<string, string>): DatabaseRecord {
+  const where: DatabaseRecord = {};
+
+  for (const [key, value] of Object.entries(raw)) {
+    const field = collection.fields[key];
+    if (!field) {
+      where[key] = value;
+      continue;
+    }
+
+    switch (field.kind) {
+      case 'number': {
+        const num = Number(value);
+        if (Number.isNaN(num)) throw new FilterCoercionError(key);
+        where[key] = num;
+        break;
+      }
+      case 'boolean': {
+        if (value !== 'true' && value !== 'false') throw new FilterCoercionError(key);
+        where[key] = value === 'true';
+        break;
+      }
+      default:
+        where[key] = value;
+    }
+  }
+
+  return where;
+}
 
 export interface HandlerOptions<TEnv = unknown> {
   runtime: ForgeCmsRuntime<TEnv>;
@@ -56,12 +94,20 @@ export async function handleList<TEnv = unknown>(
       ? parseInt(url.searchParams.get('offset')!, 10)
       : undefined;
 
-    const where: DatabaseRecord = {};
+    const rawWhere: Record<string, string> = {};
     url.searchParams.forEach((value, key) => {
       if (key !== 'limit' && key !== 'offset') {
-        where[key] = value;
+        rawWhere[key] = value;
       }
     });
+
+    let where: DatabaseRecord;
+    try {
+      where = coerceWhere(collection, rawWhere);
+    } catch (err) {
+      if (err instanceof FilterCoercionError) return errorResponse(err.message, 400);
+      throw err;
+    }
 
     const records = await runtime.adapters.database.findMany({
       collection: collectionSlug,
