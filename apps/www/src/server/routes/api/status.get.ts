@@ -1,8 +1,8 @@
 import { defineEventHandler } from 'h3';
-import { serverRuntimePromise } from '../../api/runtime';
+import { getServerRuntime } from '../../api/runtime';
 
-export default defineEventHandler(async () => {
-  const runtime = await serverRuntimePromise;
+export default defineEventHandler(async (event) => {
+  const runtime = await getServerRuntime(event.context.cloudflare?.env);
   const db = runtime.adapters.database;
 
   let totalRecords = 0;
@@ -19,11 +19,11 @@ export default defineEventHandler(async () => {
       },
       auth: {
         name: runtime.adapters.auth.name,
-        configured: db.name !== 'in-memory' || false // honest: in-memory is not real auth
+        configured: runtime.adapters.auth.name !== 'in-memory'
       },
       storage: {
         name: runtime.adapters.storage.name,
-        files: 0 // not yet tracked
+        files: 0 // not yet tracked — no storage adapter reports a file count today
       },
       api: {
         version: 'v1',

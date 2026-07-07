@@ -1,17 +1,17 @@
 import { defineEventHandler } from 'h3';
-import { serverRuntimePromise } from '../api/runtime';
+import { getServerRuntime } from '../api/runtime';
 
 /**
- * Middleware de auth opcional.
+ * Optional auth middleware.
  *
- * Inyecta `forgeUser` en el contexto del evento si hay un token válido.
- * No bloquea la request — las rutas deciden si requieren auth o no.
+ * Injects `forgeUser` into the event context if a valid token is present.
+ * Does not block the request — routes decide whether they require auth.
  */
 export default defineEventHandler(async (event) => {
   const authHeader = event.node.req.headers.authorization;
   if (!authHeader) return;
 
-  const serverRuntime = await serverRuntimePromise;
+  const serverRuntime = await getServerRuntime(event.context.cloudflare?.env);
 
   try {
     const user = await serverRuntime.adapters.auth.validateSession(
@@ -21,6 +21,6 @@ export default defineEventHandler(async (event) => {
       event.context.forgeUser = user.user;
     }
   } catch {
-    // Token inválido, seguimos sin usuario
+    // Invalid token, continue without a user
   }
 });

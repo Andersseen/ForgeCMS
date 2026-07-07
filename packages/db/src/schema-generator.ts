@@ -73,11 +73,10 @@ export function generateCreateTableSql(collection: CollectionDefinition): string
     .map(([name, field]) => `"${name}" ${fieldKindToSqlType(field)}`)
     .join(', ');
 
-  return `CREATE TABLE IF NOT EXISTS "${collection.slug}" (
-    "id" TEXT PRIMARY KEY,
-    "created_at" TEXT,
-    "updated_at" TEXT${fieldColumns ? ', ' + fieldColumns : ''}
-  )`;
+  // Must be a single line: Cloudflare D1's real exec() splits its input on '\n' to detect multiple
+  // statements, so a pretty-printed multi-line CREATE TABLE gets sliced into invalid fragments and
+  // fails with "incomplete input" (verified against a real local D1 binding, not just mocks).
+  return `CREATE TABLE IF NOT EXISTS "${collection.slug}" ("id" TEXT PRIMARY KEY, "created_at" TEXT, "updated_at" TEXT${fieldColumns ? ', ' + fieldColumns : ''})`;
 }
 
 const tableCache = new Map<string, SQLiteTable>();

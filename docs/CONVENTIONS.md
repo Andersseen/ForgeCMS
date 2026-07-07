@@ -73,7 +73,9 @@
   `[collection].get.ts`, `[collection].post.ts`, `[collection]/[id].put.ts`, etc., each a
   `defineEventHandler` that builds an `ApiContext` and delegates to a `@forge-cms/runtime` handler.
   **Keep route files thin**; behavior belongs in packages.
-- Shared server state via the `serverRuntimePromise` singleton (`apps/www/src/server/api/runtime.ts`).
+- Shared server state via `getServerRuntime()` (`apps/www/src/server/api/runtime.ts`) — seeding is
+  lazy (triggered on first call from within a request handler), since Cloudflare Workers forbids
+  async I/O at module scope; never call it or invoke async adapter I/O at module top level.
 
 ## Workflow & hygiene
 

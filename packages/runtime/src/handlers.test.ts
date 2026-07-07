@@ -105,6 +105,68 @@ describe('CRUD Handlers', () => {
       const response = await handleList(context, { runtime });
       expect(response.status).toBe(404);
     });
+
+    it('coerces a number filter to match numeric field values', async () => {
+      await runtime.adapters.database.create('posts', { title: 'Popular', views: 99 });
+      await runtime.adapters.database.create('posts', { title: 'Quiet', views: 1 });
+
+      const context = createTestContext('GET', 'https://forge.test/api/posts?views=99');
+      context.params = { collection: 'posts' };
+
+      const response = await handleList(context, { runtime });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].title).toBe('Popular');
+    });
+
+    it('coerces a boolean filter to match boolean field values', async () => {
+      await runtime.adapters.database.create('posts', { title: 'Live', published: true });
+      await runtime.adapters.database.create('posts', { title: 'Draft', published: false });
+
+      const context = createTestContext('GET', 'https://forge.test/api/posts?published=true');
+      context.params = { collection: 'posts' };
+
+      const response = await handleList(context, { runtime });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].title).toBe('Live');
+    });
+
+    it('returns 400 for an invalid number filter', async () => {
+      const context = createTestContext('GET', 'https://forge.test/api/posts?views=abc');
+      context.params = { collection: 'posts' };
+
+      const response = await handleList(context, { runtime });
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.error).toContain('views');
+    });
+
+    it('returns 400 for an invalid boolean filter', async () => {
+      const context = createTestContext('GET', 'https://forge.test/api/posts?published=maybe');
+      context.params = { collection: 'posts' };
+
+      const response = await handleList(context, { runtime });
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.error).toContain('published');
+    });
+
+    it('passes through query params that are not field names unchanged', async () => {
+      await runtime.adapters.database.create('posts', { title: 'Hello' });
+
+      const context = createTestContext('GET', 'https://forge.test/api/posts?unknownParam=1');
+      context.params = { collection: 'posts' };
+
+      const response = await handleList(context, { runtime });
+      expect(response.status).toBe(200);
+    });
   });
 
   describe('handleRead', () => {

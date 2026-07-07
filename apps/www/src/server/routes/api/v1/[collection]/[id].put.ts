@@ -1,9 +1,9 @@
 import { defineEventHandler, getRouterParam, readBody, createError } from 'h3';
 import { validateCollection } from '@forge-cms/core';
-import { serverRuntimePromise } from '../../../../api/runtime';
+import { getServerRuntime } from '../../../../api/runtime';
 
 export default defineEventHandler(async (event) => {
-  const serverRuntime = await serverRuntimePromise;
+  const serverRuntime = await getServerRuntime(event.context.cloudflare?.env);
   const collection = getRouterParam(event, 'collection');
   const id = getRouterParam(event, 'id');
 

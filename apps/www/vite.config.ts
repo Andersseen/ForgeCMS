@@ -4,7 +4,11 @@ import { defineConfig } from 'vitest/config';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig({
-  plugins: [analog({ ssr: false }), tailwindcss(), tsconfigPaths()],
+  plugins: [
+    analog({ ssr: false, nitro: { preset: 'cloudflare-pages' } }),
+    tailwindcss(),
+    tsconfigPaths()
+  ],
   optimizeDeps: {
     include: [
       '@angular/common',

@@ -1,6 +1,6 @@
 # 001 — Coerce list-filter query params to field types
 
-- **Status:** draft
+- **Status:** done
 - **Author:** agent draft (example spec — also serves as the reference for the format)
 - **Date:** 2026-07-07
 - **Branch:** —
@@ -43,10 +43,10 @@ unchanged (current behavior). Invalid coercion returns the standard error envelo
 
 ## Implementation plan
 
-- [ ] Add `coerceWhere` + unit tests in `packages/runtime` (`handlers.test.ts` or a new `coerce.test.ts`)
-- [ ] Use it in `handleList`; add handler-level tests for number/boolean/invalid cases
-- [ ] Changeset (patch, @forge-cms/runtime) + update STATE.md known issue #2
-- [ ] Mark this spec done
+- [x] Add `coerceWhere` + unit tests in `packages/runtime` (`handlers.test.ts` or a new `coerce.test.ts`)
+- [x] Use it in `handleList`; add handler-level tests for number/boolean/invalid cases
+- [x] Changeset (patch, @forge-cms/runtime) + update STATE.md known issue #2
+- [x] Mark this spec done
 
 ## Test plan
 
@@ -68,4 +68,8 @@ unchanged (current behavior). Invalid coercion returns the standard error envelo
 
 ## Outcome
 
-—
+Implemented as designed. `coerceWhere` lives in `packages/runtime/src/handlers.ts` (not exported),
+used by `handleList` before `findMany`; invalid number/boolean values throw a `FilterCoercionError`
+caught by the handler and turned into a 400 with `{ error: "Invalid filter value for field '<name>'" }`.
+6 new tests added to `handlers.test.ts`. Full quality gates
+(`lint`/`typecheck`/`test`/`build`) green. Changeset added for `@forge-cms/runtime` (patch).

@@ -2,20 +2,20 @@ import type { AuthAdapter, AuthSession, AuthUser } from './index.js';
 import { ForgeAuthError } from './index.js';
 
 export interface ExternalAuthConfig {
-  /** URL del microservicio de auth para validar tokens */
+  /** URL of the auth microservice used to validate tokens */
   validateUrl: string;
-  /** API key opcional para autenticar con el microservicio */
+  /** Optional API key to authenticate with the microservice */
   apiKey?: string;
 }
 
 /**
- * Auth adapter que delega la validación de sesiones a un microservicio externo.
+ * Auth adapter that delegates session validation to an external microservice.
  *
- * Agnóstico de plataforma — usa la API fetch() nativa, funciona en:
+ * Platform-agnostic — uses the native fetch() API, works in:
  * - Cloudflare Workers / Pages Functions
  * - Vercel Edge Functions
  * - Deno Deploy
- * - Node.js 18+ (con fetch global)
+ * - Node.js 18+ (with global fetch)
  */
 export class ExternalAuthAdapter implements AuthAdapter {
   readonly name = 'external';

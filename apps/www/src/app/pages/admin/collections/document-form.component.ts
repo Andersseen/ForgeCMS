@@ -1,0 +1,183 @@
+import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
+import {
+  VoltButton,
+  VoltCard,
+  VoltError,
+  VoltInput,
+  VoltLabel,
+  VoltNativeSelect,
+  VoltSwitch,
+  VoltTextarea
+} from '@voltui/components';
+import type { FieldMeta } from '@forge-cms/angular';
+
+/**
+ * Modal chrome is hand-rolled (plain Tailwind overlay), not @voltui/components' VoltDialog: that
+ * component composes via a CDK-style trigger+TemplateRef pattern that couldn't be visually verified
+ * in this environment, and getting it wrong would break the CRUD demo entirely. VoltCard/VoltInput/
+ * VoltSwitch/etc. (simple signal-model form controls) are used as designed.
+ */
+@Component({
+  selector: 'forge-document-form',
+  standalone: true,
+  imports: [
+    VoltButton,
+    VoltCard,
+    VoltInput,
+    VoltTextarea,
+    VoltSwitch,
+    VoltNativeSelect,
+    VoltLabel,
+    VoltError
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      (click)="cancel.emit()"
+    >
+      <volt-card
+        class="w-full max-w-lg p-6 space-y-4 max-h-[85vh] overflow-y-auto"
+        (click)="$event.stopPropagation()"
+      >
+        <h2 class="text-lg font-semibold">
+          {{ submitLabel() === 'Create' ? 'New document' : 'Edit document' }}
+        </h2>
+
+        <form class="space-y-4" (submit)="onSubmit($event)">
+          @for (field of fields(); track field.name) {
+            <div class="space-y-1.5">
+              <volt-label [htmlFor]="field.name" [error]="!!fieldErrors()[field.name]">
+                {{ field.label }}@if (field.required) {
+                  <span class="text-destructive">&nbsp;*</span>
+                }
+              </volt-label>
+
+              @switch (field.kind) {
+                @case ('textarea') {
+                  <volt-textarea
+                    [id]="field.name"
+                    [value]="getStringValue(field.name)"
+                    (valueChange)="setValue(field.name, $event)"
+                  />
+                }
+                @case ('json') {
+                  <volt-textarea
+                    [id]="field.name"
+                    [value]="getStringValue(field.name)"
+                    (valueChange)="setValue(field.name, $event)"
+                  />
+                }
+                @case ('boolean') {
+                  <volt-switch
+                    [id]="field.name"
+                    [checked]="getBooleanValue(field.name)"
+                    (checkedChange)="setValue(field.name, $event)"
+                  />
+                }
+                @case ('select') {
+                  <volt-native-select
+                    [id]="field.name"
+                    (change)="onSelectChange(field.name, $event)"
+                  >
+                    <option value="">Select…</option>
+                    @for (opt of field.options ?? []; track opt) {
+                      <option [value]="opt" [selected]="getStringValue(field.name) === opt">
+                        {{ opt }}
+                      </option>
+                    }
+                  </volt-native-select>
+                }
+                @case ('number') {
+                  <volt-input
+                    [id]="field.name"
+                    type="number"
+                    [value]="getStringValue(field.name)"
+                    (valueChange)="setValue(field.name, $event)"
+                  />
+                }
+                @case ('date') {
+                  <volt-input
+                    [id]="field.name"
+                    type="date"
+                    [value]="getStringValue(field.name)"
+                    (valueChange)="setValue(field.name, $event)"
+                  />
+                }
+                @case ('email') {
+                  <volt-input
+                    [id]="field.name"
+                    type="email"
+                    [value]="getStringValue(field.name)"
+                    (valueChange)="setValue(field.name, $event)"
+                  />
+                }
+                @default {
+                  <volt-input
+                    [id]="field.name"
+                    type="text"
+                    [value]="getStringValue(field.name)"
+                    (valueChange)="setValue(field.name, $event)"
+                  />
+                }
+              }
+
+              @if (fieldErrors()[field.name]; as message) {
+                <volt-error>{{ message }}</volt-error>
+              }
+            </div>
+          }
+
+          <div class="flex items-center justify-end gap-2 pt-2">
+            <volt-button type="button" variant="outline" size="sm" (click)="cancel.emit()">
+              Cancel
+            </volt-button>
+            <volt-button type="submit" size="sm">{{ submitLabel() }}</volt-button>
+          </div>
+        </form>
+      </volt-card>
+    </div>
+  `
+})
+export class DocumentFormComponent {
+  fields = input.required<FieldMeta[]>();
+  initialValue = input<Record<string, unknown>>({});
+  fieldErrors = input<Record<string, string>>({});
+  submitLabel = input('Save');
+
+  save = output<Record<string, unknown>>();
+  cancel = output<void>();
+
+  protected readonly formValue = signal<Record<string, unknown>>({ ...this.initialValue() });
+
+  getStringValue(name: string): string {
+    const value = this.formValue()[name];
+    return value === undefined || value === null ? '' : String(value);
+  }
+
+  getBooleanValue(name: string): boolean {
+    return Boolean(this.formValue()[name]);
+  }
+
+  setValue(name: string, value: unknown): void {
+    this.formValue.update((current) => ({ ...current, [name]: value }));
+  }
+
+  onSelectChange(name: string, event: Event): void {
+    this.setValue(name, (event.target as HTMLSelectElement).value);
+  }
+
+  onSubmit(event: Event): void {
+    event.preventDefault();
+
+    const fields = this.fields();
+    const coerced: Record<string, unknown> = { ...this.formValue() };
+    for (const field of fields) {
+      if (field.kind === 'number' && coerced[field.name] !== undefined) {
+        coerced[field.name] = Number(coerced[field.name]);
+      }
+    }
+
+    this.save.emit(coerced);
+  }
+}
