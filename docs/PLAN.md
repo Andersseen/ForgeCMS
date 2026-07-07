@@ -15,13 +15,13 @@ runtime**, open one, and **create / edit / delete a document with schema validat
 README that presents the project honestly. That is a representative demo of the vision
 ("Payload for Angular").
 
-## ⚠️ Critical finding (2026-07-07)
+## ✅ Critical finding, fixed 2026-07-07 (was: client-only static deploy)
 
-The production deploy is **client-only static files**: `apps/www/vite.config.ts` uses
-`analog({ ssr: false })` and the deploy workflow uploads only `apps/www/dist/client`. So the
-deployed site has **no `/api/*` routes** — the online `/admin` cannot load data. Everything works
-only in local dev (`pnpm dev:www`, where Nitro serves the API). Fixing this (P1-1) is the single
-most important step toward a showable demo.
+The production deploy used to be **client-only static files** (`analog({ ssr: false })` +
+`dist/client`-only upload), so the online `/admin` couldn't load data. Fixed by P1-1 / spec 002: the
+deploy now uses Nitro's `cloudflare-pages` preset (`apps/www/dist/analog/public`, incl. `_worker.js`),
+so `/api/*` is served for real online. See [specs/002-deploy-api-cloudflare-pages.md](specs/002-deploy-api-cloudflare-pages.md)
+for the full investigation and the critical seed-timing bug it also fixed.
 
 ---
 
@@ -63,43 +63,38 @@ most important step toward a showable demo.
 
 Do in this order; P1-2/P1-3 can proceed in parallel with P1-1.
 
-### P1-1 · Deploy the API to Cloudflare Pages (server build) — `L` · **spec required** · ⚠️ riskiest task
+### ~~P1-1 · Deploy the API to Cloudflare Pages (server build)~~ — `L` — done 2026-07-07
 
-- **Goal:** the deployed site serves `/api/*` (Nitro server on Pages Functions), so the online
-  `/admin` works.
-- **Known facts for the spec author:** dev works via Analog's Nitro server; build currently emits
-  only static client (`ssr: false` + deploy of `dist/client`). Analog supports API routes without
-  full SSR; Nitro has a `cloudflare-pages` preset that emits `_worker.js`. `wrangler.toml` has
-  `pages_build_output_dir = "apps/www/dist/client"` and the deploy workflow uploads that directory —
-  both must change to the full Pages output.
-- **Investigate first** (put findings in the spec): exact Analog config for
-  `nitro: { preset: 'cloudflare-pages' }`, resulting output directory, whether `ssr: false` can stay.
-- **Acceptance:** `curl https://<deployed>/api/status` returns the JSON envelope; `/admin` loads
-  collections online; CI deploy workflow green.
-- **Note:** this task touches infra + CI; if the implementing model gets stuck after one honest
-  attempt, escalate to a human or a stronger model rather than thrashing.
+- **Spec:** [specs/002-deploy-api-cloudflare-pages.md](specs/002-deploy-api-cloudflare-pages.md)
+  (status: done). Fixed a critical latent bug found during investigation: demo seed data was
+  fire-and-forget at module scope, silently failing on Cloudflare Workers (disallows async I/O outside
+  a request handler) — every collection would have been permanently empty online. Fixed via lazy,
+  request-triggered seeding (`getServerRuntime()`). Also removed a pre-existing duplicate,
+  ungated deploy workflow (`deploy.yml`) that raced the gated `deploy-cloudflare.yml` on every push.
+  Verified locally end-to-end against a real `wrangler pages dev` (workerd) instance.
+- **Remaining:** verify `curl https://<deployed>/api/status` on the actual production URL after the
+  next merge-to-main deploy (can only be confirmed post-deploy, not from local dev).
 
-### P1-2 · Collection detail page (browse documents) — `M` · **spec required**
+### ~~P1-2 · Collection detail page (browse documents)~~ — `M` — done 2026-07-07
 
-- **Goal:** route `/admin/collections/:slug` listing that collection's documents in a table
-  (columns from the field definitions), with loading/error/empty states, using `CmsApiService`.
-- **Context:** admin pages already read from the real API (list of collections exists); there is no
-  per-collection page and zero `routerLink`s into one. Reuse the local admin components
-  (`PageHeaderComponent`, `LoadingStateComponent`, …) and `@voltui/components`.
-- **Acceptance:** from `/admin/collections`, clicking a collection navigates to its document list
-  showing seeded data (local dev).
+- **Spec:** [specs/003-collection-detail-page.md](specs/003-collection-detail-page.md) (status:
+  done). Added `fieldDefinitions` to `GET /api/v1/collections` (additive). Hit a version mismatch
+  mid-implementation — installed `@voltui/components@0.1.0` had no Table/DatePicker/Drawer exports —
+  resolved by bumping to `^0.6.0` (+ `lumen-icons`, `quartz-headless`, `angular-movement`).
+  **Not yet visually verified in a real browser** — do a manual pass in `pnpm dev:www` before demoing.
 
-### P1-3 · Schema-driven document form: create / edit / delete — `L` · **spec required** · the "wow" feature
+### ~~P1-3 · Schema-driven document form: create / edit / delete~~ — `L` — done 2026-07-07 · the "wow" feature
 
-- **Goal:** from the detail page (P1-2): "New" and "Edit" open a form **generated from the
-  collection's `FieldDefinition`s** (text→input, textarea→textarea, boolean→toggle, select→select,
-  number→number, date→date picker, json→textarea raw, relation→plain id input for now); submit via
-  `createDocument`/`updateDocument`; server validation errors (`{ error, details }`) rendered per
-  field; delete with confirm.
-- **Placement decision (already made):** build it in `apps/www` now for speed; migrating into
-  `@forge-cms/admin` is P2-3. Don't block the demo on package design.
-- **Acceptance:** full CRUD cycle on `posts` from the browser in local dev, including a visible
-  per-field validation error when submitting an empty required field.
+- **Spec:** [specs/004-schema-driven-document-form.md](specs/004-schema-driven-document-form.md)
+  (status: done). Three divergences found and resolved during implementation: `VoltNativeSelect`
+  instead of the full custom `VoltSelect`; hand-rolled Tailwind modal chrome instead of `VoltDialog`
+  (its trigger+TemplateRef composition couldn't be visually verified); and a corrected client-side
+  `ApiValidationError` that parses the *real* error shape the write routes return
+  (`{ data: { errors } }` via h3's `createError`), not the `{ error, details }` shape ARCHITECTURE.md
+  documents — that mismatch is now STATE.md known issue #5, unresolved.
+- **Verification:** full CRUD cycle (create/update/delete + validation-error shape) confirmed against
+  the real running dev server via curl. **Not yet visually verified in a real browser** — do a manual
+  pass in `pnpm dev:www` before demoing this.
 
 ### P1-4 · E2E test for the CRUD flow — `M` (after P1-2/P1-3)
 
@@ -161,15 +156,15 @@ case — e.g. settings/cache), or remove "KV" from the description. Honest > asp
 | ~~QW-2 status fix~~ | S | — | Done 2026-07-07 |
 | ~~QW-3 English comments~~ | S | — | Done 2026-07-07 |
 | ~~QW-4 filter coercion~~ | M | — | Done 2026-07-07 |
-| **P1-1 deploy API** | **L** | spec | **Online demo is broken without it** |
-| P1-2 detail page | M | spec | First half of the demo |
-| **P1-3 schema-driven CRUD form** | **L** | P1-2, spec | **The feature that shows what ForgeCMS is** |
-| P1-4 e2e CRUD | M | P1-2/3 | Locks the demo against regressions |
-| P1-5 landing CTA | S | P1-1 | Discoverability of the demo |
-| P2-1 D1 in prod | L | P1-1, spec | Real persistence = real CMS |
+| ~~P1-1 deploy API~~ | L | — | Done 2026-07-07 |
+| ~~P1-2 detail page~~ | M | — | Done 2026-07-07 |
+| ~~P1-3 schema-driven CRUD form~~ | L | — | Done 2026-07-07 (not yet visually verified in a browser) |
+| **P1-4 e2e CRUD** | **M** | — | **Locks the demo against regressions — do this next** |
+| P1-5 landing CTA | S | — | Discoverability of the demo |
+| P2-1 D1 in prod | L | spec | Real persistence = real CMS |
 | P2-2 auth | L | spec | Credibility + security |
-| P2-3 admin package | L | P1-3, spec | Makes the flagship package real |
+| P2-3 admin package | L | spec | Makes the flagship package real |
 
-**Suggested handoff order for a weaker model:** Phase 0 (QW-1 through QW-4) is done. Next:
-(spec for P1-2) → P1-2 → (spec for P1-3) → P1-3 → P1-4. Keep P1-1 for a stronger model or human
-pairing — it's investigation-heavy infra.
+**Suggested handoff order for a weaker model:** Phase 0 and P1-1/P1-2/P1-3 are done — but do a manual
+browser pass on the new CRUD flow first (see P1-3's caveat above) before trusting it in front of
+anyone. Next: P1-4 (e2e, locks in the flow) → P1-5 (landing CTA, quick).

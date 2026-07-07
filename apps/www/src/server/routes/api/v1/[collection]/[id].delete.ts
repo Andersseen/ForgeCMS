@@ -1,8 +1,8 @@
 import { defineEventHandler, getRouterParam, createError } from 'h3';
-import { serverRuntimePromise } from '../../../../api/runtime';
+import { getServerRuntime } from '../../../../api/runtime';
 
 export default defineEventHandler(async (event) => {
-  const serverRuntime = await serverRuntimePromise;
+  const serverRuntime = await getServerRuntime();
   const collection = getRouterParam(event, 'collection');
   const id = getRouterParam(event, 'id');
 

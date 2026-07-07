@@ -15,11 +15,43 @@ export interface ApiItemResponse<T> {
   data: T;
 }
 
+export interface FieldMeta {
+  name: string;
+  kind: string;
+  label: string;
+  required: boolean;
+  options?: string[];
+}
+
 export interface CollectionMeta {
   slug: string;
   name: string;
   description: string;
   fields: string[];
+  fieldDefinitions: FieldMeta[];
+}
+
+export interface ApiFieldError {
+  field: string;
+  message: string;
+  code: string;
+}
+
+/**
+ * Thrown by createDocument/updateDocument when the server responds with per-field validation
+ * errors. The write routes in apps/www use h3's `createError({ statusCode, statusMessage, data })`,
+ * so the actual body is `{ statusMessage, data: { errors: ApiFieldError[] } }` — not the
+ * `{ error, details }` shape documented for the rest of the envelope (verified against the running
+ * server; ARCHITECTURE.md's documented error envelope doesn't match these two routes today).
+ */
+export class ApiValidationError extends Error {
+  constructor(
+    message: string,
+    readonly details: ApiFieldError[]
+  ) {
+    super(message);
+    this.name = 'ApiValidationError';
+  }
 }
 
 export interface AuthUser {
@@ -38,6 +70,18 @@ export const FORGE_CMS_CONFIG = new InjectionToken<ForgeCmsConfig>('FORGE_CMS_CO
 
 export function provideForgeCms(config: ForgeCmsConfig): Provider[] {
   return [{ provide: FORGE_CMS_CONFIG, useValue: config }];
+}
+
+async function toApiError(response: Response, fallbackMessage: string): Promise<Error> {
+  try {
+    const body = (await response.json()) as { statusMessage?: string; data?: { errors?: ApiFieldError[] } };
+    if (body.data?.errors) {
+      return new ApiValidationError(body.statusMessage ?? fallbackMessage, body.data.errors);
+    }
+    return new Error(`${fallbackMessage}: ${response.status}`);
+  } catch {
+    return new Error(`${fallbackMessage}: ${response.status}`);
+  }
 }
 
 @Injectable({ providedIn: 'root' })
@@ -100,7 +144,7 @@ export class CmsApiService {
       headers: this.getHeaders(),
       body: JSON.stringify(data)
     });
-    if (!response.ok) throw new Error(`Failed to create document: ${response.status}`);
+    if (!response.ok) throw await toApiError(response, 'Failed to create document');
     const result = (await response.json()) as ApiItemResponse<T>;
     return result.data;
   }
@@ -115,7 +159,7 @@ export class CmsApiService {
       headers: this.getHeaders(),
       body: JSON.stringify(data)
     });
-    if (!response.ok) throw new Error(`Failed to update document: ${response.status}`);
+    if (!response.ok) throw await toApiError(response, 'Failed to update document');
     const result = (await response.json()) as ApiItemResponse<T>;
     return result.data;
   }

@@ -1,5 +1,5 @@
 import { defineEventHandler, createError, getRequestURL } from 'h3';
-import { serverRuntimePromise } from '../../../api/runtime';
+import { getServerRuntime } from '../../../api/runtime';
 
 /**
  * GET /api/auth/me
@@ -8,7 +8,7 @@ import { serverRuntimePromise } from '../../../api/runtime';
  * contra el auth adapter configurado (InMemory o External).
  */
 export default defineEventHandler(async (event) => {
-  const serverRuntime = await serverRuntimePromise;
+  const serverRuntime = await getServerRuntime();
   const request = new Request(getRequestURL(event).toString(), {
     headers: event.node.req.headers as Record<string, string>
   });

@@ -27,7 +27,7 @@ has never been wired to real Cloudflare bindings end-to-end.
 | `@forge-cms/api` | 🟡 Minimal | `ApiContext`, `CrudHandlers` types, `defineCrudHandlers` | Anything beyond type definitions; route-mounting helpers |
 | `@forge-cms/runtime` | ✅ Solid | `ForgeCmsRuntime` (binds collections + adapters, `init`, `syncSchema`), HTTP handlers `handleList/Read/Create/Update/Delete` with validation, optional auth, JSON envelopes | Hooks (beforeChange etc.), field-level access control, relation population |
 | `@forge-cms/cloudflare` | 🟡 Partial | `D1DatabaseAdapter` (with index creation), `R2StorageAdapter`, hand-written binding types, tests with mocked bindings | KV adapter (mentioned in package description, absent), tests against real/miniflare bindings |
-| `@forge-cms/angular` | ✅ Solid | `CmsApiService` (fetch-based, full CRUD + collections + me), `provideForgeCms`, `FORGE_CMS_CONFIG` token | Signals-based resources, SSR-safe fetch, error typing |
+| `@forge-cms/angular` | ✅ Solid | `CmsApiService` (fetch-based, full CRUD + collections + me), `provideForgeCms`, `FORGE_CMS_CONFIG` token, `CollectionMeta.fieldDefinitions`/`FieldMeta` (field kind/label/required/options, added 2026-07-07 for schema-driven UI) | Signals-based resources, SSR-safe fetch, error typing |
 | `@forge-cms/admin` | 🔴 Skeleton | `ForgeAdminLayoutComponent`, `ForgeCollectionListComponent`, `ForgeCollectionFormComponent`, `ForgeAdminConfig` | Not consumed anywhere; apps/www admin uses its own local components instead |
 | `@forge-cms/testing` | ✅ Solid | Contract test suites for database/auth/storage adapters (`runDatabaseAdapterContractTests`, …), exported via `@forge-cms/testing/contracts` | — |
 
@@ -35,7 +35,7 @@ has never been wired to real Cloudflare bindings end-to-end.
 
 | App | Status | Notes |
 | --- | --- | --- |
-| `apps/www` | ✅ Working demo (local only) | Analog.js + Angular 21 + Tailwind 4 + `@voltui/components`. Landing page, `/admin` demo (dashboard, collections, media, users, api, settings — read-only except settings; no per-collection detail/CRUD pages yet), h3 server API. Server runtime at `src/server/api/runtime.ts`: 9 demo collections, in-memory adapters, seed data on module load (resets every reload — intentional). Playwright e2e. ⚠️ Deploys to Cloudflare Pages **client-only** (`ssr: false`, uploads `dist/client`) — the deployed site has no `/api/*`, so the online admin can't load data. See PLAN.md P1-1. |
+| `apps/www` | ✅ Working demo (full CRUD, deploys with a real API) | Analog.js + Angular 21 + Tailwind 4 + `@voltui/components@^0.6.0` (+ `lumen-icons`, `quartz-headless`, `angular-movement`, added 2026-07-07). Landing page, `/admin` demo (dashboard, collections, collection detail with a documents table + schema-driven create/edit form + delete, media, users, api, settings), h3 server API. Server runtime at `src/server/api/runtime.ts`: 9 demo collections, in-memory adapters, seed data lazily triggered on first request via `getServerRuntime()` (not module load — required for Cloudflare Workers, which forbids async I/O at module scope). Playwright e2e (not yet covering the new CRUD flow — PLAN.md P1-4). Deploys to Cloudflare Pages via the `cloudflare-pages` Nitro preset (`apps/www/dist/analog/public`, incl. `_worker.js`) — the deployed site serves `/api/*` for real. Data still resets per isolate/cold start (in-memory adapters) until D1 lands (PLAN.md P2-1). ⚠️ The new create/edit/delete flow was verified against the real server via curl but **not yet visually verified in a real browser** — do a manual pass before demoing. |
 | `apps/playground` | ✅ Minimal | Analog.js sandbox with a sample `posts` collection + test. |
 
 ## API surface (implemented in apps/www server routes)
@@ -51,18 +51,35 @@ item `{ data }`, error `{ error, details? }`, delete `204`.
 
 ## Infrastructure
 
-- CI (GitHub Actions): lint + typecheck + test + build on push/PR to main; separate e2e workflow; deploy-to-Cloudflare-Pages workflow (needs `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` secrets).
+- CI (GitHub Actions): `ci.yml` (lint + typecheck + test + build on push/PR to main); `e2e.yml`
+  (Playwright, separate workflow); `deploy-cloudflare.yml` (checks job — format/lint/typecheck/test/e2e —
+  then deploys `apps/www/dist/analog/public` to Cloudflare Pages; needs `CLOUDFLARE_API_TOKEN`,
+  `CLOUDFLARE_ACCOUNT_ID` secrets). The previously-duplicate ungated `deploy.yml` was removed (PLAN.md
+  P1-1 / spec 002) — it raced `deploy-cloudflare.yml` on every push with no test gate.
 - Changesets configured; **no package published yet** (all 0.0.0).
-- `wrangler.toml`: Pages config, output `apps/www/dist/client`, `nodejs_compat`.
+- `wrangler.toml`: Pages config, output `apps/www/dist/analog/public` (Nitro `cloudflare-pages`
+  preset — includes `_worker.js`, the compiled API server), `nodejs_compat`.
 
 ## Known issues / debt (verified 2026-07-07)
 
-0. **Production deploy is static-only** — no server/API on the deployed Cloudflare Pages site
-   (`analog({ ssr: false })` + workflow uploads only `apps/www/dist/client`). The online `/admin`
-   cannot fetch data. Fix tracked as PLAN.md **P1-1** (highest priority).
-1. `handleUpdate` partial validation is approximate (validates merged body, then filters errors to sent fields).
+1. `handleUpdate` (`@forge-cms/runtime`) partial validation is approximate (validates merged body,
+   then filters errors to sent fields). `apps/www`'s actual `[collection]/[id].put.ts` route doesn't
+   even call `handleUpdate` — it reimplements similar (equally approximate) logic inline, so this bug
+   exists in two places today.
 2. `@forge-cms/admin` is dead code until apps/www's admin migrates to it.
 3. No KV adapter despite the cloudflare package description advertising one.
+4. `_routes.json`/`_headers`/`_redirects` (Nitro's Cloudflare Pages preset output) land in
+   `apps/www/dist/analog/` instead of inside `apps/www/dist/analog/public/`, so they're not included
+   in the deploy — cosmetic only (the worker itself already serves static assets via `env.ASSETS`
+   regardless), noted as a non-goal follow-up in spec 002.
+5. **The documented API error envelope doesn't match reality.** ARCHITECTURE.md documents errors as
+   `{ error: string, details?: ValidationError[] }`, but `apps/www`'s write routes
+   (`[collection].post.ts`, `[collection]/[id].put.ts`) don't delegate to `@forge-cms/runtime`'s
+   handlers at all — they use h3's `createError({ statusCode, statusMessage, data })` directly, so the
+   actual body is `{ error: true, statusCode, statusMessage, message, data: { errors:
+   ValidationError[] } }` (verified against the running dev server, 2026-07-07). `@forge-cms/angular`'s
+   `ApiValidationError` (added for spec 004) parses the real shape; the mismatch between docs and the
+   write-route implementations is unresolved.
 
 ## What's next
 

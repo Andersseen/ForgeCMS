@@ -1,34 +1,29 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import type { OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { CmsApiService } from '@forge-cms/angular';
 import {
   VoltAvatar,
   VoltAvatarFallback,
   VoltAvatarImage,
   VoltButton,
   VoltCard,
-  VoltInput,
   VoltSeparator
 } from '@voltui/components';
 import {
   IconClock,
   IconEdit,
   IconEye,
-  IconFileText,
   IconFilter,
-  IconGlobe,
-  IconImage,
   IconMoreVertical,
-  IconNewspaper,
-  IconPlus,
-  IconUsers
+  IconPlus
 } from '../../../components/icons';
-import { CmsApiService } from '@forge-cms/angular';
 import {
-  PageHeaderComponent,
-  LoadingStateComponent,
+  CollectionIconComponent,
   ErrorStateComponent,
-  SearchToolbarComponent,
-  CollectionIconComponent
+  LoadingStateComponent,
+  PageHeaderComponent,
+  SearchToolbarComponent
 } from '../components';
 
 interface CollectionViewModel {
@@ -60,23 +55,18 @@ const ICON_MAP: Record<string, string> = {
   selector: 'forge-cms-collections',
   standalone: true,
   imports: [
+    RouterLink,
     VoltCard,
     VoltButton,
     VoltAvatar,
     VoltAvatarImage,
     VoltAvatarFallback,
-    VoltInput,
     VoltSeparator,
     IconPlus,
     IconFilter,
     IconMoreVertical,
     IconEdit,
     IconEye,
-    IconGlobe,
-    IconNewspaper,
-    IconFileText,
-    IconImage,
-    IconUsers,
     IconClock,
     CollectionIconComponent,
     PageHeaderComponent,
@@ -116,7 +106,10 @@ const ICON_MAP: Record<string, string> = {
       } @else {
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           @for (col of collections(); track col.id) {
-            <volt-card class="p-5 hover:border-primary/50 transition-all cursor-pointer group">
+            <volt-card
+              [routerLink]="['/admin/collections', col.slug]"
+              class="p-5 hover:border-primary/50 transition-all cursor-pointer group"
+            >
               <div class="flex items-start justify-between">
                 <div class="flex items-center gap-3">
                   <div

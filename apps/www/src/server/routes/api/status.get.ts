@@ -1,8 +1,8 @@
 import { defineEventHandler } from 'h3';
-import { serverRuntimePromise } from '../../api/runtime';
+import { getServerRuntime } from '../../api/runtime';
 
 export default defineEventHandler(async () => {
-  const runtime = await serverRuntimePromise;
+  const runtime = await getServerRuntime();
   const db = runtime.adapters.database;
 
   let totalRecords = 0;

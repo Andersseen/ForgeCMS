@@ -1,5 +1,5 @@
 import { defineEventHandler } from 'h3';
-import { serverRuntimePromise } from '../api/runtime';
+import { getServerRuntime } from '../api/runtime';
 
 /**
  * Optional auth middleware.
@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const authHeader = event.node.req.headers.authorization;
   if (!authHeader) return;
 
-  const serverRuntime = await serverRuntimePromise;
+  const serverRuntime = await getServerRuntime();
 
   try {
     const user = await serverRuntime.adapters.auth.validateSession(

@@ -26,8 +26,11 @@
     "@forge-cms/db": "workspace:*",
     "@forge-cms/runtime": "workspace:*",
     "@forge-cms/storage": "workspace:*",
-    "@voltui/components": "^0.1.0",
+    "@voltui/components": "^0.6.0",
+    "angular-movement": "^0.5.0",
     "h3": "^1.15.0",
+    "lumen-icons": "^0.2.0",
+    "quartz-headless": "^0.0.3",
     "rxjs": "^7.8.2",
     "tslib": "^2.8.1",
     "zone.js": "^0.15.1"

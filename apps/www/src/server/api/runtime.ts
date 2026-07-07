@@ -123,8 +123,19 @@ const runtime = new ForgeCmsRuntime({
 
 runtime.init();
 
-// Seed data for development
-void seedData(runtime);
+let seedPromise: Promise<void> | undefined;
+
+/**
+ * Lazily seeds demo data on first call. Must only be invoked from within a request handler —
+ * Cloudflare Workers forbids async I/O (including crypto.randomUUID) at module/global scope, so
+ * seeding cannot run eagerly at module load time.
+ */
+export function getServerRuntime(): Promise<ForgeCmsRuntime> {
+  if (!seedPromise) {
+    seedPromise = seedData(runtime);
+  }
+  return seedPromise.then(() => runtime);
+}
 
 async function seedData(runtime: ForgeCmsRuntime) {
   const db = runtime.adapters.database;
@@ -187,5 +198,3 @@ async function seedData(runtime: ForgeCmsRuntime) {
     contentAlerts: false
   });
 }
-
-export const serverRuntimePromise = Promise.resolve(runtime);

@@ -20,6 +20,13 @@ export const routes: Routes = [
           import('./pages/admin/collections/collections.page').then((m) => m.CollectionsPage)
       },
       {
+        path: 'collections/:slug',
+        loadComponent: () =>
+          import('./pages/admin/collections/collection-detail.page').then(
+            (m) => m.CollectionDetailPage
+          )
+      },
+      {
         path: 'media',
         loadComponent: () => import('./pages/admin/media/media.page').then((m) => m.MediaPage)
       },
