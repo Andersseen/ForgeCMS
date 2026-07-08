@@ -1,6 +1,8 @@
 export { InMemoryAuthAdapter } from './in-memory.adapter.js';
 export { ExternalAuthAdapter } from './external.adapter.js';
 export type { ExternalAuthConfig } from './external.adapter.js';
+export { SignedTokenAuthAdapter, DEMO_CREDENTIALS } from './signed-token.adapter.js';
+export type { SignedTokenEnv } from './signed-token.adapter.js';
 
 export class ForgeAuthError extends Error {
   constructor(

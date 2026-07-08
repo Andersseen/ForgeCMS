@@ -1,20 +1,17 @@
-import { defineEventHandler, getRouterParam, createError } from 'h3';
+import { defineEventHandler, getRouterParam, toWebRequest } from 'h3';
+import type { ApiContext } from '@forge-cms/api';
+import { handleDelete } from '@forge-cms/runtime';
 import { getServerRuntime } from '../../../../api/runtime';
 
 export default defineEventHandler(async (event) => {
-  const serverRuntime = await getServerRuntime(event.context.cloudflare?.env);
-  const collection = getRouterParam(event, 'collection');
-  const id = getRouterParam(event, 'id');
-
-  if (!collection || !id) {
-    throw createError({ statusCode: 400, statusMessage: 'Missing collection or id parameter' });
-  }
-
-  const collectionDef = serverRuntime.getCollection(collection);
-  if (!collectionDef) {
-    throw createError({ statusCode: 404, statusMessage: `Collection '${collection}' not found` });
-  }
-
-  await serverRuntime.adapters.database.delete(collection, id);
-  return new Response(null, { status: 204 });
+  const runtime = await getServerRuntime(event.context.cloudflare?.env);
+  const context: ApiContext = {
+    request: toWebRequest(event),
+    params: {
+      collection: getRouterParam(event, 'collection') ?? '',
+      id: getRouterParam(event, 'id') ?? ''
+    },
+    env: event.context.cloudflare?.env
+  };
+  return handleDelete(context, { runtime, requireAuth: true });
 });

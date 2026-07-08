@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { VoltBadge, VoltButton } from '@voltui/components';
 import { exampleCode } from '../landing-data';
 
 @Component({
   selector: 'forge-cms-hero-section',
   standalone: true,
-  imports: [VoltBadge, VoltButton],
+  imports: [VoltBadge, VoltButton, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section
@@ -24,13 +25,20 @@ import { exampleCode } from '../landing-data';
         </p>
 
         <div class="mt-9 flex flex-col gap-3 sm:flex-row">
+          <a routerLink="/admin">
+            <volt-button size="lg">Explore the admin demo</volt-button>
+          </a>
           <a href="#architecture">
-            <volt-button size="lg">Explore architecture</volt-button>
+            <volt-button variant="outline" size="lg">Explore architecture</volt-button>
           </a>
           <a href="#packages">
             <volt-button variant="outline" size="lg">View packages</volt-button>
           </a>
         </div>
+        <p class="mt-3 text-sm text-muted-foreground">
+          Live demo — browses real collections through the actual ForgeCMS runtime; demo data may
+          reset periodically.
+        </p>
       </div>
 
       <section

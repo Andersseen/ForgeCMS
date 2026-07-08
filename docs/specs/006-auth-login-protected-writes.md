@@ -1,9 +1,9 @@
 # 006 — Auth: login + protected writes
 
-- **Status:** draft
+- **Status:** done
 - **Author:** agent draft
 - **Date:** 2026-07-07
-- **Branch:** —
+- **Branch:** main
 - **Affected packages/apps:** @forge-cms/auth, @forge-cms/angular, apps/www
 
 ## Context / Why
@@ -88,25 +88,14 @@ contract test file).
   concrete adapter type since it's not part of the shared `AuthAdapter` contract — same pattern
   `InMemoryAuthAdapter.registerSession` already uses outside the contract), returns
   `{ data: { token, user } }` on success, 401 on failure.
-- New shared helper `apps/www/src/server/utils/require-write-auth.ts`:
-  ```ts
-  export async function requireWriteAuth(event: H3Event, runtime: ForgeCmsRuntime): Promise<void> {
-    const request = new Request(getRequestURL(event).toString(), {
-      headers: event.node.req.headers as Record<string, string>
-    });
-    try {
-      await runtime.adapters.auth.requireAuth(request);
-    } catch {
-      throw createError({ statusCode: 401, statusMessage: 'Unauthorized' });
-    }
-  }
-  ```
-  (Mirrors the `Request`-reconstruction pattern already used in `me.get.ts` — kept as a shared helper
-  instead of copy-pasted three times.)
-- Call `await requireWriteAuth(event, serverRuntime)` at the top of the three write routes —
-  `[collection].post.ts`, `[collection]/[id].put.ts`, `[collection]/[id].delete.ts` — right after
-  resolving `serverRuntime`, before reading the body. GET routes (`list`, `read`, `collections`)
-  are untouched — reads stay open.
+- **Revised during implementation (2026-07-08):** by the time this spec was implemented, PLAN.md
+  P2-1.5 had already landed (spec 007) — the three write routes now delegate to
+  `@forge-cms/runtime`'s `handleCreate`/`handleUpdate`/`handleDelete`, which already implement exactly
+  this gate via `HandlerOptions.requireAuth` (calls `runtime.adapters.auth.requireAuth(context.request)`,
+  returns a 401 `Response` on failure). So no bespoke `require-write-auth.ts` helper was written —
+  each write route instead just passes `requireAuth: true` in its call to the matching handler. Same
+  observable behavior as originally designed, less duplicated code. GET routes (`list`, `read`,
+  `collections`) are untouched — reads stay open.
 
 ### 3. `@forge-cms/angular` changes
 
@@ -127,7 +116,7 @@ contract test file).
   success: store the token (`localStorage.setItem('forge-auth-token', token)`), navigate to
   `/admin/collections`.
 - `apps/www/src/app/app.config.ts`: wire `provideForgeCms({ authToken: () =>
-  localStorage.getItem('forge-auth-token') })` so `CmsApiService` automatically attaches the stored
+localStorage.getItem('forge-auth-token') })` so `CmsApiService` automatically attaches the stored
   token to every request (already-supported config shape — no `@forge-cms/angular` change needed for
   this part).
 - `collection-detail.page.ts`'s `onSave`/`deleteDoc` catch blocks: when `err instanceof ApiAuthError`,
@@ -138,20 +127,20 @@ contract test file).
 
 ## Implementation plan
 
-- [ ] `packages/auth/src/signed-token.adapter.ts`: `SignedTokenAuthAdapter` (Design §1)
-- [ ] `packages/auth/src/signed-token.adapter.test.ts`: contract tests + login/issueToken/expiry tests
-- [ ] `packages/auth/src/index.ts`: export the new adapter
-- [ ] Changeset (patch, `@forge-cms/auth`)
-- [ ] `apps/www`: swap the auth adapter, add `login.post.ts`, add `require-write-auth.ts`, wire it
-      into the three write routes (Design §2)
-- [ ] `packages/angular/src/index.ts`: `ApiAuthError`, `CmsApiService.login()`, 401 handling in
+- [x] `packages/auth/src/signed-token.adapter.ts`: `SignedTokenAuthAdapter` (Design §1)
+- [x] `packages/auth/src/signed-token.adapter.test.ts`: contract tests + login/issueToken/expiry tests
+- [x] `packages/auth/src/index.ts`: export the new adapter
+- [x] Changeset (minor, `@forge-cms/auth`)
+- [x] `apps/www`: swap the auth adapter, add `login.post.ts`, wire `requireAuth: true` into the three
+      write routes' handler calls (Design §2, revised)
+- [x] `packages/angular/src/index.ts`: `ApiAuthError`, `CmsApiService.login()`, 401 handling in
       create/update/delete (Design §3)
-- [ ] Changeset (patch, `@forge-cms/angular`)
-- [ ] New login page + route + `app.config.ts` wiring + admin layout login/logout link (Design §4)
-- [ ] Manual verification: attempt a create while logged out → 401 → redirected to `/login`; log in
-      with the published demo credentials → retry → succeeds; log out → writes 401 again
-- [ ] Update STATE.md (`@forge-cms/auth` row: real adapter exists; `apps/www` row: writes protected)
-- [ ] Full gates: `pnpm lint && pnpm typecheck && pnpm test && pnpm build`
+- [x] Changeset (minor, `@forge-cms/angular`)
+- [x] New login page + route + `app.config.ts` wiring + admin layout login/logout link (Design §4)
+- [x] Manual verification: attempt a create while logged out → 401; log in with the published demo
+      credentials via curl and via a real browser pass → retry → succeeds; reads unaffected
+- [x] Update STATE.md (`@forge-cms/auth` row: real adapter exists; `apps/www` row: writes protected)
+- [x] Full gates: `pnpm lint && pnpm typecheck && pnpm test && pnpm build`
 
 ## Test plan
 
@@ -180,4 +169,8 @@ or set as a Cloudflare secret later without any code change.)
 
 ## Outcome
 
-—
+Shipped as designed, with the Design §2 revision noted above (reuse `HandlerOptions.requireAuth`
+instead of a bespoke helper, since spec 007 landed first). Verified end-to-end: 401 without a token,
+successful login + authenticated write via curl, and a real Playwright-driven browser pass of the
+login page (renders, submits, redirects to `/admin/collections`, stores the token, "Log out" appears
+in the header).

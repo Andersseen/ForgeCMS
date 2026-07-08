@@ -4,10 +4,10 @@ Cloudflare-native adapters and types for ForgeCMS.
 
 ## Target services
 
-| Service | Binding type  | Adapter             | Status                                  |
-| ------- | ------------- | ------------------- | --------------------------------------- |
-| **D1**  | `D1Database`  | `D1DatabaseAdapter` | Implemented (SQL native, Drizzle-ready) |
-| **R2**  | `R2Bucket`    | `R2StorageAdapter`  | Implemented                             |
+| Service | Binding type | Adapter             | Status                                  |
+| ------- | ------------ | ------------------- | --------------------------------------- |
+| **D1**  | `D1Database` | `D1DatabaseAdapter` | Implemented (SQL native, Drizzle-ready) |
+| **R2**  | `R2Bucket`   | `R2StorageAdapter`  | Implemented                             |
 
 No KV adapter — nothing in the runtime today needs a key-value store (no caching/settings layer).
 

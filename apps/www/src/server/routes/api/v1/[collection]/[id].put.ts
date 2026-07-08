@@ -1,44 +1,17 @@
-import { defineEventHandler, getRouterParam, readBody, createError } from 'h3';
-import { validateCollection } from '@forge-cms/core';
+import { defineEventHandler, getRouterParam, toWebRequest } from 'h3';
+import type { ApiContext } from '@forge-cms/api';
+import { handleUpdate } from '@forge-cms/runtime';
 import { getServerRuntime } from '../../../../api/runtime';
 
 export default defineEventHandler(async (event) => {
-  const serverRuntime = await getServerRuntime(event.context.cloudflare?.env);
-  const collection = getRouterParam(event, 'collection');
-  const id = getRouterParam(event, 'id');
-
-  if (!collection || !id) {
-    throw createError({ statusCode: 400, statusMessage: 'Missing collection or id parameter' });
-  }
-
-  const collectionDef = serverRuntime.getCollection(collection);
-  if (!collectionDef) {
-    throw createError({ statusCode: 404, statusMessage: `Collection '${collection}' not found` });
-  }
-
-  let body: Record<string, unknown>;
-  try {
-    body = await readBody(event);
-  } catch {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid JSON body' });
-  }
-
-  // Validate only fields present in the partial update
-  const partialData = { ...body, id };
-  const validation = validateCollection(collectionDef, partialData);
-  if (!validation.valid) {
-    const relevantErrors = validation.errors.filter(
-      (e) => body[e.field] !== undefined || e.code === 'required'
-    );
-    if (relevantErrors.length > 0) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Validation failed',
-        data: { errors: relevantErrors }
-      });
-    }
-  }
-
-  const record = await serverRuntime.adapters.database.update(collection, id, body);
-  return { data: record };
+  const runtime = await getServerRuntime(event.context.cloudflare?.env);
+  const context: ApiContext = {
+    request: toWebRequest(event),
+    params: {
+      collection: getRouterParam(event, 'collection') ?? '',
+      id: getRouterParam(event, 'id') ?? ''
+    },
+    env: event.context.cloudflare?.env
+  };
+  return handleUpdate(context, { runtime, requireAuth: true });
 });

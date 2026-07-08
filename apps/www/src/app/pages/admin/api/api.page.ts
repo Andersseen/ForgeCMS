@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { VoltButton, VoltCard } from '@voltui/components';
 import { IconCode, IconKey, IconPlus } from '../../../components/icons';
-import { PageHeaderComponent, EmptyStateComponent } from '../components';
+import { PageHeaderComponent, EmptyStateComponent } from '@forge-cms/admin';
 
 @Component({
   selector: 'forge-cms-api',

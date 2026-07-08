@@ -8,6 +8,9 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideRouter(routes, withComponentInputBinding()),
     provideVoltTheme({ color: 'volt', style: 'soft' }),
-    provideForgeCms({ baseUrl: '/api/v1' })
+    provideForgeCms({
+      baseUrl: '/api/v1',
+      authToken: () => localStorage.getItem('forge-auth-token')
+    })
   ]
 };

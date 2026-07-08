@@ -15,14 +15,8 @@ import {
 } from '../../../components/icons';
 import { CmsApiService } from '@forge-cms/angular';
 import { RouterLink } from '@angular/router';
-import {
-  PageHeaderComponent,
-  LoadingStateComponent,
-  ErrorStateComponent,
-  StatCardComponent,
-  SectionHeaderComponent,
-  CollectionIconComponent
-} from '../components';
+import { PageHeaderComponent, LoadingStateComponent, ErrorStateComponent } from '@forge-cms/admin';
+import { StatCardComponent, SectionHeaderComponent, CollectionIconComponent } from '../components';
 
 interface CollectionStat {
   name: string;

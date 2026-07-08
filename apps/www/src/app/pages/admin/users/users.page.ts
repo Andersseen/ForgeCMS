@@ -18,13 +18,8 @@ import {
   IconUsers
 } from '../../../components/icons';
 import { CmsApiService } from '@forge-cms/angular';
-import {
-  PageHeaderComponent,
-  ErrorStateComponent,
-  EmptyStateComponent,
-  StatCardComponent,
-  SearchToolbarComponent
-} from '../components';
+import { PageHeaderComponent, ErrorStateComponent, EmptyStateComponent } from '@forge-cms/admin';
+import { StatCardComponent, SearchToolbarComponent } from '../components';
 
 @Component({
   selector: 'forge-cms-users',

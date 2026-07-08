@@ -1,12 +1,13 @@
 import { defineCollection, defineField } from '@forge-cms/core';
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
-import { InMemoryAuthAdapter } from '@forge-cms/auth';
+import { SignedTokenAuthAdapter } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import { D1DatabaseAdapter, type D1Database } from '@forge-cms/cloudflare';
 import { ForgeCmsRuntime } from '@forge-cms/runtime';
 
 export interface ServerEnv {
   DB?: D1Database;
+  AUTH_SECRET?: string;
 }
 
 const pages = defineCollection({
@@ -117,7 +118,17 @@ const siteConfig = defineCollection({
   }
 });
 
-const collections = [pages, posts, products, media, users, categories, forms, navigation, siteConfig];
+const collections = [
+  pages,
+  posts,
+  products,
+  media,
+  users,
+  categories,
+  forms,
+  navigation,
+  siteConfig
+];
 
 let runtimePromise: Promise<ForgeCmsRuntime<ServerEnv>> | undefined;
 
@@ -141,7 +152,7 @@ async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>
     collections,
     adapters: {
       database,
-      auth: new InMemoryAuthAdapter(),
+      auth: new SignedTokenAuthAdapter(),
       storage: new InMemoryStorageAdapter()
     },
     ...(env !== undefined && { env })

@@ -1,8 +1,13 @@
+import '@angular/compiler';
 import { describe, expect, it } from 'vitest';
 import {
   ForgeAdminLayoutComponent,
   ForgeCollectionListComponent,
-  ForgeCollectionFormComponent
+  ForgeCollectionFormComponent,
+  PageHeaderComponent,
+  LoadingStateComponent,
+  ErrorStateComponent,
+  EmptyStateComponent
 } from './index';
 
 describe('@forge-cms/admin', () => {
@@ -16,5 +21,12 @@ describe('@forge-cms/admin', () => {
 
   it('exports collection form component', () => {
     expect(ForgeCollectionFormComponent).toBeDefined();
+  });
+
+  it('exports shared presentational components', () => {
+    expect(PageHeaderComponent).toBeDefined();
+    expect(LoadingStateComponent).toBeDefined();
+    expect(ErrorStateComponent).toBeDefined();
+    expect(EmptyStateComponent).toBeDefined();
   });
 });

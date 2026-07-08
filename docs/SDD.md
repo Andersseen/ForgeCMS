@@ -1,19 +1,19 @@
 # SDD — Spec-Driven Development workflow
 
 This repo uses lightweight spec-driven development: **non-trivial changes are specified in
-`docs/specs/` before implementation.** The spec is the source of truth for *intent*; code review
+`docs/specs/` before implementation.** The spec is the source of truth for _intent_; code review
 checks the diff against the spec, not against vibes.
 
 ## When a spec is required
 
-| Change | Spec? |
-| --- | --- |
-| New package, new adapter, new API endpoint | ✅ Required |
-| Change to an adapter contract or the API envelope | ✅ Required (these are stable interfaces) |
-| New field kind, runtime feature (hooks, access control) | ✅ Required |
-| Multi-file feature in an app (new admin page, auth flow) | ✅ Required |
-| Bug fix, typo, refactor with no behavior change, test-only change | ❌ Just do it (with a regression test) |
-| Doc updates, CI tweaks | ❌ Just do it |
+| Change                                                            | Spec?                                     |
+| ----------------------------------------------------------------- | ----------------------------------------- |
+| New package, new adapter, new API endpoint                        | ✅ Required                               |
+| Change to an adapter contract or the API envelope                 | ✅ Required (these are stable interfaces) |
+| New field kind, runtime feature (hooks, access control)           | ✅ Required                               |
+| Multi-file feature in an app (new admin page, auth flow)          | ✅ Required                               |
+| Bug fix, typo, refactor with no behavior change, test-only change | ❌ Just do it (with a regression test)    |
+| Doc updates, CI tweaks                                            | ❌ Just do it                             |
 
 Rule of thumb: if you can't finish it in one sitting or it changes a public surface, write a spec.
 

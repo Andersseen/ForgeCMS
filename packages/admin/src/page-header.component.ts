@@ -12,21 +12,13 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
           <p class="text-sm text-muted-foreground mt-1">{{ subtitle() }}</p>
         }
       </div>
-      @if (hasActions()) {
-        <div class="flex items-center gap-2">
-          <ng-content select="[actions]" />
-        </div>
-      }
+      <div class="flex items-center gap-2">
+        <ng-content select="[actions]" />
+      </div>
     </div>
   `
 })
 export class PageHeaderComponent {
   title = input.required<string>();
   subtitle = input<string>();
-
-  hasActions(): boolean {
-    // Angular doesn't provide a direct way to check ng-content presence
-    // Pages always include actions wrapper when needed, so this is fine
-    return true;
-  }
 }

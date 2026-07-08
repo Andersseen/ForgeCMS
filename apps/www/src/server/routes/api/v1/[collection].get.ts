@@ -1,34 +1,14 @@
-import { defineEventHandler, getRouterParam, getRequestURL, createError } from 'h3';
+import { defineEventHandler, getRouterParam, toWebRequest } from 'h3';
+import type { ApiContext } from '@forge-cms/api';
+import { handleList } from '@forge-cms/runtime';
 import { getServerRuntime } from '../../../api/runtime';
 
 export default defineEventHandler(async (event) => {
-  const serverRuntime = await getServerRuntime(event.context.cloudflare?.env);
-  const collection = getRouterParam(event, 'collection');
-  if (!collection) {
-    throw createError({ statusCode: 400, statusMessage: 'Missing collection parameter' });
-  }
-
-  const collectionDef = serverRuntime.getCollection(collection);
-  if (!collectionDef) {
-    throw createError({ statusCode: 404, statusMessage: `Collection '${collection}' not found` });
-  }
-
-  const url = getRequestURL(event);
-  const limit = url.searchParams.has('limit')
-    ? parseInt(url.searchParams.get('limit')!, 10)
-    : undefined;
-  const offset = url.searchParams.has('offset')
-    ? parseInt(url.searchParams.get('offset')!, 10)
-    : undefined;
-
-  const records = await serverRuntime.adapters.database.findMany({
-    collection,
-    ...(limit !== undefined && { limit }),
-    ...(offset !== undefined && { offset })
-  });
-
-  return {
-    data: records,
-    meta: { collection, count: records.length, limit, offset }
+  const runtime = await getServerRuntime(event.context.cloudflare?.env);
+  const context: ApiContext = {
+    request: toWebRequest(event),
+    params: { collection: getRouterParam(event, 'collection') ?? '' },
+    env: event.context.cloudflare?.env
   };
+  return handleList(context, { runtime });
 });

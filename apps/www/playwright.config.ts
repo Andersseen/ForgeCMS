@@ -8,7 +8,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : '50%',
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: 'http://127.0.0.1:5173',
     trace: 'on-first-retry'
   },
   projects: [
@@ -18,9 +18,11 @@ export default defineConfig({
     }
   ],
   webServer: {
-    command:
-      'pnpm --filter @forge-cms/www... build && pnpm exec vite preview --host 127.0.0.1 --port 4173',
-    url: 'http://127.0.0.1:4173',
+    // The dev server (not `vite preview`, which only serves static client assets) — needed because
+    // the CRUD/auth e2e flow exercises the real `/api/*` h3 routes, which only run under Nitro dev
+    // middleware or a full server deploy, not the static preview build.
+    command: 'pnpm --filter @forge-cms/www dev',
+    url: 'http://127.0.0.1:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000
   }

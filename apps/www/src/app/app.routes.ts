@@ -6,8 +6,12 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/landing.page').then((m) => m.LandingPage)
   },
   {
+    path: 'login',
+    loadComponent: () => import('./pages/login/login.page').then((m) => m.LoginPage)
+  },
+  {
     path: 'admin',
-    loadComponent: () => import('./layouts/admin/admin.layout').then((m) => m.AdminLayout),
+    loadComponent: () => import('@forge-cms/admin').then((m) => m.ForgeAdminLayoutComponent),
     children: [
       {
         path: '',

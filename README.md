@@ -10,12 +10,13 @@ Angular." Edge-first: designed to run on Cloudflare Pages/Workers with D1 + R2.
 ## Status
 
 **Experimental, pre-alpha, not production-ready** — but substantially implemented, not just
-scaffolding. Working today: the schema DSL and runtime validation, a framework-agnostic CRUD
-runtime with HTTP handlers, database adapters (in-memory, LibSQL, Cloudflare D1), storage adapters
-(in-memory, Cloudflare R2), an Angular client SDK, and a demo admin UI served by the real runtime in
-`apps/www`. Still missing: a real auth provider, the `@forge-cms/admin` Angular package isn't yet
-consumed by the demo, and nothing is published to npm. See [docs/STATE.md](docs/STATE.md) for the
-full, continuously-updated picture and [docs/PLAN.md](docs/PLAN.md) for what's being worked on next.
+scaffolding. Working today: the schema DSL and runtime validation, a framework-agnostic CRUD runtime
+with HTTP handlers (actually used by the demo app's routes), database adapters (in-memory, LibSQL,
+Cloudflare D1), storage adapters (in-memory, Cloudflare R2), a real signed-token auth provider with
+protected writes, an Angular client SDK, and a demo admin UI built from `@forge-cms/admin`'s real
+components. Still missing: nothing has been published to npm yet, and the demo has never been
+verified against real Cloudflare bindings in production. See [docs/STATE.md](docs/STATE.md) for the
+full, continuously-updated picture, and [docs/QUICKSTART.md](docs/QUICKSTART.md) to try it yourself.
 
 ## Quick Start
 
@@ -29,6 +30,9 @@ pnpm dev:www
 # Start the playground
 pnpm dev:playground
 ```
+
+See [docs/QUICKSTART.md](docs/QUICKSTART.md) for a 10-minute walkthrough that adds your own
+collection to the demo and exercises the CRUD API with `curl`.
 
 ## Commands
 
@@ -65,24 +69,26 @@ packages/
   runtime/      ForgeCmsRuntime orchestrator + framework-agnostic HTTP CRUD handlers
   cloudflare/   Cloudflare D1 (database) and R2 (storage) adapters
   angular/      Angular client SDK (CmsApiService, provideForgeCms)
-  admin/        Angular admin components (skeleton — not yet consumed by apps/www)
+  admin/        Angular admin UI components (layout, document list, schema-driven form) — consumed by apps/www
   testing/      Shared adapter contract test suites
 ```
 
 ## Packages
 
-| Package              | Version | Description                                              |
-| -------------------- | ------- | --------------------------------------------------------- |
-| `@forge-cms/core`      | 0.0.0   | Schema DSL with types + runtime validation                |
-| `@forge-cms/db`        | 0.0.0   | DatabaseAdapter contract + in-memory/LibSQL adapters       |
-| `@forge-cms/auth`      | 0.0.0   | AuthAdapter contract + in-memory/external adapters         |
-| `@forge-cms/storage`   | 0.0.0   | StorageAdapter contract + in-memory adapter                |
-| `@forge-cms/api`       | 0.0.0   | CRUD/API context and handler types                         |
-| `@forge-cms/runtime`   | 0.0.0   | Runtime orchestrator + framework-agnostic CRUD HTTP handlers |
-| `@forge-cms/cloudflare`| 0.0.0   | Cloudflare D1 + R2 adapters                                |
-| `@forge-cms/angular`   | 0.0.0   | Angular client SDK                                          |
-| `@forge-cms/admin`     | 0.0.0   | Angular admin UI components (skeleton, not yet wired up)    |
-| `@forge-cms/testing`   | 0.0.0   | Shared adapter contract test suites                        |
+| Package                 | Version | Description                                                     |
+| ----------------------- | ------- | --------------------------------------------------------------- |
+| `@forge-cms/core`       | 0.0.0   | Schema DSL with types + runtime validation                      |
+| `@forge-cms/db`         | 0.0.1   | DatabaseAdapter contract + in-memory/LibSQL adapters            |
+| `@forge-cms/auth`       | 0.1.0   | AuthAdapter contract + in-memory/external/signed-token adapters |
+| `@forge-cms/storage`    | 0.0.0   | StorageAdapter contract + in-memory adapter                     |
+| `@forge-cms/api`        | 0.0.0   | CRUD/API context and handler types                              |
+| `@forge-cms/runtime`    | 0.0.1   | Runtime orchestrator + framework-agnostic CRUD HTTP handlers    |
+| `@forge-cms/cloudflare` | 0.0.1   | Cloudflare D1 + R2 adapters                                     |
+| `@forge-cms/angular`    | 0.1.0   | Angular client SDK                                              |
+| `@forge-cms/admin`      | 0.1.0   | Angular admin UI components (layout, list, schema-driven form)  |
+| `@forge-cms/testing`    | 0.0.0   | Shared adapter contract test suites                             |
+
+Versions are bumped and ready via changesets; none of these are published to npm yet.
 
 ## Contributing
 
@@ -102,9 +108,9 @@ See [CHANGELOG.md](./CHANGELOG.md).
 
 ## Cloudflare Pages
 
-`apps/www` builds to `apps/www/dist` and is configured for Cloudflare Pages with Wrangler.
-⚠️ The current production deploy is client-only static files (no `/api/*`) — see
-[docs/PLAN.md](docs/PLAN.md) task P1-1 for the fix in progress.
+`apps/www` builds to `apps/www/dist/analog` via Nitro's `cloudflare-pages` preset (includes
+`_worker.js`, the compiled API server) and deploys to Cloudflare Pages with Wrangler — the deployed
+site serves `/api/*` for real, not just static assets.
 
 Required GitHub secrets for deployment:
 

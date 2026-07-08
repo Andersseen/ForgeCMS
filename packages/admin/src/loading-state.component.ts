@@ -8,13 +8,6 @@ import { VoltCard } from '@voltui/components';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @switch (variant()) {
-      @case ('spinner') {
-        <div class="flex items-center justify-center py-12">
-          <div
-            class="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"
-          ></div>
-        </div>
-      }
       @case ('stat-grid') {
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           @for (_ of [1, 2, 3, 4]; track $index) {

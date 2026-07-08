@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/admin",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Angular admin components and utilities for ForgeCMS.",
   "author": "ForgeCMS contributors",
   "license": "MIT",
@@ -34,7 +34,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "ngc -p tsconfig.build.json",
     "test": "vitest run --dir .",
     "test:watch": "vitest --dir .",
     "lint": "eslint .",
@@ -43,14 +43,22 @@
   },
   "peerDependencies": {
     "@angular/core": ">=19.0.0",
-    "@angular/router": ">=19.0.0"
+    "@angular/router": ">=19.0.0",
+    "@voltui/components": "^0.6.0",
+    "lumen-icons": "^0.2.0",
+    "rxjs": "^7.8.0"
   },
   "dependencies": {
     "@forge-cms/angular": "workspace:*"
   },
   "devDependencies": {
+    "@angular/compiler": "^21.2.10",
+    "@angular/compiler-cli": "^21.2.10",
     "@angular/core": "^21.2.10",
     "@angular/router": "^21.2.10",
+    "@voltui/components": "^0.6.0",
+    "lumen-icons": "^0.2.0",
+    "rxjs": "^7.8.2",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

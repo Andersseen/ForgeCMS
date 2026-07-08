@@ -11,7 +11,10 @@ class FilterCoercionError extends Error {
 }
 
 /** Coerce raw query-param strings to the value types declared by the collection's fields. */
-function coerceWhere(collection: CollectionDefinition, raw: Record<string, string>): DatabaseRecord {
+function coerceWhere(
+  collection: CollectionDefinition,
+  raw: Record<string, string>
+): DatabaseRecord {
   const where: DatabaseRecord = {};
 
   for (const [key, value] of Object.entries(raw)) {

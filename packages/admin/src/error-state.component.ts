@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { VoltButton, VoltCard } from '@voltui/components';
-import { IconAlertCircle } from '../../../../components/icons';
+import { LmnAlertCircleIcon } from 'lumen-icons';
 
 @Component({
   selector: 'forge-error-state',
   standalone: true,
-  imports: [VoltCard, VoltButton, IconAlertCircle],
+  imports: [VoltCard, VoltButton, LmnAlertCircleIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <volt-card class="p-8">
@@ -13,7 +13,7 @@ import { IconAlertCircle } from '../../../../components/icons';
         <div
           class="h-12 w-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mx-auto"
         >
-          <icon-alert-circle class="h-6 w-6" />
+          <lmn-alert-circle [size]="24" />
         </div>
         <h3 class="text-sm font-medium">{{ title() }}</h3>
         @if (message()) {

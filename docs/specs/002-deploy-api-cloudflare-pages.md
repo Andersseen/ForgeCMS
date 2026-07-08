@@ -33,7 +33,7 @@ Setting `nitro: { preset: 'cloudflare-pages' }` (or env `BUILD_PRESET=cloudflare
 `{{ output.publicDir }}/_worker.js` — and Nitro's `copyPublicAssets` step already copies the client
 SPA build into `output.publicDir` (verified: `dist/analog/public` is byte-identical to `dist/client`
 today). Net effect: after this change, **`apps/www/dist/analog/public` is the single directory**
-containing the static site *and* a `_worker.js/` subdirectory with the compiled API server
+containing the static site _and_ a `_worker.js/` subdirectory with the compiled API server
 (Cloudflare Pages "Advanced Mode" convention — a `_worker.js` directory works the same as a single
 file). No `.output/` or other nitro-default paths are involved; Analog's own directory layout is used
 throughout.
@@ -67,15 +67,16 @@ level**: `void seedData(runtime)`, and exports `serverRuntimePromise = Promise.r
 synchronously with no `await` anywhere in `InMemoryDatabaseAdapter.create`.
 
 Verified by running the actual built worker under `wrangler pages dev`:
+
 - **As-is today**: the unawaited `seedData()` promise rejects immediately with `Disallowed operation
-  called within global scope. Asynchronous I/O ... are not allowed within global scope` (a hard
+called within global scope. Asynchronous I/O ... are not allowed within global scope` (a hard
   Cloudflare Workers runtime rule — no I/O/random/timers outside a request handler). Because nothing
   awaits it, the rejection is silently swallowed. Result: **every collection is permanently empty on
   Workers** — `GET /api/status` reports `records: 0` on every request, `GET /api/v1/posts` returns
   `[]`, consistently, across multiple requests in the same running isolate. (Local Node dev is
   unaffected — confirmed `records: 6` there — because Node has no such restriction, so this bug is
   invisible in `pnpm dev:www` and would only surface once deployed.)
-- If `serverRuntimePromise` is instead made to *await* the seed at module scope (the "obvious" fix),
+- If `serverRuntimePromise` is instead made to _await_ the seed at module scope (the "obvious" fix),
   every request 500s instead, because the same disallowed-operation error now propagates instead of
   being silently swallowed.
 - **The fix that works**: make seeding lazy, triggered from inside a request handler instead of
@@ -156,7 +157,7 @@ pages_build_output_dir = "apps/www/dist/analog/public"
 
 ### 5. Deploy workflow(s) — consolidation decision needed
 
-**Found a pre-existing issue not previously documented**: there are *two* GitHub Actions workflows
+**Found a pre-existing issue not previously documented**: there are _two_ GitHub Actions workflows
 that both deploy on every push to `main` — `.github/workflows/deploy-cloudflare.yml` ("Deploy WWW to
 Cloudflare Pages": gates on its own `checks` job — format, lint, typecheck, test, e2e — before
 deploying) and `.github/workflows/deploy.yml` ("Deploy": builds and deploys with **no test gate at
@@ -181,7 +182,7 @@ In `deploy-cloudflare.yml`, change the `Verify build output` step's checked path
       `deploy-cloudflare.yml`'s paths; also fixed `package.json`'s `deploy:www` script (same stale
       `apps/www/dist` path, found while touching this area)
 - [x] Local verification: `pnpm build:www` (config-based preset, no env var needed), then `wrangler
-      pages dev apps/www/dist/analog/public`, curl `/api/status` twice (stable `records: 6`),
+  pages dev apps/www/dist/analog/public`, curl `/api/status` twice (stable `records: 6`),
       `/api/v1/posts` (seeded post present), `/admin` (200 HTML), static asset (200)
 - [x] Update STATE.md known issue #0 → removed; noted the deploy target in the `apps/www` row and
       Infrastructure section

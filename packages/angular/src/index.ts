@@ -39,10 +39,8 @@ export interface ApiFieldError {
 
 /**
  * Thrown by createDocument/updateDocument when the server responds with per-field validation
- * errors. The write routes in apps/www use h3's `createError({ statusCode, statusMessage, data })`,
- * so the actual body is `{ statusMessage, data: { errors: ApiFieldError[] } }` — not the
- * `{ error, details }` shape documented for the rest of the envelope (verified against the running
- * server; ARCHITECTURE.md's documented error envelope doesn't match these two routes today).
+ * errors, matching ARCHITECTURE.md's documented envelope: `{ error: string, details:
+ * ApiFieldError[] }`.
  */
 export class ApiValidationError extends Error {
   constructor(
@@ -51,6 +49,14 @@ export class ApiValidationError extends Error {
   ) {
     super(message);
     this.name = 'ApiValidationError';
+  }
+}
+
+/** Thrown by write methods when the server responds `401` — the caller isn't authenticated. */
+export class ApiAuthError extends Error {
+  constructor(message = 'Unauthorized') {
+    super(message);
+    this.name = 'ApiAuthError';
   }
 }
 
@@ -73,10 +79,13 @@ export function provideForgeCms(config: ForgeCmsConfig): Provider[] {
 }
 
 async function toApiError(response: Response, fallbackMessage: string): Promise<Error> {
+  if (response.status === 401) {
+    return new ApiAuthError();
+  }
   try {
-    const body = (await response.json()) as { statusMessage?: string; data?: { errors?: ApiFieldError[] } };
-    if (body.data?.errors) {
-      return new ApiValidationError(body.statusMessage ?? fallbackMessage, body.data.errors);
+    const body = (await response.json()) as { error?: string; details?: ApiFieldError[] };
+    if (body.details) {
+      return new ApiValidationError(body.error ?? fallbackMessage, body.details);
     }
     return new Error(`${fallbackMessage}: ${response.status}`);
   } catch {
@@ -169,6 +178,17 @@ export class CmsApiService {
       method: 'DELETE',
       headers: this.getHeaders()
     });
-    if (!response.ok) throw new Error(`Failed to delete document: ${response.status}`);
+    if (!response.ok) throw await toApiError(response, 'Failed to delete document');
+  }
+
+  async login(email: string, password: string): Promise<{ token: string; user: AuthUser }> {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    if (!response.ok) throw await toApiError(response, 'Login failed');
+    const result = (await response.json()) as { data: { token: string; user: AuthUser } };
+    return result.data;
   }
 }

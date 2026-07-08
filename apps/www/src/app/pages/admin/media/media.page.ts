@@ -10,12 +10,8 @@ import {
   IconTrash
 } from '../../../components/icons';
 import { CmsApiService } from '@forge-cms/angular';
-import {
-  PageHeaderComponent,
-  ErrorStateComponent,
-  EmptyStateComponent,
-  SearchToolbarComponent
-} from '../components';
+import { PageHeaderComponent, ErrorStateComponent, EmptyStateComponent } from '@forge-cms/admin';
+import { SearchToolbarComponent } from '../components';
 
 @Component({
   selector: 'forge-cms-media',

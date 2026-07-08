@@ -29,12 +29,8 @@ import {
   IconZap
 } from '../../../components/icons';
 import { CmsApiService } from '@forge-cms/angular';
-import {
-  PageHeaderComponent,
-  LoadingStateComponent,
-  ErrorStateComponent,
-  SettingsCardComponent
-} from '../components';
+import { PageHeaderComponent, LoadingStateComponent, ErrorStateComponent } from '@forge-cms/admin';
+import { SettingsCardComponent } from '../components';
 
 function bool(value: unknown): boolean {
   return value === true || value === 'true' || value === 1 || value === '1';

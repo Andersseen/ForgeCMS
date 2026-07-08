@@ -36,16 +36,16 @@ cycle works on `posts` from the browser in local dev.
 
 ### Field-kind → input mapping
 
-| `FieldMeta.kind` | Control | Notes |
-| --- | --- | --- |
-| `text`, `email`, `slug` | `VoltInput` (`type="email"` for email) | |
-| `textarea` | `VoltTextarea` | |
-| `json` | `VoltTextarea` | raw JSON as a string; parse-on-submit is a non-goal — send as-is, matching how seed data stores `json` fields as strings today (see `runtime.ts`'s `seo: '{}'`) |
-| `boolean` | `VoltSwitch` | |
-| `select` | `VoltNativeSelect` (**changed from `VoltSelect`** — see note below), options from `FieldMeta.options` | |
-| `number` | `VoltInput` `type="number"` | coerce to `Number(value)` on submit |
-| `date` | `VoltInput type="date"` (**not `VoltDatePicker`** — see note below) | send as ISO string |
-| `relation` | `VoltInput` (plain text) | comma-separated ids if the field is `many`, else a single id string |
+| `FieldMeta.kind`        | Control                                                                                               | Notes                                                                                                                                                           |
+| ----------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `text`, `email`, `slug` | `VoltInput` (`type="email"` for email)                                                                |                                                                                                                                                                 |
+| `textarea`              | `VoltTextarea`                                                                                        |                                                                                                                                                                 |
+| `json`                  | `VoltTextarea`                                                                                        | raw JSON as a string; parse-on-submit is a non-goal — send as-is, matching how seed data stores `json` fields as strings today (see `runtime.ts`'s `seo: '{}'`) |
+| `boolean`               | `VoltSwitch`                                                                                          |                                                                                                                                                                 |
+| `select`                | `VoltNativeSelect` (**changed from `VoltSelect`** — see note below), options from `FieldMeta.options` |                                                                                                                                                                 |
+| `number`                | `VoltInput` `type="number"`                                                                           | coerce to `Number(value)` on submit                                                                                                                             |
+| `date`                  | `VoltInput type="date"` (**not `VoltDatePicker`** — see note below)                                   | send as ISO string                                                                                                                                              |
+| `relation`              | `VoltInput` (plain text)                                                                              | comma-separated ids if the field is `many`, else a single id string                                                                                             |
 
 **Divergence found during implementation**: `VoltSelect` is a full custom listbox/popover component
 (separate `VoltSelectContent`/`VoltSelectItem` composition, positioned overlay) whose exact wiring
@@ -93,7 +93,7 @@ keeps the table visible underneath.
 - Each table row gets an "Edit" action opening the form with `initialValue = <that row's record>`.
 - On `save`: call `createDocument(slug, value)` or `updateDocument(slug, id, value)`. On success:
   close the form, refresh the document list (re-`getDocuments`). On failure: if `err instanceof
-  ApiValidationError`, map `err.details` (each `{ field, message, code }`) into `fieldErrors` (a
+ApiValidationError`, map `err.details` (each `{ field, message, code }`) into `fieldErrors` (a
   `Record<field, message>`) and keep the form open; otherwise (unexpected/network error)
   `window.alert(...)` and keep the form open with its data intact (there is no page-level error
   state that's safe to reuse here — setting the page's `error` signal would replace the whole page,
@@ -145,7 +145,7 @@ plain `Error`.
       with missing required fields → exact `{ data: { errors: [...] } }` shape `ApiValidationError`
       expects; create/update/delete all succeed with valid payloads. **Not visually verified in a
       real browser** (no browser automation available this session) — `pnpm --filter @forge-cms/www
-      typecheck` passed with `strictTemplates: true`, which does validate every template binding
+  typecheck` passed with `strictTemplates: true`, which does validate every template binding
       against the real component APIs, but does not catch layout/click-handling issues live.
 - [x] Update STATE.md (PLAN.md P1-3 done; the demo is now full-CRUD; new known issue for the
       error-envelope mismatch)

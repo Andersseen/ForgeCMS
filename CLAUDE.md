@@ -5,26 +5,25 @@ ForgeCMS is an experimental, TypeScript-native, Payload-like headless CMS for **
 ## Read this first (in order)
 
 1. This file — commands, hard rules, gotchas.
-2. [docs/STATE.md](docs/STATE.md) — what is implemented **today**. ⚠️ The README's "Status" section is outdated (it claims nothing is implemented — much is). Trust STATE.md and the code, not the README.
-3. [docs/PLAN.md](docs/PLAN.md) — prioritized task list (QW-*/P1-*/P2-* IDs). If you were handed a task ID, it lives here.
-4. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — package graph, data flow, API contracts.
-5. [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — code style and patterns you MUST follow.
-6. [docs/SDD.md](docs/SDD.md) — spec-driven workflow. Non-trivial features need a spec in `docs/specs/` before coding.
+2. [docs/STATE.md](docs/STATE.md) — what is implemented **today** and what's next. Trust STATE.md and the code over any other doc if they disagree.
+3. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — package graph, data flow, API contracts.
+4. [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — code style and patterns you MUST follow.
+5. [docs/SDD.md](docs/SDD.md) — spec-driven workflow. Non-trivial features need a spec in `docs/specs/` before coding; past specs there are also the historical record of why things are built the way they are.
 
 ## Environment & commands
 
 Node >= 22 (`.nvmrc`), pnpm `10.11.0` (via `packageManager` field). Never use npm or yarn.
 
-| Command | Purpose |
-| --- | --- |
-| `pnpm install` | Install deps (frozen lockfile in CI) |
-| `pnpm build` | Build all packages/apps (topological, cached by Turbo) |
-| `pnpm dev:www` / `pnpm dev:playground` | Run the landing/admin app or the playground |
-| `pnpm test` | Unit tests (Vitest) across the repo |
-| `pnpm lint` / `pnpm typecheck` | ESLint / `tsc --noEmit` across the repo |
-| `pnpm format` / `pnpm format:check` | Prettier write / check |
-| `pnpm e2e:www` | Playwright e2e for `apps/www` |
-| `pnpm changeset` | Add a changeset (required when changing any `packages/*`) |
+| Command                                | Purpose                                                   |
+| -------------------------------------- | --------------------------------------------------------- |
+| `pnpm install`                         | Install deps (frozen lockfile in CI)                      |
+| `pnpm build`                           | Build all packages/apps (topological, cached by Turbo)    |
+| `pnpm dev:www` / `pnpm dev:playground` | Run the landing/admin app or the playground               |
+| `pnpm test`                            | Unit tests (Vitest) across the repo                       |
+| `pnpm lint` / `pnpm typecheck`         | ESLint / `tsc --noEmit` across the repo                   |
+| `pnpm format` / `pnpm format:check`    | Prettier write / check                                    |
+| `pnpm e2e:www`                         | Playwright e2e for `apps/www`                             |
+| `pnpm changeset`                       | Add a changeset (required when changing any `packages/*`) |
 
 **Quality gates — run before declaring any task done:**
 `pnpm lint && pnpm typecheck && pnpm test && pnpm build`

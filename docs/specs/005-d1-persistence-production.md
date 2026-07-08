@@ -102,7 +102,10 @@ every cold start, since D1 data survives between isolates. Guard it:
 
 ```ts
 async function seedIfEmpty(runtime: ForgeCmsRuntime): Promise<void> {
-  const existing = await runtime.adapters.database.findMany({ collection: 'site_config', limit: 1 });
+  const existing = await runtime.adapters.database.findMany({
+    collection: 'site_config',
+    limit: 1
+  });
   if (existing.length > 0) return; // already seeded (D1) — skip
   await seedData(runtime);
 }

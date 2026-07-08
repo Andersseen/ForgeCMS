@@ -18,13 +18,8 @@ import {
   IconMoreVertical,
   IconPlus
 } from '../../../components/icons';
-import {
-  CollectionIconComponent,
-  ErrorStateComponent,
-  LoadingStateComponent,
-  PageHeaderComponent,
-  SearchToolbarComponent
-} from '../components';
+import { ErrorStateComponent, LoadingStateComponent, PageHeaderComponent } from '@forge-cms/admin';
+import { CollectionIconComponent, SearchToolbarComponent } from '../components';
 
 interface CollectionViewModel {
   id: string;
