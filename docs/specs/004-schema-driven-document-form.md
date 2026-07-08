@@ -145,7 +145,7 @@ plain `Error`.
       with missing required fields → exact `{ data: { errors: [...] } }` shape `ApiValidationError`
       expects; create/update/delete all succeed with valid payloads. **Not visually verified in a
       real browser** (no browser automation available this session) — `pnpm --filter @forge-cms/www
-  typecheck` passed with `strictTemplates: true`, which does validate every template binding
+typecheck` passed with `strictTemplates: true`, which does validate every template binding
       against the real component APIs, but does not catch layout/click-handling issues live.
 - [x] Update STATE.md (PLAN.md P1-3 done; the demo is now full-CRUD; new known issue for the
       error-envelope mismatch)

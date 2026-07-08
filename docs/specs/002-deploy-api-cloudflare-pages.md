@@ -182,7 +182,7 @@ In `deploy-cloudflare.yml`, change the `Verify build output` step's checked path
       `deploy-cloudflare.yml`'s paths; also fixed `package.json`'s `deploy:www` script (same stale
       `apps/www/dist` path, found while touching this area)
 - [x] Local verification: `pnpm build:www` (config-based preset, no env var needed), then `wrangler
-  pages dev apps/www/dist/analog/public`, curl `/api/status` twice (stable `records: 6`),
+pages dev apps/www/dist/analog/public`, curl `/api/status` twice (stable `records: 6`),
       `/api/v1/posts` (seeded post present), `/admin` (200 HTML), static asset (200)
 - [x] Update STATE.md known issue #0 → removed; noted the deploy target in the `apps/www` row and
       Infrastructure section
