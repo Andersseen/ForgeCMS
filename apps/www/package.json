@@ -45,6 +45,7 @@
     "@angular/compiler-cli": "^21.2.10",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/vite": "^4.3.0",
+    "front-matter": "^4.0.2",
     "jsdom": "^27.3.0",
     "tailwindcss": "^4.3.0",
     "typescript": "catalog:",

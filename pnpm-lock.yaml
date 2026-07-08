@@ -202,6 +202,9 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.3.0
         version: 4.3.0(vite@7.3.3(@types/node@22.15.3)(jiti@2.7.0)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.48.0)(tsx@4.22.3))
+      front-matter:
+        specifier: ^4.0.2
+        version: 4.0.2
       jsdom:
         specifier: ^27.3.0
         version: 27.4.0
@@ -4139,6 +4142,9 @@ packages:
   fresh@2.0.0:
     resolution: {integrity: sha512-Rx/WycZ60HOaqLKAi6cHRKKI7zxWbJ31MhntmtwMoaTeF7XFH9hhBp8vITaMidfljRQ6eYWCKkaTK+ykVJHP2A==}
     engines: {node: '>= 0.8'}
+
+  front-matter@4.0.2:
+    resolution: {integrity: sha512-I8ZuJ/qG92NWX8i5x1Y8qyj3vizhXS31OxjKDu3LKP+7/qBgfIKValiZIEwoVoJKUHlhWtYrktkxV1XsX+pPlg==}
 
   fs-extra@7.0.1:
     resolution: {integrity: sha512-YJDaCJZEnBmcbw13fvdAM9AwNOJwOzrE4pqMqBq5nFiEqXUqHwlK4B+3pUw6JNvfSPtX05xFHtYy/1ni01eGCw==}
@@ -9564,6 +9570,10 @@ snapshots:
       signal-exit: 4.1.0
 
   fresh@2.0.0: {}
+
+  front-matter@4.0.2:
+    dependencies:
+      js-yaml: 3.14.2
 
   fs-extra@7.0.1:
     dependencies:

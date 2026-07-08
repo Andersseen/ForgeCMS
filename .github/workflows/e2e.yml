@@ -14,7 +14,7 @@ jobs:
   e2e:
     name: Playwright E2E Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -34,6 +34,11 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        # Workspace packages are consumed from dist/ (see packages/*/package.json exports).
+        # The E2E dev server needs them built before it can resolve @forge-cms/* imports.
+        run: pnpm exec turbo run build --filter=@forge-cms/www^...
 
       - name: Install Playwright browsers
         run: pnpm --filter @forge-cms/www exec playwright install --with-deps chromium
