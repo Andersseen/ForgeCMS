@@ -77,17 +77,30 @@ import type { FieldMeta } from '@forge-cms/angular';
                   />
                 }
                 @case ('select') {
-                  <volt-native-select
+                  <select
                     [id]="field.name"
+                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    [value]="getStringValue(field.name)"
                     (change)="onSelectChange(field.name, $event)"
                   >
                     <option value="">Select…</option>
                     @for (opt of field.options ?? []; track opt) {
-                      <option [value]="opt" [selected]="getStringValue(field.name) === opt">
-                        {{ opt }}
-                      </option>
+                      <option [value]="opt">{{ opt }}</option>
                     }
-                  </volt-native-select>
+                  </select>
+                }
+                @case ('relation') {
+                  <volt-input
+                    [id]="field.name"
+                    type="text"
+                    [value]="getRelationValue(field.name)"
+                    (valueChange)="setRelationValue(field.name, $event, field.relation?.many === true)"
+                    [placeholder]="
+                      field.relation?.many === true
+                        ? 'Comma-separated IDs'
+                        : 'Related document ID'
+                    "
+                  />
                 }
                 @case ('number') {
                   <volt-input
@@ -164,8 +177,26 @@ export class ForgeCollectionFormComponent {
     return value === undefined || value === null ? '' : String(value);
   }
 
+  getRelationValue(name: string): string {
+    const value = this.formValue()[name];
+    if (Array.isArray(value)) return value.join(', ');
+    return value === undefined || value === null ? '' : String(value);
+  }
+
   getBooleanValue(name: string): boolean {
     return Boolean(this.formValue()[name]);
+  }
+
+  setRelationValue(name: string, value: string, many: boolean): void {
+    if (many) {
+      const ids = value
+        .split(',')
+        .map((id) => id.trim())
+        .filter((id) => id.length > 0);
+      this.setValue(name, ids.length > 0 ? ids : []);
+    } else {
+      this.setValue(name, value);
+    }
   }
 
   setValue(name: string, value: unknown): void {
