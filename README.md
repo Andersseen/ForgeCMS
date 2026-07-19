@@ -14,8 +14,9 @@ scaffolding. Working today: the schema DSL and runtime validation, a framework-a
 with HTTP handlers (actually used by the demo app's routes), database adapters (in-memory, LibSQL,
 Cloudflare D1), storage adapters (in-memory, Cloudflare R2), a real signed-token auth provider with
 protected writes, an Angular client SDK, and a demo admin UI built from `@forge-cms/admin`'s real
-components. Still missing: nothing has been published to npm yet, and the demo has never been
-verified against real Cloudflare bindings in production. See [docs/STATE.md](docs/STATE.md) for the
+components. Still missing: nothing has been published to npm yet. The production deploy uses real
+Cloudflare D1 + signed-token auth, but persistence and auth should be verified after the next deploy.
+See [docs/STATE.md](docs/STATE.md) for the
 full, continuously-updated picture, and [docs/QUICKSTART.md](docs/QUICKSTART.md) to try it yourself.
 
 ## Quick Start
@@ -77,16 +78,16 @@ packages/
 
 | Package                 | Version | Description                                                     |
 | ----------------------- | ------- | --------------------------------------------------------------- |
-| `@forge-cms/core`       | 0.0.0   | Schema DSL with types + runtime validation                      |
-| `@forge-cms/db`         | 0.0.1   | DatabaseAdapter contract + in-memory/LibSQL adapters            |
+| `@forge-cms/core`       | 0.1.0   | Schema DSL with types + runtime validation                      |
+| `@forge-cms/db`         | 0.1.0   | DatabaseAdapter contract + in-memory/LibSQL adapters            |
 | `@forge-cms/auth`       | 0.1.0   | AuthAdapter contract + in-memory/external/signed-token adapters |
-| `@forge-cms/storage`    | 0.0.0   | StorageAdapter contract + in-memory adapter                     |
-| `@forge-cms/api`        | 0.0.0   | CRUD/API context and handler types                              |
-| `@forge-cms/runtime`    | 0.0.1   | Runtime orchestrator + framework-agnostic CRUD HTTP handlers    |
-| `@forge-cms/cloudflare` | 0.0.1   | Cloudflare D1 + R2 adapters                                     |
+| `@forge-cms/storage`    | 0.1.0   | StorageAdapter contract + in-memory adapter                     |
+| `@forge-cms/api`        | 0.1.0   | CRUD/API context and handler types                              |
+| `@forge-cms/runtime`    | 0.1.0   | Runtime orchestrator + framework-agnostic CRUD HTTP handlers    |
+| `@forge-cms/cloudflare` | 0.1.0   | Cloudflare D1 + R2 adapters                                     |
 | `@forge-cms/angular`    | 0.1.0   | Angular client SDK                                              |
 | `@forge-cms/admin`      | 0.1.0   | Angular admin UI components (layout, list, schema-driven form)  |
-| `@forge-cms/testing`    | 0.0.0   | Shared adapter contract test suites                             |
+| `@forge-cms/testing`    | 0.1.0   | Shared adapter contract test suites                             |
 
 Versions are bumped and ready via changesets; none of these are published to npm yet.
 
