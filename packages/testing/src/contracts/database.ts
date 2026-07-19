@@ -16,6 +16,7 @@ interface ContractDatabaseAdapter {
     id: string,
     data: Partial<Record<string, unknown>>
   ): Promise<Record<string, unknown>>;
+  count(collection: string): Promise<number>;
   delete(collection: string, id: string): Promise<void>;
   syncSchema(collections: unknown[]): Promise<void>;
 }
@@ -84,6 +85,12 @@ export function runDatabaseAdapterContractTests(createAdapter: () => ContractDat
       await adapter.delete('posts', '8');
       const found = await adapter.findById('posts', '8');
       expect(found).toBeNull();
+    });
+
+    it('counts records', async () => {
+      await adapter.create('posts', { id: '9', title: 'Countable' });
+      const count = await adapter.count('posts');
+      expect(count).toBeGreaterThanOrEqual(1);
     });
   });
 }

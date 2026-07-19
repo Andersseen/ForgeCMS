@@ -25,6 +25,7 @@ export interface DatabaseAdapter<TRecord extends DatabaseRecord = DatabaseRecord
   init(env?: unknown): this;
   findById(collection: string, id: string): Promise<TRecord | null>;
   findMany(options: FindManyOptions): Promise<TRecord[]>;
+  count(collection: string): Promise<number>;
   create(collection: string, data: TRecord): Promise<TRecord>;
   update(collection: string, id: string, data: Partial<TRecord>): Promise<TRecord>;
   delete(collection: string, id: string): Promise<void>;

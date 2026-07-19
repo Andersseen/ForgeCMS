@@ -157,6 +157,14 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     await db.prepare(`DELETE FROM "${collection}" WHERE id = ?`).bind(id).run();
   }
 
+  async count(collection: string): Promise<number> {
+    const db = this.getDb();
+    const result = await db.prepare(`SELECT COUNT(*) as count FROM "${collection}"`).first<{
+      count: number;
+    }>();
+    return result?.count ?? 0;
+  }
+
   private hydrateRecord(row: DatabaseRecord, collection: string): DatabaseRecord {
     const collectionDef = this.getCollectionDef(collection);
     if (!collectionDef) return row;

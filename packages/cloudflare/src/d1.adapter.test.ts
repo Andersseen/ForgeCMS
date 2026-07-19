@@ -37,6 +37,13 @@ class MockD1PreparedStatement implements D1PreparedStatement {
   }
 
   async first<T = unknown>(): Promise<T | null> {
+    if (this.query.match(/SELECT\s+COUNT\s*\(/i)) {
+      const tableMatch = this.query.match(/FROM\s+"([^"]+)"/i);
+      const table = tableMatch?.[1] ?? '';
+      const rows = this.getTableRows(table);
+      return { count: rows.size } as T;
+    }
+
     const { table, where } = this.parseSelect();
     const rows = this.getTableRows(table);
     for (const row of rows.values()) {
@@ -324,5 +331,16 @@ describe('D1DatabaseAdapter', () => {
 
     const found = await adapter.findById('posts', createdId);
     expect(found).toBeNull();
+  });
+
+  it('counts records without fetching them all', async () => {
+    await adapter.syncSchema([posts]);
+
+    await adapter.create('posts', { title: 'One' });
+    await adapter.create('posts', { title: 'Two' });
+    await adapter.create('posts', { title: 'Three' });
+
+    const count = await adapter.count('posts');
+    expect(count).toBe(3);
   });
 });

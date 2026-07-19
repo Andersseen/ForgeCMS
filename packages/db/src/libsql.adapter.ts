@@ -9,7 +9,7 @@ import {
 } from './schema-generator.js';
 import { drizzle } from 'drizzle-orm/libsql';
 import { createClient, type Client } from '@libsql/client';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, count as drizzleCount } from 'drizzle-orm';
 
 export interface LibSqlEnv {
   DATABASE_URL?: string;
@@ -166,6 +166,15 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
     const table = this.getTable(collection);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await db.delete(table).where(eq((table as any)['id'], id));
+  }
+
+  async count(collection: string): Promise<number> {
+    const db = this.getDb();
+    const table = this.getTable(collection);
+    const result = (await db
+      .select({ count: drizzleCount() })
+      .from(table)) as { count: number }[];
+    return result[0]?.count ?? 0;
   }
 
   private hydrateRecord(row: DatabaseRecord, collection: string): DatabaseRecord {

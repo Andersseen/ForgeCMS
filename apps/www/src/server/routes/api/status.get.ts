@@ -7,8 +7,7 @@ export default defineEventHandler(async (event) => {
 
   let totalRecords = 0;
   for (const collection of runtime.getCollections()) {
-    const docs = await db.findMany({ collection: collection.slug });
-    totalRecords += docs.length;
+    totalRecords += await db.count(collection.slug);
   }
 
   return {
