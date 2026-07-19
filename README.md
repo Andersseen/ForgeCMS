@@ -80,13 +80,13 @@ packages/
 | ----------------------- | ------- | --------------------------------------------------------------- |
 | `@forge-cms/core`       | 0.1.0   | Schema DSL with types + runtime validation                      |
 | `@forge-cms/db`         | 0.1.0   | DatabaseAdapter contract + in-memory/LibSQL adapters            |
-| `@forge-cms/auth`       | 0.1.0   | AuthAdapter contract + in-memory/external/signed-token adapters |
+| `@forge-cms/auth`       | 0.2.0   | AuthAdapter contract + in-memory/external/signed-token adapters |
 | `@forge-cms/storage`    | 0.1.0   | StorageAdapter contract + in-memory adapter                     |
 | `@forge-cms/api`        | 0.1.0   | CRUD/API context and handler types                              |
 | `@forge-cms/runtime`    | 0.1.0   | Runtime orchestrator + framework-agnostic CRUD HTTP handlers    |
 | `@forge-cms/cloudflare` | 0.1.0   | Cloudflare D1 + R2 adapters                                     |
-| `@forge-cms/angular`    | 0.1.0   | Angular client SDK                                              |
-| `@forge-cms/admin`      | 0.1.0   | Angular admin UI components (layout, list, schema-driven form)  |
+| `@forge-cms/angular`    | 0.2.0   | Angular client SDK                                              |
+| `@forge-cms/admin`      | 0.2.0   | Angular admin UI components (layout, list, schema-driven form)  |
 | `@forge-cms/testing`    | 0.1.0   | Shared adapter contract test suites                             |
 
 Versions are bumped and ready via changesets; none of these are published to npm yet.

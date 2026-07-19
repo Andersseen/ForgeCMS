@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/playground",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "description": "Analog.js playground for ForgeCMS.",
   "type": "module",

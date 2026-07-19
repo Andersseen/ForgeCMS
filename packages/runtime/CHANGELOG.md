@@ -1,5 +1,22 @@
 # @forge-cms/runtime
 
+## 0.1.0
+
+### Minor Changes
+
+- 83f3b66: Normalize all package versions to 0.1.0 before the first npm publish.
+
+### Patch Changes
+
+- a759660: Fix `handleUpdate` partial validation so that required fields already present on the stored record are not required to be resent in a PUT body.
+- Updated dependencies [2b5d6da]
+- Updated dependencies [83f3b66]
+  - @forge-cms/db@0.1.0
+  - @forge-cms/core@0.1.0
+  - @forge-cms/api@0.1.0
+  - @forge-cms/storage@0.1.0
+  - @forge-cms/auth@0.2.0
+
 ## 0.0.1
 
 ### Patch Changes

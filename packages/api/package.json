@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/api",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "API route and CRUD handler helpers for ForgeCMS.",
   "author": "ForgeCMS contributors",
   "license": "MIT",

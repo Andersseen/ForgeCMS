@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/cloudflare",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Cloudflare-native adapters and types for ForgeCMS (D1, R2).",
   "author": "ForgeCMS contributors",
   "license": "MIT",

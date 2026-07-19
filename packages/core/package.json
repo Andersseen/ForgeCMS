@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Core schema DSL and base types for ForgeCMS.",
   "author": "ForgeCMS contributors",
   "license": "MIT",
