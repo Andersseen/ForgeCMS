@@ -1,12 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import {
-    VoltButton,
-    VoltCard,
-    VoltError,
-    VoltInput,
-    VoltLabel,
-    VoltSwitch,
-    VoltTextarea
+  VoltButton,
+  VoltCard,
+  VoltError,
+  VoltInput,
+  VoltLabel,
+  VoltSwitch,
+  VoltTextarea
 } from '@voltui/components';
 import type { FieldMeta } from '@forge-cms/angular';
 
@@ -19,16 +19,7 @@ import type { FieldMeta } from '@forge-cms/angular';
 @Component({
   selector: 'forge-collection-form',
   standalone: true,
-  imports: [
-    VoltButton,
-    VoltCard,
-    VoltInput,
-    VoltTextarea,
-    VoltSwitch,
-    VoltNativeSelect,
-    VoltLabel,
-    VoltError
-  ],
+  imports: [VoltButton, VoltCard, VoltInput, VoltTextarea, VoltSwitch, VoltLabel, VoltError],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
