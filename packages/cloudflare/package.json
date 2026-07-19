@@ -45,8 +45,7 @@
   },
   "dependencies": {
     "@forge-cms/core": "workspace:*",
-    "@forge-cms/db": "workspace:*",
-    "@forge-cms/runtime": "workspace:*"
+    "@forge-cms/db": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250514.0",
