@@ -1,25 +1,38 @@
-import { ChangeDetectionStrategy, Component, signal, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import type { OnInit } from '@angular/core';
 import {
-  VoltAvatar,
-  VoltAvatarFallback,
-  VoltBadge,
   VoltButton,
   VoltCard,
-  VoltInput
+  VoltError,
+  VoltInput,
+  VoltLabel,
+  VoltNativeSelect,
+  VoltTable,
+  VoltTableBody,
+  VoltTableCell,
+  VoltTableHead,
+  VoltTableHeader,
+  VoltTableRow
 } from '@voltui/components';
 import {
-  IconAlertCircle,
-  IconEdit,
-  IconFilter,
-  IconMail,
-  IconMoreVertical,
-  IconShield,
-  IconUsers
-} from '../../../components/icons';
-import { CmsApiService } from '@forge-cms/angular';
-import { PageHeaderComponent, ErrorStateComponent, EmptyStateComponent } from '@forge-cms/admin';
-import { StatCardComponent, SearchToolbarComponent } from '../components';
+  LmnPencilIcon,
+  LmnPlusIcon,
+  LmnTrashIcon,
+  LmnUsersIcon
+} from 'lumen-icons';
+import { CmsApiService, type AuthUser, type CreateUserInput } from '@forge-cms/angular';
+import { ErrorStateComponent, LoadingStateComponent, PageHeaderComponent } from '@forge-cms/admin';
+
+interface UserFormValue {
+  name: string;
+  email: string;
+  password: string;
+  role: 'admin' | 'editor' | 'viewer';
+}
+
+function emptyForm(): UserFormValue {
+  return { name: '', email: '', password: '', role: 'viewer' };
+}
 
 @Component({
   selector: 'forge-cms-users',
@@ -27,173 +40,148 @@ import { StatCardComponent, SearchToolbarComponent } from '../components';
   imports: [
     VoltCard,
     VoltButton,
-    VoltBadge,
-    VoltAvatar,
-    VoltAvatarFallback,
     VoltInput,
-    IconFilter,
-    IconUsers,
-    IconShield,
-    IconMail,
-    IconEdit,
-    IconMoreVertical,
-    IconAlertCircle,
+    VoltLabel,
+    VoltError,
+    VoltNativeSelect,
+    VoltTable,
+    VoltTableHeader,
+    VoltTableBody,
+    VoltTableRow,
+    VoltTableHead,
+    VoltTableCell,
+    LmnPlusIcon,
+    LmnPencilIcon,
+    LmnTrashIcon,
+    LmnUsersIcon,
     PageHeaderComponent,
     ErrorStateComponent,
-    EmptyStateComponent,
-    StatCardComponent,
-    SearchToolbarComponent
+    LoadingStateComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-6">
-      <forge-page-header title="Users" subtitle="Manage team members and their permissions.">
-        <div actions class="flex items-center gap-2">
-          <volt-button variant="outline" size="sm">
-            <icon-mail class="h-3.5 w-3.5 mr-1.5" />
-            Invite
-          </volt-button>
-          <volt-button size="sm">
-            <icon-users class="h-3.5 w-3.5 mr-1.5" />
-            New User
-          </volt-button>
+      <forge-page-header title="Users" subtitle="Manage team members and their roles.">
+        <div actions>
+          @if (!showForm()) {
+            <volt-button size="sm" (click)="startCreate()">
+              <lmn-plus [size]="14" class="mr-1.5" />
+              New User
+            </volt-button>
+          }
         </div>
       </forge-page-header>
 
-      @if (loading()) {
-        <div class="grid gap-4 md:grid-cols-4">
-          @for (_ of [1, 2, 3, 4]; track $index) {
-            <volt-card class="p-4">
-              <div class="animate-pulse flex items-center gap-3">
-                <div class="h-9 w-9 rounded-lg bg-muted"></div>
-                <div class="space-y-2">
-                  <div class="h-5 bg-muted rounded w-12"></div>
-                  <div class="h-3 bg-muted rounded w-20"></div>
-                </div>
+      @if (showForm()) {
+        <volt-card class="p-6 space-y-4">
+          <h2 class="text-lg font-semibold">
+            {{ editingUser() ? 'Edit user' : 'New user' }}
+          </h2>
+
+          <form class="space-y-4" (submit)="onSubmit($event)">
+            <div class="grid gap-4 md:grid-cols-2">
+              <div class="space-y-1.5">
+                <volt-label htmlFor="user-name">Name</volt-label>
+                <volt-input id="user-name" [value]="form().name" (valueChange)="update('name', $event)" />
               </div>
-            </volt-card>
-          }
-        </div>
-        <volt-card class="overflow-hidden p-6">
-          <div class="animate-pulse space-y-3">
-            @for (_ of [1, 2, 3, 4, 5]; track $index) {
-              <div class="h-10 bg-muted rounded"></div>
+              <div class="space-y-1.5">
+                <volt-label htmlFor="user-email">Email</volt-label>
+                <volt-input
+                  id="user-email"
+                  type="email"
+                  [value]="form().email"
+                  (valueChange)="update('email', $event)"
+                />
+              </div>
+            </div>
+
+            <div class="grid gap-4 md:grid-cols-2">
+              <div class="space-y-1.5">
+                <volt-label htmlFor="user-role">Role</volt-label>
+                <select
+                  id="user-role"
+                  class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  [value]="form().role"
+                  (change)="onRoleChange($event)"
+                >
+                  <option value="admin">Admin</option>
+                  <option value="editor">Editor</option>
+                  <option value="viewer">Viewer</option>
+                </select>
+              </div>
+              <div class="space-y-1.5">
+                <volt-label htmlFor="user-password">
+                  {{ editingUser() ? 'New password (leave blank to keep)' : 'Password' }}
+                </volt-label>
+                <volt-input
+                  id="user-password"
+                  type="password"
+                  [value]="form().password"
+                  (valueChange)="update('password', $event)"
+                />
+              </div>
+            </div>
+
+            @if (formError(); as message) {
+              <volt-error>{{ message }}</volt-error>
             }
-          </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2">
+              <volt-button type="button" variant="outline" size="sm" (click)="cancelForm()">
+                Cancel
+              </volt-button>
+              <volt-button type="submit" size="sm">
+                {{ editingUser() ? 'Save' : 'Create' }}
+              </volt-button>
+            </div>
+          </form>
         </volt-card>
+      }
+
+      @if (loading()) {
+        <forge-loading-state variant="table" />
       } @else if (error()) {
-        <forge-error-state title="Unable to load users" [message]="error()" (retry)="loadUsers()" />
-      } @else if (users().length === 0) {
-        <forge-empty-state
-          title="No users yet"
-          message="User management depends on your auth provider. Add users via your authentication microservice."
-        >
-          <icon-users icon class="h-6 w-6" />
-        </forge-empty-state>
+        <forge-error-state title="Unable to load users" [message]="error()" (retry)="load()" />
       } @else {
-        <div class="grid gap-4 md:grid-cols-4">
-          <forge-stat-card
-            [value]="users().length"
-            label="Total Users"
-            color="primary"
-            layout="horizontal"
-          >
-            <icon-users icon class="h-4 w-4" />
-          </forge-stat-card>
-          <forge-stat-card
-            [value]="activeCount()"
-            label="Active"
-            color="success"
-            layout="horizontal"
-          >
-            <icon-shield icon class="h-4 w-4" />
-          </forge-stat-card>
-          <forge-stat-card
-            [value]="invitedCount()"
-            label="Invited"
-            color="warning"
-            layout="horizontal"
-          >
-            <icon-mail icon class="h-4 w-4" />
-          </forge-stat-card>
-          <forge-stat-card
-            [value]="inactiveCount()"
-            label="Inactive"
-            color="muted"
-            layout="horizontal"
-          >
-            <icon-users icon class="h-4 w-4" />
-          </forge-stat-card>
-        </div>
-
-        <forge-search-toolbar placeholder="Search users...">
-          <div filters>
-            <volt-button variant="outline" size="sm">
-              <icon-filter class="h-3.5 w-3.5 mr-1.5" />
-              All Roles
-            </volt-button>
-          </div>
-        </forge-search-toolbar>
-
         <volt-card class="overflow-hidden">
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead class="bg-muted/50">
-                <tr class="border-b border-border">
-                  <th class="h-10 px-4 text-left font-medium text-muted-foreground">User</th>
-                  <th class="h-10 px-4 text-left font-medium text-muted-foreground">Role</th>
-                  <th class="h-10 px-4 text-left font-medium text-muted-foreground">Status</th>
-                  <th class="h-10 px-4 text-left font-medium text-muted-foreground">Last Login</th>
-                  <th class="h-10 px-4 text-right font-medium text-muted-foreground">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (user of users(); track user.id) {
-                  <tr class="border-b border-border hover:bg-muted/30 transition-colors">
-                    <td class="px-4 py-3">
-                      <div class="flex items-center gap-3">
-                        <volt-avatar>
-                          <volt-avatar-fallback>{{ initials(user) }}</volt-avatar-fallback>
-                        </volt-avatar>
-                        <div>
-                          <p class="font-medium">{{ user.name || 'Unknown' }}</p>
-                          <p class="text-xs text-muted-foreground">{{ user.email }}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td class="px-4 py-3">
-                      <volt-badge class="text-[10px]">{{ user.role || 'viewer' }}</volt-badge>
-                    </td>
-                    <td class="px-4 py-3">
-                      <span class="inline-flex items-center gap-1.5">
-                        <span
-                          class="h-1.5 w-1.5 rounded-full"
-                          [class.bg-success]="user.status === 'active'"
-                          [class.bg-muted-foreground]="user.status !== 'active'"
-                        ></span>
-                        <span class="text-xs text-muted-foreground">{{
-                          user.status || 'active'
-                        }}</span>
-                      </span>
-                    </td>
-                    <td class="px-4 py-3 text-muted-foreground">
-                      {{ user.lastLogin ? formatDate(user.lastLogin) : '—' }}
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                      <div class="flex items-center justify-end gap-1">
-                        <volt-button variant="ghost" size="icon" class="h-7 w-7">
-                          <icon-edit class="h-3.5 w-3.5" />
-                        </volt-button>
-                        <volt-button variant="ghost" size="icon" class="h-7 w-7">
-                          <icon-more-vertical class="h-3.5 w-3.5" />
-                        </volt-button>
-                      </div>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
+          <volt-table>
+            <volt-table-header>
+              <volt-table-row>
+                <volt-table-head>Name</volt-table-head>
+                <volt-table-head>Email</volt-table-head>
+                <volt-table-head>Role</volt-table-head>
+                <volt-table-head class="text-right">Actions</volt-table-head>
+              </volt-table-row>
+            </volt-table-header>
+            <volt-table-body>
+              @for (user of users(); track user.id) {
+                <volt-table-row>
+                  <volt-table-cell>
+                    <div class="flex items-center gap-3">
+                      <lmn-users [size]="16" class="text-muted-foreground" />
+                      <span class="font-medium">{{ user.name || 'Unknown' }}</span>
+                    </div>
+                  </volt-table-cell>
+                  <volt-table-cell>{{ user.email }}</volt-table-cell>
+                  <volt-table-cell>
+                    <span class="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium">
+                      {{ user.role || 'viewer' }}
+                    </span>
+                  </volt-table-cell>
+                  <volt-table-cell class="text-right">
+                    <div class="flex items-center justify-end gap-1">
+                      <volt-button variant="ghost" size="icon" class="h-7 w-7" (click)="startEdit(user)">
+                        <lmn-pencil [size]="14" />
+                      </volt-button>
+                      <volt-button variant="ghost" size="icon" class="h-7 w-7" (click)="deleteUser(user)">
+                        <lmn-trash [size]="14" />
+                      </volt-button>
+                    </div>
+                  </volt-table-cell>
+                </volt-table-row>
+              }
+            </volt-table-body>
+          </volt-table>
         </volt-card>
       }
     </div>
@@ -202,54 +190,107 @@ import { StatCardComponent, SearchToolbarComponent } from '../components';
 export class UsersPage implements OnInit {
   private api = inject(CmsApiService);
 
-  users = signal<Record<string, unknown>[]>([]);
-  loading = signal(true);
-  error = signal<string | null>(null);
+  readonly users = signal<AuthUser[]>([]);
+  readonly loading = signal(true);
+  readonly error = signal<string | null>(null);
+  readonly showForm = signal(false);
+  readonly editingUser = signal<AuthUser | null>(null);
+  readonly form = signal<UserFormValue>(emptyForm());
+  readonly formError = signal<string | null>(null);
 
-  activeCount = signal(0);
-  invitedCount = signal(0);
-  inactiveCount = signal(0);
-
-  ngOnInit() {
-    void this.loadUsers();
+  ngOnInit(): void {
+    void this.load();
   }
 
-  initials(user: Record<string, unknown>): string {
-    const name = (user.name as string) || (user.email as string) || '?';
-    return name.slice(0, 2).toUpperCase();
-  }
-
-  formatDate(value: unknown): string {
-    try {
-      return new Date(value as string).toLocaleString();
-    } catch {
-      return String(value);
-    }
-  }
-
-  async loadUsers() {
+  async load(): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const docs = await this.api.getDocuments('users');
-      this.users.set(docs);
-
-      let active = 0;
-      let invited = 0;
-      let inactive = 0;
-      for (const u of docs) {
-        const status = (u.status as string) || 'active';
-        if (status === 'active') active++;
-        else if (status === 'invited') invited++;
-        else if (status === 'inactive') inactive++;
-      }
-      this.activeCount.set(active);
-      this.invitedCount.set(invited);
-      this.inactiveCount.set(inactive);
-    } catch (e) {
-      this.error.set(e instanceof Error ? e.message : 'Failed to load users');
+      const users = await this.api.getUsers();
+      this.users.set(users);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Failed to load users');
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  startCreate(): void {
+    this.editingUser.set(null);
+    this.form.set(emptyForm());
+    this.formError.set(null);
+    this.showForm.set(true);
+  }
+
+  startEdit(user: AuthUser): void {
+    this.editingUser.set(user);
+    this.form.set({
+      name: user.name ?? '',
+      email: user.email ?? '',
+      password: '',
+      role: (user.role as 'admin' | 'editor' | 'viewer') ?? 'viewer'
+    });
+    this.formError.set(null);
+    this.showForm.set(true);
+  }
+
+  cancelForm(): void {
+    this.showForm.set(false);
+    this.editingUser.set(null);
+    this.form.set(emptyForm());
+    this.formError.set(null);
+  }
+
+  update(field: keyof UserFormValue, value: string): void {
+    this.form.update((current) => ({ ...current, [field]: value }));
+  }
+
+  onRoleChange(event: Event): void {
+    this.update('role', (event.target as HTMLSelectElement).value as UserFormValue['role']);
+  }
+
+  async onSubmit(event: Event): Promise<void> {
+    event.preventDefault();
+    this.formError.set(null);
+
+    const current = this.form();
+    const editing = this.editingUser();
+
+    if (!current.email || (!editing && !current.password)) {
+      this.formError.set('Email and password are required.');
+      return;
+    }
+
+    const input: Partial<CreateUserInput> & { email: string } = {
+      email: current.email,
+      name: current.name,
+      role: current.role
+    };
+
+    if (current.password) {
+      input.password = current.password;
+    }
+
+    try {
+      if (editing) {
+        await this.api.updateUser(editing.id, input);
+      } else {
+        await this.api.createUser(input as CreateUserInput);
+      }
+      this.cancelForm();
+      await this.load();
+    } catch (err) {
+      this.formError.set(err instanceof Error ? err.message : 'Failed to save user');
+    }
+  }
+
+  async deleteUser(user: AuthUser): Promise<void> {
+    if (!window.confirm(`Delete user ${user.email}? This cannot be undone.`)) return;
+    try {
+      await this.api.deleteUser(user.id);
+      await this.load();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Failed to delete user');
     }
   }
 }
