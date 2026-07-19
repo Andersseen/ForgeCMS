@@ -64,12 +64,17 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     let sql = `SELECT * FROM "${options.collection}"`;
     const bindings: unknown[] = [];
 
+    const collectionDef = this.getCollectionDef(options.collection);
+
     if (options.where && Object.keys(options.where).length > 0) {
       const conditions = Object.keys(options.where)
         .map((key) => `"${key}" = ?`)
         .join(' AND ');
       sql += ` WHERE ${conditions}`;
-      bindings.push(...Object.values(options.where));
+      for (const [key, value] of Object.entries(options.where)) {
+        const field = collectionDef?.fields[key];
+        bindings.push(field ? toDbValue(value, field.kind) : value);
+      }
     }
 
     if (options.limit !== undefined) {
