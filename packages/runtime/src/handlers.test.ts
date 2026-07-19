@@ -246,6 +246,32 @@ describe('CRUD Handlers', () => {
 
       expect(body.data.title).toBe('Updated');
     });
+
+    it('allows partial updates without resending required fields', async () => {
+      const created = await runtime.adapters.database.create('posts', { title: 'Old', views: 5 });
+
+      const context = createTestContext('PUT', `https://forge.test/api/posts/${created.id}`, {
+        views: 10
+      });
+      context.params = { collection: 'posts', id: created.id as string };
+
+      const response = await handleUpdate(context, { runtime });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.data.title).toBe('Old');
+      expect(body.data.views).toBe(10);
+    });
+
+    it('returns 404 for a missing record', async () => {
+      const context = createTestContext('PUT', 'https://forge.test/api/posts/unknown', {
+        views: 10
+      });
+      context.params = { collection: 'posts', id: 'unknown' };
+
+      const response = await handleUpdate(context, { runtime });
+      expect(response.status).toBe(404);
+    });
   });
 
   describe('handleDelete', () => {
