@@ -171,9 +171,7 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
   async count(collection: string): Promise<number> {
     const db = this.getDb();
     const table = this.getTable(collection);
-    const result = (await db
-      .select({ count: drizzleCount() })
-      .from(table)) as { count: number }[];
+    const result = (await db.select({ count: drizzleCount() }).from(table)) as { count: number }[];
     return result[0]?.count ?? 0;
   }
 

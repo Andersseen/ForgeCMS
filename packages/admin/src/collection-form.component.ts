@@ -1,13 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import {
-  VoltButton,
-  VoltCard,
-  VoltError,
-  VoltInput,
-  VoltLabel,
-  VoltNativeSelect,
-  VoltSwitch,
-  VoltTextarea
+    VoltButton,
+    VoltCard,
+    VoltError,
+    VoltInput,
+    VoltLabel,
+    VoltSwitch,
+    VoltTextarea
 } from '@voltui/components';
 import type { FieldMeta } from '@forge-cms/angular';
 
@@ -94,11 +93,11 @@ import type { FieldMeta } from '@forge-cms/angular';
                     [id]="field.name"
                     type="text"
                     [value]="getRelationValue(field.name)"
-                    (valueChange)="setRelationValue(field.name, $event, field.relation?.many === true)"
+                    (valueChange)="
+                      setRelationValue(field.name, $event, field.relation?.many === true)
+                    "
                     [placeholder]="
-                      field.relation?.many === true
-                        ? 'Comma-separated IDs'
-                        : 'Related document ID'
+                      field.relation?.many === true ? 'Comma-separated IDs' : 'Related document ID'
                     "
                   />
                 }
