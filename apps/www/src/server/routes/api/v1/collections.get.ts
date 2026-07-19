@@ -8,7 +8,6 @@ export default defineEventHandler(async (event) => {
     slug: c.slug,
     name: c.slug.charAt(0).toUpperCase() + c.slug.slice(1),
     description: `Content collection for ${c.slug}`,
-    fields: Object.keys(c.fields),
     fieldDefinitions: Object.entries(c.fields).map(([name, field]) => ({
       name,
       kind: field.kind,
@@ -16,6 +15,12 @@ export default defineEventHandler(async (event) => {
       required: field.options.required ?? false,
       ...(field.kind === 'select' && {
         options: (field.options as SelectFieldOptions).options
+      }),
+      ...(field.kind === 'relation' && {
+        relation: {
+          collection: (field.options as { collection: string }).collection,
+          many: (field.options as { many?: boolean }).many ?? false
+        }
       })
     }))
   }));

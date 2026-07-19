@@ -21,13 +21,16 @@ export interface FieldMeta {
   label: string;
   required: boolean;
   options?: string[];
+  relation?: {
+    collection: string;
+    many: boolean;
+  };
 }
 
 export interface CollectionMeta {
   slug: string;
   name: string;
   description: string;
-  fields: string[];
   fieldDefinitions: FieldMeta[];
 }
 

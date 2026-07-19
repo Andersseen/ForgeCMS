@@ -1,5 +1,18 @@
 # @forge-cms/admin
 
+## 0.2.0
+
+### Minor Changes
+
+- 1a9dec6: Refactor collection metadata: remove redundant `CollectionMeta.fields` and add `relation` metadata to `FieldMeta`. The admin form now renders `relation` fields and uses a native select for `select` fields.
+- 83f3b66: Normalize all package versions to 0.1.0 before the first npm publish.
+
+### Patch Changes
+
+- Updated dependencies [1a9dec6]
+- Updated dependencies [83f3b66]
+  - @forge-cms/angular@0.2.0
+
 ## 0.1.0
 
 ### Minor Changes

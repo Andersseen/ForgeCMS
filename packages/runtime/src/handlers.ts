@@ -219,12 +219,17 @@ export async function handleUpdate<TEnv = unknown>(
       return errorResponse('Invalid JSON body', 400);
     }
 
-    // For partial updates, we validate only the fields present in the body
-    const partialValidation = validateCollection(collection, { ...body, id });
-    if (!partialValidation.valid) {
-      // Filter to only errors for fields that were actually sent
-      const relevantErrors = partialValidation.errors.filter(
-        (e) => body[e.field] !== undefined || e.code === 'required'
+    const existing = await runtime.adapters.database.findById(collectionSlug, id);
+    if (!existing) return errorResponse(`Record '${id}' not found in '${collectionSlug}'`, 404);
+
+    // Merge existing record with the partial body so required fields already present
+    // on the stored document do not fail validation. Report only errors for fields the
+    // caller is touching (present in body) or for fields that do not exist yet.
+    const merged = { ...existing, ...body };
+    const validation = validateCollection(collection, merged);
+    if (!validation.valid) {
+      const relevantErrors = validation.errors.filter(
+        (e) => body[e.field] !== undefined || existing[e.field] === undefined
       );
       if (relevantErrors.length > 0) {
         return jsonResponse({ error: 'Validation failed', details: relevantErrors }, 400);

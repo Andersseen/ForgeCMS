@@ -64,12 +64,17 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     let sql = `SELECT * FROM "${options.collection}"`;
     const bindings: unknown[] = [];
 
+    const collectionDef = this.getCollectionDef(options.collection);
+
     if (options.where && Object.keys(options.where).length > 0) {
       const conditions = Object.keys(options.where)
         .map((key) => `"${key}" = ?`)
         .join(' AND ');
       sql += ` WHERE ${conditions}`;
-      bindings.push(...Object.values(options.where));
+      for (const [key, value] of Object.entries(options.where)) {
+        const field = collectionDef?.fields[key];
+        bindings.push(field ? toDbValue(value, field.kind) : value);
+      }
     }
 
     if (options.limit !== undefined) {
@@ -150,6 +155,14 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
   async delete(collection: string, id: string): Promise<void> {
     const db = this.getDb();
     await db.prepare(`DELETE FROM "${collection}" WHERE id = ?`).bind(id).run();
+  }
+
+  async count(collection: string): Promise<number> {
+    const db = this.getDb();
+    const result = await db.prepare(`SELECT COUNT(*) as count FROM "${collection}"`).first<{
+      count: number;
+    }>();
+    return result?.count ?? 0;
   }
 
   private hydrateRecord(row: DatabaseRecord, collection: string): DatabaseRecord {

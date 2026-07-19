@@ -37,6 +37,13 @@ class MockD1PreparedStatement implements D1PreparedStatement {
   }
 
   async first<T = unknown>(): Promise<T | null> {
+    if (this.query.match(/SELECT\s+COUNT\s*\(/i)) {
+      const tableMatch = this.query.match(/FROM\s+"([^"]+)"/i);
+      const table = tableMatch?.[1] ?? '';
+      const rows = this.getTableRows(table);
+      return { count: rows.size } as T;
+    }
+
     const { table, where } = this.parseSelect();
     const rows = this.getTableRows(table);
     for (const row of rows.values()) {
@@ -165,7 +172,9 @@ class MockD1PreparedStatement implements D1PreparedStatement {
 
     const record: Record<string, unknown> = {};
     cols.forEach((col, i) => {
-      record[col] = this.bindings[i];
+      // Mimic D1's real SQLite storage: booleans are stored as 0/1 integers.
+      const value = this.bindings[i];
+      record[col] = typeof value === 'boolean' ? (value ? 1 : 0) : value;
     });
 
     rows.set(record.id as string, record);
@@ -287,6 +296,21 @@ describe('D1DatabaseAdapter', () => {
     expect(results).toHaveLength(2);
   });
 
+  it('filters by boolean fields by coercing true/false to 1/0 bindings', async () => {
+    await adapter.syncSchema([posts]);
+
+    await adapter.create('posts', { title: 'Published', published: true });
+    await adapter.create('posts', { title: 'Draft', published: false });
+
+    const results = await adapter.findMany({
+      collection: 'posts',
+      where: { published: true }
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.title).toBe('Published');
+  });
+
   it('updates a record', async () => {
     await adapter.syncSchema([posts]);
 
@@ -307,5 +331,16 @@ describe('D1DatabaseAdapter', () => {
 
     const found = await adapter.findById('posts', createdId);
     expect(found).toBeNull();
+  });
+
+  it('counts records without fetching them all', async () => {
+    await adapter.syncSchema([posts]);
+
+    await adapter.create('posts', { title: 'One' });
+    await adapter.create('posts', { title: 'Two' });
+    await adapter.create('posts', { title: 'Three' });
+
+    const count = await adapter.count('posts');
+    expect(count).toBe(3);
   });
 });

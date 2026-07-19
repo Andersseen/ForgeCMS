@@ -306,9 +306,6 @@ importers:
       '@forge-cms/db':
         specifier: workspace:*
         version: link:../db
-      '@forge-cms/runtime':
-        specifier: workspace:*
-        version: link:../runtime
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20250514.0

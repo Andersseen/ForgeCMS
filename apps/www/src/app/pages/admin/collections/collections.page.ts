@@ -96,7 +96,7 @@ const ICON_MAP: Record<string, string> = {
         <forge-error-state
           title="Unable to load collections"
           [message]="error()"
-          (retry)="ngOnInit()"
+          (retry)="load()"
         />
       } @else {
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -194,7 +194,11 @@ export class CollectionsPage implements OnInit {
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
 
-  async ngOnInit() {
+  ngOnInit(): void {
+    void this.load();
+  }
+
+  async load(): Promise<void> {
     try {
       this.loading.set(true);
       this.error.set(null);
@@ -214,7 +218,7 @@ export class CollectionsPage implements OnInit {
             count: docs.length,
             drafts: draftCount,
             icon: ICON_MAP[meta.slug] ?? 'file-text',
-            fields: meta.fields,
+            fields: meta.fieldDefinitions.map((f) => f.name),
             lastModified: 'Just now',
             modifiedBy: 'System',
             modifiedByAvatar: 'https://i.pravatar.cc/150?u=system'

@@ -56,6 +56,10 @@ export class InMemoryDatabaseAdapter implements DatabaseAdapter {
     return records[index];
   }
 
+  async count(collection: string): Promise<number> {
+    return this.store.get(collection)?.length ?? 0;
+  }
+
   async delete(collection: string, id: string): Promise<void> {
     const records = this.store.get(collection) ?? [];
     this.store.set(

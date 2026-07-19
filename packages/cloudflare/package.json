@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/cloudflare",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Cloudflare-native adapters and types for ForgeCMS (D1, R2).",
   "author": "ForgeCMS contributors",
   "license": "MIT",
@@ -45,8 +45,7 @@
   },
   "dependencies": {
     "@forge-cms/core": "workspace:*",
-    "@forge-cms/db": "workspace:*",
-    "@forge-cms/runtime": "workspace:*"
+    "@forge-cms/db": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250514.0",
