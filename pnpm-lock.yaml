@@ -288,6 +288,9 @@ importers:
 
   packages/auth:
     devDependencies:
+      '@forge-cms/db':
+        specifier: workspace:*
+        version: link:../db
       '@forge-cms/testing':
         specifier: workspace:*
         version: link:../testing

@@ -3,6 +3,8 @@ export { ExternalAuthAdapter } from './external.adapter.js';
 export type { ExternalAuthConfig } from './external.adapter.js';
 export { SignedTokenAuthAdapter, DEMO_CREDENTIALS } from './signed-token.adapter.js';
 export type { SignedTokenEnv } from './signed-token.adapter.js';
+export { UsersCollectionAuthAdapter } from './users-collection.adapter.js';
+export type { UsersCollectionAuthEnv, CreateUserInput } from './users-collection.adapter.js';
 
 export class ForgeAuthError extends Error {
   constructor(
