@@ -1,6 +1,7 @@
-import { defineEventHandler, readBody, createError, toWebRequest } from 'h3';
+import { defineEventHandler, readBody, createError } from 'h3';
 import type { UsersCollectionAuthAdapter, CreateUserInput } from '@forge-cms/auth';
 import { getServerRuntime } from '../../../api/runtime';
+import { createAuthRequest } from '../../../api/auth-request';
 
 /**
  * POST /api/auth/users
@@ -11,17 +12,17 @@ export default defineEventHandler(async (event) => {
   const serverRuntime = await getServerRuntime(event.context.cloudflare?.env);
   const auth = serverRuntime.adapters.auth as UsersCollectionAuthAdapter;
 
-  try {
-    await auth.requireAuth(toWebRequest(event));
-  } catch {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' });
-  }
-
   let body: Partial<CreateUserInput>;
   try {
     body = await readBody(event);
   } catch {
     throw createError({ statusCode: 400, statusMessage: 'Invalid JSON body' });
+  }
+
+  try {
+    await auth.requireAuth(createAuthRequest(event));
+  } catch {
+    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' });
   }
 
   if (!body.email || !body.password) {

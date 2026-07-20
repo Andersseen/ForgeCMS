@@ -50,9 +50,13 @@ function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
 
 async function hashPassword(password: string): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, [
-    'deriveBits'
-  ]);
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
   const derived = await crypto.subtle.deriveBits(
     { name: 'PBKDF2', salt, iterations: ITERATIONS, hash: 'SHA-256' },
     key,
@@ -69,9 +73,13 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
   const combined = base64UrlDecode(stored);
   const salt = combined.slice(0, SALT_BYTES);
   const hash = combined.slice(SALT_BYTES);
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, [
-    'deriveBits'
-  ]);
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
   const derived = await crypto.subtle.deriveBits(
     { name: 'PBKDF2', salt, iterations: ITERATIONS, hash: 'SHA-256' },
     key,
@@ -105,7 +113,8 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
   }
 
   private getDb(): DatabaseAdapter {
-    if (!this.db) throw new Error('UsersCollectionAuthAdapter not initialized. Call init() with userDatabase.');
+    if (!this.db)
+      throw new Error('UsersCollectionAuthAdapter not initialized. Call init() with userDatabase.');
     return this.db;
   }
 
@@ -143,7 +152,10 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
 
   async createUser(input: CreateUserInput): Promise<{ token: string; user: AuthUser } | null> {
     const db = this.getDb();
-    const existing = await db.findMany({ collection: this.collection, where: { email: input.email } });
+    const existing = await db.findMany({
+      collection: this.collection,
+      where: { email: input.email }
+    });
     if (existing.length > 0) return null;
 
     const passwordHash = await hashPassword(input.password);
@@ -185,4 +197,3 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     await db.delete(this.collection, id);
   }
 }
-

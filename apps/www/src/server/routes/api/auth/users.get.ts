@@ -1,6 +1,7 @@
-import { defineEventHandler, createError, toWebRequest } from 'h3';
+import { defineEventHandler, createError } from 'h3';
 import type { UsersCollectionAuthAdapter } from '@forge-cms/auth';
 import { getServerRuntime } from '../../../api/runtime';
+import { createAuthRequest } from '../../../api/auth-request';
 
 /**
  * GET /api/auth/users
@@ -12,7 +13,7 @@ export default defineEventHandler(async (event) => {
   const auth = serverRuntime.adapters.auth as UsersCollectionAuthAdapter;
 
   try {
-    await auth.requireAuth(toWebRequest(event));
+    await auth.requireAuth(createAuthRequest(event));
   } catch {
     throw createError({ statusCode: 401, statusMessage: 'Unauthorized' });
   }

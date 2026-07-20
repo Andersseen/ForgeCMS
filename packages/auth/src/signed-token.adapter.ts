@@ -1,4 +1,4 @@
-import type { AuthAdapter, AuthUser } from './index.js';
+import type { AuthAdapter, AuthSession, AuthUser } from './index.js';
 import { ForgeAuthError } from './index.js';
 import { extractToken, issueToken, validateSession } from './token-signer.js';
 
@@ -43,7 +43,7 @@ export class SignedTokenAuthAdapter implements AuthAdapter {
     return issueToken(this.secret, user);
   }
 
-  async validateSession(token: string): Promise<import('./index.js').AuthSession | null> {
+  async validateSession(token: string): Promise<AuthSession | null> {
     return validateSession(this.secret, token);
   }
 

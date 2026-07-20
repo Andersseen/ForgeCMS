@@ -11,7 +11,12 @@ function createAdapter() {
 async function createAdapterWithUser(password = 'password123') {
   const db = new InMemoryDatabaseAdapter();
   const adapter = new UsersCollectionAuthAdapter().init({ userDatabase: db });
-  await adapter.createUser({ email: 'test@example.com', password, name: 'Test User', role: 'admin' });
+  await adapter.createUser({
+    email: 'test@example.com',
+    password,
+    name: 'Test User',
+    role: 'admin'
+  });
   return { adapter, db };
 }
 

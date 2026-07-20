@@ -6,7 +6,6 @@ import {
   VoltError,
   VoltInput,
   VoltLabel,
-  VoltNativeSelect,
   VoltTable,
   VoltTableBody,
   VoltTableCell,
@@ -14,12 +13,7 @@ import {
   VoltTableHeader,
   VoltTableRow
 } from '@voltui/components';
-import {
-  LmnPencilIcon,
-  LmnPlusIcon,
-  LmnTrashIcon,
-  LmnUsersIcon
-} from 'lumen-icons';
+import { LmnPencilIcon, LmnPlusIcon, LmnTrashIcon, LmnUsersIcon } from 'lumen-icons';
 import { CmsApiService, type AuthUser, type CreateUserInput } from '@forge-cms/angular';
 import { ErrorStateComponent, LoadingStateComponent, PageHeaderComponent } from '@forge-cms/admin';
 
@@ -43,7 +37,6 @@ function emptyForm(): UserFormValue {
     VoltInput,
     VoltLabel,
     VoltError,
-    VoltNativeSelect,
     VoltTable,
     VoltTableHeader,
     VoltTableBody,
@@ -78,11 +71,15 @@ function emptyForm(): UserFormValue {
             {{ editingUser() ? 'Edit user' : 'New user' }}
           </h2>
 
-          <form class="space-y-4" (submit)="onSubmit($event)">
+          <div class="space-y-4">
             <div class="grid gap-4 md:grid-cols-2">
               <div class="space-y-1.5">
                 <volt-label htmlFor="user-name">Name</volt-label>
-                <volt-input id="user-name" [value]="form().name" (valueChange)="update('name', $event)" />
+                <volt-input
+                  id="user-name"
+                  [value]="form().name"
+                  (valueChange)="update('name', $event)"
+                />
               </div>
               <div class="space-y-1.5">
                 <volt-label htmlFor="user-email">Email</volt-label>
@@ -130,11 +127,11 @@ function emptyForm(): UserFormValue {
               <volt-button type="button" variant="outline" size="sm" (click)="cancelForm()">
                 Cancel
               </volt-button>
-              <volt-button type="submit" size="sm">
+              <volt-button type="button" size="sm" (click)="onSubmit($event)">
                 {{ editingUser() ? 'Save' : 'Create' }}
               </volt-button>
             </div>
-          </form>
+          </div>
         </volt-card>
       }
 
@@ -164,16 +161,28 @@ function emptyForm(): UserFormValue {
                   </volt-table-cell>
                   <volt-table-cell>{{ user.email }}</volt-table-cell>
                   <volt-table-cell>
-                    <span class="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium">
+                    <span
+                      class="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium"
+                    >
                       {{ user.role || 'viewer' }}
                     </span>
                   </volt-table-cell>
                   <volt-table-cell class="text-right">
                     <div class="flex items-center justify-end gap-1">
-                      <volt-button variant="ghost" size="icon" class="h-7 w-7" (click)="startEdit(user)">
+                      <volt-button
+                        variant="ghost"
+                        size="icon"
+                        class="h-7 w-7"
+                        (click)="startEdit(user)"
+                      >
                         <lmn-pencil [size]="14" />
                       </volt-button>
-                      <volt-button variant="ghost" size="icon" class="h-7 w-7" (click)="deleteUser(user)">
+                      <volt-button
+                        variant="ghost"
+                        size="icon"
+                        class="h-7 w-7"
+                        (click)="deleteUser(user)"
+                      >
                         <lmn-trash [size]="14" />
                       </volt-button>
                     </div>

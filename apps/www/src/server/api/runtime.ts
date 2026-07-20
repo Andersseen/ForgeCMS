@@ -147,12 +147,13 @@ export function getServerRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<Serve
 
 async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>> {
   const database = env?.DB ? new D1DatabaseAdapter() : new InMemoryDatabaseAdapter();
+  const auth = new UsersCollectionAuthAdapter().init({ ...env, userDatabase: database });
 
   const runtime = new ForgeCmsRuntime<ServerEnv>({
     collections,
     adapters: {
       database,
-      auth: new UsersCollectionAuthAdapter(),
+      auth,
       storage: new InMemoryStorageAdapter()
     },
     ...(env !== undefined && { env })

@@ -1,6 +1,7 @@
-import { defineEventHandler, getRouterParam, readBody, createError, toWebRequest } from 'h3';
+import { defineEventHandler, getRouterParam, readBody, createError } from 'h3';
 import type { UsersCollectionAuthAdapter, CreateUserInput } from '@forge-cms/auth';
 import { getServerRuntime } from '../../../../api/runtime';
+import { createAuthRequest } from '../../../../api/auth-request';
 
 /**
  * PUT /api/auth/users/:id
@@ -10,12 +11,6 @@ import { getServerRuntime } from '../../../../api/runtime';
 export default defineEventHandler(async (event) => {
   const serverRuntime = await getServerRuntime(event.context.cloudflare?.env);
   const auth = serverRuntime.adapters.auth as UsersCollectionAuthAdapter;
-
-  try {
-    await auth.requireAuth(toWebRequest(event));
-  } catch {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' });
-  }
 
   const id = getRouterParam(event, 'id');
   if (!id) {
@@ -27,6 +22,12 @@ export default defineEventHandler(async (event) => {
     body = await readBody(event);
   } catch {
     throw createError({ statusCode: 400, statusMessage: 'Invalid JSON body' });
+  }
+
+  try {
+    await auth.requireAuth(createAuthRequest(event));
+  } catch {
+    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' });
   }
 
   const updated = await auth.updateUser(id, body);
