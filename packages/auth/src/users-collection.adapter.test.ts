@@ -138,4 +138,50 @@ describe('UsersCollectionAuthAdapter', () => {
     const stored = await db.findById('users', created!.user.id);
     expect(stored).toBeNull();
   });
+
+  it('requireRole allows matching role', async () => {
+    const login = await adapter.login('test@example.com', 'password123');
+    const request = new Request('https://forge.test', {
+      headers: { authorization: `Bearer ${login?.token}` }
+    });
+    const user = await adapter.requireRole(request, 'admin');
+    expect(user.email).toBe('test@example.com');
+  });
+
+  it('requireRole rejects insufficient role', async () => {
+    const created = await adapter.createUser({
+      email: 'viewer@example.com',
+      password: 'secret',
+      role: 'viewer'
+    });
+    const request = new Request('https://forge.test', {
+      headers: { authorization: `Bearer ${created?.token}` }
+    });
+    await expect(adapter.requireRole(request, 'admin')).rejects.toThrow('Forbidden');
+  });
+
+  it('requireAnyRole allows one matching role', async () => {
+    const created = await adapter.createUser({
+      email: 'editor@example.com',
+      password: 'secret',
+      role: 'editor'
+    });
+    const request = new Request('https://forge.test', {
+      headers: { authorization: `Bearer ${created?.token}` }
+    });
+    const user = await adapter.requireAnyRole(request, ['admin', 'editor']);
+    expect(user.role).toBe('editor');
+  });
+
+  it('requireAnyRole rejects non-matching role', async () => {
+    const created = await adapter.createUser({
+      email: 'viewer2@example.com',
+      password: 'secret',
+      role: 'viewer'
+    });
+    const request = new Request('https://forge.test', {
+      headers: { authorization: `Bearer ${created?.token}` }
+    });
+    await expect(adapter.requireAnyRole(request, ['admin', 'editor'])).rejects.toThrow('Forbidden');
+  });
 });

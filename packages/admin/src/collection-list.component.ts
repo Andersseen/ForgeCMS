@@ -54,10 +54,12 @@ function formatCellValue(kind: string, value: unknown): string {
   template: `
     <forge-page-header [title]="collection().name" [subtitle]="collection().description">
       <div actions>
-        <volt-button size="sm" (click)="create.emit()">
-          <lmn-plus [size]="14" class="mr-1.5" />
-          New
-        </volt-button>
+        @if (!readOnly()) {
+          <volt-button size="sm" (click)="create.emit()">
+            <lmn-plus [size]="14" class="mr-1.5" />
+            New
+          </volt-button>
+        }
       </div>
     </forge-page-header>
 
@@ -89,19 +91,26 @@ function formatCellValue(kind: string, value: unknown): string {
                 }}</volt-table-cell>
               }
               <volt-table-cell class="text-right">
-                <div class="flex items-center justify-end gap-1">
-                  <volt-button variant="ghost" size="icon" class="h-7 w-7" (click)="edit.emit(doc)">
-                    <lmn-pencil [size]="14" />
-                  </volt-button>
-                  <volt-button
-                    variant="ghost"
-                    size="icon"
-                    class="h-7 w-7"
-                    (click)="delete.emit(doc)"
-                  >
-                    <lmn-trash [size]="14" />
-                  </volt-button>
-                </div>
+                @if (!readOnly()) {
+                  <div class="flex items-center justify-end gap-1">
+                    <volt-button
+                      variant="ghost"
+                      size="icon"
+                      class="h-7 w-7"
+                      (click)="edit.emit(doc)"
+                    >
+                      <lmn-pencil [size]="14" />
+                    </volt-button>
+                    <volt-button
+                      variant="ghost"
+                      size="icon"
+                      class="h-7 w-7"
+                      (click)="delete.emit(doc)"
+                    >
+                      <lmn-trash [size]="14" />
+                    </volt-button>
+                  </div>
+                }
               </volt-table-cell>
             </volt-table-row>
           }
@@ -113,6 +122,7 @@ function formatCellValue(kind: string, value: unknown): string {
 export class ForgeCollectionListComponent {
   collection = input.required<CollectionMeta>();
   documents = input.required<Record<string, unknown>[]>();
+  readOnly = input<boolean>(false);
 
   create = output<void>();
   edit = output<Record<string, unknown>>();

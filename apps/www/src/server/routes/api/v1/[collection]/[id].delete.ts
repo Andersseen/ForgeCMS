@@ -13,5 +13,5 @@ export default defineEventHandler(async (event) => {
     },
     env: event.context.cloudflare?.env
   };
-  return handleDelete(context, { runtime, requireAuth: true });
+  return handleDelete(context, { runtime, allowedRoles: ['admin', 'editor'] });
 });

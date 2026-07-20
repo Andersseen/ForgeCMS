@@ -42,13 +42,16 @@ test('admin CRUD flow: log in, create, edit, delete a document', async ({ page }
   await expect(page.locator('volt-table-row', { hasText: updatedTitle })).toHaveCount(0);
 });
 
-test('creating a document while logged out redirects to /login', async ({ page }) => {
+test('anonymous users cannot create documents', async ({ page }) => {
   await page.goto('/admin/collections/posts');
-  await page.getByRole('button', { name: /New/i }).click();
-  await page.locator('input#title').fill('Should not be created');
-  await page.locator('input#slug').fill(`should-not-be-created-${Date.now()}`);
-  await page.getByRole('button', { name: 'Create' }).click();
 
-  await page.waitForURL('**/login');
-  await expect(page).toHaveURL(/\/login$/);
+  // The UI hides the write path for unauthenticated (read-only) users.
+  await expect(page.getByRole('button', { name: /New/i })).not.toBeVisible();
+
+  // The API also rejects anonymous write requests.
+  const response = await page.request.post('/api/v1/posts', {
+    data: { title: 'Should not be created', slug: `should-not-be-created-${Date.now()}` },
+    headers: { 'content-type': 'application/json' }
+  });
+  expect(response.status()).toBe(401);
 });

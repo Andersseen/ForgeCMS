@@ -5,6 +5,8 @@ const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 interface TokenPayload {
   sub: string;
   email?: string;
+  name?: string;
+  role?: string;
   roles?: string[];
   exp: number;
 }
@@ -44,6 +46,8 @@ export async function issueToken(secret: string, user: AuthUser): Promise<string
   const payload: TokenPayload = {
     sub: user.id,
     ...(user.email !== undefined && { email: user.email }),
+    ...(user.name !== undefined && { name: user.name }),
+    ...(user.role !== undefined && { role: user.role }),
     ...(user.roles !== undefined && { roles: user.roles }),
     exp: Date.now() + TOKEN_TTL_MS
   };
@@ -85,6 +89,8 @@ export async function validateSession(secret: string, token: string): Promise<Au
   const user: AuthUser = {
     id: payload.sub,
     ...(payload.email !== undefined && { email: payload.email }),
+    ...(payload.name !== undefined && { name: payload.name }),
+    ...(payload.role !== undefined && { role: payload.role }),
     ...(payload.roles !== undefined && { roles: payload.roles })
   };
   return { user, expiresAt: new Date(payload.exp) };

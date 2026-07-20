@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import type { OnInit } from '@angular/core';
 import {
   VoltButton,
@@ -14,7 +14,12 @@ import {
   VoltTableRow
 } from '@voltui/components';
 import { LmnPencilIcon, LmnPlusIcon, LmnTrashIcon, LmnUsersIcon } from 'lumen-icons';
-import { CmsApiService, type AuthUser, type CreateUserInput } from '@forge-cms/angular';
+import {
+  CmsApiService,
+  canManageUsers,
+  type AuthUser,
+  type CreateUserInput
+} from '@forge-cms/angular';
 import { ErrorStateComponent, LoadingStateComponent, PageHeaderComponent } from '@forge-cms/admin';
 
 interface UserFormValue {
@@ -135,7 +140,13 @@ function emptyForm(): UserFormValue {
         </volt-card>
       }
 
-      @if (loading()) {
+      @if (!isAdmin()) {
+        <forge-error-state
+          title="Access denied"
+          message="You don't have permission to manage users."
+          [showRetry]="false"
+        />
+      } @else if (loading()) {
         <forge-loading-state variant="table" />
       } @else if (error()) {
         <forge-error-state title="Unable to load users" [message]="error()" (retry)="load()" />
@@ -202,13 +213,25 @@ export class UsersPage implements OnInit {
   readonly users = signal<AuthUser[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+  readonly currentUser = signal<AuthUser | null>(null);
+  readonly isAdmin = computed(() => canManageUsers(this.currentUser()));
   readonly showForm = signal(false);
   readonly editingUser = signal<AuthUser | null>(null);
   readonly form = signal<UserFormValue>(emptyForm());
   readonly formError = signal<string | null>(null);
 
   ngOnInit(): void {
+    void this.loadUser();
     void this.load();
+  }
+
+  private async loadUser(): Promise<void> {
+    try {
+      const user = await this.api.getCurrentUser();
+      this.currentUser.set(user);
+    } catch {
+      this.currentUser.set(null);
+    }
   }
 
   async load(): Promise<void> {

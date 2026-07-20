@@ -71,11 +71,34 @@ export interface AuthUser {
   roles?: string[];
 }
 
+export type UserRole = 'admin' | 'editor' | 'viewer';
+
+export const USER_ROLES: UserRole[] = ['admin', 'editor', 'viewer'];
+
+export function userRole(user: AuthUser | null | undefined): UserRole {
+  const role = user?.role;
+  if (role === 'admin' || role === 'editor' || role === 'viewer') return role;
+  return 'viewer';
+}
+
+export function isAdmin(user: AuthUser | null | undefined): boolean {
+  return userRole(user) === 'admin';
+}
+
+export function canWriteContent(user: AuthUser | null | undefined): boolean {
+  const role = userRole(user);
+  return role === 'admin' || role === 'editor';
+}
+
+export function canManageUsers(user: AuthUser | null | undefined): boolean {
+  return isAdmin(user);
+}
+
 export interface CreateUserInput {
   email: string;
   password: string;
   name?: string;
-  role?: 'admin' | 'editor' | 'viewer';
+  role?: UserRole;
 }
 
 export interface ForgeCmsConfig {

@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { defineCollection, defineField } from '@forge-cms/core';
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
-import { InMemoryAuthAdapter } from '@forge-cms/auth';
+import { InMemoryAuthAdapter, type AuthUser } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import { ForgeCmsRuntime } from './runtime.js';
 import { handleList, handleRead, handleCreate, handleUpdate, handleDelete } from './handlers.js';
@@ -39,6 +39,29 @@ function createTestRuntime() {
   auth.registerSession('test-token', {
     user: { id: 'user-1', email: 'test@example.com' }
   });
+
+  return new ForgeCmsRuntime({
+    collections: [posts],
+    adapters: {
+      database: new InMemoryDatabaseAdapter(),
+      auth,
+      storage: new InMemoryStorageAdapter()
+    }
+  });
+}
+
+function createTestRuntimeWithUser(user: AuthUser, token = 'role-token') {
+  const posts = defineCollection({
+    slug: 'posts',
+    fields: {
+      title: defineField.text({ required: true }),
+      published: defineField.boolean(),
+      views: defineField.number()
+    }
+  });
+
+  const auth = new InMemoryAuthAdapter();
+  auth.registerSession(token, { user });
 
   return new ForgeCmsRuntime({
     collections: [posts],
@@ -311,6 +334,124 @@ describe('CRUD Handlers', () => {
 
       const response = await handleList(context, { runtime, requireAuth: true });
       expect(response.status).toBe(200);
+    });
+  });
+
+  describe('role-based access control', () => {
+    it('allows admins and editors to create documents', async () => {
+      for (const role of ['admin', 'editor'] as const) {
+        const roleRuntime = createTestRuntimeWithUser({ id: role, role });
+        roleRuntime.init();
+
+        const context = createTestContext(
+          'POST',
+          'https://forge.test/api/posts',
+          { title: `${role} post` },
+          'role-token'
+        );
+        context.params = { collection: 'posts' };
+
+        const response = await handleCreate(context, {
+          runtime: roleRuntime,
+          allowedRoles: ['admin', 'editor']
+        });
+        expect(response.status).toBe(201);
+      }
+    });
+
+    it('forbids viewers from creating documents', async () => {
+      const viewerRuntime = createTestRuntimeWithUser({ id: 'viewer', role: 'viewer' });
+      viewerRuntime.init();
+
+      const context = createTestContext(
+        'POST',
+        'https://forge.test/api/posts',
+        { title: 'Viewer post' },
+        'role-token'
+      );
+      context.params = { collection: 'posts' };
+
+      const response = await handleCreate(context, {
+        runtime: viewerRuntime,
+        allowedRoles: ['admin', 'editor']
+      });
+      expect(response.status).toBe(403);
+    });
+
+    it('requires authentication when allowedRoles is set', async () => {
+      const context = createTestContext('POST', 'https://forge.test/api/posts', {
+        title: 'Anonymous post'
+      });
+      context.params = { collection: 'posts' };
+
+      const anonymousRuntime = createTestRuntimeWithUser({ id: 'admin', role: 'admin' });
+      anonymousRuntime.init();
+
+      const response = await handleCreate(context, {
+        runtime: anonymousRuntime,
+        allowedRoles: ['admin', 'editor']
+      });
+      expect(response.status).toBe(401);
+    });
+
+    it('allows admins to update documents', async () => {
+      const adminRuntime = createTestRuntimeWithUser({ id: 'admin', role: 'admin' });
+      adminRuntime.init();
+      const created = await adminRuntime.adapters.database.create('posts', { title: 'Old' });
+
+      const context = createTestContext(
+        'PUT',
+        `https://forge.test/api/posts/${created.id}`,
+        { title: 'Updated' },
+        'role-token'
+      );
+      context.params = { collection: 'posts', id: created.id as string };
+
+      const response = await handleUpdate(context, {
+        runtime: adminRuntime,
+        allowedRoles: ['admin', 'editor']
+      });
+      expect(response.status).toBe(200);
+    });
+
+    it('forbids viewers from updating documents', async () => {
+      const viewerRuntime = createTestRuntimeWithUser({ id: 'viewer', role: 'viewer' });
+      viewerRuntime.init();
+      const created = await viewerRuntime.adapters.database.create('posts', { title: 'Old' });
+
+      const context = createTestContext(
+        'PUT',
+        `https://forge.test/api/posts/${created.id}`,
+        { title: 'Updated' },
+        'role-token'
+      );
+      context.params = { collection: 'posts', id: created.id as string };
+
+      const response = await handleUpdate(context, {
+        runtime: viewerRuntime,
+        allowedRoles: ['admin', 'editor']
+      });
+      expect(response.status).toBe(403);
+    });
+
+    it('forbids viewers from deleting documents', async () => {
+      const viewerRuntime = createTestRuntimeWithUser({ id: 'viewer', role: 'viewer' });
+      viewerRuntime.init();
+      const created = await viewerRuntime.adapters.database.create('posts', { title: 'To Delete' });
+
+      const context = createTestContext(
+        'DELETE',
+        `https://forge.test/api/posts/${created.id}`,
+        undefined,
+        'role-token'
+      );
+      context.params = { collection: 'posts', id: created.id as string };
+
+      const response = await handleDelete(context, {
+        runtime: viewerRuntime,
+        allowedRoles: ['admin', 'editor']
+      });
+      expect(response.status).toBe(403);
     });
   });
 });

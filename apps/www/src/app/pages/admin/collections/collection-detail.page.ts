@@ -1,7 +1,13 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import type { OnInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { ApiAuthError, ApiValidationError, CmsApiService } from '@forge-cms/angular';
+import {
+  ApiAuthError,
+  ApiValidationError,
+  CmsApiService,
+  canWriteContent,
+  type AuthUser
+} from '@forge-cms/angular';
 import type { CollectionMeta } from '@forge-cms/angular';
 import {
   ErrorStateComponent,
@@ -41,12 +47,13 @@ import { LmnArrowLeftIcon } from 'lumen-icons';
         <forge-collection-list
           [collection]="col"
           [documents]="documents()"
+          [readOnly]="!canWrite()"
           (create)="openCreate()"
           (edit)="openEdit($event)"
           (delete)="deleteDoc($event)"
         />
 
-        @if (showForm()) {
+        @if (showForm() && canWrite()) {
           <forge-collection-form
             [fields]="col.fieldDefinitions"
             [initialValue]="editingDoc() ?? {}"
@@ -70,12 +77,25 @@ export class CollectionDetailPage implements OnInit {
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
 
+  readonly currentUser = signal<AuthUser | null>(null);
+  readonly canWrite = computed(() => canWriteContent(this.currentUser()));
+
   readonly showForm = signal(false);
   readonly editingDoc = signal<Record<string, unknown> | null>(null);
   readonly fieldErrors = signal<Record<string, string>>({});
 
   ngOnInit(): void {
+    void this.loadUser();
     void this.load();
+  }
+
+  private async loadUser(): Promise<void> {
+    try {
+      const user = await this.api.getCurrentUser();
+      this.currentUser.set(user);
+    } catch {
+      this.currentUser.set(null);
+    }
   }
 
   async load(): Promise<void> {

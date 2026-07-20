@@ -10,5 +10,5 @@ export default defineEventHandler(async (event) => {
     params: { collection: getRouterParam(event, 'collection') ?? '' },
     env: event.context.cloudflare?.env
   };
-  return handleCreate(context, { runtime, requireAuth: true });
+  return handleCreate(context, { runtime, allowedRoles: ['admin', 'editor'] });
 });

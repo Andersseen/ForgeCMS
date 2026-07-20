@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map, startWith } from 'rxjs';
+import { CmsApiService, type AuthUser, canManageUsers, userRole } from '@forge-cms/angular';
 import {
   VoltAvatar,
   VoltAvatarFallback,
@@ -117,9 +118,11 @@ const AUTH_TOKEN_KEY = 'forge-auth-token';
           </div>
 
           <volt-sidebar-group label="Users & Access">
-            <volt-sidebar-item routerLink="/admin/users" label="Users">
-              <lmn-users slot="icon" [size]="16" />
-            </volt-sidebar-item>
+            @if (canManageUsers(currentUser())) {
+              <volt-sidebar-item routerLink="/admin/users" label="Users">
+                <lmn-users slot="icon" [size]="16" />
+              </volt-sidebar-item>
+            }
             <volt-sidebar-item routerLink="/admin/api" label="API Keys">
               <lmn-code-bracket slot="icon" [size]="16" />
             </volt-sidebar-item>
@@ -139,13 +142,19 @@ const AUTH_TOKEN_KEY = 'forge-auth-token';
         <volt-sidebar-footer>
           <div class="flex items-center gap-3">
             <volt-avatar>
-              <img voltAvatarImage src="https://i.pravatar.cc/150?u=admin" alt="Admin" />
-              <volt-avatar-fallback>AD</volt-avatar-fallback>
+              <img
+                voltAvatarImage
+                [src]="'https://i.pravatar.cc/150?u=' + (currentUser()?.email ?? 'admin')"
+                [alt]="currentUser()?.name ?? 'User'"
+              />
+              <volt-avatar-fallback>{{ userInitials() }}</volt-avatar-fallback>
             </volt-avatar>
             @if (!sidebarService.isCollapsed()) {
               <div class="flex flex-col truncate">
-                <span class="text-sm font-medium">Admin User</span>
-                <span class="text-xs text-muted-foreground">admin&#64;forgecms.dev</span>
+                <span class="text-sm font-medium">{{ currentUser()?.name ?? 'Admin User' }}</span>
+                <span class="text-xs text-muted-foreground">
+                  {{ currentUser()?.email ?? 'admin@forgecms.dev' }} · {{ currentUserRole() }}
+                </span>
               </div>
             }
           </div>
@@ -236,6 +245,24 @@ export class ForgeAdminLayoutComponent {
   sidebarService = inject(VoltSidebarService);
   themeService = inject(ThemeService);
   private router = inject(Router);
+  private api = inject(CmsApiService);
+
+  readonly currentUser = signal<AuthUser | null>(null);
+  readonly currentUserRole = computed(() => userRole(this.currentUser()));
+  readonly userInitials = computed(() => {
+    const name = this.currentUser()?.name ?? '';
+    const email = this.currentUser()?.email ?? '';
+    const source = name || email || 'U';
+    return source
+      .split(/\s+/)
+      .filter((part) => part.length > 0)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase();
+  });
+
+  protected readonly canManageUsers = canManageUsers;
 
   private routeChanges = toSignal(
     this.router.events.pipe(
@@ -247,6 +274,19 @@ export class ForgeAdminLayoutComponent {
   );
 
   breadcrumbs = computed<BreadcrumbItem[]>(() => this.routeChanges());
+
+  constructor() {
+    void this.loadCurrentUser();
+  }
+
+  private async loadCurrentUser(): Promise<void> {
+    try {
+      const user = await this.api.getCurrentUser();
+      this.currentUser.set(user);
+    } catch {
+      // leave footer in default state if /api/auth/me fails
+    }
+  }
 
   protected isLoggedIn(): boolean {
     return localStorage.getItem(AUTH_TOKEN_KEY) !== null;

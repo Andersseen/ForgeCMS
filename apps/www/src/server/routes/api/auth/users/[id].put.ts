@@ -25,9 +25,13 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    await auth.requireAuth(createAuthRequest(event));
-  } catch {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' });
+    await auth.requireRole(createAuthRequest(event), 'admin');
+  } catch (err) {
+    const statusCode = err instanceof Error && err.message === 'Forbidden' ? 403 : 401;
+    throw createError({
+      statusCode,
+      statusMessage: err instanceof Error ? err.message : 'Unauthorized'
+    });
   }
 
   const updated = await auth.updateUser(id, body);

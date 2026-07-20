@@ -1,7 +1,7 @@
 import type { OnInit } from '@angular/core';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { CmsApiService } from '@forge-cms/angular';
+import { CmsApiService, canWriteContent, type AuthUser } from '@forge-cms/angular';
 import {
   VoltAvatar,
   VoltAvatarFallback,
@@ -74,10 +74,12 @@ const ICON_MAP: Record<string, string> = {
     <div class="space-y-6">
       <forge-page-header title="Collections" subtitle="Manage your content types and schemas.">
         <div actions>
-          <volt-button size="sm">
-            <icon-plus class="h-3.5 w-3.5 mr-1.5" />
-            New Collection
-          </volt-button>
+          @if (canWrite()) {
+            <volt-button size="sm">
+              <icon-plus class="h-3.5 w-3.5 mr-1.5" />
+              New Collection
+            </volt-button>
+          }
         </div>
       </forge-page-header>
 
@@ -193,9 +195,21 @@ export class CollectionsPage implements OnInit {
   readonly collections = signal<CollectionViewModel[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+  readonly currentUser = signal<AuthUser | null>(null);
+  readonly canWrite = computed(() => canWriteContent(this.currentUser()));
 
   ngOnInit(): void {
+    void this.loadUser();
     void this.load();
+  }
+
+  private async loadUser(): Promise<void> {
+    try {
+      const user = await this.api.getCurrentUser();
+      this.currentUser.set(user);
+    } catch {
+      this.currentUser.set(null);
+    }
   }
 
   async load(): Promise<void> {

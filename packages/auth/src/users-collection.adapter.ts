@@ -2,6 +2,8 @@ import type { DatabaseAdapter, DatabaseRecord } from '@forge-cms/db';
 import type { AuthAdapter, AuthSession, AuthUser } from './index.js';
 import { ForgeAuthError } from './index.js';
 import { extractToken, issueToken, validateSession } from './token-signer.js';
+import type { UserRole } from './roles.js';
+import { hasAnyRole } from './roles.js';
 
 export interface UsersCollectionAuthEnv {
   AUTH_SECRET?: string;
@@ -131,6 +133,22 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     const session = await this.validateSession(token ?? '');
     if (!session) throw new ForgeAuthError('Unauthorized', 'unauthorized');
     return session.user;
+  }
+
+  async requireRole(request: Request, role: UserRole): Promise<AuthUser> {
+    const user = await this.requireAuth(request);
+    if (!hasAnyRole(user, [role])) {
+      throw new ForgeAuthError('Forbidden', 'forbidden');
+    }
+    return user;
+  }
+
+  async requireAnyRole(request: Request, roles: UserRole[]): Promise<AuthUser> {
+    const user = await this.requireAuth(request);
+    if (!hasAnyRole(user, roles)) {
+      throw new ForgeAuthError('Forbidden', 'forbidden');
+    }
+    return user;
   }
 
   async login(email: string, password: string): Promise<{ token: string; user: AuthUser } | null> {

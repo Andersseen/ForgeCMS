@@ -13,5 +13,5 @@ export default defineEventHandler(async (event) => {
     },
     env: event.context.cloudflare?.env
   };
-  return handleUpdate(context, { runtime, requireAuth: true });
+  return handleUpdate(context, { runtime, allowedRoles: ['admin', 'editor'] });
 });

@@ -3,6 +3,8 @@ import type { ApiContext } from '@forge-cms/api';
 import type { ForgeCmsRuntime } from './runtime.js';
 import type { DatabaseRecord } from '@forge-cms/db';
 import type { CollectionDefinition } from '@forge-cms/core';
+import type { AuthUser, UserRole } from '@forge-cms/auth';
+import { hasAnyRole } from '@forge-cms/auth';
 
 class FilterCoercionError extends Error {
   constructor(readonly field: string) {
@@ -47,6 +49,7 @@ function coerceWhere(
 export interface HandlerOptions<TEnv = unknown> {
   runtime: ForgeCmsRuntime<TEnv>;
   requireAuth?: boolean;
+  allowedRoles?: UserRole[];
 }
 
 function jsonResponse(data: unknown, status = 200): Response {
@@ -60,15 +63,25 @@ function errorResponse(message: string, status = 500): Response {
   return jsonResponse({ error: message }, status);
 }
 
-async function requireAuth<TEnv>(
+type AuthorizationResult<T> = { success: true; user: T } | { success: false; response: Response };
+
+async function authorize<TEnv>(
   context: ApiContext<TEnv>,
-  runtime: ForgeCmsRuntime<TEnv>
-): Promise<unknown | null> {
+  runtime: ForgeCmsRuntime<TEnv>,
+  allowedRoles?: UserRole[]
+): Promise<AuthorizationResult<AuthUser>> {
+  let user: AuthUser;
   try {
-    return await runtime.adapters.auth.requireAuth(context.request);
+    user = await runtime.adapters.auth.requireAuth(context.request);
   } catch {
-    return null;
+    return { success: false, response: errorResponse('Unauthorized', 401) };
   }
+
+  if (allowedRoles !== undefined && !hasAnyRole(user, allowedRoles)) {
+    return { success: false, response: errorResponse('Forbidden', 403) };
+  }
+
+  return { success: true, user };
 }
 
 export async function handleList<TEnv = unknown>(
@@ -76,11 +89,11 @@ export async function handleList<TEnv = unknown>(
   options: HandlerOptions<TEnv>
 ): Promise<Response> {
   try {
-    const { runtime, requireAuth: requireAuthFlag } = options;
+    const { runtime, requireAuth: requireAuthFlag, allowedRoles } = options;
 
-    if (requireAuthFlag) {
-      const user = await requireAuth(context, runtime);
-      if (!user) return errorResponse('Unauthorized', 401);
+    if (requireAuthFlag || allowedRoles !== undefined) {
+      const result = await authorize(context, runtime, allowedRoles);
+      if (!result.success) return result.response;
     }
 
     const collectionSlug = context.params?.['collection'];
@@ -133,11 +146,11 @@ export async function handleRead<TEnv = unknown>(
   options: HandlerOptions<TEnv>
 ): Promise<Response> {
   try {
-    const { runtime, requireAuth: requireAuthFlag } = options;
+    const { runtime, requireAuth: requireAuthFlag, allowedRoles } = options;
 
-    if (requireAuthFlag) {
-      const user = await requireAuth(context, runtime);
-      if (!user) return errorResponse('Unauthorized', 401);
+    if (requireAuthFlag || allowedRoles !== undefined) {
+      const result = await authorize(context, runtime, allowedRoles);
+      if (!result.success) return result.response;
     }
 
     const collectionSlug = context.params?.['collection'];
@@ -161,11 +174,11 @@ export async function handleCreate<TEnv = unknown>(
   options: HandlerOptions<TEnv>
 ): Promise<Response> {
   try {
-    const { runtime, requireAuth: requireAuthFlag } = options;
+    const { runtime, requireAuth: requireAuthFlag, allowedRoles } = options;
 
-    if (requireAuthFlag) {
-      const user = await requireAuth(context, runtime);
-      if (!user) return errorResponse('Unauthorized', 401);
+    if (requireAuthFlag || allowedRoles !== undefined) {
+      const result = await authorize(context, runtime, allowedRoles);
+      if (!result.success) return result.response;
     }
 
     const collectionSlug = context.params?.['collection'];
@@ -198,11 +211,11 @@ export async function handleUpdate<TEnv = unknown>(
   options: HandlerOptions<TEnv>
 ): Promise<Response> {
   try {
-    const { runtime, requireAuth: requireAuthFlag } = options;
+    const { runtime, requireAuth: requireAuthFlag, allowedRoles } = options;
 
-    if (requireAuthFlag) {
-      const user = await requireAuth(context, runtime);
-      if (!user) return errorResponse('Unauthorized', 401);
+    if (requireAuthFlag || allowedRoles !== undefined) {
+      const result = await authorize(context, runtime, allowedRoles);
+      if (!result.success) return result.response;
     }
 
     const collectionSlug = context.params?.['collection'];
@@ -248,11 +261,11 @@ export async function handleDelete<TEnv = unknown>(
   options: HandlerOptions<TEnv>
 ): Promise<Response> {
   try {
-    const { runtime, requireAuth: requireAuthFlag } = options;
+    const { runtime, requireAuth: requireAuthFlag, allowedRoles } = options;
 
-    if (requireAuthFlag) {
-      const user = await requireAuth(context, runtime);
-      if (!user) return errorResponse('Unauthorized', 401);
+    if (requireAuthFlag || allowedRoles !== undefined) {
+      const result = await authorize(context, runtime, allowedRoles);
+      if (!result.success) return result.response;
     }
 
     const collectionSlug = context.params?.['collection'];
