@@ -36,7 +36,7 @@ is done and locally-verified but its production deploy is unconfirmed from this 
 | `@forge-cms/api`        | 🟡 Minimal                       | `ApiContext`, `CrudHandlers` types, `defineCrudHandlers`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Anything beyond type definitions; route-mounting helpers                                                                                                |
 | `@forge-cms/runtime`    | ✅ Solid, now actually used      | `ForgeCmsRuntime` (binds collections + adapters, `init`, `syncSchema`), HTTP handlers `handleList/Read/Create/Update/Delete` with validation, optional auth, JSON envelopes — all correctly implemented and tested, and (as of spec 007, 2026-07-08) actually called by all 5 of `apps/www`'s CRUD routes; **partial `handleUpdate` bug fixed 2026-07-19**; (spec 010, 2026-07-20) handlers support `allowedRoles` and return `401`/`403`                                                                                                                                                                                                                                                                                    | Hooks (beforeChange etc.), field-level access control, relation population                                                                              |
 | `@forge-cms/cloudflare` | ✅ D1 wired into production      | `D1DatabaseAdapter` (with index creation) — **now used for real** in `apps/www`'s production deploy (PLAN.md P2-1, 2026-07-07), selected automatically when `env.DB` exists; `R2StorageAdapter` (still unused by apps/www); hand-written binding types; **`findMany` where-value coercion fixed 2026-07-19**                                                                                                                                                                                                                                                                                                                                                                                                                 | Tests against real/miniflare bindings for `R2StorageAdapter`. No KV adapter — description/keywords no longer claim one (2026-07-07)                     |
-| `@forge-cms/angular`    | ✅ Solid                         | `CmsApiService` (fetch-based, full CRUD + collections + me + login + **user management**, added spec 009 2026-07-20), `provideForgeCms`, `FORGE_CMS_CONFIG` token, `CollectionMeta.fieldDefinitions`/`FieldMeta` (redundant `fields: string[]` removed 2026-07-19), `ApiValidationError`/`ApiAuthError` (401/validation-error typing, added 2026-07-08); (spec 010, 2026-07-20) `UserRole` type and role helpers (`isAdmin`, `canWriteContent`, `canManageUsers`)                                                                                                                                                                                                                                                            | Signals-based resources, SSR-safe fetch                                                                                                                 |
+| `@forge-cms/angular`    | ✅ Solid                         | `CmsApiService` (fetch-based, full CRUD + collections + me + login + **user management**, added spec 009 2026-07-20), `provideForgeCms`, `FORGE_CMS_CONFIG` token, `CollectionMeta.fieldDefinitions`/`FieldMeta` (redundant `fields: string[]` removed 2026-07-19), `ApiValidationError`/`ApiAuthError` (401/validation-error typing, added 2026-07-08); (spec 010, 2026-07-20) `UserRole` type and role helpers (`isAdmin`, `canWriteContent`, `canManageUsers`); **now built with `ngc` (`compilationMode: "partial"`) instead of plain `tsc`, 2026-07-20** — `CmsApiService`'s `@Injectable()` needs real Ivy compilation, not just type-checking, or it crashes in AOT production builds (see known issue #10)                                                                                                                                                                                                                                                            | Signals-based resources, SSR-safe fetch                                                                                                                 |
 | `@forge-cms/admin`      | ✅ Solid, now consumed           | Real `ForgeAdminLayoutComponent` (sidebar/breadcrumbs/theme toggle/login-logout), `ForgeCollectionListComponent` (schema-driven document table), `ForgeCollectionFormComponent` (schema-driven create/edit form, now supports `relation` fields and native select), `ForgeAdminConfig`, plus `PageHeaderComponent`/`LoadingStateComponent`/`ErrorStateComponent`/`EmptyStateComponent` (spec 008, 2026-07-08) — `apps/www` consumes all of these now; peer deps on `@voltui/components`/`lumen-icons`/`rxjs`; **builds with `ngc` (`angularCompilerOptions.compilationMode: "partial"`)**; (spec 010, 2026-07-20) layout loads/displays current user and conditionally shows Users nav; collection-list has `readOnly` input | `dashboard`/`media`/`api`/`settings` pages and the all-collections grid stay app-local; a config-driven/dynamic sidebar nav (currently fixed nav items) |
 | `@forge-cms/testing`    | ✅ Solid                         | Contract test suites for database/auth/storage adapters (`runDatabaseAdapterContractTests`, …), exported via `@forge-cms/testing/contracts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | —                                                                                                                                                       |
 
@@ -98,18 +98,34 @@ ARCHITECTURE.md: `{ error: string, details?: ValidationError[] }`.
 9. ~~Role-based access control~~ — **fixed 2026-07-20, spec 010.** Roles are now enforced in the
    backend (`/api/auth/users` admin-only, `/api/v1/*` writes restricted to admin/editor) and the
    admin UI hides write actions and the Users page for unauthorized roles.
-10. Production-only crash on every `/admin` page: `Error: JIT compiler unavailable`. Root cause:
-    `@forge-cms/admin` and `@voltui/components` both built with `angularCompilerOptions.compilationMode:
-    "partial"` (Ivy partial compilation), which requires the consuming app's build to run the Angular
-    linker over `node_modules`. `apps/www`'s Vite/Analog.js pipeline has no linker step, so unlinked
-    `ɵɵngDeclareComponent` calls shipped to production; AOT prod builds tree-shake `@angular/compiler`
-    out entirely, so Angular's runtime JIT fallback for those unlinked declarations threw. Silent in
-    local dev because dev builds keep JIT available. `@forge-cms/admin` **fixed 2026-07-20** (switched
-    to `compilationMode: "full"`, takes effect on next deploy). `@voltui/components` fixed in its own
-    repo (0.6.1, same change) but **not yet published to npm from this environment (no valid npm
-    credentials)** — `apps/www`'s `@voltui/components` dependency is still pinned to the broken `^0.6.0`
-    until 0.6.1 is published and the dependency is bumped, so the production crash is not fully resolved
-    yet.
+10. ~~Production-only crash on every `/admin` page: `Error: JIT compiler unavailable`~~ — **fixed
+    2026-07-20.** Two independent causes, both fixed inside this repo without touching any external
+    package:
+    - `@forge-cms/admin` and third-party libraries like `@voltui/components` build with
+      `angularCompilerOptions.compilationMode: "partial"` (the correct choice for a publishable
+      library — it isn't pinned to one exact Angular compiler version). Partial compilation ships
+      `ɵɵngDeclareComponent`-style calls that require the consuming app's build to run the **Angular
+      linker**. `apps/www`'s Vite/Analog.js pipeline had no linker step, so those declarations reached
+      production unlinked; AOT prod builds tree-shake `@angular/compiler` out entirely, so Angular's
+      runtime JIT fallback threw. Fixed by adding a real Angular linker to `apps/www`'s Vite build:
+      `apps/www/vite-plugins/angular-linker.ts` runs `@angular/compiler-cli/linker/babel` (the
+      officially documented way to integrate the linker outside the Angular CLI) over any dependency
+      file that `@angular/compiler-cli/linker`'s `needsLinking` flags — this fixes every partial-Ivy
+      dependency in the graph, present and future, without changing any library's compilation mode.
+    - Separately, `@forge-cms/angular` built with plain `tsc`, not `ngc`, so `CmsApiService`'s
+      `@Injectable({ providedIn: 'root' })` was never processed by Angular's compiler at all — it
+      shipped as a raw runtime decorator with no static `ɵprov`, which also needs JIT (a different
+      failure mode from the linking issue above, same underlying "AOT prod builds have no
+      `@angular/compiler`" cause). Fixed by switching its build to `ngc` with
+      `compilationMode: "partial"` (consistent with `@forge-cms/admin`); the same linker plugin
+      resolves it at `apps/www`'s build time.
+    - Verified with a real browser (Playwright) against the actual `wrangler pages dev`-served
+      production build: landing, login (rendering real `@voltui/components`), and `/admin/dashboard`
+      all load with zero console errors.
+    - Found but **not fixed** (separate, unrelated bug, needs its own investigation): local D1 login
+      returns `500 D1_ERROR: table users has no column named passwordHash` — the generated `users`
+      table schema and `UsersCollectionAuthAdapter.createUser`'s insert are out of sync on the D1
+      adapter path.
 
 ## What's next
 

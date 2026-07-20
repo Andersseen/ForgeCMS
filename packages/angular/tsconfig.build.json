@@ -1,4 +1,10 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false
+  },
+  "angularCompilerOptions": {
+    "compilationMode": "partial"
+  },
   "exclude": ["src/**/*.test.ts"]
 }

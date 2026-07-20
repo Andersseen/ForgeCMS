@@ -34,7 +34,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "ngc -p tsconfig.build.json",
     "test": "vitest run --dir .",
     "test:watch": "vitest --dir .",
     "lint": "eslint .",
@@ -45,6 +45,8 @@
     "@angular/core": ">=19.0.0"
   },
   "devDependencies": {
+    "@angular/compiler": "^21.2.10",
+    "@angular/compiler-cli": "^21.2.10",
     "@angular/core": "^21.2.10",
     "typescript": "catalog:",
     "vitest": "catalog:"
