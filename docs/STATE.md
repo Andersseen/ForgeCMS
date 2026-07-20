@@ -98,6 +98,18 @@ ARCHITECTURE.md: `{ error: string, details?: ValidationError[] }`.
 9. ~~Role-based access control~~ — **fixed 2026-07-20, spec 010.** Roles are now enforced in the
    backend (`/api/auth/users` admin-only, `/api/v1/*` writes restricted to admin/editor) and the
    admin UI hides write actions and the Users page for unauthorized roles.
+10. Production-only crash on every `/admin` page: `Error: JIT compiler unavailable`. Root cause:
+    `@forge-cms/admin` and `@voltui/components` both built with `angularCompilerOptions.compilationMode:
+    "partial"` (Ivy partial compilation), which requires the consuming app's build to run the Angular
+    linker over `node_modules`. `apps/www`'s Vite/Analog.js pipeline has no linker step, so unlinked
+    `ɵɵngDeclareComponent` calls shipped to production; AOT prod builds tree-shake `@angular/compiler`
+    out entirely, so Angular's runtime JIT fallback for those unlinked declarations threw. Silent in
+    local dev because dev builds keep JIT available. `@forge-cms/admin` **fixed 2026-07-20** (switched
+    to `compilationMode: "full"`, takes effect on next deploy). `@voltui/components` fixed in its own
+    repo (0.6.1, same change) but **not yet published to npm from this environment (no valid npm
+    credentials)** — `apps/www`'s `@voltui/components` dependency is still pinned to the broken `^0.6.0`
+    until 0.6.1 is published and the dependency is bumped, so the production crash is not fully resolved
+    yet.
 
 ## What's next
 
