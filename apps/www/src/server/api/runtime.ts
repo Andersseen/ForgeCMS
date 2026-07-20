@@ -1,6 +1,6 @@
 import { defineCollection, defineField } from '@forge-cms/core';
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
-import { SignedTokenAuthAdapter } from '@forge-cms/auth';
+import { UsersCollectionAuthAdapter } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import { D1DatabaseAdapter, type D1Database } from '@forge-cms/cloudflare';
 import { ForgeCmsRuntime } from '@forge-cms/runtime';
@@ -147,12 +147,13 @@ export function getServerRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<Serve
 
 async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>> {
   const database = env?.DB ? new D1DatabaseAdapter() : new InMemoryDatabaseAdapter();
+  const auth = new UsersCollectionAuthAdapter().init({ ...env, userDatabase: database });
 
   const runtime = new ForgeCmsRuntime<ServerEnv>({
     collections,
     adapters: {
       database,
-      auth: new SignedTokenAuthAdapter(),
+      auth,
       storage: new InMemoryStorageAdapter()
     },
     ...(env !== undefined && { env })
@@ -167,12 +168,21 @@ async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>
 
 async function seedIfEmpty(runtime: ForgeCmsRuntime): Promise<void> {
   const db = runtime.adapters.database;
+  const auth = runtime.adapters.auth as UsersCollectionAuthAdapter;
 
   // site_config is seeded with exactly one record and nothing else creates one, so it's a safe,
   // cheap sentinel for "has this database already been seeded" — D1 persists across cold starts,
   // so seeding must not run more than once against the same database.
   const existing = await db.findMany({ collection: 'site_config', limit: 1 });
   if (existing.length > 0) return;
+
+  // Seed the demo admin user so the published login credentials keep working.
+  await auth.createUser({
+    email: 'demo@forgecms.dev',
+    password: 'forgecms-demo',
+    name: 'Demo Admin',
+    role: 'admin'
+  });
 
   await db.create('pages', {
     title: 'Home',

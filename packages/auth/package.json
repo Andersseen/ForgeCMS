@@ -43,6 +43,7 @@
     "clean": "rm -rf dist coverage"
   },
   "devDependencies": {
+    "@forge-cms/db": "workspace:*",
     "@forge-cms/testing": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"

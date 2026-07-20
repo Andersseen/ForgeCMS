@@ -1,11 +1,11 @@
 import { defineEventHandler, readBody, createError } from 'h3';
-import type { SignedTokenAuthAdapter } from '@forge-cms/auth';
+import type { UsersCollectionAuthAdapter } from '@forge-cms/auth';
 import { getServerRuntime } from '../../../api/runtime';
 
 /**
  * POST /api/auth/login
  *
- * Validates { email, password } against the demo credentials and returns a signed token + user.
+ * Validates { email, password } against the users collection and returns a signed token + user.
  */
 export default defineEventHandler(async (event) => {
   const serverRuntime = await getServerRuntime(event.context.cloudflare?.env);
@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Missing email or password' });
   }
 
-  const auth = serverRuntime.adapters.auth as SignedTokenAuthAdapter;
+  const auth = serverRuntime.adapters.auth as UsersCollectionAuthAdapter;
   const result = await auth.login(body.email, body.password);
   if (!result) {
     throw createError({ statusCode: 401, statusMessage: 'Invalid email or password' });

@@ -67,7 +67,15 @@ export interface AuthUser {
   id: string;
   email?: string;
   name?: string;
+  role?: string;
   roles?: string[];
+}
+
+export interface CreateUserInput {
+  email: string;
+  password: string;
+  name?: string;
+  role?: 'admin' | 'editor' | 'viewer';
 }
 
 export interface ForgeCmsConfig {
@@ -193,5 +201,42 @@ export class CmsApiService {
     if (!response.ok) throw await toApiError(response, 'Login failed');
     const result = (await response.json()) as { data: { token: string; user: AuthUser } };
     return result.data;
+  }
+
+  async getUsers(): Promise<AuthUser[]> {
+    const response = await fetch('/api/auth/users', { headers: this.getHeaders() });
+    if (!response.ok) throw await toApiError(response, 'Failed to fetch users');
+    const result = (await response.json()) as { data: AuthUser[] };
+    return result.data;
+  }
+
+  async createUser(input: CreateUserInput): Promise<AuthUser> {
+    const response = await fetch('/api/auth/users', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(input)
+    });
+    if (!response.ok) throw await toApiError(response, 'Failed to create user');
+    const result = (await response.json()) as { data: AuthUser };
+    return result.data;
+  }
+
+  async updateUser(id: string, input: Partial<CreateUserInput>): Promise<AuthUser> {
+    const response = await fetch(`/api/auth/users/${id}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(input)
+    });
+    if (!response.ok) throw await toApiError(response, 'Failed to update user');
+    const result = (await response.json()) as { data: AuthUser };
+    return result.data;
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    const response = await fetch(`/api/auth/users/${id}`, {
+      method: 'DELETE',
+      headers: this.getHeaders()
+    });
+    if (!response.ok) throw await toApiError(response, 'Failed to delete user');
   }
 }

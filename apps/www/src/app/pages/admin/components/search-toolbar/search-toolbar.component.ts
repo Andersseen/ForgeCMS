@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { VoltButton, VoltInput } from '@voltui/components';
+import { VoltInput } from '@voltui/components';
 
 @Component({
   selector: 'forge-search-toolbar',
   standalone: true,
-  imports: [VoltButton, VoltInput],
+  imports: [VoltInput],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex items-center gap-3">
