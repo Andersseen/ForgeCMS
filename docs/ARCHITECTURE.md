@@ -99,8 +99,15 @@ run the matching suite in its test file.** This is what makes adapters swappable
 
 - `defineField.text({ required: true })` → `FieldDefinition<'text', string, TextFieldOptions>`; the
   phantom `__value` carries the value type for inference.
-- `defineCollection({ slug, fields })` → `CollectionDefinition`; `CollectionData<typeof col>` infers
-  the record type.
+- `defineCollection({ slug, fields, hooks?, access? })` → `CollectionDefinition`;
+  `CollectionData<typeof col>` infers the record type. `hooks.beforeChange`/`afterChange` (spec 013) are
+  arrays of functions run in order by `@forge-cms/runtime`'s handlers around create/update; a throwing
+  `beforeChange` hook rejects the request (`400`), a throwing `afterChange` hook is logged and does not
+  fail the (already-succeeded) request. `access.{read,create,update,delete}` (spec 013) are role-name
+  arrays that override the route's static `allowedRoles` for that operation when present.
+- Field options gain `access.{read,write}` (spec 013, role-name arrays) — `read` hides the field from
+  `GET` responses for other roles (including unauthenticated), `write` rejects (`403`) a create/update
+  body that sets the field from another role.
 - `validateCollection(definition, data)` → `{ valid, errors: ValidationError[] }` used by write handlers.
 - `db`'s schema-generator maps field kinds to SQLite column types and generates
   `CREATE TABLE IF NOT EXISTS` (+ indexes for `index: true` / `unique: true` in D1).

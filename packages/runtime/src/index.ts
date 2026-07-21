@@ -9,3 +9,5 @@ export {
   type HandlerOptions
 } from './handlers.js';
 export { populateRecord, populateRecords } from './populate.js';
+export { runBeforeChangeHooks, runAfterChangeHooks } from './hooks.js';
+export { filterReadableFields, assertWritableFields, FieldAccessError } from './field-access.js';

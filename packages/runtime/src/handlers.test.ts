@@ -633,4 +633,201 @@ describe('CRUD Handlers', () => {
       expect(body.error).toContain('depth');
     });
   });
+
+  describe('hooks and access control', () => {
+    function createRuntimeWithAccess(
+      opts: {
+        collectionAccess?: { create?: ('admin' | 'editor' | 'viewer')[] };
+        beforeChange?: (ctx: {
+          data: Record<string, unknown>;
+        }) => Record<string, unknown> | Promise<Record<string, unknown>>;
+        afterChangeSpy?: (result: Record<string, unknown>) => void;
+      } = {}
+    ) {
+      const articles = defineCollection({
+        slug: 'articles',
+        fields: {
+          title: defineField.text({ required: true }),
+          internalNote: defineField.text({ access: { read: ['admin'], write: ['admin'] } })
+        },
+        ...(opts.collectionAccess && { access: opts.collectionAccess }),
+        ...((opts.beforeChange || opts.afterChangeSpy) && {
+          hooks: {
+            ...(opts.beforeChange && { beforeChange: [opts.beforeChange] }),
+            ...(opts.afterChangeSpy && {
+              afterChange: [(ctx: { result: Record<string, unknown> }) => opts.afterChangeSpy!(ctx.result)]
+            })
+          }
+        })
+      });
+
+      const admin = new InMemoryAuthAdapter();
+      admin.registerSession('admin-token', { user: { id: 'admin-1', role: 'admin' } });
+      admin.registerSession('editor-token', { user: { id: 'editor-1', role: 'editor' } });
+      admin.registerSession('viewer-token', { user: { id: 'viewer-1', role: 'viewer' } });
+
+      const accessRuntime = new ForgeCmsRuntime({
+        collections: [articles],
+        adapters: {
+          database: new InMemoryDatabaseAdapter(),
+          auth: admin,
+          storage: new InMemoryStorageAdapter()
+        }
+      });
+      accessRuntime.init();
+      return accessRuntime;
+    }
+
+    it('collection.access.create overrides the route allowedRoles', async () => {
+      const accessRuntime = createRuntimeWithAccess({ collectionAccess: { create: ['admin'] } });
+
+      const context = createTestContext(
+        'POST',
+        'https://forge.test/api/articles',
+        { title: 'Hello' },
+        'editor-token'
+      );
+      context.params = { collection: 'articles' };
+
+      // route says admin OR editor may create, but the collection itself narrows to admin-only
+      const response = await handleCreate(context, {
+        runtime: accessRuntime,
+        allowedRoles: ['admin', 'editor']
+      });
+      expect(response.status).toBe(403);
+    });
+
+    it('falls back to the route allowedRoles when collection.access is unset', async () => {
+      const accessRuntime = createRuntimeWithAccess();
+
+      const context = createTestContext(
+        'POST',
+        'https://forge.test/api/articles',
+        { title: 'Hello' },
+        'editor-token'
+      );
+      context.params = { collection: 'articles' };
+
+      const response = await handleCreate(context, {
+        runtime: accessRuntime,
+        allowedRoles: ['admin', 'editor']
+      });
+      expect(response.status).toBe(201);
+    });
+
+    it('strips a field-read-restricted field from list responses for an unauthorized role', async () => {
+      const accessRuntime = createRuntimeWithAccess();
+      await accessRuntime.adapters.database.create('articles', {
+        title: 'Hello',
+        internalNote: 'secret'
+      });
+
+      const context = createTestContext(
+        'GET',
+        'https://forge.test/api/articles',
+        undefined,
+        'viewer-token'
+      );
+      context.params = { collection: 'articles' };
+
+      const response = await handleList(context, { runtime: accessRuntime, requireAuth: true });
+      const body = await response.json();
+
+      expect(body.data[0].title).toBe('Hello');
+      expect(body.data[0]).not.toHaveProperty('internalNote');
+    });
+
+    it('keeps a field-read-restricted field for an authorized role', async () => {
+      const accessRuntime = createRuntimeWithAccess();
+      await accessRuntime.adapters.database.create('articles', {
+        title: 'Hello',
+        internalNote: 'secret'
+      });
+
+      const context = createTestContext(
+        'GET',
+        'https://forge.test/api/articles',
+        undefined,
+        'admin-token'
+      );
+      context.params = { collection: 'articles' };
+
+      const response = await handleList(context, { runtime: accessRuntime, requireAuth: true });
+      const body = await response.json();
+
+      expect(body.data[0].internalNote).toBe('secret');
+    });
+
+    it('rejects writing a field-write-restricted field from an unauthorized role', async () => {
+      const accessRuntime = createRuntimeWithAccess();
+
+      const context = createTestContext(
+        'POST',
+        'https://forge.test/api/articles',
+        { title: 'Hello', internalNote: 'secret' },
+        'editor-token'
+      );
+      context.params = { collection: 'articles' };
+
+      const response = await handleCreate(context, { runtime: accessRuntime, requireAuth: true });
+      const body = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(body.error).toContain('internalNote');
+    });
+
+    it('runs a beforeChange hook that mutates data before validation', async () => {
+      const accessRuntime = createRuntimeWithAccess({
+        beforeChange: (ctx) => ({ ...ctx.data, title: `${ctx.data.title as string} (edited)` })
+      });
+
+      const context = createTestContext('POST', 'https://forge.test/api/articles', {
+        title: 'Hello'
+      });
+      context.params = { collection: 'articles' };
+
+      const response = await handleCreate(context, { runtime: accessRuntime });
+      const body = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(body.data.title).toBe('Hello (edited)');
+    });
+
+    it('returns 400 when a beforeChange hook throws', async () => {
+      const accessRuntime = createRuntimeWithAccess({
+        beforeChange: () => {
+          throw new Error('rejected by hook');
+        }
+      });
+
+      const context = createTestContext('POST', 'https://forge.test/api/articles', {
+        title: 'Hello'
+      });
+      context.params = { collection: 'articles' };
+
+      const response = await handleCreate(context, { runtime: accessRuntime });
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.error).toContain('rejected by hook');
+    });
+
+    it('runs an afterChange hook after a successful create', async () => {
+      let seenTitle: unknown;
+      const accessRuntime = createRuntimeWithAccess({
+        afterChangeSpy: (result) => {
+          seenTitle = result.title;
+        }
+      });
+
+      const context = createTestContext('POST', 'https://forge.test/api/articles', {
+        title: 'Hello'
+      });
+      context.params = { collection: 'articles' };
+
+      const response = await handleCreate(context, { runtime: accessRuntime });
+      expect(response.status).toBe(201);
+      expect(seenTitle).toBe('Hello');
+    });
+  });
 });

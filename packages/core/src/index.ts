@@ -10,12 +10,20 @@ export type FieldKind =
   | 'email'
   | 'textarea';
 
+export interface FieldAccess {
+  /** Role names allowed to read this field's value. Undefined = every role (incl. unauthenticated). */
+  read?: string[];
+  /** Role names allowed to set this field on create/update. Undefined = anyone who can write the collection. */
+  write?: string[];
+}
+
 export interface BaseFieldOptions {
   label?: string;
   required?: boolean;
   defaultValue?: unknown;
   unique?: boolean;
   index?: boolean;
+  access?: FieldAccess;
 }
 
 export interface TextFieldOptions extends BaseFieldOptions {
@@ -89,12 +97,44 @@ export type AnyField =
 
 export type FieldMap = Record<string, AnyField>;
 
+export interface HookContext {
+  collection: CollectionDefinition;
+  operation: 'create' | 'update';
+  data: Record<string, unknown>;
+  /** The record as it existed before this change. Only set for `update`. */
+  previousData?: Record<string, unknown>;
+}
+
+export type BeforeChangeHook = (
+  ctx: HookContext
+) => Record<string, unknown> | Promise<Record<string, unknown>>;
+
+export type AfterChangeHook = (
+  ctx: HookContext & { result: Record<string, unknown> }
+) => void | Promise<void>;
+
+export interface CollectionHooks {
+  beforeChange?: BeforeChangeHook[];
+  afterChange?: AfterChangeHook[];
+}
+
+export interface CollectionAccess {
+  /** Role names allowed to read documents. Undefined = public (today's default). */
+  read?: string[];
+  /** Role names allowed to create documents. Undefined = fall back to the route's own role check. */
+  create?: string[];
+  update?: string[];
+  delete?: string[];
+}
+
 export interface CollectionDefinition<
   TSlug extends string = string,
   TFields extends FieldMap = FieldMap
 > {
   slug: TSlug;
   fields: Readonly<TFields>;
+  hooks?: CollectionHooks;
+  access?: CollectionAccess;
 }
 
 export type CollectionData<TCollection extends CollectionDefinition> = {

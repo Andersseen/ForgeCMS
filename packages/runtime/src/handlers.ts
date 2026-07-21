@@ -4,8 +4,10 @@ import type { ForgeCmsRuntime } from './runtime.js';
 import type { DatabaseRecord, DatabaseWhere } from '@forge-cms/db';
 import type { CollectionDefinition } from '@forge-cms/core';
 import type { AuthUser, UserRole } from '@forge-cms/auth';
-import { hasAnyRole } from '@forge-cms/auth';
+import { hasAnyRole, userRole } from '@forge-cms/auth';
 import { populateRecord, populateRecords } from './populate.js';
+import { runBeforeChangeHooks, runAfterChangeHooks } from './hooks.js';
+import { filterReadableFields, assertWritableFields, FieldAccessError } from './field-access.js';
 
 const WHERE_OPERATORS = new Set(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'contains']);
 const SYSTEM_SORT_FIELDS = new Set(['id', 'created_at', 'updated_at']);
@@ -155,6 +157,26 @@ async function authorize<TEnv>(
   return { success: true, user };
 }
 
+/** Best-effort auth resolution for routes that don't require it, so field-read access can still apply. */
+async function resolveOptionalUser<TEnv>(
+  context: ApiContext<TEnv>,
+  runtime: ForgeCmsRuntime<TEnv>
+): Promise<AuthUser | null> {
+  try {
+    return await runtime.adapters.auth.requireAuth(context.request);
+  } catch {
+    return null;
+  }
+}
+
+/** Collection-defined access for an operation, falling back to the handler's static allowedRoles. */
+function effectiveRoles(
+  collectionRoles: string[] | undefined,
+  allowedRoles: UserRole[] | undefined
+): UserRole[] | undefined {
+  return (collectionRoles as UserRole[] | undefined) ?? allowedRoles;
+}
+
 export async function handleList<TEnv = unknown>(
   context: ApiContext<TEnv>,
   options: HandlerOptions<TEnv>
@@ -162,16 +184,22 @@ export async function handleList<TEnv = unknown>(
   try {
     const { runtime, requireAuth: requireAuthFlag, allowedRoles } = options;
 
-    if (requireAuthFlag || allowedRoles !== undefined) {
-      const result = await authorize(context, runtime, allowedRoles);
-      if (!result.success) return result.response;
-    }
-
     const collectionSlug = context.params?.['collection'];
     if (!collectionSlug) return errorResponse('Missing collection parameter', 400);
 
     const collection = runtime.getCollection(collectionSlug);
     if (!collection) return errorResponse(`Collection '${collectionSlug}' not found`, 404);
+
+    const roles = effectiveRoles(collection.access?.read, allowedRoles);
+    let user: AuthUser | null = null;
+    if (requireAuthFlag || roles !== undefined) {
+      const result = await authorize(context, runtime, roles);
+      if (!result.success) return result.response;
+      user = result.user;
+    } else {
+      user = await resolveOptionalUser(context, runtime);
+    }
+    const role = user ? userRole(user) : undefined;
 
     const url = new URL(context.request.url);
     const limit = url.searchParams.has('limit')
@@ -219,6 +247,7 @@ export async function handleList<TEnv = unknown>(
     if (depth === 1) {
       records = await populateRecords(records, collection, runtime);
     }
+    records = records.map((r) => filterReadableFields(r, collection, role));
 
     return jsonResponse({
       data: records,
@@ -236,17 +265,23 @@ export async function handleRead<TEnv = unknown>(
   try {
     const { runtime, requireAuth: requireAuthFlag, allowedRoles } = options;
 
-    if (requireAuthFlag || allowedRoles !== undefined) {
-      const result = await authorize(context, runtime, allowedRoles);
-      if (!result.success) return result.response;
-    }
-
     const collectionSlug = context.params?.['collection'];
     const id = context.params?.['id'];
     if (!collectionSlug || !id) return errorResponse('Missing collection or id parameter', 400);
 
     const collection = runtime.getCollection(collectionSlug);
     if (!collection) return errorResponse(`Collection '${collectionSlug}' not found`, 404);
+
+    const roles = effectiveRoles(collection.access?.read, allowedRoles);
+    let user: AuthUser | null = null;
+    if (requireAuthFlag || roles !== undefined) {
+      const result = await authorize(context, runtime, roles);
+      if (!result.success) return result.response;
+      user = result.user;
+    } else {
+      user = await resolveOptionalUser(context, runtime);
+    }
+    const role = user ? userRole(user) : undefined;
 
     let depth: 0 | 1;
     try {
@@ -262,6 +297,7 @@ export async function handleRead<TEnv = unknown>(
     if (depth === 1) {
       record = await populateRecord(record, collection, runtime);
     }
+    record = filterReadableFields(record, collection, role);
 
     return jsonResponse({ data: record });
   } catch (err) {
@@ -276,16 +312,20 @@ export async function handleCreate<TEnv = unknown>(
   try {
     const { runtime, requireAuth: requireAuthFlag, allowedRoles } = options;
 
-    if (requireAuthFlag || allowedRoles !== undefined) {
-      const result = await authorize(context, runtime, allowedRoles);
-      if (!result.success) return result.response;
-    }
-
     const collectionSlug = context.params?.['collection'];
     if (!collectionSlug) return errorResponse('Missing collection parameter', 400);
 
     const collection = runtime.getCollection(collectionSlug);
     if (!collection) return errorResponse(`Collection '${collectionSlug}' not found`, 404);
+
+    const roles = effectiveRoles(collection.access?.create, allowedRoles);
+    let user: AuthUser | null = null;
+    if (requireAuthFlag || roles !== undefined) {
+      const result = await authorize(context, runtime, roles);
+      if (!result.success) return result.response;
+      user = result.user;
+    }
+    const role = user ? userRole(user) : undefined;
 
     let body: DatabaseRecord;
     try {
@@ -294,12 +334,27 @@ export async function handleCreate<TEnv = unknown>(
       return errorResponse('Invalid JSON body', 400);
     }
 
-    const validation = validateCollection(collection, body);
+    try {
+      assertWritableFields(body, collection, role);
+    } catch (err) {
+      if (err instanceof FieldAccessError) return errorResponse(err.message, 403);
+      throw err;
+    }
+
+    let data: Record<string, unknown>;
+    try {
+      data = await runBeforeChangeHooks(collection, { operation: 'create', data: body });
+    } catch (err) {
+      return errorResponse(err instanceof Error ? err.message : 'beforeChange hook failed', 400);
+    }
+
+    const validation = validateCollection(collection, data);
     if (!validation.valid) {
       return jsonResponse({ error: 'Validation failed', details: validation.errors }, 400);
     }
 
-    const record = await runtime.adapters.database.create(collectionSlug, body);
+    const record = await runtime.adapters.database.create(collectionSlug, data);
+    await runAfterChangeHooks(collection, { operation: 'create', data, result: record });
     return jsonResponse({ data: record }, 201);
   } catch (err) {
     return errorResponse(err instanceof Error ? err.message : 'Unknown error', 500);
@@ -313,17 +368,21 @@ export async function handleUpdate<TEnv = unknown>(
   try {
     const { runtime, requireAuth: requireAuthFlag, allowedRoles } = options;
 
-    if (requireAuthFlag || allowedRoles !== undefined) {
-      const result = await authorize(context, runtime, allowedRoles);
-      if (!result.success) return result.response;
-    }
-
     const collectionSlug = context.params?.['collection'];
     const id = context.params?.['id'];
     if (!collectionSlug || !id) return errorResponse('Missing collection or id parameter', 400);
 
     const collection = runtime.getCollection(collectionSlug);
     if (!collection) return errorResponse(`Collection '${collectionSlug}' not found`, 404);
+
+    const roles = effectiveRoles(collection.access?.update, allowedRoles);
+    let user: AuthUser | null = null;
+    if (requireAuthFlag || roles !== undefined) {
+      const result = await authorize(context, runtime, roles);
+      if (!result.success) return result.response;
+      user = result.user;
+    }
+    const role = user ? userRole(user) : undefined;
 
     let body: DatabaseRecord;
     try {
@@ -332,24 +391,48 @@ export async function handleUpdate<TEnv = unknown>(
       return errorResponse('Invalid JSON body', 400);
     }
 
+    try {
+      assertWritableFields(body, collection, role);
+    } catch (err) {
+      if (err instanceof FieldAccessError) return errorResponse(err.message, 403);
+      throw err;
+    }
+
     const existing = await runtime.adapters.database.findById(collectionSlug, id);
     if (!existing) return errorResponse(`Record '${id}' not found in '${collectionSlug}'`, 404);
 
-    // Merge existing record with the partial body so required fields already present
-    // on the stored document do not fail validation. Report only errors for fields the
-    // caller is touching (present in body) or for fields that do not exist yet.
-    const merged = { ...existing, ...body };
+    let data: Record<string, unknown>;
+    try {
+      data = await runBeforeChangeHooks(collection, {
+        operation: 'update',
+        data: body,
+        previousData: existing
+      });
+    } catch (err) {
+      return errorResponse(err instanceof Error ? err.message : 'beforeChange hook failed', 400);
+    }
+
+    // Merge existing record with the (hook-processed) partial body so required fields already
+    // present on the stored document do not fail validation. Report only errors for fields the
+    // caller is touching (present in data) or for fields that do not exist yet.
+    const merged = { ...existing, ...data };
     const validation = validateCollection(collection, merged);
     if (!validation.valid) {
       const relevantErrors = validation.errors.filter(
-        (e) => body[e.field] !== undefined || existing[e.field] === undefined
+        (e) => data[e.field] !== undefined || existing[e.field] === undefined
       );
       if (relevantErrors.length > 0) {
         return jsonResponse({ error: 'Validation failed', details: relevantErrors }, 400);
       }
     }
 
-    const record = await runtime.adapters.database.update(collectionSlug, id, body);
+    const record = await runtime.adapters.database.update(collectionSlug, id, data);
+    await runAfterChangeHooks(collection, {
+      operation: 'update',
+      data,
+      previousData: existing,
+      result: record
+    });
     return jsonResponse({ data: record });
   } catch (err) {
     return errorResponse(err instanceof Error ? err.message : 'Unknown error', 500);
@@ -363,17 +446,18 @@ export async function handleDelete<TEnv = unknown>(
   try {
     const { runtime, requireAuth: requireAuthFlag, allowedRoles } = options;
 
-    if (requireAuthFlag || allowedRoles !== undefined) {
-      const result = await authorize(context, runtime, allowedRoles);
-      if (!result.success) return result.response;
-    }
-
     const collectionSlug = context.params?.['collection'];
     const id = context.params?.['id'];
     if (!collectionSlug || !id) return errorResponse('Missing collection or id parameter', 400);
 
     const collection = runtime.getCollection(collectionSlug);
     if (!collection) return errorResponse(`Collection '${collectionSlug}' not found`, 404);
+
+    const roles = effectiveRoles(collection.access?.delete, allowedRoles);
+    if (requireAuthFlag || roles !== undefined) {
+      const result = await authorize(context, runtime, roles);
+      if (!result.success) return result.response;
+    }
 
     await runtime.adapters.database.delete(collectionSlug, id);
     return new Response(null, { status: 204 });
