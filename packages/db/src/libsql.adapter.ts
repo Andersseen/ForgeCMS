@@ -3,6 +3,7 @@ import type { DatabaseAdapter, DatabaseRecord, FindManyOptions } from './index.j
 import {
   getOrCreateDrizzleTable,
   generateCreateTableSql,
+  generateAddColumnSql,
   toDbValue,
   fromDbValue,
   clearTableCache
@@ -74,6 +75,11 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
       const createSql = generateCreateTableSql(collection);
       await db.run(sql.raw(createSql));
 
+      const existingColumns = await this.getExistingColumns(collection.slug);
+      for (const alterSql of generateAddColumnSql(collection, existingColumns)) {
+        await db.run(sql.raw(alterSql));
+      }
+
       // Create indexes for fields marked with index: true
       for (const [fieldName, field] of Object.entries(collection.fields)) {
         if (field.options.index === true || field.options.unique === true) {
@@ -83,6 +89,12 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
         }
       }
     }
+  }
+
+  private async getExistingColumns(tableName: string): Promise<string[]> {
+    if (!this.client) throw new Error('LibSqlDatabaseAdapter not initialized. Call init() first.');
+    const result = await this.client.execute(`PRAGMA table_info("${tableName}")`);
+    return result.rows.map((row) => row.name as string);
   }
 
   async findById(collection: string, id: string): Promise<DatabaseRecord | null> {

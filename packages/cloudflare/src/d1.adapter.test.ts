@@ -12,13 +12,36 @@ interface ParsedCondition {
 /** Simple in-memory mock of D1Database for unit testing */
 class MockD1Database implements D1Database {
   private tables = new Map<string, Map<string, Record<string, unknown>>>();
+  /** Tracks column names per table, populated from CREATE TABLE / ALTER TABLE exec() calls,
+   *  so PRAGMA table_info (used by additive migrations) reflects reality. */
+  private schemas = new Map<string, Set<string>>();
 
   prepare(query: string): MockD1PreparedStatement {
-    return new MockD1PreparedStatement(query, this.tables);
+    return new MockD1PreparedStatement(query, this.tables, this.schemas);
   }
 
-  async exec(_query: string): Promise<{ count: number; duration: number }> {
-    // Only CREATE TABLE is supported in exec for schema sync
+  async exec(query: string): Promise<{ count: number; duration: number }> {
+    const createMatch = query.match(/CREATE TABLE IF NOT EXISTS\s+"([^"]+)"\s*\(([^)]*)\)/i);
+    if (createMatch) {
+      const [, table, columnsPart] = createMatch;
+      const columns = new Set(
+        (columnsPart ?? '').split(',').map((c) => c.trim().match(/^"([^"]+)"/)?.[1] ?? '')
+      );
+      columns.delete('');
+      this.schemas.set(table!, columns);
+      return { count: 0, duration: 0 };
+    }
+
+    const alterMatch = query.match(/ALTER TABLE\s+"([^"]+)"\s+ADD COLUMN\s+"([^"]+)"/i);
+    if (alterMatch) {
+      const [, table, column] = alterMatch;
+      const columns = this.schemas.get(table!) ?? new Set<string>();
+      columns.add(column!);
+      this.schemas.set(table!, columns);
+      return { count: 0, duration: 0 };
+    }
+
+    // CREATE INDEX and other statements are no-ops in this mock.
     return { count: 0, duration: 0 };
   }
 
@@ -30,11 +53,17 @@ class MockD1Database implements D1Database {
 class MockD1PreparedStatement implements D1PreparedStatement {
   private query: string;
   private tables: Map<string, Map<string, Record<string, unknown>>>;
+  private schemas: Map<string, Set<string>>;
   private bindings: unknown[] = [];
 
-  constructor(query: string, tables: Map<string, Map<string, Record<string, unknown>>>) {
+  constructor(
+    query: string,
+    tables: Map<string, Map<string, Record<string, unknown>>>,
+    schemas: Map<string, Set<string>>
+  ) {
     this.query = query;
     this.tables = tables;
+    this.schemas = schemas;
   }
 
   bind(...values: unknown[]): MockD1PreparedStatement {
@@ -74,6 +103,15 @@ class MockD1PreparedStatement implements D1PreparedStatement {
   }
 
   async all<T = unknown>(): Promise<D1Result<T>> {
+    const pragmaMatch = this.query.match(/PRAGMA table_info\("([^"]+)"\)/i);
+    if (pragmaMatch) {
+      const columns = this.schemas.get(pragmaMatch[1]!) ?? new Set<string>();
+      return {
+        results: Array.from(columns).map((name) => ({ name }) as T),
+        success: true
+      };
+    }
+
     const { table, conditions, orderBy, limit, offset } = this.parseSelect();
     const rows = this.getTableRows(table);
     let results = Array.from(rows.values()).filter((r) => this.matchesConditions(r, conditions));
@@ -137,7 +175,9 @@ class MockD1PreparedStatement implements D1PreparedStatement {
           conditions.push({ key: likeMatch[1]!, op: 'LIKE', values: [this.bindings[bindingIdx++]] });
           continue;
         }
-        const cmpMatch = part.match(/"([^"]+)"\s*(!=|>=|<=|>|<|=)\s*\?/);
+        // Column name may or may not be quoted: findMany quotes it, but findById/update/delete
+        // build `WHERE id = ?` unquoted.
+        const cmpMatch = part.match(/"?([A-Za-z_][A-Za-z0-9_]*)"?\s*(!=|>=|<=|>|<|=)\s*\?/);
         if (cmpMatch) {
           conditions.push({
             key: cmpMatch[1]!,
@@ -279,6 +319,38 @@ describe('D1DatabaseAdapter', () => {
 
   it('syncs schema without errors', async () => {
     await expect(adapter.syncSchema([posts])).resolves.toBeUndefined();
+  });
+
+  describe('additive schema migrations', () => {
+    it('adds a column for a field added to the collection definition after the table exists', async () => {
+      const v1 = defineCollection({
+        slug: 'articles',
+        fields: { title: defineField.text({ required: true }) }
+      });
+      await adapter.syncSchema([v1]);
+      const existing = await adapter.create('articles', { title: 'Before migration' });
+
+      const v2 = defineCollection({
+        slug: 'articles',
+        fields: {
+          title: defineField.text({ required: true }),
+          views: defineField.number()
+        }
+      });
+      await adapter.syncSchema([v2]);
+
+      const found = await adapter.findById('articles', existing.id as string);
+      expect(found?.title).toBe('Before migration');
+
+      const created = await adapter.create('articles', { title: 'After migration', views: 5 });
+      const foundNew = await adapter.findById('articles', created.id as string);
+      expect(foundNew?.views).toBe(5);
+    });
+
+    it('is idempotent: re-syncing an unchanged collection does not error', async () => {
+      await adapter.syncSchema([posts]);
+      await expect(adapter.syncSchema([posts])).resolves.toBeUndefined();
+    });
   });
 
   it('creates and finds a record', async () => {

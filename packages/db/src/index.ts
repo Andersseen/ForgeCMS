@@ -7,6 +7,7 @@ export {
   toDbValue,
   fromDbValue,
   generateCreateTableSql,
+  generateAddColumnSql,
   getOrCreateDrizzleTable,
   clearTableCache
 } from './schema-generator.js';

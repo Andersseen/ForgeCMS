@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defineCollection, defineField } from '@forge-cms/core';
-import { generateCreateTableSql } from './schema-generator.js';
+import { generateCreateTableSql, generateAddColumnSql } from './schema-generator.js';
 
 describe('generateCreateTableSql', () => {
   const posts = defineCollection({
@@ -37,5 +37,41 @@ describe('generateCreateTableSql', () => {
     expect(sql).not.toMatch(/\n/);
     expect(sql).toContain('CREATE TABLE IF NOT EXISTS "empty"');
     expect(sql).toContain('"updated_at" TEXT)');
+  });
+});
+
+describe('generateAddColumnSql', () => {
+  const posts = defineCollection({
+    slug: 'posts',
+    fields: {
+      title: defineField.text({ required: true }),
+      views: defineField.number()
+    }
+  });
+
+  it('generates one ALTER TABLE per missing column', () => {
+    const statements = generateAddColumnSql(posts, ['title']);
+    expect(statements).toEqual(['ALTER TABLE "posts" ADD COLUMN "views" REAL']);
+  });
+
+  it('returns an empty array when every field already has a column', () => {
+    const statements = generateAddColumnSql(posts, ['title', 'views']);
+    expect(statements).toEqual([]);
+  });
+
+  it('returns one statement per field for a table with none of its columns yet', () => {
+    const statements = generateAddColumnSql(posts, []);
+    expect(statements).toHaveLength(2);
+    expect(statements).toEqual(
+      expect.arrayContaining([
+        'ALTER TABLE "posts" ADD COLUMN "title" TEXT',
+        'ALTER TABLE "posts" ADD COLUMN "views" REAL'
+      ])
+    );
+  });
+
+  it('ignores system columns (id/created_at/updated_at) since they are never in collection.fields', () => {
+    const statements = generateAddColumnSql(posts, ['id', 'created_at', 'updated_at']);
+    expect(statements).toHaveLength(2);
   });
 });

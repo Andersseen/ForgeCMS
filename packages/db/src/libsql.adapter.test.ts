@@ -48,6 +48,44 @@ describe('LibSqlDatabaseAdapter', () => {
     expect(await adapter.count('posts')).toBe(2);
   });
 
+  describe('additive schema migrations', () => {
+    it('adds a column for a field added to the collection definition after the table exists', async () => {
+      const migrationAdapter = new LibSqlDatabaseAdapter('file::memory:');
+      migrationAdapter.init();
+
+      const v1 = defineCollection({
+        slug: 'articles',
+        fields: { title: defineField.text({ required: true }) }
+      });
+      await migrationAdapter.syncSchema([v1]);
+      const existing = await migrationAdapter.create('articles', { title: 'Before migration' });
+
+      const v2 = defineCollection({
+        slug: 'articles',
+        fields: {
+          title: defineField.text({ required: true }),
+          views: defineField.number()
+        }
+      });
+      await migrationAdapter.syncSchema([v2]);
+
+      // the pre-migration row is still readable
+      const found = await migrationAdapter.findById('articles', existing.id as string);
+      expect(found?.title).toBe('Before migration');
+
+      // and the new column is now usable
+      const created = await migrationAdapter.create('articles', { title: 'After migration', views: 5 });
+      const foundNew = await migrationAdapter.findById('articles', created.id as string);
+      expect(foundNew?.views).toBe(5);
+    });
+
+    it('is idempotent: re-syncing an unchanged collection issues no ALTER TABLE', async () => {
+      // syncSchema was already called once in beforeEach; calling it again with the same
+      // definition must not throw (no duplicate-column error from a redundant ADD COLUMN).
+      await expect(adapter.syncSchema([posts])).resolves.toBeUndefined();
+    });
+  });
+
   describe('where operators and sorting', () => {
     beforeEach(async () => {
       await adapter.create('posts', { id: 'p1', title: 'Alpha', views: 10 });

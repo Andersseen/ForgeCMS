@@ -79,6 +79,28 @@ export function generateCreateTableSql(collection: CollectionDefinition): string
   return `CREATE TABLE IF NOT EXISTS "${collection.slug}" ("id" TEXT PRIMARY KEY, "created_at" TEXT, "updated_at" TEXT${fieldColumns ? ', ' + fieldColumns : ''})`;
 }
 
+/**
+ * Additive migration: one `ALTER TABLE ... ADD COLUMN` per field in the collection's current
+ * definition that isn't already a column on the existing table. Never drops or retypes columns.
+ */
+export function generateAddColumnSql(
+  collection: CollectionDefinition,
+  existingColumns: Iterable<string>
+): string[] {
+  const existing = new Set(existingColumns);
+  const statements: string[] = [];
+
+  for (const [name, field] of Object.entries(collection.fields)) {
+    if (!existing.has(name)) {
+      statements.push(
+        `ALTER TABLE "${collection.slug}" ADD COLUMN "${name}" ${fieldKindToSqlType(field)}`
+      );
+    }
+  }
+
+  return statements;
+}
+
 const tableCache = new Map<string, SQLiteTable>();
 
 export function getOrCreateDrizzleTable(collection: CollectionDefinition): SQLiteTable {

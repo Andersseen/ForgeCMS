@@ -1,6 +1,12 @@
 import type { CollectionDefinition } from '@forge-cms/core';
 import type { DatabaseAdapter, DatabaseRecord, FindManyOptions } from '@forge-cms/db';
-import { generateCreateTableSql, toDbValue, fromDbValue, toOperatorValue } from '@forge-cms/db';
+import {
+  generateCreateTableSql,
+  generateAddColumnSql,
+  toDbValue,
+  fromDbValue,
+  toOperatorValue
+} from '@forge-cms/db';
 import type { D1Database } from './bindings.js';
 
 export interface D1Env {
@@ -47,6 +53,11 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
       const sql = generateCreateTableSql(collection);
       await db.exec(sql);
 
+      const existingColumns = await this.getExistingColumns(collection.slug);
+      for (const alterSql of generateAddColumnSql(collection, existingColumns)) {
+        await db.exec(alterSql);
+      }
+
       // Create indexes for fields marked with index: true or unique: true
       for (const [fieldName, field] of Object.entries(collection.fields)) {
         if (field.options.index === true || field.options.unique === true) {
@@ -56,6 +67,12 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
         }
       }
     }
+  }
+
+  private async getExistingColumns(tableName: string): Promise<string[]> {
+    const db = this.getDb();
+    const { results } = await db.prepare(`PRAGMA table_info("${tableName}")`).all<{ name: string }>();
+    return results.map((r) => r.name);
   }
 
   async findById(collection: string, id: string): Promise<DatabaseRecord | null> {
