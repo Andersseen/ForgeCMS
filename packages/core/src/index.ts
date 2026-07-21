@@ -163,7 +163,11 @@ export interface CollectionDefinition<
   access?: CollectionAccess;
   /** Marks this collection as upload-enabled: `POST` accepts a `multipart/form-data` body (spec 016). */
   upload?: boolean;
+  /** Adds a system `_status: 'draft' | 'published'` field; unpublished docs are hidden from public reads (spec 017). */
+  drafts?: boolean;
 }
+
+export type DraftStatus = 'draft' | 'published';
 
 export type CollectionData<TCollection extends CollectionDefinition> = {
   [Key in keyof TCollection['fields']]: TCollection['fields'][Key] extends FieldDefinition<

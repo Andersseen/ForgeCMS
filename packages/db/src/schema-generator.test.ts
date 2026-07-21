@@ -120,3 +120,21 @@ describe('upload field storage', () => {
     expect(fromDbValue('media-1', 'upload')).toBe('media-1');
   });
 });
+
+describe('drafts (_status column)', () => {
+  it('adds a "_status" column when drafts is true', () => {
+    const posts = defineCollection({
+      slug: 'posts',
+      fields: { title: defineField.text() },
+      drafts: true
+    });
+    const sql = generateCreateTableSql(posts);
+    expect(sql).toContain('"_status" TEXT');
+  });
+
+  it('omits "_status" when drafts is not set', () => {
+    const posts = defineCollection({ slug: 'posts', fields: { title: defineField.text() } });
+    const sql = generateCreateTableSql(posts);
+    expect(sql).not.toContain('_status');
+  });
+});

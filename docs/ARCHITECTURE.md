@@ -104,7 +104,7 @@ run the matching suite in its test file.** This is what makes adapters swappable
   (structural only — no fixed node-type vocabulary); stored as JSON text, same pattern as `json`.
 - `defineField.upload({ collection })` (spec 016) → a string id referencing a document in the named
   upload-enabled collection; validated and stored exactly like a single `relation`.
-- `defineCollection({ slug, fields, hooks?, access?, upload? })` → `CollectionDefinition`;
+- `defineCollection({ slug, fields, hooks?, access?, upload?, drafts? })` → `CollectionDefinition`;
   `CollectionData<typeof col>` infers the record type. `upload: true` (spec 016) marks the collection as
   upload-enabled — `@forge-cms/runtime`'s `handleCreate` then also accepts a `multipart/form-data` body
   (a `file` part, plus any other part matching a declared field) alongside its normal JSON body, uploads
@@ -115,6 +115,12 @@ run the matching suite in its test file.** This is what makes adapters swappable
   `beforeChange` hook rejects the request (`400`), a throwing `afterChange` hook is logged and does not
   fail the (already-succeeded) request. `access.{read,create,update,delete}` (spec 013) are role-name
   arrays that override the route's static `allowedRoles` for that operation when present.
+- `drafts: true` (spec 017) adds a system `_status: 'draft' | 'published'` field (never part of
+  `collection.fields`, like `id`/`created_at`/`updated_at`) — new documents default to `'draft'`;
+  anonymous `GET`s (list and single) only ever see `'published'` documents (a `draft` single read `404`s,
+  not `403`, to avoid leaking existence); authenticated requests opt in to drafts via
+  `?status=draft`/`?status=all` on list. This is draft/published status only, not version history —
+  no past-revision retention, diffing, or restore.
 - Field options gain `access.{read,write}` (spec 013, role-name arrays) — `read` hides the field from
   `GET` responses for other roles (including unauthenticated), `write` rejects (`403`) a create/update
   body that sets the field from another role.

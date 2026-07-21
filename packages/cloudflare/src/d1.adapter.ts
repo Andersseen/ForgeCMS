@@ -13,7 +13,7 @@ export interface D1Env {
   DB: D1Database;
 }
 
-const SYSTEM_COLUMNS = ['id', 'created_at', 'updated_at'];
+const SYSTEM_COLUMNS = ['id', 'created_at', 'updated_at', '_status'];
 
 function assertValidColumn(key: string, collectionDef: CollectionDefinition | undefined): void {
   if (SYSTEM_COLUMNS.includes(key) || collectionDef?.fields[key]) return;

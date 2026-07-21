@@ -936,4 +936,239 @@ describe('CRUD Handlers', () => {
       expect(response.status).toBe(400);
     });
   });
+
+  describe('drafts', () => {
+    function createDraftsRuntime() {
+      const posts = defineCollection({
+        slug: 'posts',
+        fields: { title: defineField.text({ required: true }) },
+        drafts: true
+      });
+
+      const auth = new InMemoryAuthAdapter();
+      auth.registerSession('editor-token', { user: { id: 'editor-1', role: 'editor' } });
+
+      const draftsRuntime = new ForgeCmsRuntime({
+        collections: [posts],
+        adapters: {
+          database: new InMemoryDatabaseAdapter(),
+          auth,
+          storage: new InMemoryStorageAdapter()
+        }
+      });
+      draftsRuntime.init();
+      return draftsRuntime;
+    }
+
+    it('defaults a new document to draft', async () => {
+      const draftsRuntime = createDraftsRuntime();
+      const context = createTestContext('POST', 'https://forge.test/api/posts', { title: 'Hello' });
+      context.params = { collection: 'posts' };
+
+      const response = await handleCreate(context, { runtime: draftsRuntime });
+      const body = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(body.data._status).toBe('draft');
+    });
+
+    it('honors an explicit published status on create', async () => {
+      const draftsRuntime = createDraftsRuntime();
+      const context = createTestContext('POST', 'https://forge.test/api/posts', {
+        title: 'Hello',
+        _status: 'published'
+      });
+      context.params = { collection: 'posts' };
+
+      const response = await handleCreate(context, { runtime: draftsRuntime });
+      const body = await response.json();
+      expect(body.data._status).toBe('published');
+    });
+
+    it('rejects an invalid status value on create', async () => {
+      const draftsRuntime = createDraftsRuntime();
+      const context = createTestContext('POST', 'https://forge.test/api/posts', {
+        title: 'Hello',
+        _status: 'sideways'
+      });
+      context.params = { collection: 'posts' };
+
+      const response = await handleCreate(context, { runtime: draftsRuntime });
+      expect(response.status).toBe(400);
+    });
+
+    it('rejects an invalid status value on update', async () => {
+      const draftsRuntime = createDraftsRuntime();
+      const created = await draftsRuntime.adapters.database.create('posts', {
+        title: 'Hello',
+        _status: 'draft'
+      });
+
+      const context = createTestContext('PUT', `https://forge.test/api/posts/${created.id}`, {
+        _status: 'sideways'
+      });
+      context.params = { collection: 'posts', id: created.id as string };
+
+      const response = await handleUpdate(context, { runtime: draftsRuntime });
+      expect(response.status).toBe(400);
+    });
+
+    it('publishing via update is honored', async () => {
+      const draftsRuntime = createDraftsRuntime();
+      const created = await draftsRuntime.adapters.database.create('posts', {
+        title: 'Hello',
+        _status: 'draft'
+      });
+
+      const context = createTestContext('PUT', `https://forge.test/api/posts/${created.id}`, {
+        _status: 'published'
+      });
+      context.params = { collection: 'posts', id: created.id as string };
+
+      const response = await handleUpdate(context, { runtime: draftsRuntime });
+      const body = await response.json();
+      expect(body.data._status).toBe('published');
+    });
+
+    it('anonymous list only ever sees published documents', async () => {
+      const draftsRuntime = createDraftsRuntime();
+      await draftsRuntime.adapters.database.create('posts', { title: 'Draft', _status: 'draft' });
+      await draftsRuntime.adapters.database.create('posts', { title: 'Live', _status: 'published' });
+
+      const context = createTestContext('GET', 'https://forge.test/api/posts');
+      context.params = { collection: 'posts' };
+
+      const response = await handleList(context, { runtime: draftsRuntime });
+      const body = await response.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].title).toBe('Live');
+    });
+
+    it('anonymous request cannot see drafts even when explicitly asking via ?status=draft', async () => {
+      const draftsRuntime = createDraftsRuntime();
+      await draftsRuntime.adapters.database.create('posts', { title: 'Draft', _status: 'draft' });
+
+      const context = createTestContext('GET', 'https://forge.test/api/posts?status=draft');
+      context.params = { collection: 'posts' };
+
+      const response = await handleList(context, { runtime: draftsRuntime });
+      const body = await response.json();
+      expect(body.data).toHaveLength(0);
+    });
+
+    it('authenticated request can see drafts via ?status=draft', async () => {
+      const draftsRuntime = createDraftsRuntime();
+      await draftsRuntime.adapters.database.create('posts', { title: 'Draft', _status: 'draft' });
+      await draftsRuntime.adapters.database.create('posts', { title: 'Live', _status: 'published' });
+
+      const context = createTestContext(
+        'GET',
+        'https://forge.test/api/posts?status=draft',
+        undefined,
+        'editor-token'
+      );
+      context.params = { collection: 'posts' };
+
+      const response = await handleList(context, { runtime: draftsRuntime, requireAuth: true });
+      const body = await response.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].title).toBe('Draft');
+    });
+
+    it('authenticated request sees everything via ?status=all', async () => {
+      const draftsRuntime = createDraftsRuntime();
+      await draftsRuntime.adapters.database.create('posts', { title: 'Draft', _status: 'draft' });
+      await draftsRuntime.adapters.database.create('posts', { title: 'Live', _status: 'published' });
+
+      const context = createTestContext(
+        'GET',
+        'https://forge.test/api/posts?status=all',
+        undefined,
+        'editor-token'
+      );
+      context.params = { collection: 'posts' };
+
+      const response = await handleList(context, { runtime: draftsRuntime, requireAuth: true });
+      const body = await response.json();
+      expect(body.data).toHaveLength(2);
+    });
+
+    it('authenticated request without ?status still defaults to published only', async () => {
+      const draftsRuntime = createDraftsRuntime();
+      await draftsRuntime.adapters.database.create('posts', { title: 'Draft', _status: 'draft' });
+      await draftsRuntime.adapters.database.create('posts', { title: 'Live', _status: 'published' });
+
+      const context = createTestContext(
+        'GET',
+        'https://forge.test/api/posts',
+        undefined,
+        'editor-token'
+      );
+      context.params = { collection: 'posts' };
+
+      const response = await handleList(context, { runtime: draftsRuntime, requireAuth: true });
+      const body = await response.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].title).toBe('Live');
+    });
+
+    it('returns 400 for an invalid status value', async () => {
+      const draftsRuntime = createDraftsRuntime();
+      const context = createTestContext(
+        'GET',
+        'https://forge.test/api/posts?status=sideways',
+        undefined,
+        'editor-token'
+      );
+      context.params = { collection: 'posts' };
+
+      const response = await handleList(context, { runtime: draftsRuntime, requireAuth: true });
+      expect(response.status).toBe(400);
+    });
+
+    it('anonymous single-record read of a draft 404s (does not leak existence)', async () => {
+      const draftsRuntime = createDraftsRuntime();
+      const created = await draftsRuntime.adapters.database.create('posts', {
+        title: 'Draft',
+        _status: 'draft'
+      });
+
+      const context = createTestContext('GET', `https://forge.test/api/posts/${created.id}`);
+      context.params = { collection: 'posts', id: created.id as string };
+
+      const response = await handleRead(context, { runtime: draftsRuntime });
+      expect(response.status).toBe(404);
+    });
+
+    it('authenticated single-record read of a draft succeeds', async () => {
+      const draftsRuntime = createDraftsRuntime();
+      const created = await draftsRuntime.adapters.database.create('posts', {
+        title: 'Draft',
+        _status: 'draft'
+      });
+
+      const context = createTestContext(
+        'GET',
+        `https://forge.test/api/posts/${created.id}`,
+        undefined,
+        'editor-token'
+      );
+      context.params = { collection: 'posts', id: created.id as string };
+
+      const response = await handleRead(context, { runtime: draftsRuntime, requireAuth: true });
+      expect(response.status).toBe(200);
+    });
+
+    it('is a complete no-op for a collection without drafts: true', async () => {
+      // `runtime` (outer describe) uses a plain `posts` collection with no `drafts` flag.
+      const created = await runtime.adapters.database.create('posts', { title: 'Hello' });
+      expect(created._status).toBeUndefined();
+
+      const context = createTestContext('GET', 'https://forge.test/api/posts');
+      context.params = { collection: 'posts' };
+      const response = await handleList(context, { runtime });
+      const body = await response.json();
+      expect(body.data.some((r: { id: string }) => r.id === created.id)).toBe(true);
+    });
+  });
 });

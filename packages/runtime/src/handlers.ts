@@ -2,7 +2,7 @@ import { validateCollection } from '@forge-cms/core';
 import type { ApiContext } from '@forge-cms/api';
 import type { ForgeCmsRuntime } from './runtime.js';
 import type { DatabaseRecord, DatabaseWhere } from '@forge-cms/db';
-import type { CollectionDefinition } from '@forge-cms/core';
+import type { CollectionDefinition, DraftStatus } from '@forge-cms/core';
 import type { AuthUser, UserRole } from '@forge-cms/auth';
 import { hasAnyRole, userRole } from '@forge-cms/auth';
 import { populateRecord, populateRecords } from './populate.js';
@@ -11,7 +11,7 @@ import { filterReadableFields, assertWritableFields, FieldAccessError } from './
 
 const WHERE_OPERATORS = new Set(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'contains']);
 const SYSTEM_SORT_FIELDS = new Set(['id', 'created_at', 'updated_at']);
-const RESERVED_QUERY_PARAMS = new Set(['limit', 'offset', 'sort', 'order', 'depth']);
+const RESERVED_QUERY_PARAMS = new Set(['limit', 'offset', 'sort', 'order', 'depth', 'status']);
 const WHERE_KEY_PATTERN = /^(.+)\[(\w+)\]$/;
 
 class FilterCoercionError extends Error {
@@ -38,7 +38,50 @@ class DepthError extends Error {
   }
 }
 
+class DraftStatusError extends Error {
+  constructor(readonly status: string) {
+    super(`Invalid status '${status}', expected 'draft', 'published', or 'all'`);
+  }
+}
+
 class UploadError extends Error {}
+
+/**
+ * Resolves the `_status` filter for a list/read on a drafts-enabled collection. `undefined` means "not
+ * a drafts collection, don't filter at all". Anonymous requests always get 'published' regardless of
+ * what they ask for, so unpublished content is never reachable without an authenticated role.
+ */
+function parseStatusFilter(
+  collection: CollectionDefinition,
+  url: URL,
+  role: UserRole | undefined
+): DraftStatus | 'all' | undefined {
+  if (collection.drafts !== true) return undefined;
+
+  const raw = url.searchParams.get('status');
+  if (role === undefined) return 'published';
+  if (raw === null || raw === 'published') return 'published';
+  if (raw === 'draft' || raw === 'all') return raw;
+  throw new DraftStatusError(raw);
+}
+
+/** Validates a create/update body's `_status`, if present, and defaults it to 'draft' on create. */
+function applyDraftStatus(
+  collection: CollectionDefinition,
+  data: Record<string, unknown>,
+  operation: 'create' | 'update'
+): void {
+  if (collection.drafts !== true) return;
+
+  if (data._status === undefined) {
+    if (operation === 'create') data._status = 'draft';
+    return;
+  }
+
+  if (data._status !== 'draft' && data._status !== 'published') {
+    throw new DraftStatusError(String(data._status));
+  }
+}
 
 /**
  * Parses a multipart/form-data create request into a plain body object: uploads the `file` part
@@ -262,20 +305,26 @@ export async function handleList<TEnv = unknown>(
     let where: DatabaseWhere;
     let sort: { sort?: string; order?: 'asc' | 'desc' };
     let depth: 0 | 1;
+    let statusFilter: DraftStatus | 'all' | undefined;
     try {
       where = coerceWhere(collection, rawWhere);
       sort = parseSort(collection, url);
       depth = parseDepth(url);
+      statusFilter = parseStatusFilter(collection, url, role);
     } catch (err) {
       if (
         err instanceof FilterCoercionError ||
         err instanceof SortOrderError ||
         err instanceof SortFieldError ||
-        err instanceof DepthError
+        err instanceof DepthError ||
+        err instanceof DraftStatusError
       ) {
         return errorResponse(err.message, 400);
       }
       throw err;
+    }
+    if (statusFilter !== undefined && statusFilter !== 'all') {
+      where._status = statusFilter;
     }
 
     let records = await runtime.adapters.database.findMany({
@@ -336,6 +385,10 @@ export async function handleRead<TEnv = unknown>(
 
     let record = await runtime.adapters.database.findById(collectionSlug, id);
     if (!record) return errorResponse(`Record '${id}' not found in '${collectionSlug}'`, 404);
+
+    if (collection.drafts === true && record._status === 'draft' && role === undefined) {
+      return errorResponse(`Record '${id}' not found in '${collectionSlug}'`, 404);
+    }
 
     if (depth === 1) {
       record = await populateRecord(record, collection, runtime);
@@ -401,6 +454,13 @@ export async function handleCreate<TEnv = unknown>(
       return errorResponse(err instanceof Error ? err.message : 'beforeChange hook failed', 400);
     }
 
+    try {
+      applyDraftStatus(collection, data, 'create');
+    } catch (err) {
+      if (err instanceof DraftStatusError) return errorResponse(err.message, 400);
+      throw err;
+    }
+
     const validation = validateCollection(collection, data);
     if (!validation.valid) {
       return jsonResponse({ error: 'Validation failed', details: validation.errors }, 400);
@@ -463,6 +523,13 @@ export async function handleUpdate<TEnv = unknown>(
       });
     } catch (err) {
       return errorResponse(err instanceof Error ? err.message : 'beforeChange hook failed', 400);
+    }
+
+    try {
+      applyDraftStatus(collection, data, 'update');
+    } catch (err) {
+      if (err instanceof DraftStatusError) return errorResponse(err.message, 400);
+      throw err;
     }
 
     // Merge existing record with the (hook-processed) partial body so required fields already

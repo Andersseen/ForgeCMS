@@ -77,10 +77,12 @@ export function generateCreateTableSql(collection: CollectionDefinition): string
     .map(([name, field]) => `"${name}" ${fieldKindToSqlType(field)}`)
     .join(', ');
 
+  const statusColumn = collection.drafts === true ? ', "_status" TEXT' : '';
+
   // Must be a single line: Cloudflare D1's real exec() splits its input on '\n' to detect multiple
   // statements, so a pretty-printed multi-line CREATE TABLE gets sliced into invalid fragments and
   // fails with "incomplete input" (verified against a real local D1 binding, not just mocks).
-  return `CREATE TABLE IF NOT EXISTS "${collection.slug}" ("id" TEXT PRIMARY KEY, "created_at" TEXT, "updated_at" TEXT${fieldColumns ? ', ' + fieldColumns : ''})`;
+  return `CREATE TABLE IF NOT EXISTS "${collection.slug}" ("id" TEXT PRIMARY KEY, "created_at" TEXT, "updated_at" TEXT${statusColumn}${fieldColumns ? ', ' + fieldColumns : ''})`;
 }
 
 /**
@@ -114,7 +116,8 @@ export function getOrCreateDrizzleTable(collection: CollectionDefinition): SQLit
   const columns: Record<string, ReturnType<typeof text>> = {
     id: text('id').primaryKey(),
     created_at: text('created_at'),
-    updated_at: text('updated_at')
+    updated_at: text('updated_at'),
+    ...(collection.drafts === true && { _status: text('_status') })
   };
 
   for (const [name, field] of Object.entries(collection.fields)) {
