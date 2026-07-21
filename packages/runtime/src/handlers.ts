@@ -5,10 +5,11 @@ import type { DatabaseRecord, DatabaseWhere } from '@forge-cms/db';
 import type { CollectionDefinition } from '@forge-cms/core';
 import type { AuthUser, UserRole } from '@forge-cms/auth';
 import { hasAnyRole } from '@forge-cms/auth';
+import { populateRecord, populateRecords } from './populate.js';
 
 const WHERE_OPERATORS = new Set(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'contains']);
 const SYSTEM_SORT_FIELDS = new Set(['id', 'created_at', 'updated_at']);
-const RESERVED_QUERY_PARAMS = new Set(['limit', 'offset', 'sort', 'order']);
+const RESERVED_QUERY_PARAMS = new Set(['limit', 'offset', 'sort', 'order', 'depth']);
 const WHERE_KEY_PATTERN = /^(.+)\[(\w+)\]$/;
 
 class FilterCoercionError extends Error {
@@ -27,6 +28,21 @@ class SortOrderError extends Error {
   constructor(readonly order: string) {
     super(`Invalid sort order '${order}', expected 'asc' or 'desc'`);
   }
+}
+
+class DepthError extends Error {
+  constructor(readonly depth: string) {
+    super(`Invalid depth '${depth}', expected '0' or '1'`);
+  }
+}
+
+/** Parse and validate the `depth` query param. Only `0` (default) and `1` are supported. */
+function parseDepth(url: URL): 0 | 1 {
+  const raw = url.searchParams.get('depth');
+  if (raw === null) return 0;
+  if (raw === '0') return 0;
+  if (raw === '1') return 1;
+  throw new DepthError(raw);
 }
 
 /** Coerce a raw query-param string to the value type declared by the field (bare `eq` semantics). */
@@ -174,18 +190,24 @@ export async function handleList<TEnv = unknown>(
 
     let where: DatabaseWhere;
     let sort: { sort?: string; order?: 'asc' | 'desc' };
+    let depth: 0 | 1;
     try {
       where = coerceWhere(collection, rawWhere);
       sort = parseSort(collection, url);
+      depth = parseDepth(url);
     } catch (err) {
-      if (err instanceof FilterCoercionError || err instanceof SortOrderError) {
+      if (
+        err instanceof FilterCoercionError ||
+        err instanceof SortOrderError ||
+        err instanceof SortFieldError ||
+        err instanceof DepthError
+      ) {
         return errorResponse(err.message, 400);
       }
-      if (err instanceof SortFieldError) return errorResponse(err.message, 400);
       throw err;
     }
 
-    const records = await runtime.adapters.database.findMany({
+    let records = await runtime.adapters.database.findMany({
       collection: collectionSlug,
       ...(limit !== undefined && { limit }),
       ...(offset !== undefined && { offset }),
@@ -193,6 +215,10 @@ export async function handleList<TEnv = unknown>(
       ...(sort.sort !== undefined && { sort: sort.sort }),
       ...(sort.order !== undefined && { order: sort.order })
     });
+
+    if (depth === 1) {
+      records = await populateRecords(records, collection, runtime);
+    }
 
     return jsonResponse({
       data: records,
@@ -222,8 +248,20 @@ export async function handleRead<TEnv = unknown>(
     const collection = runtime.getCollection(collectionSlug);
     if (!collection) return errorResponse(`Collection '${collectionSlug}' not found`, 404);
 
-    const record = await runtime.adapters.database.findById(collectionSlug, id);
+    let depth: 0 | 1;
+    try {
+      depth = parseDepth(new URL(context.request.url));
+    } catch (err) {
+      if (err instanceof DepthError) return errorResponse(err.message, 400);
+      throw err;
+    }
+
+    let record = await runtime.adapters.database.findById(collectionSlug, id);
     if (!record) return errorResponse(`Record '${id}' not found in '${collectionSlug}'`, 404);
+
+    if (depth === 1) {
+      record = await populateRecord(record, collection, runtime);
+    }
 
     return jsonResponse({ data: record });
   } catch (err) {

@@ -50,7 +50,7 @@ Browser (admin UI / CmsApiService)
   → runtime handler                   @forge-cms/runtime handleList(context, { runtime })
       1. optional auth (adapters.auth.requireAuth)
       2. resolve collection by slug (runtime.getCollection)
-      3. parse limit/offset/where/sort/order from query params
+      3. parse limit/offset/where/sort/order/depth from query params
       4. validation on write paths (validateCollection from @forge-cms/core)
       5. adapters.database.findMany/create/update/delete
   → Response (web standard)           JSON envelope, framework-agnostic

@@ -8,3 +8,4 @@ export {
   handleDelete,
   type HandlerOptions
 } from './handlers.js';
+export { populateRecord, populateRecords } from './populate.js';

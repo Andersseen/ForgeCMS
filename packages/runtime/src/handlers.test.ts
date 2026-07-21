@@ -538,4 +538,99 @@ describe('CRUD Handlers', () => {
       expect(response.status).toBe(403);
     });
   });
+
+  describe('depth / relation population', () => {
+    function createRuntimeWithRelations() {
+      const users = defineCollection({
+        slug: 'users',
+        fields: { name: defineField.text({ required: true }) }
+      });
+      const articles = defineCollection({
+        slug: 'articles',
+        fields: {
+          title: defineField.text({ required: true }),
+          author: defineField.relation({ collection: 'users' })
+        }
+      });
+
+      const relationRuntime = new ForgeCmsRuntime({
+        collections: [users, articles],
+        adapters: {
+          database: new InMemoryDatabaseAdapter(),
+          auth: new InMemoryAuthAdapter(),
+          storage: new InMemoryStorageAdapter()
+        }
+      });
+      relationRuntime.init();
+      return relationRuntime;
+    }
+
+    it('populates relations on handleList with depth=1', async () => {
+      const relationRuntime = createRuntimeWithRelations();
+      const author = await relationRuntime.adapters.database.create('users', { name: 'Ada' });
+      await relationRuntime.adapters.database.create('articles', {
+        title: 'Hello',
+        author: author.id
+      });
+
+      const context = createTestContext('GET', 'https://forge.test/api/articles?depth=1');
+      context.params = { collection: 'articles' };
+
+      const response = await handleList(context, { runtime: relationRuntime });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.data[0].author).toEqual(expect.objectContaining({ name: 'Ada' }));
+    });
+
+    it('populates relations on handleRead with depth=1', async () => {
+      const relationRuntime = createRuntimeWithRelations();
+      const author = await relationRuntime.adapters.database.create('users', { name: 'Ada' });
+      const article = await relationRuntime.adapters.database.create('articles', {
+        title: 'Hello',
+        author: author.id
+      });
+
+      const context = createTestContext(
+        'GET',
+        `https://forge.test/api/articles/${article.id}?depth=1`
+      );
+      context.params = { collection: 'articles', id: article.id as string };
+
+      const response = await handleRead(context, { runtime: relationRuntime });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.data.author).toEqual(expect.objectContaining({ name: 'Ada' }));
+    });
+
+    it('leaves relations as bare ids without depth', async () => {
+      const relationRuntime = createRuntimeWithRelations();
+      const author = await relationRuntime.adapters.database.create('users', { name: 'Ada' });
+      await relationRuntime.adapters.database.create('articles', {
+        title: 'Hello',
+        author: author.id
+      });
+
+      const context = createTestContext('GET', 'https://forge.test/api/articles');
+      context.params = { collection: 'articles' };
+
+      const response = await handleList(context, { runtime: relationRuntime });
+      const body = await response.json();
+
+      expect(body.data[0].author).toBe(author.id);
+    });
+
+    it('returns 400 for an unsupported depth value', async () => {
+      const relationRuntime = createRuntimeWithRelations();
+      const context = createTestContext('GET', 'https://forge.test/api/articles?depth=2');
+      context.params = { collection: 'articles' };
+
+      const response = await handleList(context, { runtime: relationRuntime });
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.error).toContain('depth');
+    });
+  });
 });
