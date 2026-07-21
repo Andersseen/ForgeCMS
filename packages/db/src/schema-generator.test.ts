@@ -108,3 +108,15 @@ describe('richtext field storage', () => {
     expect(fromDbValue(null, 'richtext')).toBeNull();
   });
 });
+
+describe('upload field storage', () => {
+  it('maps to the TEXT sql type', () => {
+    const field = defineField.upload({ collection: 'media' });
+    expect(fieldKindToSqlType(field)).toBe('TEXT');
+  });
+
+  it('passes a bare id string through toDbValue/fromDbValue unchanged', () => {
+    expect(toDbValue('media-1', 'upload')).toBe('media-1');
+    expect(fromDbValue('media-1', 'upload')).toBe('media-1');
+  });
+});

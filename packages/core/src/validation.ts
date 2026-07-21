@@ -26,6 +26,7 @@ export type ValidationErrorCode =
   | 'type_email'
   | 'type_textarea'
   | 'type_richtext'
+  | 'type_upload'
   | 'minLength'
   | 'maxLength'
   | 'min'
@@ -292,6 +293,15 @@ export function validateField(
             'type_richtext',
             `Field "${fieldName}" must be a rich text document (an array of nodes).`
           )
+        );
+      }
+      break;
+    }
+
+    case 'upload': {
+      if (typeof value !== 'string') {
+        errors.push(
+          createError(fieldName, 'type_upload', `Field "${fieldName}" must be an upload ID string.`)
         );
       }
       break;

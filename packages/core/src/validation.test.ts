@@ -263,4 +263,18 @@ describe('runtime validation', () => {
       expect(validateField(field, doc, 'body')).toHaveLength(0);
     });
   });
+
+  describe('upload field validation', () => {
+    const field = defineField.upload({ collection: 'media' });
+
+    it('accepts a string id', () => {
+      expect(validateField(field, 'media-1', 'cover')).toHaveLength(0);
+    });
+
+    it('rejects a non-string value', () => {
+      const errors = validateField(field, 42, 'cover');
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.code).toBe('type_upload');
+    });
+  });
 });

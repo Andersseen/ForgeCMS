@@ -38,6 +38,49 @@ class DepthError extends Error {
   }
 }
 
+class UploadError extends Error {}
+
+/**
+ * Parses a multipart/form-data create request into a plain body object: uploads the `file` part
+ * through the storage adapter, then merges whichever of filename/url/contentType/filesize (plus any
+ * other form fields) the collection actually declares as fields — unknown keys are dropped rather
+ * than risking an INSERT against a column the table doesn't have.
+ */
+async function buildMultipartBody<TEnv>(
+  context: ApiContext<TEnv>,
+  runtime: ForgeCmsRuntime<TEnv>,
+  collection: CollectionDefinition
+): Promise<Record<string, unknown>> {
+  const formData = await context.request.formData();
+  const file = formData.get('file');
+  if (!(file instanceof File)) {
+    throw new UploadError('Missing or invalid "file" part in multipart body');
+  }
+
+  const key = `${collection.slug}/${crypto.randomUUID()}-${file.name}`;
+  await runtime.adapters.storage.put({ key, body: file, contentType: file.type });
+  const url = await runtime.adapters.storage.getPublicUrl(key);
+
+  const data: Record<string, unknown> = {};
+  const derived: Record<string, unknown> = {
+    filename: file.name,
+    url,
+    contentType: file.type,
+    filesize: file.size
+  };
+  for (const [name, value] of Object.entries(derived)) {
+    if (collection.fields[name]) data[name] = value;
+  }
+
+  formData.forEach((value, name) => {
+    if (name !== 'file' && typeof value === 'string' && collection.fields[name]) {
+      data[name] = value;
+    }
+  });
+
+  return data;
+}
+
 /** Parse and validate the `depth` query param. Only `0` (default) and `1` are supported. */
 function parseDepth(url: URL): 0 | 1 {
   const raw = url.searchParams.get('depth');
@@ -327,11 +370,21 @@ export async function handleCreate<TEnv = unknown>(
     }
     const role = user ? userRole(user) : undefined;
 
-    let body: DatabaseRecord;
-    try {
-      body = (await context.request.json()) as DatabaseRecord;
-    } catch {
-      return errorResponse('Invalid JSON body', 400);
+    const contentType = context.request.headers.get('content-type') ?? '';
+    let body: Record<string, unknown>;
+    if (collection.upload === true && contentType.includes('multipart/form-data')) {
+      try {
+        body = await buildMultipartBody(context, runtime, collection);
+      } catch (err) {
+        if (err instanceof UploadError) return errorResponse(err.message, 400);
+        throw err;
+      }
+    } else {
+      try {
+        body = (await context.request.json()) as DatabaseRecord;
+      } catch {
+        return errorResponse('Invalid JSON body', 400);
+      }
     }
 
     try {

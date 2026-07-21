@@ -13,6 +13,7 @@ export function fieldKindToSqlType(field: AnyField): string {
     case 'email':
     case 'textarea':
     case 'richtext':
+    case 'upload':
       return 'TEXT';
     case 'number':
       return 'REAL';

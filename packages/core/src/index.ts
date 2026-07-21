@@ -9,7 +9,8 @@ export type FieldKind =
   | 'slug'
   | 'email'
   | 'textarea'
-  | 'richtext';
+  | 'richtext'
+  | 'upload';
 
 export interface FieldAccess {
   /** Role names allowed to read this field's value. Undefined = every role (incl. unauthenticated). */
@@ -46,6 +47,11 @@ export interface DateFieldOptions extends BaseFieldOptions {
 export interface RelationFieldOptions extends BaseFieldOptions {
   collection: string;
   many?: boolean;
+}
+
+export interface UploadFieldOptions extends BaseFieldOptions {
+  /** The upload-enabled collection this field references. */
+  collection: string;
 }
 
 export type JsonFieldOptions = BaseFieldOptions;
@@ -99,6 +105,7 @@ export type SlugField = FieldDefinition<'slug', string, SlugFieldOptions>;
 export type EmailField = FieldDefinition<'email', string, EmailFieldOptions>;
 export type TextareaField = FieldDefinition<'textarea', string, TextareaFieldOptions>;
 export type RichTextField = FieldDefinition<'richtext', RichTextContent, RichTextFieldOptions>;
+export type UploadField = FieldDefinition<'upload', string, UploadFieldOptions>;
 
 export type AnyField =
   | TextField
@@ -111,7 +118,8 @@ export type AnyField =
   | SlugField
   | EmailField
   | TextareaField
-  | RichTextField;
+  | RichTextField
+  | UploadField;
 
 export type FieldMap = Record<string, AnyField>;
 
@@ -153,6 +161,8 @@ export interface CollectionDefinition<
   fields: Readonly<TFields>;
   hooks?: CollectionHooks;
   access?: CollectionAccess;
+  /** Marks this collection as upload-enabled: `POST` accepts a `multipart/form-data` body (spec 016). */
+  upload?: boolean;
 }
 
 export type CollectionData<TCollection extends CollectionDefinition> = {
@@ -209,6 +219,9 @@ export const defineField = {
   },
   richtext(options: RichTextFieldOptions = {}): RichTextField {
     return createField<'richtext', RichTextContent, RichTextFieldOptions>('richtext', options);
+  },
+  upload(options: UploadFieldOptions): UploadField {
+    return createField<'upload', string, UploadFieldOptions>('upload', options);
   }
 } as const;
 

@@ -830,4 +830,110 @@ describe('CRUD Handlers', () => {
       expect(seenTitle).toBe('Hello');
     });
   });
+
+  describe('multipart upload', () => {
+    function createMediaRuntime() {
+      const media = defineCollection({
+        slug: 'media',
+        fields: {
+          filename: defineField.text({ required: true }),
+          url: defineField.text({ required: true }),
+          contentType: defineField.text(),
+          filesize: defineField.number(),
+          alt: defineField.text()
+        },
+        upload: true
+      });
+
+      const mediaRuntime = new ForgeCmsRuntime({
+        collections: [media],
+        adapters: {
+          database: new InMemoryDatabaseAdapter(),
+          auth: new InMemoryAuthAdapter(),
+          storage: new InMemoryStorageAdapter()
+        }
+      });
+      mediaRuntime.init();
+      return mediaRuntime;
+    }
+
+    it('stores the file via the storage adapter and creates a record with its metadata', async () => {
+      const mediaRuntime = createMediaRuntime();
+
+      const formData = new FormData();
+      formData.set('file', new File(['hello world'], 'greeting.txt', { type: 'text/plain' }));
+      formData.set('alt', 'A greeting');
+
+      const context = {
+        request: new Request('https://forge.test/api/media', { method: 'POST', body: formData }),
+        env: {},
+        params: { collection: 'media' }
+      };
+
+      const response = await handleCreate(context, { runtime: mediaRuntime });
+      const body = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(body.data.filename).toBe('greeting.txt');
+      expect(body.data.contentType).toBe('text/plain');
+      expect(body.data.filesize).toBe(11);
+      expect(body.data.alt).toBe('A greeting');
+      expect(typeof body.data.url).toBe('string');
+
+      const stored = await mediaRuntime.adapters.storage.list();
+      expect(stored).toHaveLength(1);
+      expect(new TextDecoder().decode(stored[0]?.body)).toBe('hello world');
+    });
+
+    it('returns 400 when the multipart body has no file part', async () => {
+      const mediaRuntime = createMediaRuntime();
+
+      const formData = new FormData();
+      formData.set('alt', 'No file here');
+
+      const context = {
+        request: new Request('https://forge.test/api/media', { method: 'POST', body: formData }),
+        env: {},
+        params: { collection: 'media' }
+      };
+
+      const response = await handleCreate(context, { runtime: mediaRuntime });
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.error).toContain('file');
+    });
+
+    it('still accepts a plain JSON create on an upload-enabled collection', async () => {
+      const mediaRuntime = createMediaRuntime();
+
+      const context = createTestContext('POST', 'https://forge.test/api/media', {
+        filename: 'manual.txt',
+        url: 'https://example.com/manual.txt'
+      });
+      context.params = { collection: 'media' };
+
+      const response = await handleCreate(context, { runtime: mediaRuntime });
+      const body = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(body.data.filename).toBe('manual.txt');
+    });
+
+    it('rejects a multipart body posted to a non-upload collection', async () => {
+      // posts (from the outer describe's runtime) has no upload: true, so multipart isn't special-cased
+      // for it and falls through to the plain JSON path, which fails to parse a multipart body.
+      const formData = new FormData();
+      formData.set('file', new File(['x'], 'x.txt'));
+
+      const context = {
+        request: new Request('https://forge.test/api/posts', { method: 'POST', body: formData }),
+        env: {},
+        params: { collection: 'posts' }
+      };
+
+      const response = await handleCreate(context, { runtime });
+      expect(response.status).toBe(400);
+    });
+  });
 });
