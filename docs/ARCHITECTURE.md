@@ -99,6 +99,9 @@ run the matching suite in its test file.** This is what makes adapters swappable
 
 - `defineField.text({ required: true })` → `FieldDefinition<'text', string, TextFieldOptions>`; the
   phantom `__value` carries the value type for inference.
+- `defineField.richtext()` (spec 015) → value type `RichTextContent` (`RichTextNode[]`), where a node is
+  `{ type: string, text?: string, children?: RichTextNode[], ...marks/extra }`. Validated recursively
+  (structural only — no fixed node-type vocabulary); stored as JSON text, same pattern as `json`.
 - `defineCollection({ slug, fields, hooks?, access? })` → `CollectionDefinition`;
   `CollectionData<typeof col>` infers the record type. `hooks.beforeChange`/`afterChange` (spec 013) are
   arrays of functions run in order by `@forge-cms/runtime`'s handlers around create/update; a throwing

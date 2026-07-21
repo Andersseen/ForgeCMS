@@ -8,7 +8,8 @@ export type FieldKind =
   | 'select'
   | 'slug'
   | 'email'
-  | 'textarea';
+  | 'textarea'
+  | 'richtext';
 
 export interface FieldAccess {
   /** Role names allowed to read this field's value. Undefined = every role (incl. unauthenticated). */
@@ -62,6 +63,21 @@ export type EmailFieldOptions = TextFieldOptions;
 
 export type TextareaFieldOptions = TextFieldOptions;
 
+export interface RichTextNode {
+  type: string;
+  /** Leaf/text nodes. */
+  text?: string;
+  /** Block/element nodes. */
+  children?: RichTextNode[];
+  /** Marks (bold, italic, ...) and node-specific data (level, href, ...) — intentionally open. */
+  [extra: string]: unknown;
+}
+
+/** A rich text document: an array of top-level block nodes. */
+export type RichTextContent = RichTextNode[];
+
+export type RichTextFieldOptions = BaseFieldOptions;
+
 export interface FieldDefinition<
   TKind extends FieldKind = FieldKind,
   TValue = unknown,
@@ -82,6 +98,7 @@ export type SelectField = FieldDefinition<'select', string, SelectFieldOptions>;
 export type SlugField = FieldDefinition<'slug', string, SlugFieldOptions>;
 export type EmailField = FieldDefinition<'email', string, EmailFieldOptions>;
 export type TextareaField = FieldDefinition<'textarea', string, TextareaFieldOptions>;
+export type RichTextField = FieldDefinition<'richtext', RichTextContent, RichTextFieldOptions>;
 
 export type AnyField =
   | TextField
@@ -93,7 +110,8 @@ export type AnyField =
   | SelectField
   | SlugField
   | EmailField
-  | TextareaField;
+  | TextareaField
+  | RichTextField;
 
 export type FieldMap = Record<string, AnyField>;
 
@@ -188,6 +206,9 @@ export const defineField = {
   },
   textarea(options: TextareaFieldOptions = {}): TextareaField {
     return createField<'textarea', string, TextareaFieldOptions>('textarea', options);
+  },
+  richtext(options: RichTextFieldOptions = {}): RichTextField {
+    return createField<'richtext', RichTextContent, RichTextFieldOptions>('richtext', options);
   }
 } as const;
 

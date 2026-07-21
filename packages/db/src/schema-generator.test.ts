@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { defineCollection, defineField } from '@forge-cms/core';
-import { generateCreateTableSql, generateAddColumnSql } from './schema-generator.js';
+import {
+  generateCreateTableSql,
+  generateAddColumnSql,
+  fieldKindToSqlType,
+  toDbValue,
+  fromDbValue
+} from './schema-generator.js';
 
 describe('generateCreateTableSql', () => {
   const posts = defineCollection({
@@ -73,5 +79,32 @@ describe('generateAddColumnSql', () => {
   it('ignores system columns (id/created_at/updated_at) since they are never in collection.fields', () => {
     const statements = generateAddColumnSql(posts, ['id', 'created_at', 'updated_at']);
     expect(statements).toHaveLength(2);
+  });
+});
+
+describe('richtext field storage', () => {
+  const field = defineField.richtext();
+
+  it('maps to the TEXT sql type', () => {
+    expect(fieldKindToSqlType(field)).toBe('TEXT');
+  });
+
+  it('round-trips a document through toDbValue/fromDbValue', () => {
+    const doc = [
+      { type: 'heading', level: 2, children: [{ type: 'text', text: 'Title', bold: true }] },
+      { type: 'paragraph', children: [{ type: 'text', text: 'Body copy.' }] }
+    ];
+
+    const stored = toDbValue(doc, 'richtext');
+    expect(typeof stored).toBe('string');
+
+    const restored = fromDbValue(stored, 'richtext');
+    expect(restored).toEqual(doc);
+  });
+
+  it('passes null/undefined through unchanged', () => {
+    expect(toDbValue(null, 'richtext')).toBeNull();
+    expect(toDbValue(undefined, 'richtext')).toBeNull();
+    expect(fromDbValue(null, 'richtext')).toBeNull();
   });
 });

@@ -207,4 +207,60 @@ describe('runtime validation', () => {
       expect(errors.length).toBeGreaterThanOrEqual(1);
     });
   });
+
+  describe('richtext field validation', () => {
+    const field = defineField.richtext();
+
+    it('accepts a well-formed document', () => {
+      const doc = [{ type: 'paragraph', children: [{ type: 'text', text: 'Hello' }] }];
+      expect(validateField(field, doc, 'body')).toHaveLength(0);
+    });
+
+    it('accepts a void node with neither text nor children', () => {
+      const doc = [{ type: 'divider' }];
+      expect(validateField(field, doc, 'body')).toHaveLength(0);
+    });
+
+    it('rejects a non-array value', () => {
+      const errors = validateField(field, { type: 'paragraph' }, 'body');
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.code).toBe('type_richtext');
+    });
+
+    it('rejects a node missing type', () => {
+      const doc = [{ children: [] }];
+      const errors = validateField(field, doc, 'body');
+      expect(errors[0]?.code).toBe('type_richtext');
+    });
+
+    it('rejects a leaf node whose text is not a string', () => {
+      const doc = [{ type: 'paragraph', children: [{ type: 'text', text: 123 }] }];
+      const errors = validateField(field, doc, 'body');
+      expect(errors[0]?.code).toBe('type_richtext');
+    });
+
+    it('rejects a node whose children is not an array', () => {
+      const doc = [{ type: 'paragraph', children: 'nope' }];
+      const errors = validateField(field, doc, 'body');
+      expect(errors[0]?.code).toBe('type_richtext');
+    });
+
+    it('validates nested children recursively', () => {
+      const doc = [
+        {
+          type: 'paragraph',
+          children: [{ type: 'text', text: 'ok' }, { type: 'text', text: 42 }]
+        }
+      ];
+      const errors = validateField(field, doc, 'body');
+      expect(errors[0]?.code).toBe('type_richtext');
+    });
+
+    it('allows marks and extra node-specific data', () => {
+      const doc = [
+        { type: 'heading', level: 2, children: [{ type: 'text', text: 'Title', bold: true }] }
+      ];
+      expect(validateField(field, doc, 'body')).toHaveLength(0);
+    });
+  });
 });

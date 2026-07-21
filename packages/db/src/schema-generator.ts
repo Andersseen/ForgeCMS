@@ -12,6 +12,7 @@ export function fieldKindToSqlType(field: AnyField): string {
     case 'slug':
     case 'email':
     case 'textarea':
+    case 'richtext':
       return 'TEXT';
     case 'number':
       return 'REAL';
@@ -32,6 +33,7 @@ export function toDbValue(value: unknown, kind: AnyField['kind']): unknown {
     case 'date':
       return value instanceof Date ? value.toISOString() : value;
     case 'json':
+    case 'richtext':
       return typeof value === 'string' ? value : JSON.stringify(value);
     default:
       return value;
@@ -55,6 +57,7 @@ export function fromDbValue(value: unknown, kind: AnyField['kind']): unknown {
     case 'date':
       return typeof value === 'string' ? new Date(value) : value;
     case 'json':
+    case 'richtext':
       if (typeof value === 'string') {
         try {
           return JSON.parse(value);

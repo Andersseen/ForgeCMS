@@ -25,6 +25,7 @@ export type ValidationErrorCode =
   | 'type_slug'
   | 'type_email'
   | 'type_textarea'
+  | 'type_richtext'
   | 'minLength'
   | 'maxLength'
   | 'min'
@@ -78,6 +79,22 @@ function validateTextLike(
   }
 
   return errors;
+}
+
+/**
+ * Structural check only: a node needs a string `type`, and — if present — `text` must be a string and
+ * `children` must be an array of valid nodes. No fixed vocabulary of node types or marks is enforced.
+ */
+function isValidRichTextNode(node: unknown): boolean {
+  if (typeof node !== 'object' || node === null || Array.isArray(node)) return false;
+  const candidate = node as Record<string, unknown>;
+
+  if (typeof candidate.type !== 'string') return false;
+  if (candidate.text !== undefined && typeof candidate.text !== 'string') return false;
+  if (candidate.children !== undefined) {
+    return Array.isArray(candidate.children) && candidate.children.every(isValidRichTextNode);
+  }
+  return true;
 }
 
 export function validateField(
@@ -261,6 +278,19 @@ export function validateField(
             fieldName,
             'select_option',
             `Field "${fieldName}" must be one of: ${selOpts.options.join(', ')}.`
+          )
+        );
+      }
+      break;
+    }
+
+    case 'richtext': {
+      if (!Array.isArray(value) || !value.every(isValidRichTextNode)) {
+        errors.push(
+          createError(
+            fieldName,
+            'type_richtext',
+            `Field "${fieldName}" must be a rich text document (an array of nodes).`
           )
         );
       }
