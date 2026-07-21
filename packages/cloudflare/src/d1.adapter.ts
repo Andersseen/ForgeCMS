@@ -1,10 +1,17 @@
 import type { CollectionDefinition } from '@forge-cms/core';
 import type { DatabaseAdapter, DatabaseRecord, FindManyOptions } from '@forge-cms/db';
-import { generateCreateTableSql, toDbValue, fromDbValue } from '@forge-cms/db';
+import { generateCreateTableSql, toDbValue, fromDbValue, toOperatorValue } from '@forge-cms/db';
 import type { D1Database } from './bindings.js';
 
 export interface D1Env {
   DB: D1Database;
+}
+
+const SYSTEM_COLUMNS = ['id', 'created_at', 'updated_at'];
+
+function assertValidColumn(key: string, collectionDef: CollectionDefinition | undefined): void {
+  if (SYSTEM_COLUMNS.includes(key) || collectionDef?.fields[key]) return;
+  throw new Error(`Unknown column '${key}'`);
 }
 
 export class D1DatabaseAdapter implements DatabaseAdapter {
@@ -67,14 +74,48 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     const collectionDef = this.getCollectionDef(options.collection);
 
     if (options.where && Object.keys(options.where).length > 0) {
-      const conditions = Object.keys(options.where)
-        .map((key) => `"${key}" = ?`)
-        .join(' AND ');
-      sql += ` WHERE ${conditions}`;
-      for (const [key, value] of Object.entries(options.where)) {
+      const conditions = Object.entries(options.where).map(([key, condition]) => {
+        assertValidColumn(key, collectionDef);
         const field = collectionDef?.fields[key];
-        bindings.push(field ? toDbValue(value, field.kind) : value);
-      }
+        const { operator, value } = toOperatorValue(condition);
+        const coerce = (v: unknown) => (field ? toDbValue(v, field.kind) : v);
+
+        switch (operator) {
+          case 'ne':
+            bindings.push(coerce(value));
+            return `"${key}" != ?`;
+          case 'gt':
+            bindings.push(coerce(value));
+            return `"${key}" > ?`;
+          case 'gte':
+            bindings.push(coerce(value));
+            return `"${key}" >= ?`;
+          case 'lt':
+            bindings.push(coerce(value));
+            return `"${key}" < ?`;
+          case 'lte':
+            bindings.push(coerce(value));
+            return `"${key}" <= ?`;
+          case 'in': {
+            const values = (value as unknown[]).map(coerce);
+            bindings.push(...values);
+            return `"${key}" IN (${values.map(() => '?').join(', ')})`;
+          }
+          case 'contains':
+            bindings.push(`%${value as string}%`);
+            return `"${key}" LIKE ?`;
+          case 'eq':
+          default:
+            bindings.push(coerce(value));
+            return `"${key}" = ?`;
+        }
+      });
+      sql += ` WHERE ${conditions.join(' AND ')}`;
+    }
+
+    if (options.sort) {
+      assertValidColumn(options.sort, collectionDef);
+      sql += ` ORDER BY "${options.sort}" ${options.order === 'desc' ? 'DESC' : 'ASC'}`;
     }
 
     if (options.limit !== undefined) {

@@ -1,10 +1,15 @@
 import { validateCollection } from '@forge-cms/core';
 import type { ApiContext } from '@forge-cms/api';
 import type { ForgeCmsRuntime } from './runtime.js';
-import type { DatabaseRecord } from '@forge-cms/db';
+import type { DatabaseRecord, DatabaseWhere } from '@forge-cms/db';
 import type { CollectionDefinition } from '@forge-cms/core';
 import type { AuthUser, UserRole } from '@forge-cms/auth';
 import { hasAnyRole } from '@forge-cms/auth';
+
+const WHERE_OPERATORS = new Set(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'contains']);
+const SYSTEM_SORT_FIELDS = new Set(['id', 'created_at', 'updated_at']);
+const RESERVED_QUERY_PARAMS = new Set(['limit', 'offset', 'sort', 'order']);
+const WHERE_KEY_PATTERN = /^(.+)\[(\w+)\]$/;
 
 class FilterCoercionError extends Error {
   constructor(readonly field: string) {
@@ -12,38 +17,88 @@ class FilterCoercionError extends Error {
   }
 }
 
-/** Coerce raw query-param strings to the value types declared by the collection's fields. */
-function coerceWhere(
-  collection: CollectionDefinition,
-  raw: Record<string, string>
-): DatabaseRecord {
-  const where: DatabaseRecord = {};
+class SortFieldError extends Error {
+  constructor(readonly field: string) {
+    super(`Invalid sort field '${field}'`);
+  }
+}
 
-  for (const [key, value] of Object.entries(raw)) {
-    const field = collection.fields[key];
-    if (!field) {
-      where[key] = value;
+class SortOrderError extends Error {
+  constructor(readonly order: string) {
+    super(`Invalid sort order '${order}', expected 'asc' or 'desc'`);
+  }
+}
+
+/** Coerce a raw query-param string to the value type declared by the field (bare `eq` semantics). */
+function coerceScalar(collection: CollectionDefinition, key: string, value: string): unknown {
+  const field = collection.fields[key];
+  if (!field) return value;
+
+  switch (field.kind) {
+    case 'number': {
+      const num = Number(value);
+      if (Number.isNaN(num)) throw new FilterCoercionError(key);
+      return num;
+    }
+    case 'boolean': {
+      if (value !== 'true' && value !== 'false') throw new FilterCoercionError(key);
+      return value === 'true';
+    }
+    default:
+      return value;
+  }
+}
+
+/**
+ * Coerce raw query-param strings to a DatabaseWhere. Supports bare equality (`field=value`) and
+ * bracket operator syntax (`field[gt]=value`, `field[in]=a,b,c`, ...).
+ */
+function coerceWhere(collection: CollectionDefinition, raw: Record<string, string>): DatabaseWhere {
+  const where: DatabaseWhere = {};
+
+  for (const [rawKey, value] of Object.entries(raw)) {
+    const match = WHERE_KEY_PATTERN.exec(rawKey);
+    if (!match) {
+      where[rawKey] = coerceScalar(collection, rawKey, value);
       continue;
     }
 
-    switch (field.kind) {
-      case 'number': {
-        const num = Number(value);
-        if (Number.isNaN(num)) throw new FilterCoercionError(key);
-        where[key] = num;
-        break;
-      }
-      case 'boolean': {
-        if (value !== 'true' && value !== 'false') throw new FilterCoercionError(key);
-        where[key] = value === 'true';
-        break;
-      }
-      default:
-        where[key] = value;
+    const [, key, operator] = match;
+    if (!key || !operator || !WHERE_OPERATORS.has(operator)) {
+      throw new FilterCoercionError(rawKey);
+    }
+
+    if (operator === 'in') {
+      where[key] = { in: value.split(',').map((v) => coerceScalar(collection, key, v)) };
+    } else if (operator === 'eq') {
+      where[key] = coerceScalar(collection, key, value);
+    } else {
+      where[key] = { [operator]: coerceScalar(collection, key, value) };
     }
   }
 
   return where;
+}
+
+/** Parse and validate `sort`/`order` query params against the collection's known fields. */
+function parseSort(
+  collection: CollectionDefinition,
+  url: URL
+): { sort?: string; order?: 'asc' | 'desc' } {
+  const sortParam = url.searchParams.get('sort');
+  if (!sortParam) return {};
+
+  if (!SYSTEM_SORT_FIELDS.has(sortParam) && !collection.fields[sortParam]) {
+    throw new SortFieldError(sortParam);
+  }
+
+  const orderParam = url.searchParams.get('order');
+  if (orderParam === null) return { sort: sortParam };
+  if (orderParam !== 'asc' && orderParam !== 'desc') {
+    throw new SortOrderError(orderParam);
+  }
+
+  return { sort: sortParam, order: orderParam };
 }
 
 export interface HandlerOptions<TEnv = unknown> {
@@ -112,16 +167,21 @@ export async function handleList<TEnv = unknown>(
 
     const rawWhere: Record<string, string> = {};
     url.searchParams.forEach((value, key) => {
-      if (key !== 'limit' && key !== 'offset') {
+      if (!RESERVED_QUERY_PARAMS.has(key)) {
         rawWhere[key] = value;
       }
     });
 
-    let where: DatabaseRecord;
+    let where: DatabaseWhere;
+    let sort: { sort?: string; order?: 'asc' | 'desc' };
     try {
       where = coerceWhere(collection, rawWhere);
+      sort = parseSort(collection, url);
     } catch (err) {
-      if (err instanceof FilterCoercionError) return errorResponse(err.message, 400);
+      if (err instanceof FilterCoercionError || err instanceof SortOrderError) {
+        return errorResponse(err.message, 400);
+      }
+      if (err instanceof SortFieldError) return errorResponse(err.message, 400);
       throw err;
     }
 
@@ -129,7 +189,9 @@ export async function handleList<TEnv = unknown>(
       collection: collectionSlug,
       ...(limit !== undefined && { limit }),
       ...(offset !== undefined && { offset }),
-      ...(Object.keys(where).length > 0 && { where })
+      ...(Object.keys(where).length > 0 && { where }),
+      ...(sort.sort !== undefined && { sort: sort.sort }),
+      ...(sort.order !== undefined && { order: sort.order })
     });
 
     return jsonResponse({

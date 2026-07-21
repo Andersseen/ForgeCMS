@@ -3,6 +3,12 @@ import { defineCollection, defineField } from '@forge-cms/core';
 import { D1DatabaseAdapter } from './d1.adapter.js';
 import type { D1Database, D1PreparedStatement, D1Result } from './bindings.js';
 
+interface ParsedCondition {
+  key: string;
+  op: '=' | '!=' | '>' | '>=' | '<' | '<=' | 'IN' | 'LIKE';
+  values: unknown[];
+}
+
 /** Simple in-memory mock of D1Database for unit testing */
 class MockD1Database implements D1Database {
   private tables = new Map<string, Map<string, Record<string, unknown>>>();
@@ -44,10 +50,10 @@ class MockD1PreparedStatement implements D1PreparedStatement {
       return { count: rows.size } as T;
     }
 
-    const { table, where } = this.parseSelect();
+    const { table, conditions } = this.parseSelect();
     const rows = this.getTableRows(table);
     for (const row of rows.values()) {
-      if (this.matchesWhere(row, where)) {
+      if (this.matchesConditions(row, conditions)) {
         return row as T;
       }
     }
@@ -68,9 +74,21 @@ class MockD1PreparedStatement implements D1PreparedStatement {
   }
 
   async all<T = unknown>(): Promise<D1Result<T>> {
-    const { table, where, limit, offset } = this.parseSelect();
+    const { table, conditions, orderBy, limit, offset } = this.parseSelect();
     const rows = this.getTableRows(table);
-    let results = Array.from(rows.values()).filter((r) => this.matchesWhere(r, where));
+    let results = Array.from(rows.values()).filter((r) => this.matchesConditions(r, conditions));
+
+    if (orderBy) {
+      const direction = orderBy.direction === 'DESC' ? -1 : 1;
+      results = [...results].sort((a, b) => {
+        const aValue = a[orderBy.column];
+        const bValue = b[orderBy.column];
+        if (aValue === bValue) return 0;
+        if (aValue === undefined || aValue === null) return 1;
+        if (bValue === undefined || bValue === null) return -1;
+        return ((aValue as string | number) < (bValue as string | number) ? -1 : 1) * direction;
+      });
+    }
 
     if (offset) results = results.slice(offset);
     if (limit !== undefined) results = results.slice(0, limit);
@@ -92,74 +110,93 @@ class MockD1PreparedStatement implements D1PreparedStatement {
 
   private parseSelect(): {
     table: string;
-    where: Record<string, unknown>;
+    conditions: ParsedCondition[];
+    orderBy?: { column: string; direction: 'ASC' | 'DESC' };
     limit?: number;
     offset?: number;
   } {
     const tableMatch = this.query.match(/FROM\s+"([^"]+)"/i);
     const table: string = tableMatch?.[1] ?? '';
 
-    const where: Record<string, unknown> = {};
-    const whereMatch = this.query.match(/WHERE\s+(.+)/i);
+    const conditions: ParsedCondition[] = [];
+    let bindingIdx = 0;
+
+    const whereMatch = this.query.match(/WHERE\s+(.+?)(?:\s+ORDER BY|\s+LIMIT|\s+OFFSET|$)/i);
     if (whereMatch) {
-      const conditions = whereMatch[1]!.split(' AND ');
-      let bindingIdx = 0;
-      for (const cond of conditions) {
-        const colMatch = cond.match(/"([^"]+)"\s*=\s*\?/);
-        if (colMatch) {
-          where[colMatch[1]!] = this.bindings[bindingIdx++];
+      for (const part of whereMatch[1]!.split(' AND ')) {
+        const inMatch = part.match(/"([^"]+)"\s+IN\s*\(([^)]*)\)/i);
+        if (inMatch) {
+          const placeholderCount = (inMatch[2]!.match(/\?/g) ?? []).length;
+          const values = this.bindings.slice(bindingIdx, bindingIdx + placeholderCount);
+          bindingIdx += placeholderCount;
+          conditions.push({ key: inMatch[1]!, op: 'IN', values });
+          continue;
+        }
+        const likeMatch = part.match(/"([^"]+)"\s+LIKE\s+\?/i);
+        if (likeMatch) {
+          conditions.push({ key: likeMatch[1]!, op: 'LIKE', values: [this.bindings[bindingIdx++]] });
+          continue;
+        }
+        const cmpMatch = part.match(/"([^"]+)"\s*(!=|>=|<=|>|<|=)\s*\?/);
+        if (cmpMatch) {
+          conditions.push({
+            key: cmpMatch[1]!,
+            op: cmpMatch[2] as ParsedCondition['op'],
+            values: [this.bindings[bindingIdx++]]
+          });
         }
       }
     }
 
+    const orderMatch = this.query.match(/ORDER BY\s+"([^"]+)"\s+(ASC|DESC)/i);
+    const orderBy = orderMatch
+      ? { column: orderMatch[1]!, direction: orderMatch[2]!.toUpperCase() as 'ASC' | 'DESC' }
+      : undefined;
+
     let limit: number | undefined;
     let offset: number | undefined;
-
-    const limitMatch = this.query.match(/LIMIT\s+\?/i);
-    if (limitMatch) {
-      const limitOffsetPart = this.query.slice(this.query.indexOf('LIMIT'));
-      const allBindings = limitOffsetPart.match(/\?/g);
-      if (allBindings) {
-        // Simplified: last binding is limit if present
-        const parts = this.query.split(/\s+/);
-        let bindCursor = 0;
-        for (let i = 0; i < parts.length; i++) {
-          const part = parts[i]!;
-          if (part.toUpperCase() === 'WHERE') {
-            // Skip WHERE bindings
-            for (let j = i + 1; j < parts.length; j++) {
-              const innerPart = parts[j]!;
-              if (innerPart === 'AND') continue;
-              if (innerPart.toUpperCase() === 'LIMIT' || innerPart.toUpperCase() === 'OFFSET')
-                break;
-              bindCursor++;
-            }
-          }
-          if (part.toUpperCase() === 'LIMIT') {
-            limit = this.bindings[bindCursor] as number;
-            bindCursor++;
-          }
-          if (part.toUpperCase() === 'OFFSET') {
-            offset = this.bindings[bindCursor] as number;
-            bindCursor++;
-          }
-        }
-      }
+    if (/LIMIT\s+\?/i.test(this.query)) {
+      limit = this.bindings[bindingIdx++] as number;
+    }
+    if (/OFFSET\s+\?/i.test(this.query)) {
+      offset = this.bindings[bindingIdx++] as number;
     }
 
     return {
       table,
-      where,
+      conditions,
+      ...(orderBy && { orderBy }),
       ...(limit !== undefined && { limit }),
       ...(offset !== undefined && { offset })
     };
   }
 
-  private matchesWhere(row: Record<string, unknown>, where: Record<string, unknown>): boolean {
-    for (const [key, value] of Object.entries(where)) {
-      if (row[key] !== value) return false;
-    }
-    return true;
+  private matchesConditions(row: Record<string, unknown>, conditions: ParsedCondition[]): boolean {
+    return conditions.every((c) => {
+      const rowValue = row[c.key];
+      switch (c.op) {
+        case '=':
+          return rowValue === c.values[0];
+        case '!=':
+          return rowValue !== c.values[0];
+        case '>':
+          return (rowValue as number) > (c.values[0] as number);
+        case '>=':
+          return (rowValue as number) >= (c.values[0] as number);
+        case '<':
+          return (rowValue as number) < (c.values[0] as number);
+        case '<=':
+          return (rowValue as number) <= (c.values[0] as number);
+        case 'IN':
+          return c.values.includes(rowValue);
+        case 'LIKE': {
+          const pattern = String(c.values[0]).replace(/^%|%$/g, '');
+          return typeof rowValue === 'string' && rowValue.includes(pattern);
+        }
+        default:
+          return false;
+      }
+    });
   }
 
   private handleInsert<T>(): D1Result<T> {
@@ -342,5 +379,64 @@ describe('D1DatabaseAdapter', () => {
 
     const count = await adapter.count('posts');
     expect(count).toBe(3);
+  });
+
+  describe('where operators and sorting', () => {
+    beforeEach(async () => {
+      await adapter.syncSchema([posts]);
+      await adapter.create('posts', { id: 'p1', title: 'Alpha', views: 10 });
+      await adapter.create('posts', { id: 'p2', title: 'Beta', views: 50 });
+      await adapter.create('posts', { id: 'p3', title: 'Gamma', views: 100 });
+    });
+
+    it('filters with gt/gte/lt/lte/ne', async () => {
+      expect((await adapter.findMany({ collection: 'posts', where: { views: { gt: 10 } } })).map(
+        (r) => r.id
+      )).toEqual(expect.arrayContaining(['p2', 'p3']));
+      expect(
+        (await adapter.findMany({ collection: 'posts', where: { views: { lt: 50 } } })).map((r) => r.id)
+      ).toEqual(['p1']);
+      expect(
+        (await adapter.findMany({ collection: 'posts', where: { views: { gte: 50 } } })).map((r) => r.id)
+      ).toEqual(expect.arrayContaining(['p2', 'p3']));
+      expect(
+        (await adapter.findMany({ collection: 'posts', where: { views: { lte: 50 } } })).map((r) => r.id)
+      ).toEqual(expect.arrayContaining(['p1', 'p2']));
+      expect(
+        (await adapter.findMany({ collection: 'posts', where: { title: { ne: 'Alpha' } } })).map(
+          (r) => r.id
+        )
+      ).toEqual(expect.arrayContaining(['p2', 'p3']));
+    });
+
+    it('filters with in', async () => {
+      const results = await adapter.findMany({
+        collection: 'posts',
+        where: { id: { in: ['p1', 'p3'] } }
+      });
+      expect(results.map((r) => r.id).sort()).toEqual(['p1', 'p3']);
+    });
+
+    it('filters with contains', async () => {
+      const results = await adapter.findMany({
+        collection: 'posts',
+        where: { title: { contains: 'et' } }
+      });
+      expect(results.map((r) => r.id)).toEqual(['p2']);
+    });
+
+    it('sorts ascending and descending', async () => {
+      const asc = await adapter.findMany({ collection: 'posts', sort: 'views', order: 'asc' });
+      expect(asc.map((r) => r.id)).toEqual(['p1', 'p2', 'p3']);
+
+      const desc = await adapter.findMany({ collection: 'posts', sort: 'views', order: 'desc' });
+      expect(desc.map((r) => r.id)).toEqual(['p3', 'p2', 'p1']);
+    });
+
+    it('rejects an unknown sort column', async () => {
+      await expect(
+        adapter.findMany({ collection: 'posts', sort: 'nonexistent' })
+      ).rejects.toThrow("Unknown column 'nonexistent'");
+    });
   });
 });

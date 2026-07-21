@@ -9,6 +9,8 @@ interface ContractDatabaseAdapter {
     limit?: number;
     offset?: number;
     where?: Record<string, unknown>;
+    sort?: string;
+    order?: 'asc' | 'desc';
   }): Promise<Record<string, unknown>[]>;
   create(collection: string, data: Record<string, unknown>): Promise<Record<string, unknown>>;
   update(
@@ -91,6 +93,96 @@ export function runDatabaseAdapterContractTests(createAdapter: () => ContractDat
       await adapter.create('posts', { id: '9', title: 'Countable' });
       const count = await adapter.count('posts');
       expect(count).toBeGreaterThanOrEqual(1);
+    });
+
+    describe('where operators', () => {
+      beforeEach(async () => {
+        await adapter.create('articles', { id: 'a1', title: 'Alpha', views: 10, status: 'draft' });
+        await adapter.create('articles', { id: 'a2', title: 'Beta', views: 50, status: 'published' });
+        await adapter.create('articles', { id: 'a3', title: 'Gamma', views: 100, status: 'published' });
+      });
+
+      it('filters with ne', async () => {
+        const results = await adapter.findMany({
+          collection: 'articles',
+          where: { status: { ne: 'draft' } }
+        });
+        expect(results.map((r) => r.id).sort()).toEqual(['a2', 'a3']);
+      });
+
+      it('filters with gt', async () => {
+        const results = await adapter.findMany({
+          collection: 'articles',
+          where: { views: { gt: 10 } }
+        });
+        expect(results.map((r) => r.id).sort()).toEqual(['a2', 'a3']);
+      });
+
+      it('filters with gte', async () => {
+        const results = await adapter.findMany({
+          collection: 'articles',
+          where: { views: { gte: 50 } }
+        });
+        expect(results.map((r) => r.id).sort()).toEqual(['a2', 'a3']);
+      });
+
+      it('filters with lt', async () => {
+        const results = await adapter.findMany({
+          collection: 'articles',
+          where: { views: { lt: 50 } }
+        });
+        expect(results.map((r) => r.id)).toEqual(['a1']);
+      });
+
+      it('filters with lte', async () => {
+        const results = await adapter.findMany({
+          collection: 'articles',
+          where: { views: { lte: 50 } }
+        });
+        expect(results.map((r) => r.id).sort()).toEqual(['a1', 'a2']);
+      });
+
+      it('filters with in', async () => {
+        const results = await adapter.findMany({
+          collection: 'articles',
+          where: { id: { in: ['a1', 'a3'] } }
+        });
+        expect(results.map((r) => r.id).sort()).toEqual(['a1', 'a3']);
+      });
+
+      it('filters with contains', async () => {
+        const results = await adapter.findMany({
+          collection: 'articles',
+          where: { title: { contains: 'et' } }
+        });
+        expect(results.map((r) => r.id)).toEqual(['a2']);
+      });
+
+      it('still supports bare-value equality', async () => {
+        const results = await adapter.findMany({
+          collection: 'articles',
+          where: { status: 'draft' }
+        });
+        expect(results.map((r) => r.id)).toEqual(['a1']);
+      });
+
+      it('sorts ascending', async () => {
+        const results = await adapter.findMany({
+          collection: 'articles',
+          sort: 'views',
+          order: 'asc'
+        });
+        expect(results.map((r) => r.id)).toEqual(['a1', 'a2', 'a3']);
+      });
+
+      it('sorts descending', async () => {
+        const results = await adapter.findMany({
+          collection: 'articles',
+          sort: 'views',
+          order: 'desc'
+        });
+        expect(results.map((r) => r.id)).toEqual(['a3', 'a2', 'a1']);
+      });
     });
   });
 }

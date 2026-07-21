@@ -190,6 +190,90 @@ describe('CRUD Handlers', () => {
       const response = await handleList(context, { runtime });
       expect(response.status).toBe(200);
     });
+
+    it('filters with the gt bracket operator', async () => {
+      await runtime.adapters.database.create('posts', { title: 'Popular', views: 99 });
+      await runtime.adapters.database.create('posts', { title: 'Quiet', views: 1 });
+
+      const context = createTestContext('GET', 'https://forge.test/api/posts?views[gt]=10');
+      context.params = { collection: 'posts' };
+
+      const response = await handleList(context, { runtime });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].title).toBe('Popular');
+    });
+
+    it('filters with the in bracket operator, splitting on commas', async () => {
+      await runtime.adapters.database.create('posts', { id: 'a', title: 'A' });
+      await runtime.adapters.database.create('posts', { id: 'b', title: 'B' });
+      await runtime.adapters.database.create('posts', { id: 'c', title: 'C' });
+
+      const context = createTestContext('GET', 'https://forge.test/api/posts?id[in]=a,c');
+      context.params = { collection: 'posts' };
+
+      const response = await handleList(context, { runtime });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.data.map((r: { id: string }) => r.id).sort()).toEqual(['a', 'c']);
+    });
+
+    it('returns 400 for an unknown operator', async () => {
+      const context = createTestContext('GET', 'https://forge.test/api/posts?views[bogus]=1');
+      context.params = { collection: 'posts' };
+
+      const response = await handleList(context, { runtime });
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.error).toContain('views[bogus]');
+    });
+
+    it('sorts by a field in descending order', async () => {
+      await runtime.adapters.database.create('posts', { title: 'Low', views: 1 });
+      await runtime.adapters.database.create('posts', { title: 'High', views: 100 });
+
+      const context = createTestContext(
+        'GET',
+        'https://forge.test/api/posts?sort=views&order=desc'
+      );
+      context.params = { collection: 'posts' };
+
+      const response = await handleList(context, { runtime });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.data[0].title).toBe('High');
+      expect(body.data[1].title).toBe('Low');
+    });
+
+    it('returns 400 for an unknown sort field', async () => {
+      const context = createTestContext('GET', 'https://forge.test/api/posts?sort=nonexistent');
+      context.params = { collection: 'posts' };
+
+      const response = await handleList(context, { runtime });
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.error).toContain('nonexistent');
+    });
+
+    it('returns 400 for an invalid sort order', async () => {
+      const context = createTestContext(
+        'GET',
+        'https://forge.test/api/posts?sort=views&order=sideways'
+      );
+      context.params = { collection: 'posts' };
+
+      const response = await handleList(context, { runtime });
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.error).toContain('sideways');
+    });
   });
 
   describe('handleRead', () => {

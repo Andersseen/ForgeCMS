@@ -9,7 +9,22 @@ import {
 } from './schema-generator.js';
 import { drizzle } from 'drizzle-orm/libsql';
 import { createClient, type Client } from '@libsql/client';
-import { eq, and, sql, count as drizzleCount } from 'drizzle-orm';
+import {
+  eq,
+  ne,
+  gt,
+  gte,
+  lt,
+  lte,
+  inArray,
+  like,
+  and,
+  asc,
+  desc,
+  sql,
+  count as drizzleCount
+} from 'drizzle-orm';
+import { toOperatorValue } from './where.js';
 
 export interface LibSqlEnv {
   DATABASE_URL?: string;
@@ -90,11 +105,39 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
     let query = db.select().from(table);
 
     if (options.where && Object.keys(options.where).length > 0) {
-      const conditions = Object.entries(options.where).map(([key, value]) =>
+      const conditions = Object.entries(options.where).map(([key, condition]) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        eq((table as any)[key], value)
-      );
+        const column = (table as any)[key];
+        const { operator, value } = toOperatorValue(condition);
+        switch (operator) {
+          case 'ne':
+            return ne(column, value);
+          case 'gt':
+            return gt(column, value);
+          case 'gte':
+            return gte(column, value);
+          case 'lt':
+            return lt(column, value);
+          case 'lte':
+            return lte(column, value);
+          case 'in':
+            return inArray(column, value as unknown[]);
+          case 'contains':
+            return like(column, `%${value as string}%`);
+          case 'eq':
+          default:
+            return eq(column, value);
+        }
+      });
       query = query.where(and(...conditions)) as typeof query;
+    }
+
+    if (options.sort) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sortColumn = (table as any)[options.sort];
+      query = query.orderBy(
+        options.order === 'desc' ? desc(sortColumn) : asc(sortColumn)
+      ) as typeof query;
     }
 
     if (options.limit !== undefined) {

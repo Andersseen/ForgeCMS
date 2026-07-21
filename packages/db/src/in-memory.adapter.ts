@@ -1,5 +1,6 @@
 import type { CollectionDefinition } from '@forge-cms/core';
 import type { DatabaseAdapter, FindManyOptions } from './index.js';
+import { matchesCondition } from './where.js';
 
 export class InMemoryDatabaseAdapter implements DatabaseAdapter {
   readonly name = 'in-memory';
@@ -17,9 +18,22 @@ export class InMemoryDatabaseAdapter implements DatabaseAdapter {
   async findMany(options: FindManyOptions): Promise<Record<string, unknown>[]> {
     let records = this.store.get(options.collection) ?? [];
     if (options.where) {
+      const where = options.where;
       records = records.filter((r) =>
-        Object.entries(options.where!).every(([key, value]) => r[key] === value)
+        Object.entries(where).every(([key, condition]) => matchesCondition(r[key], condition))
       );
+    }
+    if (options.sort) {
+      const sortField = options.sort;
+      const direction = options.order === 'desc' ? -1 : 1;
+      records = [...records].sort((a, b) => {
+        const aValue = a[sortField];
+        const bValue = b[sortField];
+        if (aValue === bValue) return 0;
+        if (aValue === undefined || aValue === null) return 1;
+        if (bValue === undefined || bValue === null) return -1;
+        return ((aValue as string | number) < (bValue as string | number) ? -1 : 1) * direction;
+      });
     }
     if (options.offset) {
       records = records.slice(options.offset);
