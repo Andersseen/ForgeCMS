@@ -172,7 +172,11 @@ class MockD1PreparedStatement implements D1PreparedStatement {
         }
         const likeMatch = part.match(/"([^"]+)"\s+LIKE\s+\?/i);
         if (likeMatch) {
-          conditions.push({ key: likeMatch[1]!, op: 'LIKE', values: [this.bindings[bindingIdx++]] });
+          conditions.push({
+            key: likeMatch[1]!,
+            op: 'LIKE',
+            values: [this.bindings[bindingIdx++]]
+          });
           continue;
         }
         // Column name may or may not be quoted: findMany quotes it, but findById/update/delete
@@ -462,17 +466,25 @@ describe('D1DatabaseAdapter', () => {
     });
 
     it('filters with gt/gte/lt/lte/ne', async () => {
-      expect((await adapter.findMany({ collection: 'posts', where: { views: { gt: 10 } } })).map(
-        (r) => r.id
-      )).toEqual(expect.arrayContaining(['p2', 'p3']));
       expect(
-        (await adapter.findMany({ collection: 'posts', where: { views: { lt: 50 } } })).map((r) => r.id)
-      ).toEqual(['p1']);
-      expect(
-        (await adapter.findMany({ collection: 'posts', where: { views: { gte: 50 } } })).map((r) => r.id)
+        (await adapter.findMany({ collection: 'posts', where: { views: { gt: 10 } } })).map(
+          (r) => r.id
+        )
       ).toEqual(expect.arrayContaining(['p2', 'p3']));
       expect(
-        (await adapter.findMany({ collection: 'posts', where: { views: { lte: 50 } } })).map((r) => r.id)
+        (await adapter.findMany({ collection: 'posts', where: { views: { lt: 50 } } })).map(
+          (r) => r.id
+        )
+      ).toEqual(['p1']);
+      expect(
+        (await adapter.findMany({ collection: 'posts', where: { views: { gte: 50 } } })).map(
+          (r) => r.id
+        )
+      ).toEqual(expect.arrayContaining(['p2', 'p3']));
+      expect(
+        (await adapter.findMany({ collection: 'posts', where: { views: { lte: 50 } } })).map(
+          (r) => r.id
+        )
       ).toEqual(expect.arrayContaining(['p1', 'p2']));
       expect(
         (await adapter.findMany({ collection: 'posts', where: { title: { ne: 'Alpha' } } })).map(
@@ -506,9 +518,9 @@ describe('D1DatabaseAdapter', () => {
     });
 
     it('rejects an unknown sort column', async () => {
-      await expect(
-        adapter.findMany({ collection: 'posts', sort: 'nonexistent' })
-      ).rejects.toThrow("Unknown column 'nonexistent'");
+      await expect(adapter.findMany({ collection: 'posts', sort: 'nonexistent' })).rejects.toThrow(
+        "Unknown column 'nonexistent'"
+      );
     });
   });
 });

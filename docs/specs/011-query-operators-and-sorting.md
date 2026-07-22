@@ -83,6 +83,7 @@ GET /api/v1/posts?status=published        // unchanged: bare value is still eq
 ```
 
 `coerceWhere` in `packages/runtime/src/handlers.ts` is extended to:
+
 1. Parse keys of the form `field[operator]`. Reject unknown operators with a 400 (reuse the existing
    `FilterCoercionError` path).
 2. Coerce the value string to the field's declared type the same way it does today for bare `eq` (number →

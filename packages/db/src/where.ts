@@ -36,7 +36,10 @@ export function isWhereValue(condition: WhereCondition): condition is WhereValue
 }
 
 /** Normalize any WhereCondition to a single `{ operator, value }` pair (eq for bare values). */
-export function toOperatorValue(condition: WhereCondition): { operator: WhereOperator; value: unknown } {
+export function toOperatorValue(condition: WhereCondition): {
+  operator: WhereOperator;
+  value: unknown;
+} {
   if (!isWhereValue(condition)) {
     return { operator: 'eq', value: condition };
   }
@@ -66,7 +69,9 @@ export function matchesCondition(recordValue: unknown, condition: WhereCondition
     case 'in':
       return Array.isArray(value) && value.includes(recordValue);
     case 'contains':
-      return typeof recordValue === 'string' && typeof value === 'string' && recordValue.includes(value);
+      return (
+        typeof recordValue === 'string' && typeof value === 'string' && recordValue.includes(value)
+      );
     default:
       return false;
   }

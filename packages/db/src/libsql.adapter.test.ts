@@ -74,7 +74,10 @@ describe('LibSqlDatabaseAdapter', () => {
       expect(found?.title).toBe('Before migration');
 
       // and the new column is now usable
-      const created = await migrationAdapter.create('articles', { title: 'After migration', views: 5 });
+      const created = await migrationAdapter.create('articles', {
+        title: 'After migration',
+        views: 5
+      });
       const foundNew = await migrationAdapter.findById('articles', created.id as string);
       expect(foundNew?.views).toBe(5);
     });

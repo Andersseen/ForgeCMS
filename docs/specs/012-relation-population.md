@@ -22,7 +22,7 @@ related record no longer exists).
 
 ## Non-goals
 
-- Multi-level population (`depth` > 1, i.e. populating relations *of* a populated relation). `depth`
+- Multi-level population (`depth` > 1, i.e. populating relations _of_ a populated relation). `depth`
   only accepts `0` (default, off) or `1`.
 - Populating relations nested inside `json` field values.
 - Changing the write shape — `POST`/`PUT` still take and validate bare ID strings, unchanged.
@@ -49,8 +49,9 @@ export async function populateRecords<TEnv>(
 
 For each `relation` field on `collection`: collect every referenced id across all input records into one
 `Set<string>`, fetch them in a single batched `findMany({ collection: targetSlug, where: { id: { in: [...] } } })`
-call (built on spec 011's `in` operator — one query per relation *field*, not per record/id), then replace
+call (built on spec 011's `in` operator — one query per relation _field_, not per record/id), then replace
 each record's field value:
+
 - single relation (`many` falsy): the matching record, or `null` if not found (deleted/dangling reference).
 - `many: true`: the array of matching records, silently dropping ids that no longer resolve.
 
@@ -82,10 +83,10 @@ so it isn't treated as a `where` filter). Only `"0"` (or absent) and `"1"` are v
   — populating replaces both correctly; a dangling `author` id becomes `null`; a dangling entry inside
   `tags` is dropped, not nulled.
 - `handlers.test.ts`: `GET /api/v1/posts?depth=1` returns populated `author`/`tags`; `GET
-  /api/v1/posts/:id?depth=1` same; `?depth=1` with no relation fields on the collection is a no-op;
+/api/v1/posts/:id?depth=1` same; `?depth=1` with no relation fields on the collection is a no-op;
   `?depth=abc` → 400.
 - Manual: `pnpm dev:www` → create a post with a real `author` id, `GET
-  /api/v1/posts?depth=1` shows the full user object instead of the id.
+/api/v1/posts?depth=1` shows the full user object instead of the id.
 
 ## Acceptance criteria
 

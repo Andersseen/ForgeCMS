@@ -27,7 +27,7 @@ adds them via `ALTER TABLE ... ADD COLUMN`, on both `LibSqlDatabaseAdapter` and 
   not attempted).
 - A migration history/version table, a CLI, or down-migrations — this stays an idempotent "sync toward the
   current definition" step run on every `syncSchema()` call, matching the existing `CREATE TABLE IF NOT
-  EXISTS` model, not a versioned migration system.
+EXISTS` model, not a versioned migration system.
 - Backfilling the new column's `defaultValue` into existing rows (new columns are added as SQL `NULL` for
   existing rows, same as raw SQLite `ADD COLUMN` behavior; validation on read/write of old rows is
   unaffected since `validateField`/`validateCollection` already treat `undefined`/`null` per the field's
@@ -79,7 +79,7 @@ indexed in the same sync pass if it declares `index`/`unique`).
 ## Test plan
 
 - `schema-generator.test.ts`: a collection with fields `[a, b]` and existing columns `[a]` → one `ALTER
-  TABLE ... ADD COLUMN "b"` statement; existing columns already matching → empty array.
+TABLE ... ADD COLUMN "b"` statement; existing columns already matching → empty array.
 - `libsql.adapter.test.ts`: `syncSchema([v1])` (fields: `title`) → create + insert a row → redefine the
   collection as `v2` (fields: `title`, `views`) → `syncSchema([v2])` → the v1 row is still readable
   (`views` reads back as `null`/undefined) and a new row can now set `views`.

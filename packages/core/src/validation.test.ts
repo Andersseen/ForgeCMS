@@ -249,7 +249,10 @@ describe('runtime validation', () => {
       const doc = [
         {
           type: 'paragraph',
-          children: [{ type: 'text', text: 'ok' }, { type: 'text', text: 42 }]
+          children: [
+            { type: 'text', text: 'ok' },
+            { type: 'text', text: 42 }
+          ]
         }
       ];
       const errors = validateField(field, doc, 'body');

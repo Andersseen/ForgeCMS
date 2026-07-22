@@ -30,7 +30,7 @@ handlers run hooks and enforce both levels of access control.
   what was asked for).
 - Hook ordering/priority configuration beyond "run in array order".
 - Field-level access on `handleCreate`'s **response** shape (the created record echoes back whatever the
-  caller could already infer from a 201; only the *request* is access-checked, and only `handleList`/
+  caller could already infer from a 201; only the _request_ is access-checked, and only `handleList`/
   `handleRead` responses are read-filtered).
 - Changing `apps/www`'s demo collections to use hooks/access (this spec ships the capability in
   `@forge-cms/core`/`@forge-cms/runtime` with full test coverage there; wiring a demo is a natural
@@ -190,7 +190,7 @@ Shipped 2026-07-20. One implementation detail differs from the design text: inst
 itself taking a `collection` parameter, each handler computes `effectiveRoles(collection.access?.[op],
 allowedRoles)` and passes the result as `authorize()`'s existing `allowedRoles` argument — same behavior,
 smaller diff to `authorize()`. Also reordered every handler to resolve `collectionSlug`/`collection`
-*before* calling `authorize`, so collection-level access can be consulted; verified against spec 010's
+_before_ calling `authorize`, so collection-level access can be consulted; verified against spec 010's
 existing RBAC tests (all still use a registered `posts` collection, so the 401/403/404 status codes for
 those cases are unchanged) plus a full `pnpm test` run — no regressions. `pnpm lint && pnpm typecheck &&
 pnpm test && pnpm build` green.

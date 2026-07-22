@@ -655,7 +655,9 @@ describe('CRUD Handlers', () => {
           hooks: {
             ...(opts.beforeChange && { beforeChange: [opts.beforeChange] }),
             ...(opts.afterChangeSpy && {
-              afterChange: [(ctx: { result: Record<string, unknown> }) => opts.afterChangeSpy!(ctx.result)]
+              afterChange: [
+                (ctx: { result: Record<string, unknown> }) => opts.afterChangeSpy!(ctx.result)
+              ]
             })
           }
         })
@@ -1033,7 +1035,10 @@ describe('CRUD Handlers', () => {
     it('anonymous list only ever sees published documents', async () => {
       const draftsRuntime = createDraftsRuntime();
       await draftsRuntime.adapters.database.create('posts', { title: 'Draft', _status: 'draft' });
-      await draftsRuntime.adapters.database.create('posts', { title: 'Live', _status: 'published' });
+      await draftsRuntime.adapters.database.create('posts', {
+        title: 'Live',
+        _status: 'published'
+      });
 
       const context = createTestContext('GET', 'https://forge.test/api/posts');
       context.params = { collection: 'posts' };
@@ -1059,7 +1064,10 @@ describe('CRUD Handlers', () => {
     it('authenticated request can see drafts via ?status=draft', async () => {
       const draftsRuntime = createDraftsRuntime();
       await draftsRuntime.adapters.database.create('posts', { title: 'Draft', _status: 'draft' });
-      await draftsRuntime.adapters.database.create('posts', { title: 'Live', _status: 'published' });
+      await draftsRuntime.adapters.database.create('posts', {
+        title: 'Live',
+        _status: 'published'
+      });
 
       const context = createTestContext(
         'GET',
@@ -1078,7 +1086,10 @@ describe('CRUD Handlers', () => {
     it('authenticated request sees everything via ?status=all', async () => {
       const draftsRuntime = createDraftsRuntime();
       await draftsRuntime.adapters.database.create('posts', { title: 'Draft', _status: 'draft' });
-      await draftsRuntime.adapters.database.create('posts', { title: 'Live', _status: 'published' });
+      await draftsRuntime.adapters.database.create('posts', {
+        title: 'Live',
+        _status: 'published'
+      });
 
       const context = createTestContext(
         'GET',
@@ -1096,7 +1107,10 @@ describe('CRUD Handlers', () => {
     it('authenticated request without ?status still defaults to published only', async () => {
       const draftsRuntime = createDraftsRuntime();
       await draftsRuntime.adapters.database.create('posts', { title: 'Draft', _status: 'draft' });
-      await draftsRuntime.adapters.database.create('posts', { title: 'Live', _status: 'published' });
+      await draftsRuntime.adapters.database.create('posts', {
+        title: 'Live',
+        _status: 'published'
+      });
 
       const context = createTestContext(
         'GET',

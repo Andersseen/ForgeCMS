@@ -103,7 +103,9 @@ describe('populateRecords', () => {
     });
 
     let findManyCalls = 0;
-    const originalFindMany = ctx.runtime.adapters.database.findMany.bind(ctx.runtime.adapters.database);
+    const originalFindMany = ctx.runtime.adapters.database.findMany.bind(
+      ctx.runtime.adapters.database
+    );
     ctx.runtime.adapters.database.findMany = (opts) => {
       findManyCalls++;
       return originalFindMany(opts);

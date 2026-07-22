@@ -33,7 +33,7 @@ documents; authenticated requests can opt in to seeing drafts via `?status=draft
 - Retroactively migrating `_status` onto a `drafts: true` collection whose table already existed before
   this flag was added (consistent with spec 014's additive-only migrations, which only track
   `collection.fields`, not system columns like `_status`/`id`/`created_at`) — a collection needs `drafts:
-  true` from its first sync, or a manual `ALTER TABLE ADD COLUMN "_status" TEXT` for existing deployments.
+true` from its first sync, or a manual `ALTER TABLE ADD COLUMN "_status" TEXT` for existing deployments.
 
 ## Design
 
