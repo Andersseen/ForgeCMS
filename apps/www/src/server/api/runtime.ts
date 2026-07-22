@@ -1,6 +1,6 @@
-import { defineCollection, defineField } from '@forge-cms/core';
+import { defineBlock, defineCollection, defineField } from '@forge-cms/core';
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
-import { UsersCollectionAuthAdapter } from '@forge-cms/auth';
+import { UsersCollectionAuthAdapter, withAuthFields } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import { D1DatabaseAdapter, type D1Database } from '@forge-cms/cloudflare';
 import { ForgeCmsRuntime } from '@forge-cms/runtime';
@@ -61,17 +61,21 @@ const media = defineCollection({
   }
 });
 
-const users = defineCollection({
-  slug: 'users',
-  fields: {
-    email: defineField.email({ required: true }),
-    name: defineField.text(),
-    role: defineField.select({ options: ['admin', 'editor', 'viewer'] }),
-    avatar: defineField.text(),
-    status: defineField.select({ options: ['active', 'inactive'] }),
-    lastLogin: defineField.date()
-  }
-});
+// `withAuthFields` merges in the columns UsersCollectionAuthAdapter writes (passwordHash). Without
+// it the generated D1 table has no such column and every createUser/login fails at runtime.
+const users = withAuthFields(
+  defineCollection({
+    slug: 'users',
+    fields: {
+      email: defineField.email({ required: true }),
+      name: defineField.text(),
+      role: defineField.select({ options: ['admin', 'editor', 'viewer'] }),
+      avatar: defineField.text(),
+      status: defineField.select({ options: ['active', 'inactive'] }),
+      lastLogin: defineField.date()
+    }
+  })
+);
 
 const categories = defineCollection({
   slug: 'categories',
@@ -118,6 +122,65 @@ const siteConfig = defineCollection({
   }
 });
 
+/**
+ * Demonstrates the composite field kinds from spec 022: a `group` (one nested object), an `array`
+ * (repeating rows of one shape) and `blocks` (repeating rows that each pick a shape) — the
+ * page-builder primitive. `/admin` renders all three recursively.
+ */
+const landingPages = defineCollection({
+  slug: 'landing_pages',
+  fields: {
+    title: defineField.text({ required: true }),
+    slug: defineField.slug({ required: true }),
+    seo: defineField.group({
+      label: 'SEO',
+      fields: {
+        metaTitle: defineField.text(),
+        metaDescription: defineField.textarea(),
+        noIndex: defineField.boolean()
+      }
+    }),
+    highlights: defineField.array({
+      label: 'Highlights',
+      maxRows: 6,
+      fields: {
+        label: defineField.text({ required: true }),
+        value: defineField.text()
+      }
+    }),
+    sections: defineField.blocks({
+      label: 'Page sections',
+      blocks: [
+        defineBlock({
+          slug: 'hero',
+          label: 'Hero',
+          fields: {
+            heading: defineField.text({ required: true }),
+            subheading: defineField.textarea(),
+            ctaLabel: defineField.text()
+          }
+        }),
+        defineBlock({
+          slug: 'feature_grid',
+          label: 'Feature grid',
+          fields: {
+            heading: defineField.text({ required: true }),
+            columns: defineField.number({ min: 1, max: 4 })
+          }
+        }),
+        defineBlock({
+          slug: 'quote',
+          label: 'Quote',
+          fields: {
+            body: defineField.textarea({ required: true }),
+            attribution: defineField.text()
+          }
+        })
+      ]
+    })
+  }
+});
+
 const collections = [
   pages,
   posts,
@@ -127,7 +190,8 @@ const collections = [
   categories,
   forms,
   navigation,
-  siteConfig
+  siteConfig,
+  landingPages
 ];
 
 let runtimePromise: Promise<ForgeCmsRuntime<ServerEnv>> | undefined;
@@ -230,6 +294,40 @@ async function seedIfEmpty(runtime: ForgeCmsRuntime): Promise<void> {
     inventory: 100,
     images: [],
     category: 'software'
+  });
+
+  // Seeded through the Local API (spec 019) rather than the raw adapter, so this row goes through
+  // the same validation and hooks a real write does — and doubles as the example of calling the CMS
+  // from server code with no HTTP hop.
+  await runtime.create({
+    collection: 'landing_pages',
+    data: {
+      title: 'ForgeCMS',
+      slug: 'forge-cms',
+      seo: {
+        metaTitle: 'ForgeCMS — a CMS for Angular and Analog.js',
+        metaDescription: 'TypeScript-native, edge-ready, Angular-first.',
+        noIndex: false
+      },
+      highlights: [
+        { label: 'Runtime', value: 'Cloudflare Workers' },
+        { label: 'Framework', value: 'Angular + Analog.js' }
+      ],
+      sections: [
+        {
+          blockType: 'hero',
+          heading: 'Content, typed end to end',
+          subheading: 'Define collections in TypeScript. Query them from your server routes.',
+          ctaLabel: 'Explore the admin demo'
+        },
+        { blockType: 'feature_grid', heading: 'Why ForgeCMS', columns: 3 },
+        {
+          blockType: 'quote',
+          body: 'The Local API is the point: no HTTP hop between your CMS and your app.',
+          attribution: 'docs/ROADMAP.md'
+        }
+      ]
+    }
   });
 
   await db.create('site_config', {

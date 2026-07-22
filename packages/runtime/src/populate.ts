@@ -1,6 +1,6 @@
 import type { CollectionDefinition, RelationFieldOptions } from '@forge-cms/core';
 import type { DatabaseRecord } from '@forge-cms/db';
-import type { ForgeCmsRuntime } from './runtime.js';
+import type { OperationContext } from './context.js';
 
 interface RelationFieldEntry {
   name: string;
@@ -17,10 +17,10 @@ function getRelationFields(collection: CollectionDefinition): RelationFieldEntry
     });
 }
 
-export async function populateRecords<TEnv>(
+export async function populateRecords(
   records: DatabaseRecord[],
   collection: CollectionDefinition,
-  runtime: ForgeCmsRuntime<TEnv>
+  ctx: OperationContext
 ): Promise<DatabaseRecord[]> {
   const relationFields = getRelationFields(collection);
   if (relationFields.length === 0 || records.length === 0) return records;
@@ -28,7 +28,7 @@ export async function populateRecords<TEnv>(
   const populated = records.map((record) => ({ ...record }));
 
   for (const { name, targetSlug, many } of relationFields) {
-    if (!runtime.getCollection(targetSlug)) continue;
+    if (!ctx.getCollection(targetSlug)) continue;
 
     const ids = new Set<string>();
     for (const record of populated) {
@@ -43,7 +43,7 @@ export async function populateRecords<TEnv>(
     }
     if (ids.size === 0) continue;
 
-    const related = await runtime.adapters.database.findMany({
+    const related = await ctx.adapters.database.findMany({
       collection: targetSlug,
       where: { id: { in: Array.from(ids) } }
     });
@@ -65,11 +65,11 @@ export async function populateRecords<TEnv>(
   return populated;
 }
 
-export async function populateRecord<TEnv>(
+export async function populateRecord(
   record: DatabaseRecord,
   collection: CollectionDefinition,
-  runtime: ForgeCmsRuntime<TEnv>
+  ctx: OperationContext
 ): Promise<DatabaseRecord> {
-  const [result] = await populateRecords([record], collection, runtime);
+  const [result] = await populateRecords([record], collection, ctx);
   return result ?? record;
 }

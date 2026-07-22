@@ -138,3 +138,51 @@ describe('drafts (_status column)', () => {
     expect(sql).not.toContain('_status');
   });
 });
+
+describe('composite fields (spec 022)', () => {
+  const landing = defineCollection({
+    slug: 'landing',
+    fields: {
+      title: defineField.text(),
+      seo: defineField.group({ fields: { metaTitle: defineField.text() } }),
+      steps: defineField.array({ fields: { label: defineField.text() } }),
+      sections: defineField.blocks({
+        blocks: [{ slug: 'hero', fields: { heading: defineField.text() } }]
+      })
+    }
+  });
+
+  it('stores every composite kind in a TEXT column', () => {
+    const sql = generateCreateTableSql(landing);
+    expect(sql).toContain('"seo" TEXT');
+    expect(sql).toContain('"steps" TEXT');
+    expect(sql).toContain('"sections" TEXT');
+  });
+
+  it('serialises composite values to JSON on the way in', () => {
+    expect(toDbValue({ metaTitle: 'x' }, 'group')).toBe('{"metaTitle":"x"}');
+    expect(toDbValue([{ label: 'a' }], 'array')).toBe('[{"label":"a"}]');
+    expect(toDbValue([{ blockType: 'hero' }], 'blocks')).toBe('[{"blockType":"hero"}]');
+  });
+
+  it('round-trips composite values through the database representation', () => {
+    const group = { metaTitle: 'Home', nested: { deep: true } };
+    expect(fromDbValue(toDbValue(group, 'group'), 'group')).toEqual(group);
+
+    const rows = [{ label: 'a' }, { label: 'b' }];
+    expect(fromDbValue(toDbValue(rows, 'array'), 'array')).toEqual(rows);
+
+    const blocks = [{ blockType: 'hero', heading: 'Hi' }];
+    expect(fromDbValue(toDbValue(blocks, 'blocks'), 'blocks')).toEqual(blocks);
+  });
+
+  it('leaves an unparseable stored value alone rather than throwing', () => {
+    expect(fromDbValue('not json', 'group')).toBe('not json');
+  });
+
+  it('adds a composite column additively when it is new to the definition', () => {
+    const statements = generateAddColumnSql(landing, ['id', 'created_at', 'updated_at', 'title']);
+    expect(statements).toContain('ALTER TABLE "landing" ADD COLUMN "seo" TEXT');
+    expect(statements).toContain('ALTER TABLE "landing" ADD COLUMN "sections" TEXT');
+  });
+});

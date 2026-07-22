@@ -5,6 +5,7 @@ export { SignedTokenAuthAdapter, DEMO_CREDENTIALS } from './signed-token.adapter
 export type { SignedTokenEnv } from './signed-token.adapter.js';
 export { UsersCollectionAuthAdapter } from './users-collection.adapter.js';
 export type { UsersCollectionAuthEnv, CreateUserInput } from './users-collection.adapter.js';
+export { AUTH_USER_FIELDS, withAuthFields } from './user-fields.js';
 export type { UserRole } from './roles.js';
 export {
   USER_ROLES,

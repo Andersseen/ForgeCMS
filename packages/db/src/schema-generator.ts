@@ -2,6 +2,11 @@ import type { CollectionDefinition, AnyField } from '@forge-cms/core';
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
 
+/**
+ * The composite kinds (`group`/`array`/`blocks`, spec 022) map to TEXT and are stored as one JSON
+ * document. Join tables would only buy the ability to query *inside* nested data, which nothing
+ * needs yet, and they cost a migration story this project does not have.
+ */
 export function fieldKindToSqlType(field: AnyField): string {
   switch (field.kind) {
     case 'text':
@@ -14,6 +19,9 @@ export function fieldKindToSqlType(field: AnyField): string {
     case 'textarea':
     case 'richtext':
     case 'upload':
+    case 'group':
+    case 'array':
+    case 'blocks':
       return 'TEXT';
     case 'number':
       return 'REAL';
@@ -35,6 +43,9 @@ export function toDbValue(value: unknown, kind: AnyField['kind']): unknown {
       return value instanceof Date ? value.toISOString() : value;
     case 'json':
     case 'richtext':
+    case 'group':
+    case 'array':
+    case 'blocks':
       return typeof value === 'string' ? value : JSON.stringify(value);
     default:
       return value;
@@ -59,6 +70,9 @@ export function fromDbValue(value: unknown, kind: AnyField['kind']): unknown {
       return typeof value === 'string' ? new Date(value) : value;
     case 'json':
     case 'richtext':
+    case 'group':
+    case 'array':
+    case 'blocks':
       if (typeof value === 'string') {
         try {
           return JSON.parse(value);

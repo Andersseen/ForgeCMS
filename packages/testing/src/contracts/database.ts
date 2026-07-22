@@ -18,7 +18,7 @@ interface ContractDatabaseAdapter {
     id: string,
     data: Partial<Record<string, unknown>>
   ): Promise<Record<string, unknown>>;
-  count(collection: string): Promise<number>;
+  count(collection: string, where?: Record<string, unknown>): Promise<number>;
   delete(collection: string, id: string): Promise<void>;
   syncSchema(collections: unknown[]): Promise<void>;
 }
@@ -95,11 +95,53 @@ export function runDatabaseAdapterContractTests(createAdapter: () => ContractDat
       expect(count).toBeGreaterThanOrEqual(1);
     });
 
+    it('counts records matching a where filter', async () => {
+      await adapter.create('articles', { id: 'c1', title: 'Yes', status: 'published', views: 5 });
+      await adapter.create('articles', {
+        id: 'c2',
+        title: 'Yes too',
+        status: 'published',
+        views: 5
+      });
+      await adapter.create('articles', { id: 'c3', title: 'No', status: 'draft', views: 5 });
+
+      expect(await adapter.count('articles', { status: 'published' })).toBe(2);
+      expect(await adapter.count('articles', { status: 'draft' })).toBe(1);
+    });
+
+    it('counts the whole collection when where is empty', async () => {
+      await adapter.create('articles', { id: 'c4', title: 'One', status: 'published', views: 1 });
+      await adapter.create('articles', { id: 'c5', title: 'Two', status: 'draft', views: 1 });
+
+      expect(await adapter.count('articles', {})).toBe(await adapter.count('articles'));
+    });
+
+    it('ignores limit-style pagination when counting', async () => {
+      await adapter.create('articles', { id: 'c6', title: 'A', status: 'published', views: 1 });
+      await adapter.create('articles', { id: 'c7', title: 'B', status: 'published', views: 1 });
+      await adapter.create('articles', { id: 'c8', title: 'C', status: 'published', views: 1 });
+
+      const page = await adapter.findMany({ collection: 'articles', limit: 2 });
+      expect(page.length).toBe(2);
+      // The whole point of count(): a paginator needs the total, not the page length.
+      expect(await adapter.count('articles', { status: 'published' })).toBe(3);
+    });
+
     describe('where operators', () => {
       beforeEach(async () => {
         await adapter.create('articles', { id: 'a1', title: 'Alpha', views: 10, status: 'draft' });
-        await adapter.create('articles', { id: 'a2', title: 'Beta', views: 50, status: 'published' });
-        await adapter.create('articles', { id: 'a3', title: 'Gamma', views: 100, status: 'published' });
+        await adapter.create('articles', {
+          id: 'a2',
+          title: 'Beta',
+          views: 50,
+          status: 'published'
+        });
+        await adapter.create('articles', {
+          id: 'a3',
+          title: 'Gamma',
+          views: 100,
+          status: 'published'
+        });
       });
 
       it('filters with ne', async () => {

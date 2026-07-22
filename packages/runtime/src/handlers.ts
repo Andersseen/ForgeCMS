@@ -1,93 +1,322 @@
-import { validateCollection } from '@forge-cms/core';
 import type { ApiContext } from '@forge-cms/api';
 import type { ForgeCmsRuntime } from './runtime.js';
-import type { DatabaseRecord, DatabaseWhere } from '@forge-cms/db';
+import type { DatabaseWhere } from '@forge-cms/db';
 import type { CollectionDefinition, DraftStatus } from '@forge-cms/core';
 import type { AuthUser, UserRole } from '@forge-cms/auth';
-import { hasAnyRole, userRole } from '@forge-cms/auth';
-import { populateRecord, populateRecords } from './populate.js';
-import { runBeforeChangeHooks, runAfterChangeHooks } from './hooks.js';
-import { filterReadableFields, assertWritableFields, FieldAccessError } from './field-access.js';
+import { hasAnyRole } from '@forge-cms/auth';
+import * as operations from './operations.js';
+import type { PaginatedDocs } from './operations.js';
+import {
+  AccessDeniedError,
+  InvalidInputError,
+  ValidationFailedError,
+  isForgeError
+} from './errors.js';
 
 const WHERE_OPERATORS = new Set(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'contains']);
 const SYSTEM_SORT_FIELDS = new Set(['id', 'created_at', 'updated_at']);
 const RESERVED_QUERY_PARAMS = new Set(['limit', 'offset', 'sort', 'order', 'depth', 'status']);
 const WHERE_KEY_PATTERN = /^(.+)\[(\w+)\]$/;
 
-class FilterCoercionError extends Error {
-  constructor(readonly field: string) {
-    super(`Invalid filter value for field '${field}'`);
-  }
+export interface HandlerOptions<TEnv = unknown> {
+  runtime: ForgeCmsRuntime<TEnv>;
+  requireAuth?: boolean;
+  allowedRoles?: UserRole[];
 }
 
-class SortFieldError extends Error {
-  constructor(readonly field: string) {
-    super(`Invalid sort field '${field}'`);
-  }
+function jsonResponse(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'content-type': 'application/json' }
+  });
 }
 
-class SortOrderError extends Error {
-  constructor(readonly order: string) {
-    super(`Invalid sort order '${order}', expected 'asc' or 'desc'`);
-  }
+function errorResponse(message: string, status = 500): Response {
+  return jsonResponse({ error: message }, status);
 }
-
-class DepthError extends Error {
-  constructor(readonly depth: string) {
-    super(`Invalid depth '${depth}', expected '0' or '1'`);
-  }
-}
-
-class DraftStatusError extends Error {
-  constructor(readonly status: string) {
-    super(`Invalid status '${status}', expected 'draft', 'published', or 'all'`);
-  }
-}
-
-class UploadError extends Error {}
 
 /**
- * Resolves the `_status` filter for a list/read on a drafts-enabled collection. `undefined` means "not
- * a drafts collection, don't filter at all". Anonymous requests always get 'published' regardless of
- * what they ask for, so unpublished content is never reachable without an authenticated role.
+ * Maps a Local API error to the HTTP envelope. An access denial with no authenticated user is
+ * reported as 401 rather than 403 — the caller has not failed a permission check so much as not
+ * presented credentials at all.
  */
-function parseStatusFilter(
-  collection: CollectionDefinition,
-  url: URL,
-  role: UserRole | undefined
-): DraftStatus | 'all' | undefined {
-  if (collection.drafts !== true) return undefined;
-
-  const raw = url.searchParams.get('status');
-  if (role === undefined) return 'published';
-  if (raw === null || raw === 'published') return 'published';
-  if (raw === 'draft' || raw === 'all') return raw;
-  throw new DraftStatusError(raw);
+function toErrorResponse(err: unknown, user: AuthUser | null): Response {
+  if (err instanceof ValidationFailedError) {
+    return jsonResponse({ error: err.message, details: err.details }, err.status);
+  }
+  if (err instanceof AccessDeniedError && user === null) {
+    return errorResponse('Unauthorized', 401);
+  }
+  if (isForgeError(err)) {
+    return errorResponse(err.message, err.status);
+  }
+  return errorResponse(err instanceof Error ? err.message : 'Unknown error', 500);
 }
 
-/** Validates a create/update body's `_status`, if present, and defaults it to 'draft' on create. */
-function applyDraftStatus(
-  collection: CollectionDefinition,
-  data: Record<string, unknown>,
-  operation: 'create' | 'update'
-): void {
-  if (collection.drafts !== true) return;
+// --- request parsing -------------------------------------------------------------------------
 
-  if (data._status === undefined) {
-    if (operation === 'create') data._status = 'draft';
-    return;
-  }
+/** Coerce a raw query-param string to the value type declared by the field (bare `eq` semantics). */
+function coerceScalar(collection: CollectionDefinition, key: string, value: string): unknown {
+  const field = collection.fields[key];
+  if (!field) return value;
 
-  if (data._status !== 'draft' && data._status !== 'published') {
-    throw new DraftStatusError(String(data._status));
+  switch (field.kind) {
+    case 'number': {
+      const num = Number(value);
+      if (Number.isNaN(num)) throw new InvalidInputError(`Invalid filter value for field '${key}'`);
+      return num;
+    }
+    case 'boolean': {
+      if (value !== 'true' && value !== 'false') {
+        throw new InvalidInputError(`Invalid filter value for field '${key}'`);
+      }
+      return value === 'true';
+    }
+    default:
+      return value;
   }
 }
 
 /**
- * Parses a multipart/form-data create request into a plain body object: uploads the `file` part
- * through the storage adapter, then merges whichever of filename/url/contentType/filesize (plus any
- * other form fields) the collection actually declares as fields — unknown keys are dropped rather
- * than risking an INSERT against a column the table doesn't have.
+ * Coerce raw query-param strings to a DatabaseWhere. Supports bare equality (`field=value`) and
+ * bracket operator syntax (`field[gt]=value`, `field[in]=a,b,c`, ...).
+ */
+function parseWhere(collection: CollectionDefinition, url: URL): DatabaseWhere {
+  const where: DatabaseWhere = {};
+
+  url.searchParams.forEach((value, rawKey) => {
+    if (RESERVED_QUERY_PARAMS.has(rawKey)) return;
+
+    const match = WHERE_KEY_PATTERN.exec(rawKey);
+    if (!match) {
+      where[rawKey] = coerceScalar(collection, rawKey, value);
+      return;
+    }
+
+    const [, key, operator] = match;
+    if (!key || !operator || !WHERE_OPERATORS.has(operator)) {
+      throw new InvalidInputError(`Invalid filter value for field '${rawKey}'`);
+    }
+
+    if (operator === 'in') {
+      where[key] = { in: value.split(',').map((v) => coerceScalar(collection, key, v)) };
+    } else if (operator === 'eq') {
+      where[key] = coerceScalar(collection, key, value);
+    } else {
+      where[key] = { [operator]: coerceScalar(collection, key, value) };
+    }
+  });
+
+  return where;
+}
+
+function parseSort(
+  collection: CollectionDefinition,
+  url: URL
+): { sort?: string; order?: 'asc' | 'desc' } {
+  const sortParam = url.searchParams.get('sort');
+  if (!sortParam) return {};
+
+  if (!SYSTEM_SORT_FIELDS.has(sortParam) && !collection.fields[sortParam]) {
+    throw new InvalidInputError(`Invalid sort field '${sortParam}'`);
+  }
+
+  const orderParam = url.searchParams.get('order');
+  if (orderParam === null) return { sort: sortParam };
+  if (orderParam !== 'asc' && orderParam !== 'desc') {
+    throw new InvalidInputError(`Invalid sort order '${orderParam}', expected 'asc' or 'desc'`);
+  }
+
+  return { sort: sortParam, order: orderParam };
+}
+
+/** Only `0` (default) and `1` are supported. */
+function parseDepth(url: URL): 0 | 1 {
+  const raw = url.searchParams.get('depth');
+  if (raw === null || raw === '0') return 0;
+  if (raw === '1') return 1;
+  throw new InvalidInputError(`Invalid depth '${raw}', expected '0' or '1'`);
+}
+
+function parseStatus(url: URL): DraftStatus | 'all' | undefined {
+  const raw = url.searchParams.get('status');
+  if (raw === null) return undefined;
+  if (raw === 'draft' || raw === 'published' || raw === 'all') return raw;
+  throw new InvalidInputError(`Invalid status '${raw}', expected 'draft', 'published', or 'all'`);
+}
+
+function parseIntParam(url: URL, name: string): number | undefined {
+  if (!url.searchParams.has(name)) return undefined;
+  const parsed = parseInt(url.searchParams.get(name)!, 10);
+  if (Number.isNaN(parsed)) throw new InvalidInputError(`Invalid ${name} value`);
+  return parsed;
+}
+
+// --- auth ------------------------------------------------------------------------------------
+
+type AuthorizationResult =
+  | { success: true; user: AuthUser }
+  | { success: false; response: Response };
+
+async function authorize<TEnv>(
+  context: ApiContext<TEnv>,
+  runtime: ForgeCmsRuntime<TEnv>,
+  allowedRoles?: UserRole[]
+): Promise<AuthorizationResult> {
+  let user: AuthUser;
+  try {
+    user = await runtime.adapters.auth.requireAuth(context.request);
+  } catch {
+    return { success: false, response: errorResponse('Unauthorized', 401) };
+  }
+
+  if (allowedRoles !== undefined && !hasAnyRole(user, allowedRoles)) {
+    return { success: false, response: errorResponse('Forbidden', 403) };
+  }
+
+  return { success: true, user };
+}
+
+/** Best-effort auth so field-level read access and draft visibility still apply on public routes. */
+async function resolveOptionalUser<TEnv>(
+  context: ApiContext<TEnv>,
+  runtime: ForgeCmsRuntime<TEnv>
+): Promise<AuthUser | null> {
+  try {
+    return await runtime.adapters.auth.requireAuth(context.request);
+  } catch {
+    return null;
+  }
+}
+
+interface ResolvedRequest {
+  collection: CollectionDefinition;
+  collectionSlug: string;
+  user: AuthUser | null;
+}
+
+/**
+ * Resolves the collection and the acting user, applying the route's static `allowedRoles` gate.
+ *
+ * A collection that declares its own `access.<operation>` rule takes over from the route gate
+ * (spec 013 semantics, preserved): the Local API evaluates that rule instead, which is what allows a
+ * rule to be a function returning a row-level constraint.
+ */
+async function resolveRequest<TEnv>(
+  context: ApiContext<TEnv>,
+  options: HandlerOptions<TEnv>,
+  operation: 'read' | 'create' | 'update' | 'delete',
+  needsId: boolean
+): Promise<ResolvedRequest | Response> {
+  const { runtime, requireAuth: requireAuthFlag, allowedRoles } = options;
+
+  const collectionSlug = context.params?.['collection'];
+  if (!collectionSlug) return errorResponse('Missing collection parameter', 400);
+  if (needsId && !context.params?.['id']) {
+    return errorResponse('Missing collection or id parameter', 400);
+  }
+
+  const collection = runtime.getCollection(collectionSlug);
+  if (!collection) return errorResponse(`Collection '${collectionSlug}' not found`, 404);
+
+  const routeRoles = collection.access?.[operation] === undefined ? allowedRoles : undefined;
+  const mustAuth = requireAuthFlag === true || routeRoles !== undefined;
+
+  let user: AuthUser | null = null;
+  if (mustAuth) {
+    const result = await authorize(context, runtime, routeRoles);
+    if (!result.success) return result.response;
+    user = result.user;
+  } else {
+    user = await resolveOptionalUser(context, runtime);
+  }
+
+  return { collection, collectionSlug, user };
+}
+
+// --- handlers --------------------------------------------------------------------------------
+
+export async function handleList<TEnv = unknown>(
+  context: ApiContext<TEnv>,
+  options: HandlerOptions<TEnv>
+): Promise<Response> {
+  const resolved = await resolveRequest(context, options, 'read', false);
+  if (resolved instanceof Response) return resolved;
+  const { collection, collectionSlug, user } = resolved;
+
+  try {
+    const url = new URL(context.request.url);
+    const where = parseWhere(collection, url);
+    const { sort, order } = parseSort(collection, url);
+    const limit = parseIntParam(url, 'limit');
+    const offset = parseIntParam(url, 'offset');
+
+    const result: PaginatedDocs = await options.runtime.find({
+      collection: collectionSlug,
+      user,
+      overrideAccess: false,
+      depth: parseDepth(url),
+      ...(Object.keys(where).length > 0 && { where }),
+      ...(limit !== undefined && { limit }),
+      ...(offset !== undefined && { offset }),
+      ...(sort !== undefined && { sort }),
+      ...(order !== undefined && { order }),
+      ...(parseStatus(url) !== undefined && { status: parseStatus(url)! })
+    });
+
+    return jsonResponse({
+      data: result.docs,
+      meta: {
+        collection: collectionSlug,
+        // `count` is the length of this page and predates pagination metadata; it is kept so
+        // existing clients do not break. `totalDocs` is the number a paginator needs.
+        count: result.docs.length,
+        limit: result.limit,
+        offset: result.offset,
+        totalDocs: result.totalDocs,
+        page: result.page,
+        totalPages: result.totalPages,
+        hasNextPage: result.hasNextPage,
+        hasPrevPage: result.hasPrevPage
+      }
+    });
+  } catch (err) {
+    return toErrorResponse(err, user);
+  }
+}
+
+export async function handleRead<TEnv = unknown>(
+  context: ApiContext<TEnv>,
+  options: HandlerOptions<TEnv>
+): Promise<Response> {
+  const resolved = await resolveRequest(context, options, 'read', true);
+  if (resolved instanceof Response) return resolved;
+  const { collectionSlug, user } = resolved;
+
+  try {
+    const url = new URL(context.request.url);
+    const status = parseStatus(url);
+
+    const doc = await options.runtime.findByID({
+      collection: collectionSlug,
+      id: context.params!['id']!,
+      user,
+      overrideAccess: false,
+      depth: parseDepth(url),
+      ...(status !== undefined && { status })
+    });
+
+    return jsonResponse({ data: doc });
+  } catch (err) {
+    return toErrorResponse(err, user);
+  }
+}
+
+/**
+ * Reads a `multipart/form-data` create body: stores the `file` part through the storage adapter,
+ * then keeps whichever of filename/url/contentType/filesize (plus any other form field) the
+ * collection actually declares. Unknown keys are dropped rather than risking an insert against a
+ * column the table does not have.
  */
 async function buildMultipartBody<TEnv>(
   context: ApiContext<TEnv>,
@@ -97,7 +326,7 @@ async function buildMultipartBody<TEnv>(
   const formData = await context.request.formData();
   const file = formData.get('file');
   if (!(file instanceof File)) {
-    throw new UploadError('Missing or invalid "file" part in multipart body');
+    throw new InvalidInputError('Missing or invalid "file" part in multipart body');
   }
 
   const key = `${collection.slug}/${crypto.randomUUID()}-${file.name}`;
@@ -124,280 +353,11 @@ async function buildMultipartBody<TEnv>(
   return data;
 }
 
-/** Parse and validate the `depth` query param. Only `0` (default) and `1` are supported. */
-function parseDepth(url: URL): 0 | 1 {
-  const raw = url.searchParams.get('depth');
-  if (raw === null) return 0;
-  if (raw === '0') return 0;
-  if (raw === '1') return 1;
-  throw new DepthError(raw);
-}
-
-/** Coerce a raw query-param string to the value type declared by the field (bare `eq` semantics). */
-function coerceScalar(collection: CollectionDefinition, key: string, value: string): unknown {
-  const field = collection.fields[key];
-  if (!field) return value;
-
-  switch (field.kind) {
-    case 'number': {
-      const num = Number(value);
-      if (Number.isNaN(num)) throw new FilterCoercionError(key);
-      return num;
-    }
-    case 'boolean': {
-      if (value !== 'true' && value !== 'false') throw new FilterCoercionError(key);
-      return value === 'true';
-    }
-    default:
-      return value;
-  }
-}
-
-/**
- * Coerce raw query-param strings to a DatabaseWhere. Supports bare equality (`field=value`) and
- * bracket operator syntax (`field[gt]=value`, `field[in]=a,b,c`, ...).
- */
-function coerceWhere(collection: CollectionDefinition, raw: Record<string, string>): DatabaseWhere {
-  const where: DatabaseWhere = {};
-
-  for (const [rawKey, value] of Object.entries(raw)) {
-    const match = WHERE_KEY_PATTERN.exec(rawKey);
-    if (!match) {
-      where[rawKey] = coerceScalar(collection, rawKey, value);
-      continue;
-    }
-
-    const [, key, operator] = match;
-    if (!key || !operator || !WHERE_OPERATORS.has(operator)) {
-      throw new FilterCoercionError(rawKey);
-    }
-
-    if (operator === 'in') {
-      where[key] = { in: value.split(',').map((v) => coerceScalar(collection, key, v)) };
-    } else if (operator === 'eq') {
-      where[key] = coerceScalar(collection, key, value);
-    } else {
-      where[key] = { [operator]: coerceScalar(collection, key, value) };
-    }
-  }
-
-  return where;
-}
-
-/** Parse and validate `sort`/`order` query params against the collection's known fields. */
-function parseSort(
-  collection: CollectionDefinition,
-  url: URL
-): { sort?: string; order?: 'asc' | 'desc' } {
-  const sortParam = url.searchParams.get('sort');
-  if (!sortParam) return {};
-
-  if (!SYSTEM_SORT_FIELDS.has(sortParam) && !collection.fields[sortParam]) {
-    throw new SortFieldError(sortParam);
-  }
-
-  const orderParam = url.searchParams.get('order');
-  if (orderParam === null) return { sort: sortParam };
-  if (orderParam !== 'asc' && orderParam !== 'desc') {
-    throw new SortOrderError(orderParam);
-  }
-
-  return { sort: sortParam, order: orderParam };
-}
-
-export interface HandlerOptions<TEnv = unknown> {
-  runtime: ForgeCmsRuntime<TEnv>;
-  requireAuth?: boolean;
-  allowedRoles?: UserRole[];
-}
-
-function jsonResponse(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'content-type': 'application/json' }
-  });
-}
-
-function errorResponse(message: string, status = 500): Response {
-  return jsonResponse({ error: message }, status);
-}
-
-type AuthorizationResult<T> = { success: true; user: T } | { success: false; response: Response };
-
-async function authorize<TEnv>(
-  context: ApiContext<TEnv>,
-  runtime: ForgeCmsRuntime<TEnv>,
-  allowedRoles?: UserRole[]
-): Promise<AuthorizationResult<AuthUser>> {
-  let user: AuthUser;
+async function readJsonBody(request: Request): Promise<Record<string, unknown>> {
   try {
-    user = await runtime.adapters.auth.requireAuth(context.request);
+    return (await request.json()) as Record<string, unknown>;
   } catch {
-    return { success: false, response: errorResponse('Unauthorized', 401) };
-  }
-
-  if (allowedRoles !== undefined && !hasAnyRole(user, allowedRoles)) {
-    return { success: false, response: errorResponse('Forbidden', 403) };
-  }
-
-  return { success: true, user };
-}
-
-/** Best-effort auth resolution for routes that don't require it, so field-read access can still apply. */
-async function resolveOptionalUser<TEnv>(
-  context: ApiContext<TEnv>,
-  runtime: ForgeCmsRuntime<TEnv>
-): Promise<AuthUser | null> {
-  try {
-    return await runtime.adapters.auth.requireAuth(context.request);
-  } catch {
-    return null;
-  }
-}
-
-/** Collection-defined access for an operation, falling back to the handler's static allowedRoles. */
-function effectiveRoles(
-  collectionRoles: string[] | undefined,
-  allowedRoles: UserRole[] | undefined
-): UserRole[] | undefined {
-  return (collectionRoles as UserRole[] | undefined) ?? allowedRoles;
-}
-
-export async function handleList<TEnv = unknown>(
-  context: ApiContext<TEnv>,
-  options: HandlerOptions<TEnv>
-): Promise<Response> {
-  try {
-    const { runtime, requireAuth: requireAuthFlag, allowedRoles } = options;
-
-    const collectionSlug = context.params?.['collection'];
-    if (!collectionSlug) return errorResponse('Missing collection parameter', 400);
-
-    const collection = runtime.getCollection(collectionSlug);
-    if (!collection) return errorResponse(`Collection '${collectionSlug}' not found`, 404);
-
-    const roles = effectiveRoles(collection.access?.read, allowedRoles);
-    let user: AuthUser | null = null;
-    if (requireAuthFlag || roles !== undefined) {
-      const result = await authorize(context, runtime, roles);
-      if (!result.success) return result.response;
-      user = result.user;
-    } else {
-      user = await resolveOptionalUser(context, runtime);
-    }
-    const role = user ? userRole(user) : undefined;
-
-    const url = new URL(context.request.url);
-    const limit = url.searchParams.has('limit')
-      ? parseInt(url.searchParams.get('limit')!, 10)
-      : undefined;
-    const offset = url.searchParams.has('offset')
-      ? parseInt(url.searchParams.get('offset')!, 10)
-      : undefined;
-
-    const rawWhere: Record<string, string> = {};
-    url.searchParams.forEach((value, key) => {
-      if (!RESERVED_QUERY_PARAMS.has(key)) {
-        rawWhere[key] = value;
-      }
-    });
-
-    let where: DatabaseWhere;
-    let sort: { sort?: string; order?: 'asc' | 'desc' };
-    let depth: 0 | 1;
-    let statusFilter: DraftStatus | 'all' | undefined;
-    try {
-      where = coerceWhere(collection, rawWhere);
-      sort = parseSort(collection, url);
-      depth = parseDepth(url);
-      statusFilter = parseStatusFilter(collection, url, role);
-    } catch (err) {
-      if (
-        err instanceof FilterCoercionError ||
-        err instanceof SortOrderError ||
-        err instanceof SortFieldError ||
-        err instanceof DepthError ||
-        err instanceof DraftStatusError
-      ) {
-        return errorResponse(err.message, 400);
-      }
-      throw err;
-    }
-    if (statusFilter !== undefined && statusFilter !== 'all') {
-      where._status = statusFilter;
-    }
-
-    let records = await runtime.adapters.database.findMany({
-      collection: collectionSlug,
-      ...(limit !== undefined && { limit }),
-      ...(offset !== undefined && { offset }),
-      ...(Object.keys(where).length > 0 && { where }),
-      ...(sort.sort !== undefined && { sort: sort.sort }),
-      ...(sort.order !== undefined && { order: sort.order })
-    });
-
-    if (depth === 1) {
-      records = await populateRecords(records, collection, runtime);
-    }
-    records = records.map((r) => filterReadableFields(r, collection, role));
-
-    return jsonResponse({
-      data: records,
-      meta: { collection: collectionSlug, count: records.length, limit, offset }
-    });
-  } catch (err) {
-    return errorResponse(err instanceof Error ? err.message : 'Unknown error', 500);
-  }
-}
-
-export async function handleRead<TEnv = unknown>(
-  context: ApiContext<TEnv>,
-  options: HandlerOptions<TEnv>
-): Promise<Response> {
-  try {
-    const { runtime, requireAuth: requireAuthFlag, allowedRoles } = options;
-
-    const collectionSlug = context.params?.['collection'];
-    const id = context.params?.['id'];
-    if (!collectionSlug || !id) return errorResponse('Missing collection or id parameter', 400);
-
-    const collection = runtime.getCollection(collectionSlug);
-    if (!collection) return errorResponse(`Collection '${collectionSlug}' not found`, 404);
-
-    const roles = effectiveRoles(collection.access?.read, allowedRoles);
-    let user: AuthUser | null = null;
-    if (requireAuthFlag || roles !== undefined) {
-      const result = await authorize(context, runtime, roles);
-      if (!result.success) return result.response;
-      user = result.user;
-    } else {
-      user = await resolveOptionalUser(context, runtime);
-    }
-    const role = user ? userRole(user) : undefined;
-
-    let depth: 0 | 1;
-    try {
-      depth = parseDepth(new URL(context.request.url));
-    } catch (err) {
-      if (err instanceof DepthError) return errorResponse(err.message, 400);
-      throw err;
-    }
-
-    let record = await runtime.adapters.database.findById(collectionSlug, id);
-    if (!record) return errorResponse(`Record '${id}' not found in '${collectionSlug}'`, 404);
-
-    if (collection.drafts === true && record._status === 'draft' && role === undefined) {
-      return errorResponse(`Record '${id}' not found in '${collectionSlug}'`, 404);
-    }
-
-    if (depth === 1) {
-      record = await populateRecord(record, collection, runtime);
-    }
-    record = filterReadableFields(record, collection, role);
-
-    return jsonResponse({ data: record });
-  } catch (err) {
-    return errorResponse(err instanceof Error ? err.message : 'Unknown error', 500);
+    throw new InvalidInputError('Invalid JSON body');
   }
 }
 
@@ -405,72 +365,27 @@ export async function handleCreate<TEnv = unknown>(
   context: ApiContext<TEnv>,
   options: HandlerOptions<TEnv>
 ): Promise<Response> {
+  const resolved = await resolveRequest(context, options, 'create', false);
+  if (resolved instanceof Response) return resolved;
+  const { collection, collectionSlug, user } = resolved;
+
   try {
-    const { runtime, requireAuth: requireAuthFlag, allowedRoles } = options;
-
-    const collectionSlug = context.params?.['collection'];
-    if (!collectionSlug) return errorResponse('Missing collection parameter', 400);
-
-    const collection = runtime.getCollection(collectionSlug);
-    if (!collection) return errorResponse(`Collection '${collectionSlug}' not found`, 404);
-
-    const roles = effectiveRoles(collection.access?.create, allowedRoles);
-    let user: AuthUser | null = null;
-    if (requireAuthFlag || roles !== undefined) {
-      const result = await authorize(context, runtime, roles);
-      if (!result.success) return result.response;
-      user = result.user;
-    }
-    const role = user ? userRole(user) : undefined;
-
     const contentType = context.request.headers.get('content-type') ?? '';
-    let body: Record<string, unknown>;
-    if (collection.upload === true && contentType.includes('multipart/form-data')) {
-      try {
-        body = await buildMultipartBody(context, runtime, collection);
-      } catch (err) {
-        if (err instanceof UploadError) return errorResponse(err.message, 400);
-        throw err;
-      }
-    } else {
-      try {
-        body = (await context.request.json()) as DatabaseRecord;
-      } catch {
-        return errorResponse('Invalid JSON body', 400);
-      }
-    }
+    const data =
+      collection.upload === true && contentType.includes('multipart/form-data')
+        ? await buildMultipartBody(context, options.runtime, collection)
+        : await readJsonBody(context.request);
 
-    try {
-      assertWritableFields(body, collection, role);
-    } catch (err) {
-      if (err instanceof FieldAccessError) return errorResponse(err.message, 403);
-      throw err;
-    }
+    const doc = await options.runtime.create({
+      collection: collectionSlug,
+      data,
+      user,
+      overrideAccess: false
+    });
 
-    let data: Record<string, unknown>;
-    try {
-      data = await runBeforeChangeHooks(collection, { operation: 'create', data: body });
-    } catch (err) {
-      return errorResponse(err instanceof Error ? err.message : 'beforeChange hook failed', 400);
-    }
-
-    try {
-      applyDraftStatus(collection, data, 'create');
-    } catch (err) {
-      if (err instanceof DraftStatusError) return errorResponse(err.message, 400);
-      throw err;
-    }
-
-    const validation = validateCollection(collection, data);
-    if (!validation.valid) {
-      return jsonResponse({ error: 'Validation failed', details: validation.errors }, 400);
-    }
-
-    const record = await runtime.adapters.database.create(collectionSlug, data);
-    await runAfterChangeHooks(collection, { operation: 'create', data, result: record });
-    return jsonResponse({ data: record }, 201);
+    return jsonResponse({ data: doc }, 201);
   } catch (err) {
-    return errorResponse(err instanceof Error ? err.message : 'Unknown error', 500);
+    return toErrorResponse(err, user);
   }
 }
 
@@ -478,84 +393,22 @@ export async function handleUpdate<TEnv = unknown>(
   context: ApiContext<TEnv>,
   options: HandlerOptions<TEnv>
 ): Promise<Response> {
+  const resolved = await resolveRequest(context, options, 'update', true);
+  if (resolved instanceof Response) return resolved;
+  const { collectionSlug, user } = resolved;
+
   try {
-    const { runtime, requireAuth: requireAuthFlag, allowedRoles } = options;
-
-    const collectionSlug = context.params?.['collection'];
-    const id = context.params?.['id'];
-    if (!collectionSlug || !id) return errorResponse('Missing collection or id parameter', 400);
-
-    const collection = runtime.getCollection(collectionSlug);
-    if (!collection) return errorResponse(`Collection '${collectionSlug}' not found`, 404);
-
-    const roles = effectiveRoles(collection.access?.update, allowedRoles);
-    let user: AuthUser | null = null;
-    if (requireAuthFlag || roles !== undefined) {
-      const result = await authorize(context, runtime, roles);
-      if (!result.success) return result.response;
-      user = result.user;
-    }
-    const role = user ? userRole(user) : undefined;
-
-    let body: DatabaseRecord;
-    try {
-      body = (await context.request.json()) as DatabaseRecord;
-    } catch {
-      return errorResponse('Invalid JSON body', 400);
-    }
-
-    try {
-      assertWritableFields(body, collection, role);
-    } catch (err) {
-      if (err instanceof FieldAccessError) return errorResponse(err.message, 403);
-      throw err;
-    }
-
-    const existing = await runtime.adapters.database.findById(collectionSlug, id);
-    if (!existing) return errorResponse(`Record '${id}' not found in '${collectionSlug}'`, 404);
-
-    let data: Record<string, unknown>;
-    try {
-      data = await runBeforeChangeHooks(collection, {
-        operation: 'update',
-        data: body,
-        previousData: existing
-      });
-    } catch (err) {
-      return errorResponse(err instanceof Error ? err.message : 'beforeChange hook failed', 400);
-    }
-
-    try {
-      applyDraftStatus(collection, data, 'update');
-    } catch (err) {
-      if (err instanceof DraftStatusError) return errorResponse(err.message, 400);
-      throw err;
-    }
-
-    // Merge existing record with the (hook-processed) partial body so required fields already
-    // present on the stored document do not fail validation. Report only errors for fields the
-    // caller is touching (present in data) or for fields that do not exist yet.
-    const merged = { ...existing, ...data };
-    const validation = validateCollection(collection, merged);
-    if (!validation.valid) {
-      const relevantErrors = validation.errors.filter(
-        (e) => data[e.field] !== undefined || existing[e.field] === undefined
-      );
-      if (relevantErrors.length > 0) {
-        return jsonResponse({ error: 'Validation failed', details: relevantErrors }, 400);
-      }
-    }
-
-    const record = await runtime.adapters.database.update(collectionSlug, id, data);
-    await runAfterChangeHooks(collection, {
-      operation: 'update',
-      data,
-      previousData: existing,
-      result: record
+    const doc = await options.runtime.update({
+      collection: collectionSlug,
+      id: context.params!['id']!,
+      data: await readJsonBody(context.request),
+      user,
+      overrideAccess: false
     });
-    return jsonResponse({ data: record });
+
+    return jsonResponse({ data: doc });
   } catch (err) {
-    return errorResponse(err instanceof Error ? err.message : 'Unknown error', 500);
+    return toErrorResponse(err, user);
   }
 }
 
@@ -563,25 +416,22 @@ export async function handleDelete<TEnv = unknown>(
   context: ApiContext<TEnv>,
   options: HandlerOptions<TEnv>
 ): Promise<Response> {
+  const resolved = await resolveRequest(context, options, 'delete', true);
+  if (resolved instanceof Response) return resolved;
+  const { collectionSlug, user } = resolved;
+
   try {
-    const { runtime, requireAuth: requireAuthFlag, allowedRoles } = options;
+    await options.runtime.delete({
+      collection: collectionSlug,
+      id: context.params!['id']!,
+      user,
+      overrideAccess: false
+    });
 
-    const collectionSlug = context.params?.['collection'];
-    const id = context.params?.['id'];
-    if (!collectionSlug || !id) return errorResponse('Missing collection or id parameter', 400);
-
-    const collection = runtime.getCollection(collectionSlug);
-    if (!collection) return errorResponse(`Collection '${collectionSlug}' not found`, 404);
-
-    const roles = effectiveRoles(collection.access?.delete, allowedRoles);
-    if (requireAuthFlag || roles !== undefined) {
-      const result = await authorize(context, runtime, roles);
-      if (!result.success) return result.response;
-    }
-
-    await runtime.adapters.database.delete(collectionSlug, id);
     return new Response(null, { status: 204 });
   } catch (err) {
-    return errorResponse(err instanceof Error ? err.message : 'Unknown error', 500);
+    return toErrorResponse(err, user);
   }
 }
+
+export { operations };
