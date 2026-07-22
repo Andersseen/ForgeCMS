@@ -15,6 +15,13 @@ export interface ApiItemResponse<T> {
   data: T;
 }
 
+/** One selectable shape of a `blocks` field, as sent to the client. */
+export interface BlockMeta {
+  slug: string;
+  label: string;
+  fields: FieldMeta[];
+}
+
 export interface FieldMeta {
   name: string;
   kind: string;
@@ -25,6 +32,12 @@ export interface FieldMeta {
     collection: string;
     many: boolean;
   };
+  /** Nested fields of a `group` or `array` field (spec 022). */
+  fields?: FieldMeta[];
+  /** Selectable shapes of a `blocks` field (spec 022). */
+  blocks?: BlockMeta[];
+  minRows?: number;
+  maxRows?: number;
 }
 
 export interface CollectionMeta {

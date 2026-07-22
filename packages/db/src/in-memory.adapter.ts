@@ -1,5 +1,6 @@
 import type { CollectionDefinition } from '@forge-cms/core';
 import type { DatabaseAdapter, FindManyOptions } from './index.js';
+import type { DatabaseWhere } from './where.js';
 import { matchesCondition } from './where.js';
 
 export class InMemoryDatabaseAdapter implements DatabaseAdapter {
@@ -70,8 +71,12 @@ export class InMemoryDatabaseAdapter implements DatabaseAdapter {
     return records[index];
   }
 
-  async count(collection: string): Promise<number> {
-    return this.store.get(collection)?.length ?? 0;
+  async count(collection: string, where?: DatabaseWhere): Promise<number> {
+    const records = this.store.get(collection) ?? [];
+    if (!where || Object.keys(where).length === 0) return records.length;
+    return records.filter((r) =>
+      Object.entries(where).every(([key, condition]) => matchesCondition(r[key], condition))
+    ).length;
   }
 
   async delete(collection: string, id: string): Promise<void> {

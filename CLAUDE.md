@@ -62,6 +62,10 @@ packages/
 
 ## Where things happen
 
-- HTTP API lives in `apps/www/src/server/routes/api/` (Analog/Nitro h3 file routes) and delegates to `@forge-cms/runtime` handlers — keep routes thin.
-- The server runtime instance + demo collections + seed data: `apps/www/src/server/api/runtime.ts` (in-memory adapters; data resets on every reload — that's expected).
-- The `/admin` UI in `apps/www` is a demo built with local components; migrating it to `@forge-cms/admin` is a known pending task.
+- **Business logic lives in the Local API**, not the HTTP layer: `packages/runtime/src/operations.ts` (`find`/`findByID`/`create`/`update`/`delete`/`count`), exposed as methods on `ForgeCmsRuntime`. It runs the whole pipeline — access, hooks, drafts, relation population, validation — with no HTTP involved. **This is the intended way to use ForgeCMS from server code** (an Analog server route, a seed script), and new operation logic belongs here.
+- `packages/runtime/src/handlers.ts` is transport only: query parsing, multipart, the auth gate, the JSON envelope, and mapping typed errors (`errors.ts`) to status codes. Don't put logic there.
+- `overrideAccess` defaults to **`true`** on Local API calls (trusted server code); the HTTP layer always passes `false` plus the resolved user. If you add an operation, keep that split.
+- HTTP API routes live in `apps/www/src/server/routes/api/` (Analog/Nitro h3 file routes) and delegate to the `handleX` handlers — keep routes thin.
+- The server runtime instance + demo collections + seed data: `apps/www/src/server/api/runtime.ts` (in-memory adapters locally, D1 when `env.DB` exists; local data resets on every reload — that's expected).
+- The `/admin` UI in `apps/www` consumes `@forge-cms/admin`'s real components; `dashboard`/`media`/`users`/`api`/`settings` pages remain app-local.
+- Roadmap and sequencing: [docs/ROADMAP.md](docs/ROADMAP.md). Phase 1 (Local API, function-based access, full hooks, composite fields) is done; Phases 2–5 are not started.

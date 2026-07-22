@@ -1,6 +1,10 @@
 import type {
   AnyField,
+  ArrayFieldOptions,
+  BlocksFieldOptions,
   CollectionDefinition,
+  FieldMap,
+  GroupFieldOptions,
   NumberFieldOptions,
   RelationFieldOptions,
   SelectFieldOptions,
@@ -27,6 +31,12 @@ export type ValidationErrorCode =
   | 'type_textarea'
   | 'type_richtext'
   | 'type_upload'
+  | 'type_group'
+  | 'type_array'
+  | 'type_blocks'
+  | 'minRows'
+  | 'maxRows'
+  | 'block_type'
   | 'minLength'
   | 'maxLength'
   | 'min'
@@ -96,6 +106,56 @@ function isValidRichTextNode(node: unknown): boolean {
     return Array.isArray(candidate.children) && candidate.children.every(isValidRichTextNode);
   }
   return true;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Row-count bounds shared by `array` and `blocks`. */
+function validateRowCount(
+  rows: unknown[],
+  fieldName: string,
+  options: { minRows?: number; maxRows?: number }
+): ValidationError[] {
+  const errors: ValidationError[] = [];
+  if (options.minRows !== undefined && rows.length < options.minRows) {
+    errors.push(
+      createError(
+        fieldName,
+        'minRows',
+        `Field "${fieldName}" must have at least ${options.minRows} rows.`
+      )
+    );
+  }
+  if (options.maxRows !== undefined && rows.length > options.maxRows) {
+    errors.push(
+      createError(
+        fieldName,
+        'maxRows',
+        `Field "${fieldName}" must have at most ${options.maxRows} rows.`
+      )
+    );
+  }
+  return errors;
+}
+
+/**
+ * Validates every field in a `FieldMap` against a data object, prefixing error paths so nested
+ * failures are addressable (`hero.title`, `sections.2.heading`). This is the recursion point shared
+ * by collections, `group`, `array` rows and `blocks` rows.
+ */
+export function validateFieldMap(
+  fields: FieldMap,
+  data: Record<string, unknown>,
+  pathPrefix = ''
+): ValidationError[] {
+  const errors: ValidationError[] = [];
+  for (const [fieldName, fieldDef] of Object.entries(fields)) {
+    const path = pathPrefix ? `${pathPrefix}.${fieldName}` : fieldName;
+    errors.push(...validateField(fieldDef, data[fieldName], path));
+  }
+  return errors;
 }
 
 export function validateField(
@@ -306,6 +366,82 @@ export function validateField(
       }
       break;
     }
+
+    case 'group': {
+      if (!isPlainObject(value)) {
+        errors.push(
+          createError(fieldName, 'type_group', `Field "${fieldName}" must be an object.`)
+        );
+        break;
+      }
+      const groupOpts = field.options as GroupFieldOptions;
+      errors.push(...validateFieldMap(groupOpts.fields, value, fieldName));
+      break;
+    }
+
+    case 'array': {
+      if (!Array.isArray(value)) {
+        errors.push(
+          createError(fieldName, 'type_array', `Field "${fieldName}" must be an array of rows.`)
+        );
+        break;
+      }
+      const arrayOpts = field.options as ArrayFieldOptions;
+      errors.push(...validateRowCount(value, fieldName, arrayOpts));
+
+      for (const [index, row] of value.entries()) {
+        const rowPath = `${fieldName}.${index}`;
+        if (!isPlainObject(row)) {
+          errors.push(createError(rowPath, 'type_array', `Row "${rowPath}" must be an object.`));
+          continue;
+        }
+        errors.push(...validateFieldMap(arrayOpts.fields, row, rowPath));
+      }
+      break;
+    }
+
+    case 'blocks': {
+      if (!Array.isArray(value)) {
+        errors.push(
+          createError(fieldName, 'type_blocks', `Field "${fieldName}" must be an array of blocks.`)
+        );
+        break;
+      }
+      const blocksOpts = field.options as BlocksFieldOptions;
+      errors.push(...validateRowCount(value, fieldName, blocksOpts));
+
+      const bySlug = new Map(blocksOpts.blocks.map((block) => [block.slug, block]));
+      for (const [index, row] of value.entries()) {
+        const rowPath = `${fieldName}.${index}`;
+        if (!isPlainObject(row)) {
+          errors.push(createError(rowPath, 'type_blocks', `Block "${rowPath}" must be an object.`));
+          continue;
+        }
+
+        const blockType = row.blockType;
+        if (typeof blockType !== 'string') {
+          errors.push(
+            createError(rowPath, 'block_type', `Block "${rowPath}" must have a string "blockType".`)
+          );
+          continue;
+        }
+
+        const block = bySlug.get(blockType);
+        if (!block) {
+          errors.push(
+            createError(
+              rowPath,
+              'block_type',
+              `Block "${rowPath}" has unknown blockType "${blockType}". Expected one of: ${[...bySlug.keys()].join(', ')}.`
+            )
+          );
+          continue;
+        }
+
+        errors.push(...validateFieldMap(block.fields, row, rowPath));
+      }
+      break;
+    }
   }
 
   return errors;
@@ -315,13 +451,7 @@ export function validateCollection<TSlug extends string, TFields extends Record<
   collection: CollectionDefinition<TSlug, TFields>,
   data: Record<string, unknown>
 ): ValidationResult {
-  const errors: ValidationError[] = [];
-
-  for (const [fieldName, fieldDef] of Object.entries(collection.fields)) {
-    const value = data[fieldName];
-    const fieldErrors = validateField(fieldDef, value, fieldName);
-    errors.push(...fieldErrors);
-  }
+  const errors = validateFieldMap(collection.fields, data);
 
   return {
     valid: errors.length === 0,

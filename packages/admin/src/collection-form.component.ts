@@ -1,25 +1,20 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
-import {
-  VoltButton,
-  VoltCard,
-  VoltError,
-  VoltInput,
-  VoltLabel,
-  VoltSwitch,
-  VoltTextarea
-} from '@voltui/components';
+import { VoltButton, VoltCard } from '@voltui/components';
 import type { FieldMeta } from '@forge-cms/angular';
+import { ForgeFieldControlComponent } from './field-control.component.js';
 
 /**
  * Modal chrome is hand-rolled (plain Tailwind overlay), not @voltui/components' VoltDialog: that
  * component composes via a CDK-style trigger+TemplateRef pattern that couldn't be visually verified
- * in this environment, and getting it wrong would break the CRUD demo entirely. VoltCard/VoltInput/
- * VoltSwitch/etc. (simple signal-model form controls) are used as designed.
+ * in this environment, and getting it wrong would break the CRUD demo entirely.
+ *
+ * Rendering a single field is `ForgeFieldControlComponent`'s job — it recurses, so this form handles
+ * arbitrarily nested `group`/`array`/`blocks` fields (spec 022) without knowing they exist.
  */
 @Component({
   selector: 'forge-collection-form',
   standalone: true,
-  imports: [VoltButton, VoltCard, VoltInput, VoltTextarea, VoltSwitch, VoltLabel, VoltError],
+  imports: [VoltButton, VoltCard, ForgeFieldControlComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
@@ -36,100 +31,13 @@ import type { FieldMeta } from '@forge-cms/angular';
 
         <form class="space-y-4" (submit)="onSubmit($event)">
           @for (field of fields(); track field.name) {
-            <div class="space-y-1.5">
-              <volt-label [htmlFor]="field.name" [error]="!!fieldErrors()[field.name]">
-                {{ field.label }}
-                @if (field.required) {
-                  <span class="text-destructive">&nbsp;*</span>
-                }
-              </volt-label>
-
-              @switch (field.kind) {
-                @case ('textarea') {
-                  <volt-textarea
-                    [id]="field.name"
-                    [value]="getStringValue(field.name)"
-                    (valueChange)="setValue(field.name, $event)"
-                  />
-                }
-                @case ('json') {
-                  <volt-textarea
-                    [id]="field.name"
-                    [value]="getStringValue(field.name)"
-                    (valueChange)="setValue(field.name, $event)"
-                  />
-                }
-                @case ('boolean') {
-                  <volt-switch
-                    [id]="field.name"
-                    [checked]="getBooleanValue(field.name)"
-                    (checkedChange)="setValue(field.name, $event)"
-                  />
-                }
-                @case ('select') {
-                  <select
-                    [id]="field.name"
-                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    [value]="getStringValue(field.name)"
-                    (change)="onSelectChange(field.name, $event)"
-                  >
-                    <option value="">Select…</option>
-                    @for (opt of field.options ?? []; track opt) {
-                      <option [value]="opt">{{ opt }}</option>
-                    }
-                  </select>
-                }
-                @case ('relation') {
-                  <volt-input
-                    [id]="field.name"
-                    type="text"
-                    [value]="getRelationValue(field.name)"
-                    (valueChange)="
-                      setRelationValue(field.name, $event, field.relation?.many === true)
-                    "
-                    [placeholder]="
-                      field.relation?.many === true ? 'Comma-separated IDs' : 'Related document ID'
-                    "
-                  />
-                }
-                @case ('number') {
-                  <volt-input
-                    [id]="field.name"
-                    type="number"
-                    [value]="getStringValue(field.name)"
-                    (valueChange)="setValue(field.name, $event)"
-                  />
-                }
-                @case ('date') {
-                  <volt-input
-                    [id]="field.name"
-                    type="date"
-                    [value]="getStringValue(field.name)"
-                    (valueChange)="setValue(field.name, $event)"
-                  />
-                }
-                @case ('email') {
-                  <volt-input
-                    [id]="field.name"
-                    type="email"
-                    [value]="getStringValue(field.name)"
-                    (valueChange)="setValue(field.name, $event)"
-                  />
-                }
-                @default {
-                  <volt-input
-                    [id]="field.name"
-                    type="text"
-                    [value]="getStringValue(field.name)"
-                    (valueChange)="setValue(field.name, $event)"
-                  />
-                }
-              }
-
-              @if (fieldErrors()[field.name]; as message) {
-                <volt-error>{{ message }}</volt-error>
-              }
-            </div>
+            <forge-field-control
+              [field]="field"
+              [value]="formValue()[field.name]"
+              [errors]="fieldErrors()"
+              [path]="field.name"
+              (valueChange)="setValue(field.name, $event)"
+            />
           }
 
           <div class="flex items-center justify-end gap-2 pt-2">
@@ -162,52 +70,14 @@ export class ForgeCollectionFormComponent {
     ...this.edits()
   }));
 
-  getStringValue(name: string): string {
-    const value = this.formValue()[name];
-    return value === undefined || value === null ? '' : String(value);
-  }
-
-  getRelationValue(name: string): string {
-    const value = this.formValue()[name];
-    if (Array.isArray(value)) return value.join(', ');
-    return value === undefined || value === null ? '' : String(value);
-  }
-
-  getBooleanValue(name: string): boolean {
-    return Boolean(this.formValue()[name]);
-  }
-
-  setRelationValue(name: string, value: string, many: boolean): void {
-    if (many) {
-      const ids = value
-        .split(',')
-        .map((id) => id.trim())
-        .filter((id) => id.length > 0);
-      this.setValue(name, ids.length > 0 ? ids : []);
-    } else {
-      this.setValue(name, value);
-    }
-  }
-
   setValue(name: string, value: unknown): void {
     this.edits.update((current) => ({ ...current, [name]: value }));
   }
 
-  onSelectChange(name: string, event: Event): void {
-    this.setValue(name, (event.target as HTMLSelectElement).value);
-  }
-
   onSubmit(event: Event): void {
     event.preventDefault();
-
-    const fields = this.fields();
-    const coerced: Record<string, unknown> = { ...this.formValue() };
-    for (const field of fields) {
-      if (field.kind === 'number' && coerced[field.name] !== undefined) {
-        coerced[field.name] = Number(coerced[field.name]);
-      }
-    }
-
-    this.save.emit(coerced);
+    // Field controls emit already-typed values (numbers as numbers, relations as arrays, composite
+    // fields as objects/arrays), so there is nothing left to coerce here.
+    this.save.emit({ ...this.formValue() });
   }
 }

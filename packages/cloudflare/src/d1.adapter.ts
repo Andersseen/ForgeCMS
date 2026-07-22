@@ -1,5 +1,10 @@
 import type { CollectionDefinition } from '@forge-cms/core';
-import type { DatabaseAdapter, DatabaseRecord, FindManyOptions } from '@forge-cms/db';
+import type {
+  DatabaseAdapter,
+  DatabaseRecord,
+  DatabaseWhere,
+  FindManyOptions
+} from '@forge-cms/db';
 import {
   generateCreateTableSql,
   generateAddColumnSql,
@@ -71,7 +76,9 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
 
   private async getExistingColumns(tableName: string): Promise<string[]> {
     const db = this.getDb();
-    const { results } = await db.prepare(`PRAGMA table_info("${tableName}")`).all<{ name: string }>();
+    const { results } = await db
+      .prepare(`PRAGMA table_info("${tableName}")`)
+      .all<{ name: string }>();
     return results.map((r) => r.name);
   }
 
@@ -83,52 +90,65 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     return this.hydrateRecord(result, collection);
   }
 
+  /**
+   * Builds a parameterized `WHERE` clause (empty string when there is nothing to filter on). Column
+   * names are validated against the collection's known fields before interpolation; values always go
+   * through bindings, never string concatenation.
+   */
+  private buildWhereClause(
+    collection: string,
+    where: DatabaseWhere | undefined
+  ): { clause: string; bindings: unknown[] } {
+    const bindings: unknown[] = [];
+    if (!where || Object.keys(where).length === 0) return { clause: '', bindings };
+
+    const collectionDef = this.getCollectionDef(collection);
+    const conditions = Object.entries(where).map(([key, condition]) => {
+      assertValidColumn(key, collectionDef);
+      const field = collectionDef?.fields[key];
+      const { operator, value } = toOperatorValue(condition);
+      const coerce = (v: unknown) => (field ? toDbValue(v, field.kind) : v);
+
+      switch (operator) {
+        case 'ne':
+          bindings.push(coerce(value));
+          return `"${key}" != ?`;
+        case 'gt':
+          bindings.push(coerce(value));
+          return `"${key}" > ?`;
+        case 'gte':
+          bindings.push(coerce(value));
+          return `"${key}" >= ?`;
+        case 'lt':
+          bindings.push(coerce(value));
+          return `"${key}" < ?`;
+        case 'lte':
+          bindings.push(coerce(value));
+          return `"${key}" <= ?`;
+        case 'in': {
+          const values = (value as unknown[]).map(coerce);
+          bindings.push(...values);
+          return `"${key}" IN (${values.map(() => '?').join(', ')})`;
+        }
+        case 'contains':
+          bindings.push(`%${value as string}%`);
+          return `"${key}" LIKE ?`;
+        case 'eq':
+        default:
+          bindings.push(coerce(value));
+          return `"${key}" = ?`;
+      }
+    });
+
+    return { clause: ` WHERE ${conditions.join(' AND ')}`, bindings };
+  }
+
   async findMany(options: FindManyOptions): Promise<DatabaseRecord[]> {
     const db = this.getDb();
-    let sql = `SELECT * FROM "${options.collection}"`;
-    const bindings: unknown[] = [];
-
     const collectionDef = this.getCollectionDef(options.collection);
 
-    if (options.where && Object.keys(options.where).length > 0) {
-      const conditions = Object.entries(options.where).map(([key, condition]) => {
-        assertValidColumn(key, collectionDef);
-        const field = collectionDef?.fields[key];
-        const { operator, value } = toOperatorValue(condition);
-        const coerce = (v: unknown) => (field ? toDbValue(v, field.kind) : v);
-
-        switch (operator) {
-          case 'ne':
-            bindings.push(coerce(value));
-            return `"${key}" != ?`;
-          case 'gt':
-            bindings.push(coerce(value));
-            return `"${key}" > ?`;
-          case 'gte':
-            bindings.push(coerce(value));
-            return `"${key}" >= ?`;
-          case 'lt':
-            bindings.push(coerce(value));
-            return `"${key}" < ?`;
-          case 'lte':
-            bindings.push(coerce(value));
-            return `"${key}" <= ?`;
-          case 'in': {
-            const values = (value as unknown[]).map(coerce);
-            bindings.push(...values);
-            return `"${key}" IN (${values.map(() => '?').join(', ')})`;
-          }
-          case 'contains':
-            bindings.push(`%${value as string}%`);
-            return `"${key}" LIKE ?`;
-          case 'eq':
-          default:
-            bindings.push(coerce(value));
-            return `"${key}" = ?`;
-        }
-      });
-      sql += ` WHERE ${conditions.join(' AND ')}`;
-    }
+    const { clause, bindings } = this.buildWhereClause(options.collection, options.where);
+    let sql = `SELECT * FROM "${options.collection}"${clause}`;
 
     if (options.sort) {
       assertValidColumn(options.sort, collectionDef);
@@ -215,11 +235,13 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     await db.prepare(`DELETE FROM "${collection}" WHERE id = ?`).bind(id).run();
   }
 
-  async count(collection: string): Promise<number> {
+  async count(collection: string, where?: DatabaseWhere): Promise<number> {
     const db = this.getDb();
-    const result = await db.prepare(`SELECT COUNT(*) as count FROM "${collection}"`).first<{
-      count: number;
-    }>();
+    const { clause, bindings } = this.buildWhereClause(collection, where);
+    const sql = `SELECT COUNT(*) as count FROM "${collection}"${clause}`;
+    const stmt = db.prepare(sql);
+    const bound = bindings.length > 0 ? stmt.bind(...bindings) : stmt;
+    const result = await bound.first<{ count: number }>();
     return result?.count ?? 0;
   }
 

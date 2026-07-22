@@ -1,6 +1,6 @@
-import type { CollectionDefinition } from '@forge-cms/core';
+import type { CmsUser, CollectionDefinition } from '@forge-cms/core';
 import type { DatabaseRecord } from '@forge-cms/db';
-import type { UserRole } from '@forge-cms/auth';
+import { resolveFieldAccess } from './access.js';
 
 export class FieldAccessError extends Error {
   constructor(readonly field: string) {
@@ -8,37 +8,51 @@ export class FieldAccessError extends Error {
   }
 }
 
-function isAllowed(allowedRoles: string[] | undefined, role: UserRole | undefined): boolean {
-  if (!allowedRoles) return true;
-  if (!role) return false;
-  return (allowedRoles as string[]).includes(role);
-}
-
-/** Omit fields the given role isn't allowed to read (per field.options.access.read). */
-export function filterReadableFields(
+/**
+ * Omits fields the user may not read (`field.options.access.read`). A rule can now be a predicate as
+ * well as a role list (spec 020), so resolution is async.
+ */
+export async function filterReadableFields(
   record: DatabaseRecord,
   collection: CollectionDefinition,
-  role: UserRole | undefined
-): DatabaseRecord {
+  user: CmsUser | null
+): Promise<DatabaseRecord> {
   const filtered: DatabaseRecord = {};
   for (const [key, value] of Object.entries(record)) {
     const field = collection.fields[key];
-    if (field && !isAllowed(field.options.access?.read, role)) continue;
+    if (field) {
+      const allowed = await resolveFieldAccess(field.options.access?.read, {
+        user,
+        operation: 'read',
+        collection,
+        fieldName: key,
+        doc: record
+      });
+      if (!allowed) continue;
+    }
     filtered[key] = value;
   }
   return filtered;
 }
 
-/** Throws FieldAccessError naming the first field the given role isn't allowed to write. */
-export function assertWritableFields(
+/** Throws {@link FieldAccessError} naming the first field the user may not write. */
+export async function assertWritableFields(
   body: Record<string, unknown>,
   collection: CollectionDefinition,
-  role: UserRole | undefined
-): void {
+  user: CmsUser | null,
+  operation: 'create' | 'update' = 'create'
+): Promise<void> {
   for (const key of Object.keys(body)) {
     const field = collection.fields[key];
-    if (field && !isAllowed(field.options.access?.write, role)) {
-      throw new FieldAccessError(key);
-    }
+    if (!field) continue;
+
+    const allowed = await resolveFieldAccess(field.options.access?.write, {
+      user,
+      operation,
+      collection,
+      fieldName: key,
+      data: body
+    });
+    if (!allowed) throw new FieldAccessError(key);
   }
 }
