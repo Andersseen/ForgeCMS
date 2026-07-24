@@ -1,6 +1,6 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-07-22.**
+> **Last updated: 2026-07-24.**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
@@ -82,11 +82,16 @@ ARCHITECTURE.md: `{ error: string, details?: ValidationError[] }`.
 
 ## Infrastructure
 
-- CI (GitHub Actions): `ci.yml` (lint + typecheck + test + build on push/PR to main); `e2e.yml`
-  (Playwright, separate workflow); `deploy-cloudflare.yml` (checks job — format/lint/typecheck/test/e2e —
-  then deploys `apps/www/dist/analog/public` to Cloudflare Pages; needs `CLOUDFLARE_API_TOKEN`,
-  `CLOUDFLARE_ACCOUNT_ID` secrets). The previously-duplicate ungated `deploy.yml` was removed (PLAN.md
-  P1-1 / spec 002) — it raced `deploy-cloudflare.yml` on every push with no test gate.
+- CI/CD (GitHub Actions): **consolidated into a single pipeline `ci.yml` as of 2026-07-24.** One
+  `checks` job (format:check + lint + typecheck + test + build + Playwright e2e) runs on every push/PR
+  to main; a `deploy` job `needs: checks` and is gated `if: github.event_name == 'push' && github.ref ==
+'refs/heads/main'`, so PRs and forks never deploy. It builds `apps/www`, verifies
+  `apps/www/dist/analog/public/index.html`, then `wrangler pages deploy`s to Cloudflare Pages
+  (`--project-name=forge-cms`); needs `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` secrets and uses
+  a `production` environment (url `https://forge-cms.pages.dev`). The old separate `e2e.yml` and
+  `deploy-cloudflare.yml` were removed — before, every push to main triggered three overlapping
+  workflow runs; now it's exactly one. **Cloudflare is the only deploy target.** (Earlier, the
+  duplicate ungated `deploy.yml` had already been removed per spec 002.)
 - Changesets configured; **no package published yet** (all 0.0.0).
 - `wrangler.toml`: Pages config, output `apps/www/dist/analog/public` (Nitro `cloudflare-pages`
   preset — includes `_worker.js`, the compiled API server), `nodejs_compat`.

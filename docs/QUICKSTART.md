@@ -17,7 +17,7 @@
 ## 1. Clone and install (2 min)
 
 ```sh
-git clone https://github.com/forge-cms/forge-cms.git
+git clone https://github.com/Andersseen/ForgeCMS.git
 cd forge-cms
 pnpm install
 pnpm build   # required once — tsconfig path mapping resolves @forge-cms/* to packages/*/dist

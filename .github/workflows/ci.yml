@@ -1,20 +1,27 @@
 name: CI
 
+# Single pipeline: quality checks on every push/PR, then deploy to
+# Cloudflare Pages — the one and only deploy target — on push to main.
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
-  ci:
-    name: Lint, Typecheck, Test & Build
+  checks:
+    name: Lint · Typecheck · Test · Build · E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -35,14 +42,70 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run linter
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint
         run: pnpm lint
 
-      - name: Run typecheck
+      - name: Typecheck
         run: pnpm typecheck
 
-      - name: Run unit tests
+      - name: Unit tests
         run: pnpm test
 
       - name: Build all packages and apps
         run: pnpm build
+
+      - name: Install Playwright (chromium)
+        run: pnpm --filter @forge-cms/www exec playwright install --with-deps chromium
+
+      - name: E2E tests
+        run: pnpm e2e:www
+
+  deploy:
+    name: Deploy to Cloudflare Pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: checks
+    # Deploy only on a real push to main — never on PRs or forks.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://forge-cms.pages.dev
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build www
+        run: pnpm build:www
+
+      - name: Verify build output
+        run: test -f apps/www/dist/analog/public/index.html
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: >
+          pnpm exec wrangler pages deploy apps/www/dist/analog/public
+          --project-name=forge-cms
+          --branch=main
+          --commit-hash=${{ github.sha }}
+          --commit-dirty=true

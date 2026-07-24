@@ -6,13 +6,13 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/forge-cms/forge-cms.git",
+    "url": "git+https://github.com/Andersseen/ForgeCMS.git",
     "directory": "packages/cloudflare"
   },
   "bugs": {
-    "url": "https://github.com/forge-cms/forge-cms/issues"
+    "url": "https://github.com/Andersseen/ForgeCMS/issues"
   },
-  "homepage": "https://github.com/forge-cms/forge-cms/tree/main/packages/cloudflare#readme",
+  "homepage": "https://github.com/Andersseen/ForgeCMS/tree/main/packages/cloudflare#readme",
   "keywords": [
     "cms",
     "cloudflare",

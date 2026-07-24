@@ -1,0 +1,71 @@
+<svg width="1200" height="320" viewBox="0 0 1200 320" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="bannerTitle bannerDesc">
+  <title id="bannerTitle">ForgeCMS</title>
+  <desc id="bannerDesc">ForgeCMS — the code-first, TypeScript-native headless CMS for Angular and Analog.js, edge-first on Cloudflare.</desc>
+  <defs>
+    <linearGradient id="edge" x1="0" y1="0" x2="1200" y2="320" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22D3EE"/>
+      <stop offset="0.5" stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(180 60) rotate(35) scale(520 340)">
+      <stop stop-color="#8B5CF6" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#8B5CF6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1080 300) rotate(-140) scale(560 360)">
+      <stop stop-color="#22D3EE" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#22D3EE" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="34" height="34" patternUnits="userSpaceOnUse">
+      <path d="M34 0H0V34" fill="none" stroke="#1E293B" stroke-width="1" stroke-opacity="0.5"/>
+    </pattern>
+    <linearGradient id="cyanText" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- panel -->
+  <rect x="1" y="1" width="1198" height="318" rx="20" fill="#0A0F1A"/>
+  <rect x="1" y="1" width="1198" height="318" rx="20" fill="url(#grid)"/>
+  <rect x="1" y="1" width="1198" height="318" rx="20" fill="url(#glowA)"/>
+  <rect x="1" y="1" width="1198" height="318" rx="20" fill="url(#glowB)"/>
+  <rect x="1.5" y="1.5" width="1197" height="317" rx="19.5" fill="none" stroke="#1E293B" stroke-width="1"/>
+  <rect x="1" y="1" width="1198" height="4" rx="2" fill="url(#edge)"/>
+
+  <!-- logo mark -->
+  <g transform="translate(84 104) scale(0.58)">
+    <rect width="192" height="192" rx="44" fill="#0F172A" stroke="#233047" stroke-width="2"/>
+    <path d="M52 48H144V70H78V90H132V112H78V144H52V48Z" fill="white"/>
+    <path d="M78 90H132L116 112H78V90Z" fill="#8B5CF6"/>
+    <path d="M78 48H144L128 70H78V48Z" fill="#22D3EE"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="232" y="158" font-family="'Segoe UI', Roboto, Helvetica, Arial, system-ui, sans-serif" font-size="76" font-weight="700" letter-spacing="-1">
+    <tspan fill="#F8FAFC">Forge</tspan><tspan fill="url(#cyanText)">CMS</tspan>
+  </text>
+
+  <!-- tagline -->
+  <text x="234" y="200" font-family="'Segoe UI', Roboto, Helvetica, Arial, system-ui, sans-serif" font-size="23" font-weight="400" fill="#94A3B8">
+    The code-first, TypeScript-native headless CMS for Angular &amp; Analog.js.
+  </text>
+
+  <!-- pills -->
+  <g font-family="'Segoe UI', Roboto, Helvetica, Arial, system-ui, sans-serif" font-size="15" font-weight="600">
+    <g transform="translate(234 232)">
+      <rect width="168" height="34" rx="17" fill="#111A2E" stroke="#233047"/>
+      <circle cx="20" cy="17" r="4" fill="#22D3EE"/>
+      <text x="34" y="22" fill="#CBD5E1">Edge-first · Cloudflare</text>
+    </g>
+    <g transform="translate(414 232)">
+      <rect width="150" height="34" rx="17" fill="#111A2E" stroke="#233047"/>
+      <circle cx="20" cy="17" r="4" fill="#8B5CF6"/>
+      <text x="34" y="22" fill="#CBD5E1">Typed schema DSL</text>
+    </g>
+    <g transform="translate(576 232)">
+      <rect width="132" height="34" rx="17" fill="#111A2E" stroke="#233047"/>
+      <circle cx="20" cy="17" r="4" fill="#22D3EE"/>
+      <text x="34" y="22" fill="#CBD5E1">D1 · R2 · Pages</text>
+    </g>
+  </g>
+</svg>

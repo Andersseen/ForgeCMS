@@ -58,7 +58,7 @@ const runtime = new ForgeCmsRuntime({
 
 ## Ecosystem context
 
-- **Monorepo**: this repo (`forge-cms/forge-cms` on GitHub) holds all packages and two apps.
+- **Monorepo**: this repo (`Andersseen/ForgeCMS` on GitHub) holds all packages and two apps.
 - **apps/www** is both the public landing page (deployed to Cloudflare Pages) and the living demo of
   the CMS (its `/admin` section and `/api/v1/*` API run on the real runtime with in-memory adapters).
 - **apps/playground** is a scratch app for trying future CMS APIs.

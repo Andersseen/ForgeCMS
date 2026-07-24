@@ -7,12 +7,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/forge-cms/forge-cms.git"
+    "url": "git+https://github.com/Andersseen/ForgeCMS.git"
   },
   "bugs": {
-    "url": "https://github.com/forge-cms/forge-cms/issues"
+    "url": "https://github.com/Andersseen/ForgeCMS/issues"
   },
-  "homepage": "https://github.com/forge-cms/forge-cms#readme",
+  "homepage": "https://github.com/Andersseen/ForgeCMS#readme",
   "keywords": [
     "cms",
     "angular",
