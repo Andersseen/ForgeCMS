@@ -2,10 +2,10 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { RouterLink } from '@angular/router';
 import { VoltBadge, VoltButton } from '@voltui/components';
 import {
+  DEMO_ADMIN_URL,
   DEMO_APP_URL,
-  DEMO_COMMANDS,
   DEMO_CREDENTIALS,
-  DEMO_LOCAL_URL,
+  DEMO_SOURCE_URL,
   DEVELOPER_STEPS,
   EDITOR_STEPS
 } from '../demo-access';
@@ -41,7 +41,7 @@ type Audience = 'editor' | 'developer';
         >
           <header class="flex items-start justify-between gap-4 border-b border-border p-6">
             <div>
-              <volt-badge variant="secondary">{{ isHosted ? 'Live demo' : 'Demo app' }}</volt-badge>
+              <volt-badge variant="secondary">Live demo</volt-badge>
               <h2 id="demo-dialog-title" class="mt-3 text-2xl font-semibold">
                 Lumea Aesthetics — a clinic running on ForgeCMS
               </h2>
@@ -142,38 +142,13 @@ type Audience = 'editor' | 'developer';
             }
           </div>
 
-          <footer class="border-t border-border p-6">
-            @if (isHosted) {
-              <div class="flex flex-wrap items-center gap-3">
-                <a [href]="demoUrl" rel="noreferrer" target="_blank">
-                  <volt-button size="lg">Open the demo →</volt-button>
-                </a>
-                <a routerLink="/admin" (click)="dialog.close()">
-                  <volt-button variant="outline" size="lg">Generic admin on this site</volt-button>
-                </a>
-              </div>
-            } @else {
-              <p class="text-sm font-medium">The clinic demo is not hosted yet — run it locally:</p>
-              <pre
-                class="mt-3 overflow-x-auto rounded-md bg-muted p-4 text-xs leading-6"
-              ><code>{{ commands }}</code></pre>
-              <p class="mt-2 text-xs text-muted-foreground">
-                It serves on <span class="font-mono">{{ localUrl }}</span
-                >, with the CMS at <span class="font-mono">/admin</span>.
-              </p>
-              <div class="mt-4 flex flex-wrap items-center gap-3">
-                <a routerLink="/admin" (click)="dialog.close()">
-                  <volt-button size="lg">Open the generic admin here instead</volt-button>
-                </a>
-                <a
-                  href="https://github.com/Andersseen/ForgeCMS/tree/main/apps/demo-aesthetics"
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  <volt-button variant="outline" size="lg">Read the demo's source</volt-button>
-                </a>
-              </div>
-            }
+          <footer class="flex flex-wrap items-center gap-3 border-t border-border p-6">
+            <a [href]="primaryUrl()" rel="noreferrer" target="_blank">
+              <volt-button size="lg">{{ primaryLabel() }}</volt-button>
+            </a>
+            <a [href]="secondaryUrl()" rel="noreferrer" target="_blank">
+              <volt-button variant="outline" size="lg">{{ secondaryLabel() }}</volt-button>
+            </a>
           </footer>
         </div>
       </div>
@@ -189,13 +164,22 @@ export class DemoDialogComponent {
   );
 
   protected readonly credentials = DEMO_CREDENTIALS;
-  protected readonly demoUrl = DEMO_APP_URL;
-  protected readonly localUrl = DEMO_LOCAL_URL;
-  protected readonly commands = DEMO_COMMANDS.join('\n');
 
   protected readonly selectedClass = 'border-primary bg-primary/5';
   protected readonly unselectedClass = 'border-border hover:bg-muted';
 
-  /** CI deploys only `apps/www`, so until the demo has a home the dialog hands out commands. */
-  protected readonly isHosted = DEMO_APP_URL !== '';
+  // An editor wants the site itself; a developer wants the code. Both get one click, never a
+  // checkout: the demo is deployed by CI on every push to main.
+  protected readonly primaryUrl = computed(() =>
+    this.audience() === 'editor' ? DEMO_APP_URL : DEMO_SOURCE_URL
+  );
+  protected readonly primaryLabel = computed(() =>
+    this.audience() === 'editor' ? 'Open the demo site →' : 'Read the content model →'
+  );
+  protected readonly secondaryUrl = computed(() =>
+    this.audience() === 'editor' ? DEMO_ADMIN_URL : DEMO_APP_URL
+  );
+  protected readonly secondaryLabel = computed(() =>
+    this.audience() === 'editor' ? 'Go straight to the CMS' : 'Open the demo site'
+  );
 }

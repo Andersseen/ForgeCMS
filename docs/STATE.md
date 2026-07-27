@@ -105,7 +105,14 @@ ARCHITECTURE.md: `{ error: string, details?: ValidationError[] }`.
   (`--project-name=forge-cms`); needs `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` secrets and uses
   a `production` environment (url `https://forge-cms.pages.dev`). The old separate `e2e.yml` and
   `deploy-cloudflare.yml` were removed — before, every push to main triggered three overlapping
-  workflow runs; now it's exactly one. **Cloudflare is the only deploy target.** (Earlier, the
+  workflow runs; now it's exactly one. **Cloudflare is the only deploy target.** **As of 2026-07-27 a
+  second deploy job, `deploy-demo`, publishes `apps/demo-aesthetics` to its own Pages project
+  `forge-cms-demo`** (`https://forge-cms-demo.pages.dev`, environment `production-demo`) under the
+  same guard and the same two secrets; it creates the project on first run and deploys via
+  `wrangler pages deploy --cwd apps/demo-aesthetics` (there is no `--config` flag for `pages deploy`,
+  so `--cwd` is how a monorepo selects a second project's `wrangler.toml`). That config ships with
+  **no bindings**, so the demo runs on in-memory adapters until someone runs `wrangler d1 create
+forge-cms-demo` and uncomments the D1 block — see the app's README. (Earlier, the
   duplicate ungated `deploy.yml` had already been removed per spec 002.)
 - Changesets configured; **no package published yet** (all 0.0.0).
 - `wrangler.toml`: Pages config, output `apps/www/dist/analog/public` (Nitro `cloudflare-pages`

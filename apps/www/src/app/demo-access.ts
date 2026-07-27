@@ -7,17 +7,18 @@
  */
 
 /**
- * The deployed demo, once there is one. **Empty means "not hosted yet"**, and the dialog then shows
- * how to run it locally instead of offering a button that goes nowhere.
- *
- * Set this to the demo's URL when it gets its own Cloudflare Pages project; nothing else needs to
- * change. (Probing at runtime does not work: every subdomain of a `pages.dev` project resolves, so
- * an unhosted URL answers with a 404 page rather than a network error.)
+ * The deployed demo. CI publishes `apps/demo-aesthetics` to its own Cloudflare Pages project on
+ * every push to main (`deploy-demo` in .github/workflows/ci.yml), so this is a plain link — trying
+ * the CMS must never require cloning anything.
  */
-export const DEMO_APP_URL = '';
+export const DEMO_APP_URL = 'https://forge-cms-demo.pages.dev';
 
-/** Where the demo runs with `pnpm dev:demo`. */
-export const DEMO_LOCAL_URL = 'http://127.0.0.1:5174';
+/** The demo's admin, so the dialog can send an editor straight to the login screen. */
+export const DEMO_ADMIN_URL = `${DEMO_APP_URL}/login`;
+
+/** The demo's source, for developers who want the code rather than the running site. */
+export const DEMO_SOURCE_URL =
+  'https://github.com/Andersseen/ForgeCMS/tree/main/apps/demo-aesthetics';
 
 export const DEMO_CREDENTIALS = [
   { role: 'Admin', email: 'demo@lumea.clinic', password: 'lumea-demo' },
@@ -85,10 +86,4 @@ export const DEVELOPER_STEPS: DemoStep[] = [
     detail:
       'pnpm test:demo — 22 tests drive the content model through the Local API: who can read a booking, what a draft is invisible to, what a hook rewrites.'
   }
-];
-
-export const DEMO_COMMANDS = [
-  'git clone https://github.com/Andersseen/ForgeCMS.git',
-  'pnpm install && pnpm build',
-  'pnpm dev:demo'
 ];

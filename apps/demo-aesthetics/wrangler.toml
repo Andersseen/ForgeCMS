@@ -1,0 +1,35 @@
+name = "forge-cms-demo"
+compatibility_date = "2026-07-27"
+compatibility_flags = ["nodejs_compat"]
+# Relative to this file. CI deploys with `wrangler pages deploy --cwd apps/demo-aesthetics`, because
+# `pages deploy` has no `--config` flag — `--cwd` is how a monorepo points it at a second project.
+pages_build_output_dir = "dist/analog/public"
+
+# --- Persistence (optional, but the demo is much better with it) --------------------------------
+#
+# Without a D1 binding the app falls back to `InMemoryDatabaseAdapter`: every Worker isolate seeds
+# its own copy, so a visitor who publishes something may not see it a minute later. With D1 the demo
+# behaves like a real deployment — `syncSchema()` creates the tables on the first request and the
+# seed runs exactly once (it checks for an existing `site_settings` row).
+#
+# One-time setup, from the repo root:
+#
+#   pnpm exec wrangler d1 create forge-cms-demo
+#
+# then paste the printed `database_id` below and uncomment the block.
+#
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "forge-cms-demo"
+# database_id = "<paste-from-wrangler-d1-create>"
+
+# --- Uploaded media (optional) -------------------------------------------------------------------
+#
+# Without it, uploads go to `InMemoryStorageAdapter` and disappear on the next cold start. Seeded
+# images are static files in `public/images`, so the site still looks right either way.
+#
+#   pnpm exec wrangler r2 bucket create forge-cms-demo-media
+#
+# [[r2_buckets]]
+# binding = "BUCKET"
+# bucket_name = "forge-cms-demo-media"

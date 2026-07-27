@@ -72,7 +72,26 @@ is subject to exactly the rules an anonymous HTTP caller would hit rather than t
 - Seeded images are static SVGs in `public/images`; uploads go through the storage adapter and are
   served back by `routes/api/media/[...key].get.ts` (finding 21).
 
+## Deployment
+
+CI publishes this app to its own Cloudflare Pages project, `forge-cms-demo`, on every push to `main`
+(the `deploy-demo` job in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)). It reuses the
+`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` secrets `apps/www` already uses, and creates the
+project on the first run. `apps/www`'s landing dialog links straight to it.
+
+**It deploys with no bindings, which means in-memory adapters:** every Worker isolate seeds its own
+copy, so something a visitor publishes may not be there a minute later. To make the demo behave like
+a real deployment, create the storage once and uncomment the matching block in
+[`wrangler.toml`](wrangler.toml):
+
+```sh
+pnpm exec wrangler d1 create forge-cms-demo             # persistence — paste the printed database_id
+pnpm exec wrangler r2 bucket create forge-cms-demo-media # uploaded files (optional)
+```
+
+No migrations are needed: the runtime's `syncSchema()` creates the tables on the first request, and
+the seed runs exactly once because it checks for an existing `site_settings` row.
+
 ## Not included
 
-No e2e suite (Playwright stays in `apps/www` per CONVENTIONS.md) and no deploy — CI builds and tests
-this app but only deploys `apps/www`.
+No e2e suite — Playwright stays in `apps/www` per CONVENTIONS.md.
