@@ -20,6 +20,7 @@ Node >= 22 (`.nvmrc`), pnpm `10.11.0` (via `packageManager` field). Never use np
 | `pnpm build`                           | Build all packages/apps (topological, cached by Turbo)    |
 | `pnpm dev:www` / `pnpm dev:playground` | Run the landing/admin app or the playground               |
 | `pnpm dev:demo`                        | Run the real-world demo app (`apps/demo-aesthetics`)      |
+| `pnpm deploy:www` / `pnpm deploy:demo` | Manual Cloudflare Pages deploy (CI does both on `main`)   |
 | `pnpm test`                            | Unit tests (Vitest) across the repo                       |
 | `pnpm lint` / `pnpm typecheck`         | ESLint / `tsc --noEmit` across the repo                   |
 | `pnpm format` / `pnpm format:check`    | Prettier write / check                                    |
