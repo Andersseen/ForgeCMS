@@ -331,6 +331,21 @@ demo implemented all six for that reason. A clinic would want "Bookings" first.
 - **Fixed (spec 042).** `ForgeAdminConfig.nav` takes groups of items (with `adminOnly`), defaulting
   to `DEFAULT_ADMIN_NAV`. The demo's sidebar now opens on Bookings.
 
+<a id="f23"></a>
+
+### 23. A hook cannot query the CMS
+
+Hook args carry `data`, `doc`, `user`, `operation` and (since spec 040) `overrideAccess` — but no
+handle on the CMS. Any rule that has to _look something up_ is stuck: "refuse this delete if it would
+leave fewer than six services", "reject a slug that already exists", "do not remove the last admin".
+
+- **Workaround:** the demo keeps a module-level runtime reference
+  ([`runtime-ref.ts`](../apps/demo-aesthetics/src/server/api/runtime-ref.ts)) purely so its limit
+  hooks can call `count()` and `find()`. It also has to live in its own module to avoid an import
+  cycle, which is a good sign the shape is wrong.
+- **Fix:** pass the `OperationContext` that `operations.ts` already holds into hook args, the way
+  Payload passes `req` with its instance.
+
 <a id="f22"></a>
 
 ### 22. Adapters disagree about timestamps

@@ -9,6 +9,7 @@
 import { defineBlock, defineCollection, defineField } from '@forge-cms/core';
 import type { AccessArgs, CmsUser } from '@forge-cms/core';
 import { withAuthFields } from '@forge-cms/auth';
+import { withDemoGuards } from './demo-guards';
 
 const STAFF_ROLES = ['admin', 'editor'];
 
@@ -441,6 +442,11 @@ export const users = withAuthFields(
   })
 );
 
+/**
+ * Every collection carries the demo's limits — a ceiling that prunes oldest-first and a floor that
+ * protects the seeded content. See `demo-guards.ts`; the definitions above stay a plain content
+ * model, exactly as a real clinic would write them.
+ */
 export const collections = [
   serviceCategories,
   services,
@@ -453,4 +459,4 @@ export const collections = [
   pages,
   siteSettings,
   users
-];
+].map(withDemoGuards);

@@ -1,11 +1,10 @@
-import { createError, defineEventHandler, getRouterParam } from 'h3';
-import { getServerRuntime } from '../../../../api/runtime';
+import { createError, getRouterParam } from 'h3';
+import { definePublicSiteRoute } from '../../../../api/public-route';
 import { toPostDetail } from '../../../../api/mappers';
 import type { PostDetail } from '../../../../../shared/site-content';
 
 /** One journal entry. Drafts 404 for anonymous readers, which is spec 017 doing its job. */
-export default defineEventHandler(async (event): Promise<{ data: PostDetail }> => {
-  const runtime = await getServerRuntime(event.context.cloudflare?.env);
+export default definePublicSiteRoute(async (runtime, event): Promise<PostDetail> => {
   const slug = getRouterParam(event, 'slug') ?? '';
 
   const found = await runtime.find({
@@ -22,5 +21,5 @@ export default defineEventHandler(async (event): Promise<{ data: PostDetail }> =
     throw createError({ statusCode: 404, statusMessage: 'Post not found' });
   }
 
-  return { data: toPostDetail(record) };
+  return toPostDetail(record);
 });

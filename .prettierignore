@@ -4,3 +4,6 @@ coverage
 .analog
 .turbo
 pnpm-lock.yaml
+
+# Wrangler scratch output
+.wrangler/

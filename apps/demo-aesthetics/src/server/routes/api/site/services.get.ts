@@ -1,11 +1,9 @@
-import { defineEventHandler } from 'h3';
-import { getServerRuntime } from '../../../api/runtime';
+import { definePublicSiteRoute } from '../../../api/public-route';
 import { toCategory, toServiceSummary } from '../../../api/mappers';
 import type { ServicesPayload } from '../../../../shared/site-content';
 
 /** The treatment menu: every published service, plus the categories to group them by. */
-export default defineEventHandler(async (event): Promise<{ data: ServicesPayload }> => {
-  const runtime = await getServerRuntime(event.context.cloudflare?.env);
+export default definePublicSiteRoute(async (runtime): Promise<ServicesPayload> => {
   const asVisitor = { overrideAccess: false, user: null } as const;
 
   const [services, categories] = await Promise.all([
@@ -27,11 +25,9 @@ export default defineEventHandler(async (event): Promise<{ data: ServicesPayload
   ]);
 
   return {
-    data: {
-      services: services.docs.map(toServiceSummary),
-      categories: categories.docs
-        .map(toCategory)
-        .filter((category): category is NonNullable<typeof category> => category !== null)
-    }
+    services: services.docs.map(toServiceSummary),
+    categories: categories.docs
+      .map(toCategory)
+      .filter((category): category is NonNullable<typeof category> => category !== null)
   };
 });

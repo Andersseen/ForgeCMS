@@ -1,12 +1,12 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { VoltBadge, VoltButton } from '@voltui/components';
 import { exampleCode } from '../landing-data';
+import { DemoDialogService } from './demo-dialog.service';
 
 @Component({
   selector: 'forge-cms-hero-section',
   standalone: true,
-  imports: [VoltBadge, VoltButton, RouterLink],
+  imports: [VoltBadge, VoltButton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section
@@ -25,9 +25,7 @@ import { exampleCode } from '../landing-data';
         </p>
 
         <div class="mt-9 flex flex-col gap-3 sm:flex-row">
-          <a routerLink="/admin">
-            <volt-button size="lg">Explore the admin demo</volt-button>
-          </a>
+          <volt-button size="lg" (click)="demo.open()">See a real site on ForgeCMS</volt-button>
           <a href="#architecture">
             <volt-button variant="outline" size="lg">Explore architecture</volt-button>
           </a>
@@ -36,8 +34,8 @@ import { exampleCode } from '../landing-data';
           </a>
         </div>
         <p class="mt-3 text-sm text-muted-foreground">
-          Live demo — browses real collections through the actual ForgeCMS runtime; demo data may
-          reset periodically.
+          A fictional clinic's website and the CMS behind it — treatments, bookings, team and
+          journal, all real content running through the actual ForgeCMS runtime.
         </p>
       </div>
 
@@ -75,5 +73,6 @@ import { exampleCode } from '../landing-data';
   `
 })
 export class HeroSectionComponent {
+  protected readonly demo = inject(DemoDialogService);
   protected readonly exampleCode = exampleCode;
 }

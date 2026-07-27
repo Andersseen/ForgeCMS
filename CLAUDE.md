@@ -34,7 +34,9 @@ Node >= 22 (`.nvmrc`), pnpm `10.11.0` (via `packageManager` field). Never use np
 ```
 apps/
   www/          Analog.js landing + /admin demo UI + h3 server API (/api/v1/*) — deploys to Cloudflare Pages
-  playground/   Analog.js sandbox for trying CMS APIs
+  playground/   The maintainer's private sandbox: edit src/app/sandbox.ts, save, and scenarios run
+                against a real runtime on in-memory adapters. Not a demo, not deployed — don't
+                polish it, and don't put anything presentable here.
   demo-aesthetics/  Real-world demo: a clinic marketing site built on the CMS (spec 039). Its point is
                     docs/DEMO-FINDINGS.md — gaps stay as app-side workarounds marked `FINDING n`, so
                     never "fix" one by editing packages/* without updating that doc.

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { ArchitectureSectionComponent } from '../components/architecture-section.component';
+import { DemoDialogComponent } from '../components/demo-dialog.component';
 import { HeaderComponent } from '../components/header.component';
 import { HeroSectionComponent } from '../components/hero-section.component';
 import { PackagesSectionComponent } from '../components/packages-section.component';
@@ -11,6 +12,7 @@ import { RoadmapSectionComponent } from '../components/roadmap-section.component
   imports: [
     HeaderComponent,
     HeroSectionComponent,
+    DemoDialogComponent,
     ArchitectureSectionComponent,
     PackagesSectionComponent,
     RoadmapSectionComponent
@@ -23,6 +25,7 @@ import { RoadmapSectionComponent } from '../components/roadmap-section.component
       <forge-cms-architecture-section />
       <forge-cms-packages-section />
       <forge-cms-roadmap-section />
+      <forge-cms-demo-dialog />
     </main>
   `
 })

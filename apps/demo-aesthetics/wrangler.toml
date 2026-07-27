@@ -1,0 +1,29 @@
+name = "forge-cms-demo"
+# Must not be newer than the runtime the pinned wrangler ships: 4.91.0 supports up to 2026-05-18 and
+# refuses to start otherwise. Same date as the root config, which deploys fine.
+compatibility_date = "2026-05-15"
+compatibility_flags = ["nodejs_compat"]
+# Relative to this file. CI deploys with `wrangler pages deploy --cwd apps/demo-aesthetics`, because
+# `pages deploy` has no `--config` flag — `--cwd` is how a monorepo points it at a second project.
+pages_build_output_dir = "dist/analog/public"
+
+# Persistence. `binding` is the name the code looks for, not the resource's name: `getServerRuntime`
+# in src/server/api/runtime.ts checks `env.DB`, and picks `InMemoryDatabaseAdapter` when it is
+# missing — so a mismatch here degrades silently to a demo that forgets everything.
+#
+# No migrations are needed: `syncSchema()` creates the tables on the first request, and the seed runs
+# exactly once because it checks for an existing `site_settings` row.
+#
+# Created with `pnpm exec wrangler d1 create forge-cms-demo`.
+[[d1_databases]]
+binding = "DB"
+database_name = "forge-cms-demo"
+database_id = "2fe5edd2-384c-4aa9-9abd-9806d906c1cc"
+
+# Uploaded media. Same rule: `R2StorageAdapter` reads `env.BUCKET` unless it is constructed with
+# `new R2StorageAdapter({ binding: '...' })`, and this app does not do that.
+#
+# Created with `pnpm exec wrangler r2 bucket create forge-cms-demo-media`.
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "forge-cms-demo-media"

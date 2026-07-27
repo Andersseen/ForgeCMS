@@ -10,6 +10,7 @@ import {
 import { ForgeCmsRuntime } from '@forge-cms/runtime';
 import { collections } from './collections';
 import { seedContent } from './seed';
+import { setRuntimeRef } from './runtime-ref';
 
 export interface ServerEnv {
   DB?: D1Database;
@@ -38,7 +39,11 @@ export function getServerRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<Serve
 /** Builds an unseeded runtime. Exported for tests, which seed (or not) as each case needs. */
 export function createRuntime(env?: ServerEnv): ForgeCmsRuntime<ServerEnv> {
   const database = env?.DB ? new D1DatabaseAdapter() : new InMemoryDatabaseAdapter();
-  const storage = env?.BUCKET ? new R2StorageAdapter() : new InMemoryStorageAdapter();
+  // `publicUrlBase` is the path `routes/api/media/[...key].get.ts` serves. It is the adapter's
+  // default too, but stating it here keeps the two ends of that contract in one place.
+  const storage = env?.BUCKET
+    ? new R2StorageAdapter({ publicUrlBase: '/api/media' })
+    : new InMemoryStorageAdapter();
   const auth = new UsersCollectionAuthAdapter().init({ ...env, userDatabase: database });
 
   const runtime = new ForgeCmsRuntime<ServerEnv>({
@@ -47,7 +52,10 @@ export function createRuntime(env?: ServerEnv): ForgeCmsRuntime<ServerEnv> {
     ...(env !== undefined && { env })
   });
 
-  return runtime.init();
+  runtime.init();
+  // Hooks get no handle on the CMS (finding 23), and the demo's limits need to count documents.
+  setRuntimeRef(runtime as unknown as ForgeCmsRuntime<never>);
+  return runtime;
 }
 
 async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>> {

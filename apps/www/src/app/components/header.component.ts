@@ -1,11 +1,11 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { VoltButton } from '@voltui/components';
+import { DemoDialogService } from './demo-dialog.service';
 
 @Component({
   selector: 'forge-cms-header',
   standalone: true,
-  imports: [VoltButton, RouterLink],
+  imports: [VoltButton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-5 md:px-8">
@@ -21,9 +21,7 @@ import { VoltButton } from '@voltui/components';
       </nav>
 
       <div class="flex items-center gap-2">
-        <a routerLink="/admin">
-          <volt-button size="sm">Dashboard</volt-button>
-        </a>
+        <volt-button size="sm" (click)="demo.open()">See the demo</volt-button>
         <a href="https://github.com/forge-cms/forge-cms" rel="noreferrer" target="_blank">
           <volt-button variant="outline" size="sm">GitHub</volt-button>
         </a>
@@ -31,4 +29,6 @@ import { VoltButton } from '@voltui/components';
     </header>
   `
 })
-export class HeaderComponent {}
+export class HeaderComponent {
+  protected readonly demo = inject(DemoDialogService);
+}

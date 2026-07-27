@@ -72,7 +72,48 @@ is subject to exactly the rules an anonymous HTTP caller would hit rather than t
 - Seeded images are static SVGs in `public/images`; uploads go through the storage adapter and are
   served back by `routes/api/media/[...key].get.ts` (finding 21).
 
+## Deployment
+
+CI publishes this app to its own Cloudflare Pages project, `forge-cms-demo`, on every push to `main`
+(the `deploy-demo` job in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)). It reuses the
+`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` secrets `apps/www` already uses, and creates the
+project on the first run. `apps/www`'s landing dialog links straight to it.
+
+[`wrangler.toml`](wrangler.toml) binds a **D1 database** (`forge-cms-demo`) and an **R2 bucket**
+(`forge-cms-demo-media`), both created once with:
+
+```sh
+pnpm exec wrangler d1 create forge-cms-demo
+pnpm exec wrangler r2 bucket create forge-cms-demo-media
+```
+
+The binding **names** are what matter: `getServerRuntime` picks `D1DatabaseAdapter` only when
+`env.DB` exists and `R2StorageAdapter` only when `env.BUCKET` does, and falls back to the in-memory
+adapters otherwise — silently. A renamed binding therefore looks like a working deploy that forgets
+everything between cold starts.
+
+No migrations are needed: the runtime's `syncSchema()` creates the tables on the first request, and
+the seed runs exactly once because it checks for an existing `site_settings` row.
+
+## Running in public without going bankrupt
+
+The demo publishes its own admin password, so anyone can write to it. On a free Cloudflare plan
+(100k Worker requests/day, 100k D1 rows written/day, 10 GB in R2) that needs limits, and they all
+live in this app — `getServerRuntime` is a deployment, not a CMS feature:
+
+| Guardrail                                                  | Where                                                  | What it stops                                                                            |
+| ---------------------------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| Public reads cached 60 s per isolate, plus `cache-control` | [`public-route.ts`](src/server/api/public-route.ts)    | The marketing site hammering D1. Any write clears it, so publishing still looks instant. |
+| 12 writes/minute per IP, 240 per isolate                   | [`demo-guard.ts`](src/server/middleware/demo-guard.ts) | A loop from one machine. Per-IP, not per person — that needs accounts.                   |
+| Body ≤ 256 KB, uploads ≤ 2 MB                              | same                                                   | Oversized payloads and R2 filling up.                                                    |
+| `/api/auth/users` returns 403                              | same                                                   | Account spam, and someone deleting the demo admin.                                       |
+| Ceilings per collection, oldest pruned                     | [`demo-guards.ts`](src/server/api/demo-guards.ts)      | Unbounded growth. Writes still succeed — a demo that starts refusing bookings is broken. |
+| Floors per collection                                      | same                                                   | Someone emptying the treatment menu and leaving the site blank.                          |
+
+The numbers are all in [`demo-limits.ts`](src/server/api/demo-limits.ts). None of it is security: it
+is a spending limit. If the demo ever moves to a custom domain, a WAF rate-limiting rule (one is free
+per zone) filters abuse before it reaches the Worker and is worth adding on top.
+
 ## Not included
 
-No e2e suite (Playwright stays in `apps/www` per CONVENTIONS.md) and no deploy — CI builds and tests
-this app but only deploys `apps/www`.
+No e2e suite — Playwright stays in `apps/www` per CONVENTIONS.md.

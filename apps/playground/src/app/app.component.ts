@@ -1,26 +1,54 @@
-import { Component } from '@angular/core';
-import { postFields, posts } from './posts.collection';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import type { OnInit } from '@angular/core';
+import { createSandboxRuntime, scenarios } from './sandbox';
 
+interface ScenarioResult {
+  name: string;
+  status: 'ok' | 'threw';
+  output: string;
+  ms: number;
+}
+
+/**
+ * A local scratchpad, not a demo: it runs every scenario in `sandbox.ts` against a real
+ * `ForgeCmsRuntime` on in-memory adapters and prints what came back. Each scenario gets its own
+ * fresh runtime, so they cannot interfere with each other.
+ *
+ * The realistic, presentable example lives in `apps/demo-aesthetics`.
+ */
 @Component({
   selector: 'forge-playground-root',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <main class="shell">
-      <p class="eyebrow">ForgeCMS</p>
-      <h1>Analog.js playground</h1>
-      <p class="summary">
-        The playground imports <code>@forge-cms/core</code> and declares an example
-        <code>{{ collection.slug }}</code> collection.
-      </p>
+      <header class="head">
+        <div>
+          <p class="eyebrow">ForgeCMS</p>
+          <h1>Sandbox</h1>
+          <p class="summary">
+            Edit <code>src/app/sandbox.ts</code> and save. Every scenario runs against a real
+            runtime on in-memory adapters — the full pipeline, no server, no database.
+          </p>
+        </div>
+        <button type="button" (click)="run()" [disabled]="running()">
+          {{ running() ? 'Running…' : 'Re-run' }}
+        </button>
+      </header>
 
-      <section aria-label="Collection fields" class="fields">
-        @for (field of fields; track field.name) {
-          <article class="field">
-            <span>{{ field.name }}</span>
-            <code>{{ field.kind }}</code>
-          </article>
-        }
-      </section>
+      @for (result of results(); track result.name) {
+        <article class="scenario" [class.threw]="result.status === 'threw'">
+          <div class="scenario-head">
+            <span class="name">{{ result.name }}</span>
+            <span class="meta">
+              {{ result.status === 'threw' ? 'threw' : 'ok' }} · {{ result.ms }}ms
+            </span>
+          </div>
+          <pre>{{ result.output }}</pre>
+        </article>
+      } @empty {
+        <p class="summary">No scenarios yet — add one to <code>sandbox.ts</code>.</p>
+      }
     </main>
   `,
   styles: [
@@ -41,32 +69,55 @@ import { postFields, posts } from './posts.collection';
       }
 
       .shell {
-        width: min(920px, calc(100% - 32px));
+        width: min(980px, calc(100% - 32px));
         margin: 0 auto;
-        padding: 72px 0;
+        padding: 56px 0 96px;
+      }
+
+      .head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 32px;
       }
 
       .eyebrow {
-        margin: 0 0 12px;
+        margin: 0 0 8px;
         color: #0f766e;
         font-size: 0.78rem;
         font-weight: 700;
-        letter-spacing: 0;
         text-transform: uppercase;
       }
 
       h1 {
         margin: 0;
-        font-size: clamp(2.4rem, 7vw, 5rem);
-        line-height: 0.95;
+        font-size: clamp(2rem, 5vw, 3.2rem);
+        line-height: 1;
       }
 
       .summary {
-        max-width: 680px;
-        margin: 24px 0 36px;
+        max-width: 640px;
+        margin: 16px 0 0;
         color: #52606d;
-        font-size: 1.08rem;
-        line-height: 1.7;
+        line-height: 1.65;
+      }
+
+      button {
+        flex-shrink: 0;
+        border: 1px solid #0f766e;
+        border-radius: 8px;
+        padding: 10px 18px;
+        color: #ffffff;
+        background: #0f766e;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      button:disabled {
+        opacity: 0.55;
+        cursor: default;
       }
 
       code {
@@ -77,31 +128,107 @@ import { postFields, posts } from './posts.collection';
         font: inherit;
       }
 
-      .fields {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 12px;
-      }
-
-      .field {
-        display: flex;
-        min-height: 64px;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
+      .scenario {
+        margin-bottom: 16px;
+        overflow: hidden;
         border: 1px solid #d9e2ec;
-        border-radius: 8px;
-        padding: 16px;
+        border-radius: 10px;
         background: #ffffff;
       }
 
-      .field span {
-        font-weight: 700;
+      .scenario.threw {
+        border-color: #f3b3b3;
+      }
+
+      .scenario-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 12px 16px;
+        border-bottom: 1px solid #eef2f6;
+      }
+
+      .name {
+        font-weight: 650;
+      }
+
+      .meta {
+        color: #7b8794;
+        font-size: 0.8rem;
+      }
+
+      .threw .meta {
+        color: #b91c1c;
+      }
+
+      pre {
+        max-height: 340px;
+        margin: 0;
+        overflow: auto;
+        padding: 16px;
+        color: #243b53;
+        background: #fbfcfe;
+        font-size: 0.85rem;
+        line-height: 1.6;
       }
     `
   ]
 })
-export class AppComponent {
-  protected readonly collection = posts;
-  protected readonly fields = postFields;
+export class AppComponent implements OnInit {
+  protected readonly results = signal<ScenarioResult[]>([]);
+  protected readonly running = signal(false);
+
+  ngOnInit(): void {
+    void this.run();
+  }
+
+  protected async run(): Promise<void> {
+    this.running.set(true);
+    const collected: ScenarioResult[] = [];
+
+    for (const scenario of scenarios) {
+      // A fresh runtime per scenario: seeded state from one must not leak into the next.
+      const cms = await createSandboxRuntime();
+      const started = performance.now();
+
+      try {
+        const value = await scenario.run(cms);
+        collected.push({
+          name: scenario.name,
+          status: 'ok',
+          output: format(value),
+          ms: Math.round(performance.now() - started)
+        });
+      } catch (err) {
+        collected.push({
+          name: scenario.name,
+          status: 'threw',
+          output: formatError(err),
+          ms: Math.round(performance.now() - started)
+        });
+      }
+    }
+
+    this.results.set(collected);
+    this.running.set(false);
+  }
+}
+
+function format(value: unknown): string {
+  if (value === undefined) return 'undefined';
+  return JSON.stringify(value, null, 2);
+}
+
+/** Errors from the Local API carry a status and, for validation failures, per-field details. */
+function formatError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  const extra = err as Error & { status?: number; details?: unknown };
+  return [
+    `${err.name}: ${err.message}`,
+    extra.status !== undefined ? `status: ${extra.status}` : '',
+    extra.details !== undefined ? `details: ${JSON.stringify(extra.details, null, 2)}` : ''
+  ]
+    .filter(Boolean)
+    .join('\n');
 }

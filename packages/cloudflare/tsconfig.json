@@ -1,7 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "src",
+    // No `rootDir` here, matching `db`/`storage`: this config only typechecks, and tests import
+    // `@forge-cms/testing/contracts`, which resolves to that package's sources. `tsconfig.build.json`
+    // sets `rootDir` for the emit, which is where it actually matters.
     "types": ["@cloudflare/workers-types"]
   },
   "include": ["src/**/*.ts"]

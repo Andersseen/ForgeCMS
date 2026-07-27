@@ -1,11 +1,10 @@
-import { createError, defineEventHandler, getRouterParam } from 'h3';
-import { getServerRuntime } from '../../../../api/runtime';
+import { createError, getRouterParam } from 'h3';
+import { definePublicSiteRoute } from '../../../../api/public-route';
 import { toServiceDetail, toServiceSummary, toTeamMember } from '../../../../api/mappers';
 import type { ServiceDetailPayload } from '../../../../../shared/site-content';
 
 /** One treatment, its siblings in the same category, and the specialists who perform it. */
-export default defineEventHandler(async (event): Promise<{ data: ServiceDetailPayload }> => {
-  const runtime = await getServerRuntime(event.context.cloudflare?.env);
+export default definePublicSiteRoute(async (runtime, event): Promise<ServiceDetailPayload> => {
   const slug = getRouterParam(event, 'slug') ?? '';
   const asVisitor = { overrideAccess: false, user: null } as const;
 
@@ -48,12 +47,10 @@ export default defineEventHandler(async (event): Promise<{ data: ServiceDetailPa
     return Array.isArray(specialties) && specialties.includes(service.id);
   });
   return {
-    data: {
-      service,
-      relatedServices: related.docs
-        .filter((doc) => String(doc.id) !== service.id)
-        .map(toServiceSummary),
-      specialists: specialistRecords.map(toTeamMember)
-    }
+    service,
+    relatedServices: related.docs
+      .filter((doc) => String(doc.id) !== service.id)
+      .map(toServiceSummary),
+    specialists: specialistRecords.map(toTeamMember)
   };
 });

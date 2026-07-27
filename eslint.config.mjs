@@ -10,6 +10,9 @@ export default tseslint.config(
       '**/dist/**',
       '**/.analog/**',
       '**/.turbo/**',
+      // Wrangler's bundling scratch directory. It only appears after `wrangler dev`/`pages dev`, so
+      // linting was clean in CI and broke the moment anyone ran the app locally.
+      '**/.wrangler/**',
       '**/coverage/**',
       '**/node_modules/**',
       '**/drizzle.config.ts',
