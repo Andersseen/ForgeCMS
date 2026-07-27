@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { VoltBadge, VoltButton } from '@voltui/components';
 import { exampleCode } from '../landing-data';
 import { DemoDialogService } from './demo-dialog.service';
@@ -6,7 +7,7 @@ import { DemoDialogService } from './demo-dialog.service';
 @Component({
   selector: 'forge-cms-hero-section',
   standalone: true,
-  imports: [VoltBadge, VoltButton],
+  imports: [RouterLink, VoltBadge, VoltButton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section
@@ -26,11 +27,11 @@ import { DemoDialogService } from './demo-dialog.service';
 
         <div class="mt-9 flex flex-col gap-3 sm:flex-row">
           <volt-button size="lg" (click)="demo.open()">See a real site on ForgeCMS</volt-button>
+          <a routerLink="/docs">
+            <volt-button variant="outline" size="lg">Read the docs</volt-button>
+          </a>
           <a href="#architecture">
             <volt-button variant="outline" size="lg">Explore architecture</volt-button>
-          </a>
-          <a href="#packages">
-            <volt-button variant="outline" size="lg">View packages</volt-button>
           </a>
         </div>
         <p class="mt-3 text-sm text-muted-foreground">

@@ -32,3 +32,232 @@ body {
     radial-gradient(circle at 18% 0%, oklch(0.94 0.05 255 / 0.75), transparent 28rem),
     linear-gradient(180deg, oklch(0.99 0.004 260), oklch(0.96 0.006 260));
 }
+
+/* ---------------------------------------------------------------------------------------------
+ * /docs — markdown prose (spec 043)
+ *
+ * `<analog-markdown>` renders build-time HTML with ViewEncapsulation.None, so these are plain
+ * global styles scoped by `.forge-prose`. `:where()` keeps specificity at 0 so a utility class in
+ * the markdown can still win.
+ * ------------------------------------------------------------------------------------------- */
+
+.forge-prose {
+  display: block;
+  color: var(--foreground);
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.forge-prose :where(h2, h3, h4) {
+  scroll-margin-top: 2rem;
+  font-weight: 600;
+  color: var(--foreground);
+  letter-spacing: -0.01em;
+}
+
+.forge-prose :where(h2) {
+  margin-top: 3rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 1.5rem;
+  line-height: 2rem;
+}
+
+.forge-prose :where(h3) {
+  margin-top: 2.25rem;
+  margin-bottom: 0.75rem;
+  font-size: 1.185rem;
+  line-height: 1.75rem;
+}
+
+.forge-prose :where(h4) {
+  margin-top: 1.75rem;
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+}
+
+.forge-prose :where(p, ul, ol, blockquote, pre, table) {
+  margin-top: 1.15rem;
+  margin-bottom: 1.15rem;
+}
+
+.forge-prose :where(ul, ol) {
+  padding-left: 1.5rem;
+}
+
+.forge-prose :where(ul) {
+  list-style: disc;
+}
+
+.forge-prose :where(ol) {
+  list-style: decimal;
+}
+
+.forge-prose :where(li) {
+  margin-top: 0.35rem;
+}
+
+.forge-prose :where(li > ul, li > ol) {
+  margin-top: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.forge-prose :where(a) {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.forge-prose :where(a:hover) {
+  text-decoration-thickness: 2px;
+}
+
+.forge-prose :where(strong) {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.forge-prose :where(blockquote) {
+  border-left: 3px solid var(--primary);
+  padding: 0.25rem 0 0.25rem 1rem;
+  color: var(--muted-foreground);
+}
+
+.forge-prose :where(blockquote p) {
+  margin: 0.35rem 0;
+}
+
+.forge-prose :where(hr) {
+  margin: 2.5rem 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+/* Inline code — `pre code` is reset below so code blocks keep the block treatment. */
+.forge-prose :where(code) {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background-color: var(--muted);
+  padding: 0.1rem 0.35rem;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.875em;
+  white-space: nowrap;
+}
+
+.forge-prose :where(pre) {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--fc-code-bg);
+  padding: 1rem 1.15rem;
+  font-size: 0.85rem;
+  line-height: 1.7;
+}
+
+.forge-prose :where(pre code) {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 0;
+  font-size: inherit;
+  white-space: pre;
+  color: var(--fc-code-fg);
+}
+
+.forge-prose :where(table) {
+  display: block;
+  overflow-x: auto;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.925rem;
+}
+
+.forge-prose :where(th, td) {
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.forge-prose :where(th) {
+  background-color: var(--muted);
+  font-weight: 600;
+}
+
+.forge-prose :where(img) {
+  max-width: 100%;
+  border-radius: var(--radius-md);
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * Prism tokens.
+ *
+ * A dedicated palette rather than the semantic tokens: `--warning` and `--success` are tuned for
+ * badges on a page background and drop below readable contrast on a code surface, especially in
+ * light mode.
+ * ------------------------------------------------------------------------------------------- */
+
+:root {
+  --fc-code-bg: oklch(0.975 0.004 265);
+  --fc-code-fg: oklch(0.25 0.01 265);
+  --fc-code-comment: oklch(0.58 0.02 265);
+  --fc-code-keyword: oklch(0.52 0.2 300);
+  --fc-code-string: oklch(0.5 0.13 150);
+  --fc-code-number: oklch(0.55 0.17 40);
+  --fc-code-function: oklch(0.52 0.17 255);
+  --fc-code-punctuation: oklch(0.5 0.02 265);
+}
+
+.dark {
+  --fc-code-bg: oklch(0.13 0.012 265);
+  --fc-code-fg: oklch(0.92 0.004 265);
+  --fc-code-comment: oklch(0.62 0.02 265);
+  --fc-code-keyword: oklch(0.78 0.13 300);
+  --fc-code-string: oklch(0.8 0.13 150);
+  --fc-code-number: oklch(0.8 0.13 55);
+  --fc-code-function: oklch(0.78 0.12 250);
+  --fc-code-punctuation: oklch(0.7 0.02 265);
+}
+
+.forge-prose :where(.token.comment, .token.prolog, .token.doctype, .token.cdata) {
+  color: var(--fc-code-comment);
+  font-style: italic;
+}
+
+.forge-prose :where(.token.punctuation, .token.operator) {
+  color: var(--fc-code-punctuation);
+}
+
+.forge-prose
+  :where(
+    .token.keyword,
+    .token.atrule,
+    .token.rule,
+    .token.important,
+    .token.selector,
+    .token.tag
+  ) {
+  color: var(--fc-code-keyword);
+}
+
+.forge-prose
+  :where(.token.string, .token.char, .token.attr-value, .token.regex, .token.inserted, .token.url) {
+  color: var(--fc-code-string);
+}
+
+.forge-prose :where(.token.number, .token.boolean, .token.constant, .token.symbol, .token.deleted) {
+  color: var(--fc-code-number);
+}
+
+.forge-prose
+  :where(
+    .token.function,
+    .token.class-name,
+    .token.property,
+    .token.attr-name,
+    .token.builtin,
+    .token.variable
+  ) {
+  color: var(--fc-code-function);
+}
