@@ -9,6 +9,13 @@
 > **Relationship to other docs:** [STATE.md](STATE.md) is what exists **today** (trust it over this
 > file). This file is what should exist **next, and in what order**. When an item ships, mark it here
 > and move the detail into STATE.md. Per [SDD.md](SDD.md), non-trivial items still need a spec.
+>
+> **Evidence check (2026-07-27):** [DEMO-FINDINGS.md](DEMO-FINDINGS.md) records what a real build
+> (`apps/demo-aesthetics`, spec 039) actually cost. It supports this file's thesis but argues for two
+> changes to the ordering below: **pull 036 forward to the front** (the client SDK, not the core, was
+> the expensive gap), and land a handful of one-line fixes first — `depth: 1` ignoring `upload`
+> fields, `slug.autoGenerate`/`defaultValue` being inert, adapter binding names being hardcoded, and
+> the in-memory adapter not setting timestamps.
 
 ## The thesis
 

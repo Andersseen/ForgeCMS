@@ -1,0 +1,73 @@
+# @forge-cms/demo-aesthetics — Lumea Aesthetics
+
+A marketing site for a fictional skin & body clinic, built entirely on ForgeCMS. It exists to answer
+one question the rest of the repo cannot: **what breaks when you build a real site with this?**
+
+The answer is written up in [docs/DEMO-FINDINGS.md](../../docs/DEMO-FINDINGS.md). Every workaround in
+this app is marked `FINDING n` in a comment pointing back to it. Spec:
+[039](../../docs/specs/039-real-world-demo-app.md).
+
+> **No file under `packages/*` was changed to make this app work.** That was the point: gaps stay
+> visible as app-side workarounds instead of quietly disappearing into the CMS.
+
+## Run it
+
+```bash
+pnpm install && pnpm build          # packages must be built first (tsconfig maps to dist/)
+pnpm dev:demo                       # http://127.0.0.1:5174
+```
+
+Sign in at `/login`:
+
+| Role               | Email                    | Password     |
+| ------------------ | ------------------------ | ------------ |
+| Admin              | `demo@lumea.clinic`      | `lumea-demo` |
+| Editor (frontdesk) | `frontdesk@lumea.clinic` | `lumea-desk` |
+
+Data lives in the in-memory adapters locally, so **it resets on every reload** — the seed
+([`src/server/api/seed.ts`](src/server/api/seed.ts)) reruns automatically. With a D1 binding
+(`env.DB`) it persists and the seed becomes a no-op.
+
+## What to look at
+
+| Path                          | Why it is interesting                                                                                      |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `/`                           | Rendered from a `blocks` field, not a fixed template. Reorder the blocks in `/admin` and the page changes. |
+| `/services/:slug`             | Composite fields (`array` benefits/FAQs, `group` aftercare) plus relations and uploads.                    |
+| `/booking`                    | The only public **write**. Allowed by the collection's own `access.create`, not by the route.              |
+| `/journal`                    | `drafts: true` in action — the unpublished post is invisible here and 404s by slug.                        |
+| `/admin`                      | `@forge-cms/admin`'s real layout, list and schema-driven form.                                             |
+| `/admin/collections/bookings` | The booking inbox, including the request you just sent from `/booking`.                                    |
+
+## How it is wired
+
+```
+src/server/api/collections.ts   11 collections: hooks, function-based access, drafts, blocks, uploads
+src/server/api/seed.ts          realistic content, written through the Local API
+src/server/routes/api/site/*    purpose-built endpoints — the Local API, no HTTP hop
+src/server/routes/api/v1/*      the generic CRUD handlers from @forge-cms/runtime
+src/app/pages/site/*            the public site
+src/app/pages/admin/*           the editor UI
+src/tests/content-model.test.ts 18 tests driving the content model through the Local API
+```
+
+The interesting file is [`src/server/routes/api/site/home.get.ts`](src/server/routes/api/site/home.get.ts):
+five collections composed into one payload, with access control and draft rules applied, in one
+server-side call each — the thing [ROADMAP.md](../../docs/ROADMAP.md)'s thesis is about.
+
+Every site endpoint calls the Local API with `overrideAccess: false, user: null`, so the public site
+is subject to exactly the rules an anonymous HTTP caller would hit rather than trusting itself.
+
+## Conventions worth knowing
+
+- **Tests live in `src/tests/`, not next to the code.** Nitro bundles everything under `src/server/**`
+  into the worker, so a `*.test.ts` there drags `vitest` into the server bundle and the API crashes
+  on the first request.
+- SSR is off (`ssr: false`), as in `apps/www` — see finding 2.
+- Seeded images are static SVGs in `public/images`; uploads go through the storage adapter and are
+  served back by `routes/api/media/[...key].get.ts` (finding 21).
+
+## Not included
+
+No e2e suite (Playwright stays in `apps/www` per CONVENTIONS.md) and no deploy — CI builds and tests
+this app but only deploys `apps/www`.
