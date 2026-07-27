@@ -12,5 +12,11 @@
     "strictInputAccessModifiers": true,
     "strictTemplates": true
   },
-  "include": ["src/**/*.ts", "e2e/**/*.ts", "vite.config.ts", "playwright.config.ts"]
+  "include": [
+    "src/**/*.ts",
+    "e2e/**/*.ts",
+    "vite-plugins/**/*.ts",
+    "vite.config.ts",
+    "playwright.config.ts"
+  ]
 }
