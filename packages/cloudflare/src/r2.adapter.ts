@@ -8,15 +8,27 @@ export interface R2Env {
 export interface R2AdapterOptions {
   /** Which binding on `env` holds the bucket. Defaults to `'BUCKET'`. */
   binding?: string;
-  /** Base URL stored objects are publicly reachable at, e.g. a CDN domain. */
+  /**
+   * Base URL stored objects are publicly reachable at — a bucket's custom domain, or a CDN.
+   * Defaults to {@link DEFAULT_PUBLIC_URL_BASE}.
+   */
   publicUrlBase?: string;
 }
+
+/**
+ * Where `getPublicUrl` points when nothing else is configured: the path `handleFile` from
+ * `@forge-cms/runtime` is meant to be mounted on, matching `InMemoryStorageAdapter`.
+ *
+ * It used to be `https://r2.example.com/<key>` — a domain that does not exist, so every uploaded
+ * file was stored successfully and then rendered as a broken image.
+ */
+const DEFAULT_PUBLIC_URL_BASE = '/api/media';
 
 export class R2StorageAdapter implements StorageAdapter {
   readonly name = 'r2';
   private bucket?: R2Bucket;
   private readonly binding: string;
-  private publicUrlBase?: string;
+  private publicUrlBase: string = DEFAULT_PUBLIC_URL_BASE;
 
   constructor(options: R2AdapterOptions = {}) {
     this.binding = options.binding ?? 'BUCKET';
@@ -55,11 +67,25 @@ export class R2StorageAdapter implements StorageAdapter {
     return this.toStorageObject(r2Object);
   }
 
+  /**
+   * Reads an object **with its bytes**.
+   *
+   * This used to call `bucket.head()`, which returns metadata only — so `body` was always
+   * undefined and anything trying to serve a stored file (`handleFile`, an image tag) got nothing
+   * back. The adapter was effectively write-only. `runStorageAdapterContractTests` now covers it.
+   */
   async get(key: string): Promise<StorageObject | null> {
     const bucket = this.getBucket();
-    const r2Object = await bucket.head(key);
+    const r2Object = await bucket.get(key);
     if (!r2Object) return null;
-    return this.toStorageObject(r2Object);
+
+    return { ...this.toStorageObject(r2Object), body: await r2Object.arrayBuffer() };
+  }
+
+  /** Metadata only, without transferring the object. */
+  async head(key: string): Promise<StorageObject | null> {
+    const r2Object = await this.getBucket().head(key);
+    return r2Object ? this.toStorageObject(r2Object) : null;
   }
 
   async delete(key: string): Promise<void> {
@@ -68,10 +94,7 @@ export class R2StorageAdapter implements StorageAdapter {
   }
 
   async getPublicUrl(key: string): Promise<string> {
-    if (this.publicUrlBase) {
-      return `${this.publicUrlBase}/${key}`;
-    }
-    return `https://r2.example.com/${key}`;
+    return `${this.publicUrlBase}/${key}`;
   }
 
   async list(prefix?: string): Promise<StorageObject[]> {

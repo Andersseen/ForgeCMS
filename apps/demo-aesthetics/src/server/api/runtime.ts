@@ -38,7 +38,11 @@ export function getServerRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<Serve
 /** Builds an unseeded runtime. Exported for tests, which seed (or not) as each case needs. */
 export function createRuntime(env?: ServerEnv): ForgeCmsRuntime<ServerEnv> {
   const database = env?.DB ? new D1DatabaseAdapter() : new InMemoryDatabaseAdapter();
-  const storage = env?.BUCKET ? new R2StorageAdapter() : new InMemoryStorageAdapter();
+  // `publicUrlBase` is the path `routes/api/media/[...key].get.ts` serves. It is the adapter's
+  // default too, but stating it here keeps the two ends of that contract in one place.
+  const storage = env?.BUCKET
+    ? new R2StorageAdapter({ publicUrlBase: '/api/media' })
+    : new InMemoryStorageAdapter();
   const auth = new UsersCollectionAuthAdapter().init({ ...env, userDatabase: database });
 
   const runtime = new ForgeCmsRuntime<ServerEnv>({

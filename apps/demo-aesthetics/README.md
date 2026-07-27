@@ -79,15 +79,18 @@ CI publishes this app to its own Cloudflare Pages project, `forge-cms-demo`, on 
 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` secrets `apps/www` already uses, and creates the
 project on the first run. `apps/www`'s landing dialog links straight to it.
 
-**It deploys with no bindings, which means in-memory adapters:** every Worker isolate seeds its own
-copy, so something a visitor publishes may not be there a minute later. To make the demo behave like
-a real deployment, create the storage once and uncomment the matching block in
-[`wrangler.toml`](wrangler.toml):
+[`wrangler.toml`](wrangler.toml) binds a **D1 database** (`forge-cms-demo`) and an **R2 bucket**
+(`forge-cms-demo-media`), both created once with:
 
 ```sh
-pnpm exec wrangler d1 create forge-cms-demo             # persistence — paste the printed database_id
-pnpm exec wrangler r2 bucket create forge-cms-demo-media # uploaded files (optional)
+pnpm exec wrangler d1 create forge-cms-demo
+pnpm exec wrangler r2 bucket create forge-cms-demo-media
 ```
+
+The binding **names** are what matter: `getServerRuntime` picks `D1DatabaseAdapter` only when
+`env.DB` exists and `R2StorageAdapter` only when `env.BUCKET` does, and falls back to the in-memory
+adapters otherwise — silently. A renamed binding therefore looks like a working deploy that forgets
+everything between cold starts.
 
 No migrations are needed: the runtime's `syncSchema()` creates the tables on the first request, and
 the seed runs exactly once because it checks for an existing `site_settings` row.

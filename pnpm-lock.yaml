@@ -450,6 +450,9 @@ importers:
       '@cloudflare/workers-types':
         specifier: ^4.20250514.0
         version: 4.20260522.1
+      '@forge-cms/testing':
+        specifier: workspace:*
+        version: link:../testing
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@cloudflare/workers-types@4.20260522.1)(@libsql/client@0.17.3)

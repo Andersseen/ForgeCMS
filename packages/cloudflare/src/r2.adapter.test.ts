@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
+import { runStorageAdapterContractTests } from '@forge-cms/testing/contracts';
 import { R2StorageAdapter } from './r2.adapter.js';
 import type { R2Bucket, R2Object, R2HTTPMetadata } from './bindings.js';
 
@@ -15,8 +16,10 @@ class MockR2ObjectBody implements R2Object {
   version = '1';
   body = new ReadableStream();
   bodyUsed = false;
+  private readonly bytes: Uint8Array;
 
-  constructor(obj: R2Object) {
+  constructor(obj: R2Object, bytes: Uint8Array = new Uint8Array()) {
+    this.bytes = bytes;
     this.key = obj.key;
     this.size = obj.size;
     this.etag = obj.etag;
@@ -27,11 +30,14 @@ class MockR2ObjectBody implements R2Object {
   }
 
   async arrayBuffer(): Promise<ArrayBuffer> {
-    return new ArrayBuffer(0);
+    return this.bytes.buffer.slice(
+      this.bytes.byteOffset,
+      this.bytes.byteOffset + this.bytes.byteLength
+    ) as ArrayBuffer;
   }
 
   async text(): Promise<string> {
-    return '';
+    return new TextDecoder().decode(this.bytes);
   }
 
   async json<T>(): Promise<T> {
@@ -44,8 +50,41 @@ class MockR2ObjectBody implements R2Object {
 }
 
 /** Simple in-memory mock of R2Bucket for unit testing */
+async function toBytes(
+  value: ReadableStream | ArrayBuffer | ArrayBufferView | string | Blob | null
+): Promise<Uint8Array> {
+  if (value === null) return new Uint8Array();
+  if (typeof value === 'string') return new TextEncoder().encode(value);
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (ArrayBuffer.isView(value)) {
+    return new Uint8Array(
+      value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength)
+    );
+  }
+  if (value instanceof Blob) return new Uint8Array(await value.arrayBuffer());
+
+  const reader = (value as ReadableStream<Uint8Array>).getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value: chunk } = await reader.read();
+    if (done) break;
+    chunks.push(chunk);
+    total += chunk.length;
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
+}
+
 class MockR2Bucket implements R2Bucket {
   private objects = new Map<string, R2Object>();
+  /** Real bytes, so `get()` can be held to the contract's round-trip assertion. */
+  private bodies = new Map<string, Uint8Array>();
 
   async head(key: string): Promise<R2Object | null> {
     return this.objects.get(key) ?? null;
@@ -54,7 +93,7 @@ class MockR2Bucket implements R2Bucket {
   async get(key: string): Promise<MockR2ObjectBody | null> {
     const obj = this.objects.get(key);
     if (!obj) return null;
-    return new MockR2ObjectBody(obj);
+    return new MockR2ObjectBody(obj, this.bodies.get(key) ?? new Uint8Array());
   }
 
   async put(
@@ -62,7 +101,9 @@ class MockR2Bucket implements R2Bucket {
     _value: ReadableStream | ArrayBuffer | ArrayBufferView | string | Blob | null,
     options?: { customMetadata?: Record<string, string>; httpMetadata?: R2HTTPMetadata }
   ): Promise<R2Object> {
-    const size = typeof _value === 'string' ? _value.length : 0;
+    const bytes = await toBytes(_value);
+    this.bodies.set(key, bytes);
+    const size = bytes.length;
     const obj: R2Object = {
       key,
       size,
@@ -80,6 +121,7 @@ class MockR2Bucket implements R2Bucket {
 
   async delete(key: string): Promise<void> {
     this.objects.delete(key);
+    this.bodies.delete(key);
   }
 
   async list(options?: { limit?: number; prefix?: string; cursor?: string }): Promise<{
@@ -96,6 +138,10 @@ class MockR2Bucket implements R2Bucket {
     };
   }
 }
+
+// CONVENTIONS.md requires this of every adapter, but only the in-memory ones were doing it — which
+// is exactly why `get()` returning no body went unnoticed until a demo tried to serve an image.
+runStorageAdapterContractTests(() => new R2StorageAdapter().init({ BUCKET: new MockR2Bucket() }));
 
 describe('R2StorageAdapter', () => {
   let adapter: R2StorageAdapter;
@@ -163,9 +209,11 @@ describe('R2StorageAdapter', () => {
     expect(got).toBeNull();
   });
 
-  it('returns public URL with default base', async () => {
-    const url = await adapter.getPublicUrl('public.txt');
-    expect(url).toBe('https://r2.example.com/public.txt');
+  // The default has to be a path an app can actually serve (`handleFile`), not a placeholder
+  // domain: a stored file whose URL points nowhere is a broken image on every page that shows it.
+  it('returns a servable public URL by default', async () => {
+    const url = await adapter.getPublicUrl('media/public.txt');
+    expect(url).toBe('/api/media/media/public.txt');
   });
 
   it('returns public URL with custom base', async () => {
