@@ -1,7 +1,13 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import type { OnInit } from '@angular/core';
 import { PageHeaderComponent } from '@forge-cms/admin';
-import { AdminApiService } from '../../services/admin-api.service';
+
+interface AdapterStatus {
+  database: string;
+  auth: string;
+  storage: string;
+  collections: Record<string, number>;
+}
 
 interface EndpointGroup {
   title: string;
@@ -61,9 +67,7 @@ interface EndpointGroup {
   `
 })
 export class AdminApiPage implements OnInit {
-  private readonly api = inject(AdminApiService);
-
-  protected readonly status = signal<Awaited<ReturnType<AdminApiService['status']>> | null>(null);
+  protected readonly status = signal<AdapterStatus | null>(null);
 
   protected readonly groups: EndpointGroup[] = [
     {
@@ -131,9 +135,10 @@ export class AdminApiPage implements OnInit {
   ];
 
   ngOnInit(): void {
-    void this.api
-      .status()
-      .then((info) => this.status.set(info))
+    // `/api/status` is this app's own endpoint, not part of the CMS surface, so it stays a fetch.
+    void fetch('/api/status')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body: { data: AdapterStatus } | null) => this.status.set(body?.data ?? null))
       .catch(() => this.status.set(null));
   }
 }

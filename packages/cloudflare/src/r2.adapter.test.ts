@@ -116,6 +116,28 @@ describe('R2StorageAdapter', () => {
     expect(() => badAdapter.init({})).toThrow('R2StorageAdapter requires env.BUCKET binding');
   });
 
+  it('reads a custom binding name (spec 040)', async () => {
+    const custom = new R2StorageAdapter({ binding: 'MEDIA' });
+    custom.init({ MEDIA: mockBucket });
+
+    await custom.put({ key: 'x.txt', body: new TextEncoder().encode('hi') });
+    expect(await custom.get('x.txt')).not.toBeNull();
+  });
+
+  it('names the binding it looked for when it is missing', () => {
+    const custom = new R2StorageAdapter({ binding: 'MEDIA' });
+    expect(() => custom.init({ BUCKET: mockBucket })).toThrow(
+      'R2StorageAdapter requires env.MEDIA binding'
+    );
+  });
+
+  it('takes a public URL base from the constructor', async () => {
+    const custom = new R2StorageAdapter({ publicUrlBase: 'https://cdn.example.com/' });
+    custom.init({ BUCKET: mockBucket });
+
+    expect(await custom.getPublicUrl('media/a.png')).toBe('https://cdn.example.com/media/a.png');
+  });
+
   it('puts and gets an object', async () => {
     const data = new TextEncoder().encode('hello r2');
     const putResult = await adapter.put({

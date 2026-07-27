@@ -18,6 +18,16 @@ export interface D1Env {
   DB: D1Database;
 }
 
+export interface D1AdapterOptions {
+  /**
+   * Which binding on `env` holds the database. Defaults to `'DB'`.
+   *
+   * Without this the binding name was fixed by the adapter, so a Worker with two databases — or one
+   * whose binding is called anything else — could not use it at all.
+   */
+  binding?: string;
+}
+
 const SYSTEM_COLUMNS = ['id', 'created_at', 'updated_at', '_status'];
 
 function assertValidColumn(key: string, collectionDef: CollectionDefinition | undefined): void {
@@ -28,14 +38,20 @@ function assertValidColumn(key: string, collectionDef: CollectionDefinition | un
 export class D1DatabaseAdapter implements DatabaseAdapter {
   readonly name = 'd1';
   private db?: D1Database;
+  private readonly binding: string;
   private collections = new Map<string, CollectionDefinition>();
 
+  constructor(options: D1AdapterOptions = {}) {
+    this.binding = options.binding ?? 'DB';
+  }
+
   init(env: unknown): this {
-    const d1Env = env as D1Env;
-    if (!d1Env.DB) {
-      throw new Error('D1DatabaseAdapter requires env.DB binding');
+    const bindings = (env ?? {}) as Record<string, D1Database | undefined>;
+    const db = bindings[this.binding];
+    if (!db) {
+      throw new Error(`D1DatabaseAdapter requires env.${this.binding} binding`);
     }
-    this.db = d1Env.DB;
+    this.db = db;
     return this;
   }
 

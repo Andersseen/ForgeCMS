@@ -7,8 +7,13 @@ The answer is written up in [docs/DEMO-FINDINGS.md](../../docs/DEMO-FINDINGS.md)
 this app is marked `FINDING n` in a comment pointing back to it. Spec:
 [039](../../docs/specs/039-real-world-demo-app.md).
 
-> **No file under `packages/*` was changed to make this app work.** That was the point: gaps stay
-> visible as app-side workarounds instead of quietly disappearing into the CMS.
+> **The app was built first with no changes to `packages/*`** — the point being that gaps stay
+> visible as app-side workarounds instead of quietly disappearing into the CMS. Specs
+> [040](../../docs/specs/040-core-fixes-from-demo-findings.md),
+> [041](../../docs/specs/041-client-query-api.md) and
+> [042](../../docs/specs/042-admin-field-widgets-and-list-view.md) then fixed 12 of the 22 findings,
+> and this app deleted the matching workarounds. What is left in here still marked `FINDING n` is
+> what the CMS still does not do.
 
 ## Run it
 

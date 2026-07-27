@@ -43,9 +43,20 @@ async function readBody(
 export class InMemoryStorageAdapter implements StorageAdapter {
   readonly name = 'in-memory';
   private store: Map<string, StorageObject> = new Map();
+  private publicUrlBase = '/api/media';
 
   init(): this {
     return this;
+  }
+
+  /**
+   * Where {@link getPublicUrl} points. Defaults to `/api/media`, matching `handleFile` from
+   * `@forge-cms/runtime` — a relative path an app can actually serve. It used to be
+   * `https://forge.test/storage/...`, a domain that does not exist, so every locally uploaded file
+   * rendered as a broken image.
+   */
+  setPublicUrlBase(base: string): void {
+    this.publicUrlBase = base.replace(/\/$/, '');
   }
 
   async put(options: PutObjectOptions): Promise<StorageObject> {
@@ -78,7 +89,7 @@ export class InMemoryStorageAdapter implements StorageAdapter {
   }
 
   async getPublicUrl(key: string): Promise<string> {
-    return `https://forge.test/storage/${key}`;
+    return `${this.publicUrlBase}/${key}`;
   }
 
   async list(prefix?: string): Promise<StorageObject[]> {

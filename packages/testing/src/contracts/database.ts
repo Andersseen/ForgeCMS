@@ -50,6 +50,28 @@ export function runDatabaseAdapterContractTests(createAdapter: () => ContractDat
       expect(result).toEqual(expect.objectContaining(data));
     });
 
+    // Every adapter must stamp these, or "newest first" means different things per deployment.
+    it('stamps created_at and updated_at on create', async () => {
+      const created = await adapter.create('posts', { title: 'Timestamped' });
+
+      expect(typeof created.created_at).toBe('string');
+      expect(typeof created.updated_at).toBe('string');
+      expect(Number.isNaN(Date.parse(String(created.created_at)))).toBe(false);
+
+      const stored = await adapter.findById('posts', String(created.id));
+      expect(stored?.created_at).toBe(created.created_at);
+    });
+
+    it('refreshes updated_at on update but keeps created_at', async () => {
+      const created = await adapter.create('posts', { title: 'Before' });
+      const updated = await adapter.update('posts', String(created.id), { title: 'After' });
+
+      expect(updated.created_at).toBe(created.created_at);
+      expect(Date.parse(String(updated.updated_at))).toBeGreaterThanOrEqual(
+        Date.parse(String(created.updated_at))
+      );
+    });
+
     it('finds a record by id', async () => {
       const data = { id: '2', title: 'World' };
       await adapter.create('posts', data);
@@ -182,6 +204,16 @@ export function runDatabaseAdapterContractTests(createAdapter: () => ContractDat
           where: { views: { lte: 50 } }
         });
         expect(results.map((r) => r.id).sort()).toEqual(['a1', 'a2']);
+      });
+
+      it('filters with contains, ignoring case', async () => {
+        await adapter.create('posts', { id: 'c1', title: 'Body & wellness' });
+        const found = await adapter.findMany({
+          collection: 'posts',
+          where: { title: { contains: 'body' } }
+        });
+
+        expect(found.map((r) => r.id)).toContain('c1');
       });
 
       it('filters with in', async () => {

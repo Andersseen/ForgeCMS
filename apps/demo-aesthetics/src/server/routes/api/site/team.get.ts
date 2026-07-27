@@ -1,6 +1,5 @@
 import { defineEventHandler } from 'h3';
 import { getServerRuntime } from '../../../api/runtime';
-import { populateUploads } from '../../../api/uploads';
 import { toTeamMember } from '../../../api/mappers';
 import type { TeamMember } from '../../../../shared/site-content';
 
@@ -19,6 +18,5 @@ export default defineEventHandler(async (event): Promise<{ data: TeamMember[] }>
     user: null
   });
 
-  const withPhotos = await populateUploads(runtime, staff.docs, ['photo']);
-  return { data: withPhotos.map(toTeamMember) };
+  return { data: staff.docs.map(toTeamMember) };
 });

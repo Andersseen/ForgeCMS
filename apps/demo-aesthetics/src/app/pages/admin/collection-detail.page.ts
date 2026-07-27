@@ -7,23 +7,26 @@ import {
   CmsApiService,
   canWriteContent,
   type AuthUser,
-  type CollectionMeta
+  type CollectionMeta,
+  type ListMeta
 } from '@forge-cms/angular';
 import {
   ErrorStateComponent,
   ForgeCollectionFormComponent,
   ForgeCollectionListComponent,
-  LoadingStateComponent
+  LoadingStateComponent,
+  type SortRequest,
+  type StatusChangeRequest
 } from '@forge-cms/admin';
-import { AdminApiService } from '../../services/admin-api.service';
+
+const PAGE_SIZE = 20;
 
 /**
- * The editor screen, built from `@forge-cms/admin`'s real components — the list and the
- * schema-driven form are the package's, not the app's.
+ * The editor screen, built entirely from `@forge-cms/admin`'s components and `CmsApiService`.
  *
- * The one thing the app has to supply is the listing itself: see finding 17 in
- * docs/DEMO-FINDINGS.md — `CmsApiService.getDocuments` cannot ask for drafts, so this page loads
- * documents through `AdminApiService` with `?status=all` instead.
+ * Everything this page needs from the API — drafts included, sorted, paginated, with relations and
+ * uploads populated — goes through the client now (spec 041). It used to need an app-local service
+ * with hand-built query strings.
  */
 @Component({
   selector: 'lumea-admin-collection-detail',
@@ -50,10 +53,15 @@ import { AdminApiService } from '../../services/admin-api.service';
         <forge-collection-list
           [collection]="meta"
           [documents]="documents()"
+          [meta]="pagination()"
+          [sort]="sort()"
           [readOnly]="!canWrite()"
           (create)="openCreate()"
           (edit)="openEdit($event)"
           (delete)="removeDocument($event)"
+          (sortChange)="changeSort($event)"
+          (pageChange)="changePage($event)"
+          (statusChange)="changeStatus($event)"
         />
 
         @if (showForm() && canWrite()) {
@@ -74,10 +82,12 @@ export class AdminCollectionDetailPage implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly cms = inject(CmsApiService);
-  private readonly admin = inject(AdminApiService);
 
   protected readonly collection = signal<CollectionMeta | null>(null);
   protected readonly documents = signal<Record<string, unknown>[]>([]);
+  protected readonly pagination = signal<ListMeta | null>(null);
+  protected readonly sort = signal<SortRequest | null>(null);
+  protected readonly page = signal(1);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
 
@@ -119,13 +129,49 @@ export class AdminCollectionDetailPage implements OnInit {
         this.error.set(`Collection '${slug}' not found`);
         return;
       }
-
       this.collection.set(meta);
-      this.documents.set(await this.admin.listDocuments(slug, { status: 'all' }));
+
+      const sort = this.sort();
+      const result = await this.cms.listDocuments(slug, {
+        // Editors work on drafts; that is the whole reason they are here.
+        status: 'all',
+        depth: 1,
+        limit: PAGE_SIZE,
+        page: this.page(),
+        ...(sort ? { sort: sort.field, order: sort.order } : {})
+      });
+
+      this.documents.set(result.docs);
+      this.pagination.set(result.meta);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load collection');
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  protected changeSort(sort: SortRequest): void {
+    this.sort.set(sort);
+    this.page.set(1);
+    void this.load();
+  }
+
+  protected changePage(page: number): void {
+    this.page.set(page);
+    void this.load();
+  }
+
+  protected async changeStatus(request: StatusChangeRequest): Promise<void> {
+    const slug = this.collection()?.slug;
+    if (!slug) return;
+
+    try {
+      await this.cms.updateDocument(slug, String(request.document['id']), {
+        _status: request.status
+      });
+      await this.load();
+    } catch (err) {
+      this.reportWriteError(err);
     }
   }
 
@@ -165,11 +211,9 @@ export class AdminCollectionDetailPage implements OnInit {
         const errors: Record<string, string> = {};
         for (const detail of err.details) errors[detail.field] = detail.message;
         this.fieldErrors.set(errors);
-      } else if (err instanceof ApiAuthError) {
-        await this.router.navigate(['/login']);
-      } else {
-        window.alert(err instanceof Error ? err.message : 'Failed to save');
+        return;
       }
+      this.reportWriteError(err);
     }
   }
 
@@ -182,11 +226,15 @@ export class AdminCollectionDetailPage implements OnInit {
       await this.cms.deleteDocument(slug, String(document['id']));
       await this.load();
     } catch (err) {
-      if (err instanceof ApiAuthError) {
-        await this.router.navigate(['/login']);
-      } else {
-        window.alert(err instanceof Error ? err.message : 'Failed to delete');
-      }
+      this.reportWriteError(err);
     }
+  }
+
+  private reportWriteError(err: unknown): void {
+    if (err instanceof ApiAuthError) {
+      void this.router.navigate(['/login']);
+      return;
+    }
+    window.alert(err instanceof Error ? err.message : 'The change could not be saved');
   }
 }

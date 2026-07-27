@@ -1,6 +1,5 @@
 import { createError, defineEventHandler, getRouterParam } from 'h3';
 import { getServerRuntime } from '../../../../api/runtime';
-import { populateUploads } from '../../../../api/uploads';
 import { toServiceDetail, toServiceSummary, toTeamMember } from '../../../../api/mappers';
 import type { ServiceDetailPayload } from '../../../../../shared/site-content';
 
@@ -24,8 +23,7 @@ export default defineEventHandler(async (event): Promise<{ data: ServiceDetailPa
     throw createError({ statusCode: 404, statusMessage: 'Service not found' });
   }
 
-  const [withImage] = await populateUploads(runtime, [record], ['image']);
-  const service = toServiceDetail(withImage ?? record);
+  const service = toServiceDetail(record);
 
   const categoryId = service.category?.id;
   const [related, staff] = await Promise.all([
@@ -49,18 +47,13 @@ export default defineEventHandler(async (event): Promise<{ data: ServiceDetailPa
     const specialties = member.specialties;
     return Array.isArray(specialties) && specialties.includes(service.id);
   });
-  const specialistsWithPhotos = await populateUploads(runtime, specialistRecords, ['photo']);
-  const relatedWithImages = await populateUploads(
-    runtime,
-    related.docs.filter((doc) => String(doc.id) !== service.id),
-    ['image']
-  );
-
   return {
     data: {
       service,
-      relatedServices: relatedWithImages.map(toServiceSummary),
-      specialists: specialistsWithPhotos.map(toTeamMember)
+      relatedServices: related.docs
+        .filter((doc) => String(doc.id) !== service.id)
+        .map(toServiceSummary),
+      specialists: specialistRecords.map(toTeamMember)
     }
   };
 });

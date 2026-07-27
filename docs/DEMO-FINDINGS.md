@@ -4,10 +4,15 @@
 > for a fictional skin clinic, built against ForgeCMS as of spec 022 (Phase 1 complete). Spec:
 > [039](specs/039-real-world-demo-app.md).
 >
-> **Rule of the exercise:** the app was allowed to work around anything, but **no file under
-> `packages/*` was changed**. Every workaround below is therefore still sitting in the demo app,
-> where it is easy to delete once the CMS grows the missing piece. Each finding is marked
-> `FINDING n` in the code it bit.
+> **Rule of the exercise:** while the demo was being built, the app was allowed to work around
+> anything, but **no file under `packages/*` was changed** — so every gap stayed visible instead of
+> quietly disappearing into the CMS. Each finding is marked `FINDING n` in the code it bit.
+>
+> **Then the findings were acted on.** Specs [040](specs/040-core-fixes-from-demo-findings.md),
+> [041](specs/041-client-query-api.md) and [042](specs/042-admin-field-widgets-and-list-view.md) —
+> in the same branch, immediately after — fixed 12 of the 22, and the demo deleted the corresponding
+> workarounds. Fixed items are marked ✅ below with what closed them; the workaround code they
+> describe is gone from the app, so read those entries as history plus a pointer to the fix.
 
 ## Summary
 
@@ -22,30 +27,30 @@ highest-value thing this exercise turned up is not on the roadmap as a numbered 
 that `@forge-cms/angular` cannot express a filtered, sorted, paginated, draft-aware query, so every
 consumer falls back to `fetch`.
 
-| #          | Finding                                                             | Bit us in                 | Roadmap       |
-| ---------- | ------------------------------------------------------------------- | ------------------------- | ------------- |
-| [15](#f15) | The client SDK cannot filter, sort, limit, paginate or set depth    | every page of the site    | 036           |
-| [17](#f17) | The admin cannot see drafts — the client has no `status`            | the editor screen         | 036 + 033     |
-| [9](#f9)   | `depth: 1` does not populate `upload` fields                        | every image on the site   | 012 follow-up |
-| [21](#f21) | Uploaded files are stored but never served                          | the media library         | new           |
-| [8](#f8)   | The Local API returns `Record<string, unknown>` — inference stops   | every server route        | 038           |
-| [5](#f5)   | A route's `allowedRoles` pre-empts the collection's own access rule | the public booking form   | new           |
-| [19](#f19) | Hooks cannot tell a trusted server call from a public request       | the seed, silently        | 021 follow-up |
-| [4](#f4)   | No globals                                                          | site settings             | 023           |
-| [10](#f10) | No `findBySlug`; no "relation contains id" filter                   | every `/:slug` page       | 026           |
-| [7](#f7)   | `richtext` has no editor and no renderer                            | journal + treatment copy  | 032           |
-| [16](#f16) | `blocks` rows are untyped at the render site                        | the home page             | 038           |
-| [1](#f1)   | Field options that nothing reads (`autoGenerate`, `defaultValue`)   | 5 collections             | new (cheap)   |
-| [18](#f18) | No upload method in the client SDK                                  | the media library         | 036           |
-| [6](#f6)   | No email adapter, so a booking notifies nobody                      | the booking hook          | 029           |
-| [11](#f11) | No h3/Nitro helpers — auth routes are copy-paste                    | 6 route files             | 037           |
-| [13](#f13) | The Angular linker plugin must be copied into every app             | app setup                 | 037           |
-| [12](#f12) | The auth-token localStorage key is not exported                     | app setup                 | 028           |
-| [2](#f2)   | No SSR story for a content site                                     | the whole premise         | 036/037       |
-| [3](#f3)   | No money or timezone-aware date handling                            | prices, appointment times | new           |
-| [14](#f14) | `R2StorageAdapter` hardcodes the `BUCKET` binding name              | runtime wiring            | new (cheap)   |
-| [20](#f20) | The admin sidebar's nav items are hardcoded                         | admin routing             | known debt    |
-| [22](#f22) | Adapters disagree about `created_at`/`updated_at`                   | sorting by creation date  | new           |
+| #          | Finding                                                             | Bit us in                 | Roadmap         |
+| ---------- | ------------------------------------------------------------------- | ------------------------- | --------------- |
+| [15](#f15) | The client SDK cannot filter, sort, limit, paginate or set depth    | every page of the site    | ✅ 041          |
+| [17](#f17) | The admin cannot see drafts — the client has no `status`            | the editor screen         | ✅ 041 + 042    |
+| [9](#f9)   | `depth: 1` does not populate `upload` fields                        | every image on the site   | ✅ 040          |
+| [21](#f21) | Uploaded files are stored but never served                          | the media library         | ✅ 040          |
+| [8](#f8)   | The Local API returns `Record<string, unknown>` — inference stops   | every server route        | 038             |
+| [5](#f5)   | A route's `allowedRoles` pre-empts the collection's own access rule | the public booking form   | ⚠️ documented   |
+| [19](#f19) | Hooks cannot tell a trusted server call from a public request       | the seed, silently        | ✅ 040          |
+| [4](#f4)   | No globals                                                          | site settings             | 023             |
+| [10](#f10) | No `findBySlug`; no "relation contains id" filter                   | every `/:slug` page       | 026             |
+| [7](#f7)   | `richtext` has no editor and no renderer                            | journal + treatment copy  | ✅ 042 (editor) |
+| [16](#f16) | `blocks` rows are untyped at the render site                        | the home page             | 038             |
+| [1](#f1)   | Field options that nothing reads (`autoGenerate`, `defaultValue`)   | 5 collections             | ✅ 040          |
+| [18](#f18) | No upload method in the client SDK                                  | the media library         | ✅ 041          |
+| [6](#f6)   | No email adapter, so a booking notifies nobody                      | the booking hook          | 029             |
+| [11](#f11) | No h3/Nitro helpers — auth routes are copy-paste                    | 6 route files             | 037             |
+| [13](#f13) | The Angular linker plugin must be copied into every app             | app setup                 | 037             |
+| [12](#f12) | The auth-token localStorage key is not exported                     | app setup                 | 028             |
+| [2](#f2)   | No SSR story for a content site                                     | the whole premise         | 036/037         |
+| [3](#f3)   | No money or timezone-aware date handling                            | prices, appointment times | new             |
+| [14](#f14) | `R2StorageAdapter` hardcodes the `BUCKET` binding name              | runtime wiring            | ✅ 040          |
+| [20](#f20) | The admin sidebar's nav items are hardcoded                         | admin routing             | ✅ 042          |
+| [22](#f22) | Adapters disagree about `created_at`/`updated_at`                   | sorting by creation date  | ✅ 040          |
 
 ---
 
@@ -66,7 +71,9 @@ also no signal/`resource()` surface, so every page hand-rolls loading/error stat
   ([`async-state.ts`](../apps/demo-aesthetics/src/app/pages/site/async-state.ts)) repeated in seven pages.
 - **Why it matters more than it looks:** this is the package that is supposed to be the reason to
   pick ForgeCMS over Payload. Today it is the weakest thing in the repo.
-- **Fix:** roadmap 036, and it should be pulled forward.
+- **Fixed (spec 041).** `QueryOptions` on `getDocuments`/`listDocuments`/`getDocument`, pagination
+  metadata, `uploadFile`, `collectionResource`/`documentResource`, and — the quiet one — reads now
+  send the auth token, which they never did. The demo deleted `admin-api.service.ts` entirely.
 
 <a id="f17"></a>
 
@@ -79,7 +86,8 @@ already live.
 - **Workaround:** `AdminApiService.listDocuments(slug, { status: 'all' })`.
 - **Also missing:** the list has no `_status` column, so once drafts _are_ loaded they look exactly
   like published rows (`_status` appears nowhere in `@forge-cms/admin` or `@forge-cms/angular`).
-- **Fix:** 036 for the client, 033 for the column.
+- **Fixed (specs 041 + 042).** The client can send `status: 'all'`, the list shows a Draft/Published
+  badge, and an editor can publish from the row without opening the document.
 
 <a id="f9"></a>
 
@@ -91,8 +99,8 @@ image came back as a bare UUID.
 
 - **Workaround:** [`uploads.ts`](../apps/demo-aesthetics/src/server/api/uploads.ts) — a 30-line
   re-implementation of the batching `populate.ts` already does.
-- **Fix:** add `'upload'` to the kind filter in `packages/runtime/src/populate.ts`. This is a
-  one-line change with a test; it is the cheapest high-impact item in this document.
+- **Fixed (spec 040).** `populate.ts` resolves `upload` as the single relation it is. The demo's
+  `uploads.ts` is gone, and the site's endpoints just pass `depth: 1`.
 
 <a id="f21"></a>
 
@@ -106,8 +114,8 @@ broken link.
 - **Workaround:** a catch-all route
   ([`api/media/[...key].get.ts`](../apps/demo-aesthetics/src/server/routes/api/media/%5B...key%5D.get.ts))
   plus a field hook that rewrites the stored URL to point at it.
-- **Fix:** either a `handleFile` transport handler in `@forge-cms/runtime`, or a documented
-  `setPublicUrlBase` requirement (R2 has one; the in-memory adapter does not).
+- **Fixed (spec 040).** `@forge-cms/runtime` exports `handleFile`, and `InMemoryStorageAdapter`
+  returns a servable `/api/media/<key>` (with `setPublicUrlBase` to change it).
 
 <a id="f8"></a>
 
@@ -139,8 +147,10 @@ write for _one_ collection without opening it for _all_ of them.
   unsafe direction.
 - **Workaround:** a dedicated endpoint that calls the Local API with `overrideAccess: false, user: null`
   ([`bookings.post.ts`](../apps/demo-aesthetics/src/server/routes/api/site/bookings.post.ts)).
-- **Fix:** make `allowedRoles` a fallback that access rules always override, and say so in
-  ARCHITECTURE.md.
+- **Status: documented, not changed.** `resolveRequest` already skips `allowedRoles` when the
+  collection declares its own rule, so the behaviour is correct — it is the _implicitness_ that is
+  dangerous. Changing the precedence is a security-shaped decision that deserves its own spec rather
+  than a drive-by fix.
 
 <a id="f19"></a>
 
@@ -156,7 +166,9 @@ the call was trusted. A `beforeChange` hook that hardens public writes ("force `
   [`content-model.test.ts`](../apps/demo-aesthetics/src/tests/content-model.test.ts) →
   _"cannot tell a trusted seed apart from a public request"_.
 - **Workaround:** create, then `update` in a second call (the update path is not hooked the same way).
-- **Fix:** pass `overrideAccess` (and ideally a `req`-style context) into hook args, as Payload does.
+- **Fixed (spec 040).** `BaseHookArgs`/`FieldHookArgs` carry `overrideAccess`. The demo's booking
+  hook now reads it, the seed writes a confirmed booking in one call, and the regression test was
+  inverted to lock the new behaviour in.
 
 ---
 
@@ -196,7 +208,9 @@ must be typed by hand) and there is no renderer for the front end.
 - **Workaround:** seed content builds the node tree in code (`paragraphs()` in
   [`seed.ts`](../apps/demo-aesthetics/src/server/api/seed.ts)), and `toParagraphs()` in `mappers.ts`
   flattens it back to plain strings — which throws away every mark the format exists to carry.
-- **Fix:** roadmap 032 for the editor; a `@forge-cms/angular` render component for the front end.
+- **Half fixed (spec 042).** `ForgeRichTextEditorComponent` edits the tree as text blocks, so nobody
+  types JSON any more. **Still open:** no renderer for the front end, so the demo still flattens
+  richtext to plain paragraphs.
 
 <a id="f16"></a>
 
@@ -221,15 +235,18 @@ grep: the only occurrence of each is its own declaration):
 - `BaseFieldOptions.defaultValue` — a `select` with `defaultValue: 'pending'` stores nothing at all;
   the demo's defaults only apply because hooks set them.
 
-This is the worst kind of gap: the API _looks_ complete, so you find out at runtime. **Fix:** either
-implement both in the operations pipeline (cheap, ~30 lines each) or delete them from the types.
+This is the worst kind of gap: the API _looks_ complete, so you find out at runtime.
+
+- **Fixed (spec 040).** Both are applied in the write pipeline before hooks run, and `slugify` is
+  exported from `@forge-cms/core`. Five collections in the demo dropped their hand-written hook.
 
 <a id="f18"></a>
 
 ### 18. The client SDK cannot upload
 
 Spec 016 built a real multipart path on the server; `CmsApiService` only ever sends JSON. Any media
-library must hand-roll the `FormData` POST (`AdminApiService.uploadMedia`). **Fix:** 036.
+library must hand-roll the `FormData` POST. **Fixed (spec 041):** `CmsApiService.uploadFile`, used by
+the admin's new media picker.
 
 <a id="f6"></a>
 
@@ -299,8 +316,7 @@ state) and 037.
 ### 14. The R2 binding name is fixed by the adapter
 
 `R2StorageAdapter.init` reads `env.BUCKET` and throws otherwise, so a project with two buckets — or
-one called `MEDIA` — cannot use it. `D1DatabaseAdapter` has the same shape for `DB`. **Fix:**
-`new R2StorageAdapter({ binding: 'MEDIA' })`.
+one called `MEDIA` — cannot use it. `D1DatabaseAdapter` has the same shape for `DB`. **Fixed (spec 040):** exactly that, plus `publicUrlBase`, and the same for `D1DatabaseAdapter`.
 
 <a id="f20"></a>
 
@@ -310,8 +326,10 @@ one called `MEDIA` — cannot use it. `D1DatabaseAdapter` has the same shape for
 `withComponentInputBinding()` — see [`app.routes.ts`](../apps/demo-aesthetics/src/app/app.routes.ts)),
 but the nav items are fixed in the layout: `Dashboard`, `Collections`, `Media Library`, `Users`,
 `API Keys`, `Settings`. Every consuming app must implement all six routes or ship dead links — this
-demo implemented all six for that reason. A clinic would want "Bookings" first. Already known debt;
-this quantifies it: **six pages of app code that exist to satisfy the package's sidebar.**
+demo implemented all six for that reason. A clinic would want "Bookings" first.
+
+- **Fixed (spec 042).** `ForgeAdminConfig.nav` takes groups of items (with `adminOnly`), defaulting
+  to `DEFAULT_ADMIN_NAV`. The demo's sidebar now opens on Bookings.
 
 <a id="f22"></a>
 
@@ -320,8 +338,9 @@ this quantifies it: **six pages of app code that exist to satisfy the package's 
 `LibSqlDatabaseAdapter` and `D1DatabaseAdapter` set `created_at`/`updated_at` on every write.
 `InMemoryDatabaseAdapter` sets neither, and the contract suite never asserts them — so "newest
 first" works in production and silently returns arbitrary order in local development. The demo sorts
-by explicit content fields (`publishedAt`, `order`) to dodge it. **Fix:** set them in the in-memory
-adapter and assert them in `runDatabaseAdapterContractTests`.
+by explicit content fields (`publishedAt`, `order`) to dodge it. **Fixed (spec 040):** the in-memory
+adapter stamps both, and the contract suite asserts it — as it now also asserts that `contains` is
+case-insensitive, another divergence found while building the relation picker.
 
 ---
 
@@ -340,16 +359,27 @@ adapter and assert them in `runDatabaseAdapterContractTests`.
 - **The error envelope and status codes** are consistent, including the deliberate
   `AccessDenied + anonymous → 401` mapping, which is the correct choice.
 
-## Suggested re-ordering of the roadmap
+## What was done about it
 
-Based on what actually cost time here, rather than on assumed cost-of-delay:
+Specs 040, 041 and 042 landed in this branch straight after the demo, closing 12 findings:
 
-1. **036 (signals client + SSR-safe fetch)** — findings 15, 17, 18, 2. Currently ranked last; it was
-   easily the most expensive gap in this build.
-2. **The one-liners** — finding 9 (populate `upload`), finding 1 (`autoGenerate`/`defaultValue`),
-   finding 14 (binding names), finding 22 (timestamps). Hours of work, days of saved confusion.
-3. **021 follow-up** (finding 19) and **the `allowedRoles` semantics** (finding 5) — both are
-   correctness/security-shaped, and both are cheap now.
-4. **023 globals** (finding 4) and **026 query completeness** (finding 10).
-5. **032 field widgets** (findings 7, 17) — the admin is usable by a developer today, not by a
-   receptionist.
+| Spec | Closed                                               | Effect on the demo                                                                                              |
+| ---- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| 040  | 1, 9, 14, 19, 21, 22 (+ case-insensitive `contains`) | Deleted `uploads.ts`, five slug hooks, a URL-rewrite hook, a file-serving route and a two-step seed workaround. |
+| 041  | 15, 17 (client half), 18                             | Deleted `admin-api.service.ts`; the admin talks to the package.                                                 |
+| 042  | 7 (editor half), 16 (partly), 17, 20                 | No UUIDs or `[object Object]` in the admin; publish from the list; the clinic's own sidebar.                    |
+
+**Still open, in the order they should be taken:**
+
+1. **036's other half — SSR** (finding 2). The Local API makes ForgeCMS ideally placed for it and the
+   demo still ships as an SPA.
+2. **038 typed documents** (findings 8, 16). The demo still hand-writes 350 lines of payload types
+   and casts every block at the render site.
+3. **023 globals** (finding 4) and **026 query completeness** (finding 10) — `findBySlug` and
+   "relation contains id" are both still worked around in the demo's route files.
+4. **029 email** (finding 6). A booking form that notifies nobody is not finished.
+5. **037 framework integration** (findings 11, 13) — the route files and the Angular linker plugin
+   are still copied per app.
+6. **A richtext renderer** (rest of finding 7) and **currency/timezone types** (finding 3).
+7. **The `allowedRoles` precedence** (finding 5) — correct today, but implicit enough to be worth a
+   spec of its own.

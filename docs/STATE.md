@@ -32,10 +32,14 @@ marketing site for a fictional skin clinic, built on the CMS with **no changes t
 find out what a real build costs. It shipped working (11 collections, 8 Local-API endpoints, 7 public
 pages, 6 admin pages, 18 content-model tests) and produced [DEMO-FINDINGS.md](DEMO-FINDINGS.md): 22
 recorded gaps, the largest cluster of them in `@forge-cms/angular` (no filter/sort/limit/depth/status
-on the client, no upload, no signals) rather than in the core. Its headline conclusion is that
-**ROADMAP item 036 should be pulled forward**, and that four one-line fixes (populate `upload` fields,
-honour `slug.autoGenerate`/`defaultValue`, configurable binding names, in-memory timestamps) remove a
-disproportionate share of the friction.
+on the client, no upload, no signals) rather than in the core. **Twelve of those findings were then fixed in the same branch** by specs 040 (core), 041 (client) and
+042 (admin UI): `depth: 1` populates uploads, `defaultValue`/`slug.autoGenerate` work, hooks receive
+`overrideAccess`, adapter bindings are configurable, the in-memory adapter stamps timestamps and
+matches SQLite's case-insensitive `contains`, stored files are served by `handleFile`, the Angular
+client can filter/sort/paginate/upload and sends its token on reads, and the admin has typed cells,
+a draft/published column with publish-in-place, a searchable relation picker, a media picker, a
+richtext block editor and a configurable sidebar. What is still open — SSR, typed documents, globals,
+query completeness, email — is listed at the end of [DEMO-FINDINGS.md](DEMO-FINDINGS.md).
 
 Remaining gap: nothing is published to npm yet (ROADMAP Phase 0.3,
 blocked on nothing now except an actual publish step requiring registry credentials), and the demo
@@ -176,9 +180,9 @@ Work is planned in [ROADMAP.md](ROADMAP.md), which sequences the remaining gaps 
 Each numbered item there gets its own spec in `docs/specs/` when picked up, per [SDD.md](SDD.md).
 
 **Read [DEMO-FINDINGS.md](DEMO-FINDINGS.md) alongside it.** It is the only document here written from
-building a real site rather than from reasoning about one, and it disagrees with the roadmap's
-ordering in one important way: item 036 (signals client, SSR-safe fetch) is currently ranked last and
-was by far the most expensive gap in practice.
+building a real site rather than from reasoning about one. Its client-side half (roadmap 036) is now
+partly delivered by spec 041 — signals resources and a full query API, but **not** SSR-safe fetch or
+transfer state, which remain the largest single gap for a content site.
 
 Status as of 2026-07-22:
 

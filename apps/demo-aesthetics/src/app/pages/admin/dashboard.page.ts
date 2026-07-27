@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import type { OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { PageHeaderComponent } from '@forge-cms/admin';
-import { AdminApiService } from '../../services/admin-api.service';
+import { CmsApiService } from '@forge-cms/angular';
 
 interface BookingRow extends Record<string, unknown> {
   id: string;
@@ -83,7 +83,7 @@ interface BookingRow extends Record<string, unknown> {
   `
 })
 export class AdminDashboardPage implements OnInit {
-  private readonly api = inject(AdminApiService);
+  private readonly api = inject(CmsApiService);
 
   protected readonly bookings = signal<BookingRow[]>([]);
   protected readonly serviceCount = signal(0);
@@ -109,13 +109,14 @@ export class AdminDashboardPage implements OnInit {
   private async load(): Promise<void> {
     try {
       const [bookings, services, posts] = await Promise.all([
-        this.api.listDocuments<BookingRow>('bookings', {
+        this.api.getDocuments<BookingRow>('bookings', {
+          where: { status: { ne: 'cancelled' } },
           sort: 'preferredDate',
           order: 'asc',
           limit: 8
         }),
-        this.api.listDocuments('services', { status: 'all', limit: 100 }),
-        this.api.listDocuments('posts', { status: 'all', limit: 100 })
+        this.api.getDocuments('services', { status: 'all', limit: 100 }),
+        this.api.getDocuments('posts', { status: 'all', limit: 100 })
       ]);
 
       this.bookings.set(bookings);

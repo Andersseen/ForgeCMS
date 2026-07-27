@@ -130,7 +130,6 @@ async function seedCategories(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<v
       collection: 'service_categories',
       data: {
         name: category.name,
-        slug: '',
         tagline: category.tagline,
         description: category.description,
         order: category.order
@@ -346,7 +345,6 @@ async function seedServices(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<voi
       collection: 'services',
       data: {
         name: service.name,
-        slug: '',
         category: ids.categories[service.category],
         summary: service.summary,
         description: service.description,
@@ -370,7 +368,6 @@ async function seedServices(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<voi
     collection: 'services',
     data: {
       name: 'Bridal glow programme',
-      slug: '',
       category: ids.categories.facials,
       summary: 'A three-month plan timed to the wedding date. Pricing still being finalised.',
       durationMinutes: 90,
@@ -427,7 +424,6 @@ async function seedStaff(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<void> 
       collection: 'staff',
       data: {
         name: member.name,
-        slug: '',
         jobTitle: member.jobTitle,
         bio: member.bio,
         photo: ids.media[member.photo],
@@ -531,7 +527,6 @@ async function seedPosts(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<void> 
     collection: 'posts',
     data: {
       title: 'The only two products your morning routine actually needs',
-      slug: '',
       excerpt:
         'Most clients arrive with eleven products and dehydrated skin. Here is what earns its place in the morning.',
       body: paragraphs(
@@ -551,7 +546,6 @@ async function seedPosts(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<void> 
     collection: 'posts',
     data: {
       title: 'What a medium-depth peel actually feels like, day by day',
-      slug: '',
       excerpt: 'An honest week of photographs and what to expect on each of them.',
       body: paragraphs(
         'Day one is tight and slightly pink. Day two the skin starts to feel like cardboard — this is normal and it is not the result.',
@@ -570,7 +564,6 @@ async function seedPosts(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<void> 
     collection: 'posts',
     data: {
       title: 'We are extending Thursday evening hours',
-      slug: '',
       excerpt: 'From next month the clinic stays open until 21:00 on Thursdays.',
       body: paragraphs('Draft announcement — waiting on the final rota before this goes live.'),
       author: ids.staff.elena,
@@ -581,7 +574,7 @@ async function seedPosts(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<void> 
 }
 
 async function seedBookings(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<void> {
-  const confirmed = await runtime.create({
+  await runtime.create({
     collection: 'bookings',
     data: {
       name: 'Lucía Fernández',
@@ -594,17 +587,6 @@ async function seedBookings(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<voi
       internalNotes: 'Patch test done on arrival — fine.',
       source: 'website'
     }
-  });
-
-  // FINDING 19: that `status: 'confirmed'` above does not survive. The collection's `beforeChange`
-  // hook resets an anonymous create to `pending`, and a hook cannot tell this trusted server-side
-  // seed apart from a request off the street: `HookContext` carries `user` (null in both cases) but
-  // not `overrideAccess`, the very flag the operation used to decide the call was trusted. So the
-  // status has to be set in a second pass, on the update path the hook does not touch.
-  await runtime.update({
-    collection: 'bookings',
-    id: String(confirmed.id),
-    data: { status: 'confirmed' }
   });
 
   await runtime.create({

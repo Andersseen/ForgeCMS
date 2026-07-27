@@ -11,11 +11,20 @@
 > and move the detail into STATE.md. Per [SDD.md](SDD.md), non-trivial items still need a spec.
 >
 > **Evidence check (2026-07-27):** [DEMO-FINDINGS.md](DEMO-FINDINGS.md) records what a real build
-> (`apps/demo-aesthetics`, spec 039) actually cost. It supports this file's thesis but argues for two
-> changes to the ordering below: **pull 036 forward to the front** (the client SDK, not the core, was
-> the expensive gap), and land a handful of one-line fixes first — `depth: 1` ignoring `upload`
-> fields, `slug.autoGenerate`/`defaultValue` being inert, adapter binding names being hardcoded, and
-> the in-memory adapter not setting timestamps.
+> (`apps/demo-aesthetics`, spec 039) actually cost, and specs 040/041/042 acted on it in the same
+> branch. **Partly done as a result:**
+>
+> - **032 (field widgets)** — relation picker with search, media picker with upload, richtext block
+>   editor, and per-kind list cells all shipped (spec 042). Remaining: a real WYSIWYG, conditional
+>   fields.
+> - **033 (list view)** — pagination, clickable sort and a publish/unpublish status column shipped
+>   (spec 042). Remaining: saved filters, bulk actions, configurable columns.
+> - **036 (signals client)** — `QueryOptions`, pagination metadata, `uploadFile`,
+>   `collectionResource`/`documentResource` shipped (spec 041). **Remaining, and now the single
+>   largest gap for a content site: SSR-safe fetch and hydration transfer.**
+>
+> The ordering argument that survives: the client and the admin were the expensive part, not the
+> core — so finish 036 (SSR) and 038 (typed documents) before more Phase 2 feature work.
 
 ## The thesis
 

@@ -7,36 +7,13 @@
  * docs/DEMO-FINDINGS.md.
  */
 import { defineBlock, defineCollection, defineField } from '@forge-cms/core';
-import type { AccessArgs, CmsUser, FieldHookArgs } from '@forge-cms/core';
+import type { AccessArgs, CmsUser } from '@forge-cms/core';
 import { withAuthFields } from '@forge-cms/auth';
 
 const STAFF_ROLES = ['admin', 'editor'];
 
 function isStaff(user: CmsUser | null): boolean {
   return user !== null && typeof user.role === 'string' && STAFF_ROLES.includes(user.role);
-}
-
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-}
-
-/**
- * Derives a slug from another field when the editor leaves it blank.
- *
- * FINDING 1: `defineField.slug({ autoGenerate: true, sourceField: 'name' })` exists in the field
- * options but nothing in the runtime reads it, so every collection re-implements this hook.
- */
-function slugFrom(sourceField: string) {
-  return ({ value, data }: FieldHookArgs): unknown => {
-    if (typeof value === 'string' && value.length > 0) return slugify(value);
-    const source = data[sourceField];
-    return typeof source === 'string' ? slugify(source) : value;
-  };
 }
 
 // --- Reference data ----------------------------------------------------------------------------
@@ -48,7 +25,8 @@ export const serviceCategories = defineCollection({
     slug: defineField.slug({
       required: true,
       unique: true,
-      hooks: { beforeValidate: [slugFrom('name')] }
+      autoGenerate: true,
+      sourceField: 'name'
     }),
     tagline: defineField.text(),
     description: defineField.textarea(),
@@ -66,7 +44,8 @@ export const services = defineCollection({
     slug: defineField.slug({
       required: true,
       unique: true,
-      hooks: { beforeValidate: [slugFrom('name')] }
+      autoGenerate: true,
+      sourceField: 'name'
     }),
     category: defineField.relation({ collection: 'service_categories', index: true }),
     summary: defineField.textarea({ required: true, maxLength: 240 }),
@@ -123,7 +102,8 @@ export const staff = defineCollection({
     slug: defineField.slug({
       required: true,
       unique: true,
-      hooks: { beforeValidate: [slugFrom('name')] }
+      autoGenerate: true,
+      sourceField: 'name'
     }),
     jobTitle: defineField.text({ required: true }),
     bio: defineField.textarea(),
@@ -210,12 +190,13 @@ export const bookings = defineCollection({
       })
     ],
     beforeChange: [
-      // A public POST must not be able to walk in already-confirmed. Field-level write access
-      // rejects the request outright when a field is set, which is too harsh for a form that may
-      // post a default; forcing the value is the friendlier equivalent.
-      ({ data, operation, user }) => {
-        if (operation !== 'create' || isStaff(user ?? null)) return data;
-        return { ...data, status: 'pending', source: data.source ?? 'website' };
+      // A public POST must not be able to walk in already-confirmed. `overrideAccess` is what tells
+      // this hook the difference between the clinic's own server code (a seed, the front desk
+      // taking a booking by phone) and a request off the street — before spec 040 a hook could not
+      // see it, and this rule silently rewrote the clinic's own writes too.
+      ({ data, operation, user, overrideAccess }) => {
+        if (operation !== 'create' || overrideAccess === true || isStaff(user ?? null)) return data;
+        return { ...data, status: 'pending', source: 'website' };
       }
     ],
     afterChange: [
@@ -273,7 +254,8 @@ export const posts = defineCollection({
     slug: defineField.slug({
       required: true,
       unique: true,
-      hooks: { beforeValidate: [slugFrom('title')] }
+      autoGenerate: true,
+      sourceField: 'title'
     }),
     excerpt: defineField.textarea({ required: true, maxLength: 280 }),
     body: defineField.richtext({ required: true }),
@@ -294,27 +276,13 @@ export const posts = defineCollection({
 
 // --- Files ----------------------------------------------------------------------------------------
 
-/**
- * Rewrites the URL the runtime derives from the storage adapter into one this app actually serves.
- *
- * FINDING 21: `InMemoryStorageAdapter.getPublicUrl` returns `https://forge.test/storage/<key>` — a
- * domain that does not exist — and no package serves stored bytes over HTTP, so uploads render as
- * broken images until the app adds both this hook and `routes/api/media/[...key].get.ts`.
- */
-const STORAGE_URL_PREFIX = 'https://forge.test/storage/';
-
-function serveThroughThisApp({ value }: FieldHookArgs): unknown {
-  if (typeof value !== 'string' || !value.startsWith(STORAGE_URL_PREFIX)) return value;
-  return `/api/media/${value.slice(STORAGE_URL_PREFIX.length)}`;
-}
-
 export const media = defineCollection({
   slug: 'media',
   upload: true,
   fields: {
     filename: defineField.text({ required: true }),
     alt: defineField.text(),
-    url: defineField.text({ hooks: { beforeChange: [serveThroughThisApp] } }),
+    url: defineField.text(),
     contentType: defineField.text(),
     filesize: defineField.number(),
     credit: defineField.text()
@@ -331,7 +299,8 @@ export const pages = defineCollection({
     slug: defineField.slug({
       required: true,
       unique: true,
-      hooks: { beforeValidate: [slugFrom('title')] }
+      autoGenerate: true,
+      sourceField: 'title'
     }),
     seo: defineField.group({
       label: 'SEO',

@@ -5,17 +5,33 @@ export interface R2Env {
   BUCKET: R2Bucket;
 }
 
+export interface R2AdapterOptions {
+  /** Which binding on `env` holds the bucket. Defaults to `'BUCKET'`. */
+  binding?: string;
+  /** Base URL stored objects are publicly reachable at, e.g. a CDN domain. */
+  publicUrlBase?: string;
+}
+
 export class R2StorageAdapter implements StorageAdapter {
   readonly name = 'r2';
   private bucket?: R2Bucket;
+  private readonly binding: string;
   private publicUrlBase?: string;
 
-  init(env: unknown): this {
-    const r2Env = env as R2Env;
-    if (!r2Env.BUCKET) {
-      throw new Error('R2StorageAdapter requires env.BUCKET binding');
+  constructor(options: R2AdapterOptions = {}) {
+    this.binding = options.binding ?? 'BUCKET';
+    if (options.publicUrlBase !== undefined) {
+      this.publicUrlBase = options.publicUrlBase.replace(/\/$/, '');
     }
-    this.bucket = r2Env.BUCKET;
+  }
+
+  init(env: unknown): this {
+    const bindings = (env ?? {}) as Record<string, R2Bucket | undefined>;
+    const bucket = bindings[this.binding];
+    if (!bucket) {
+      throw new Error(`R2StorageAdapter requires env.${this.binding} binding`);
+    }
+    this.bucket = bucket;
     return this;
   }
 

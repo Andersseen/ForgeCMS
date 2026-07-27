@@ -1,6 +1,5 @@
 import { defineEventHandler } from 'h3';
 import { getServerRuntime } from '../../../api/runtime';
-import { populateUploads } from '../../../api/uploads';
 import { toCategory, toServiceSummary } from '../../../api/mappers';
 import type { ServicesPayload } from '../../../../shared/site-content';
 
@@ -27,11 +26,9 @@ export default defineEventHandler(async (event): Promise<{ data: ServicesPayload
     })
   ]);
 
-  const withImages = await populateUploads(runtime, services.docs, ['image']);
-
   return {
     data: {
-      services: withImages.map(toServiceSummary),
+      services: services.docs.map(toServiceSummary),
       categories: categories.docs
         .map(toCategory)
         .filter((category): category is NonNullable<typeof category> => category !== null)

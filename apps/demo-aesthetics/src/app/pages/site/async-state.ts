@@ -8,10 +8,11 @@ export interface AsyncState<T> {
 }
 
 /**
- * The three signals every page needs around one `fetch`.
+ * The three signals a page needs around one `fetch`.
  *
- * FINDING 15: `@forge-cms/angular` ships a promise-based `CmsApiService` and nothing else, so each
- * app re-invents loading/error state. Roadmap 036 (signals-based `resource()` clients) is the fix.
+ * `@forge-cms/angular` now ships `collectionResource`/`documentResource` (spec 041) with the same
+ * shape, and the admin uses those. This stays for the public site only, because those pages read
+ * the app's own composed `/api/site/*` payloads rather than a single collection.
  */
 export function asyncState<T>(load?: () => Promise<T>): AsyncState<T> {
   const data: WritableSignal<T | null> = signal<T | null>(null);

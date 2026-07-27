@@ -1,6 +1,5 @@
 import { defineEventHandler } from 'h3';
 import { getServerRuntime } from '../../../api/runtime';
-import { populateUploads } from '../../../api/uploads';
 import { toPostSummary } from '../../../api/mappers';
 import type { PostSummary } from '../../../../shared/site-content';
 
@@ -18,6 +17,5 @@ export default defineEventHandler(async (event): Promise<{ data: PostSummary[] }
     user: null
   });
 
-  const withCovers = await populateUploads(runtime, posts.docs, ['coverImage']);
-  return { data: withCovers.map(toPostSummary) };
+  return { data: posts.docs.map(toPostSummary) };
 });

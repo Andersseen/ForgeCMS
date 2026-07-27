@@ -321,6 +321,20 @@ describe('D1DatabaseAdapter', () => {
     expect(() => badAdapter.init({})).toThrow('D1DatabaseAdapter requires env.DB binding');
   });
 
+  it('reads a custom binding name (spec 040)', async () => {
+    const custom = new D1DatabaseAdapter({ binding: 'CONTENT_DB' });
+    custom.init({ CONTENT_DB: mockDb });
+
+    await expect(custom.syncSchema([posts])).resolves.toBeUndefined();
+  });
+
+  it('names the binding it looked for when it is missing', () => {
+    const custom = new D1DatabaseAdapter({ binding: 'CONTENT_DB' });
+    expect(() => custom.init({ DB: mockDb })).toThrow(
+      'D1DatabaseAdapter requires env.CONTENT_DB binding'
+    );
+  });
+
   it('syncs schema without errors', async () => {
     await expect(adapter.syncSchema([posts])).resolves.toBeUndefined();
   });

@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output, signal } f
 import { VoltButton, VoltCard } from '@voltui/components';
 import type { FieldMeta } from '@forge-cms/angular';
 import { ForgeFieldControlComponent } from './field-control.component.js';
+import { normaliseReferences } from './references.js';
 
 /**
  * Modal chrome is hand-rolled (plain Tailwind overlay), not @voltui/components' VoltDialog: that
@@ -66,7 +67,7 @@ export class ForgeCollectionFormComponent {
   // detection yet) rather than reactively reflecting it. `computed` re-derives on every change.
   private readonly edits = signal<Record<string, unknown>>({});
   protected readonly formValue = computed<Record<string, unknown>>(() => ({
-    ...this.initialValue(),
+    ...normaliseReferences(this.fields(), this.initialValue()),
     ...this.edits()
   }));
 

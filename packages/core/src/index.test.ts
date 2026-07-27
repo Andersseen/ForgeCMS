@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defineCollection, defineField, type CollectionData } from './index';
+import { defineCollection, defineField, slugify, type CollectionData } from './index';
 
 describe('core schema DSL', () => {
   it('defines a typed collection', () => {
@@ -25,5 +25,28 @@ describe('core schema DSL', () => {
     expect(posts.slug).toBe('posts');
     expect(posts.fields.title.kind).toBe('text');
     expect(example.title).toBe('Hello ForgeCMS');
+  });
+});
+
+describe('slugify', () => {
+  it('lowercases and hyphenates', () => {
+    expect(slugify('Signature HydraGlow Facial')).toBe('signature-hydraglow-facial');
+  });
+
+  it('strips accents rather than dropping the letter', () => {
+    expect(slugify('Láser & Piel')).toBe('laser-piel');
+    expect(slugify('Cañón')).toBe('canon');
+  });
+
+  it('collapses runs of punctuation and trims the edges', () => {
+    expect(slugify('  ¿Qué es el peeling? — guía  ')).toBe('que-es-el-peeling-guia');
+  });
+
+  it('returns an empty string when there is nothing sluggable', () => {
+    expect(slugify('###')).toBe('');
+  });
+
+  it('leaves an already-valid slug untouched', () => {
+    expect(slugify('laser-hair-removal')).toBe('laser-hair-removal');
   });
 });

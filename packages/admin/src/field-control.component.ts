@@ -15,6 +15,9 @@ import {
   VoltTextarea
 } from '@voltui/components';
 import type { BlockMeta, FieldMeta } from '@forge-cms/angular';
+import { ForgeRelationPickerComponent } from './relation-picker.component.js';
+import { ForgeUploadPickerComponent } from './upload-picker.component.js';
+import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
 
 /**
  * Renders a single field, recursing into itself for the composite kinds (`group`, `array`,
@@ -36,6 +39,9 @@ import type { BlockMeta, FieldMeta } from '@forge-cms/angular';
     VoltLabel,
     VoltError,
     VoltButton,
+    ForgeRelationPickerComponent,
+    ForgeUploadPickerComponent,
+    ForgeRichTextEditorComponent,
     forwardRef(() => ForgeFieldControlComponent)
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -159,7 +165,7 @@ import type { BlockMeta, FieldMeta } from '@forge-cms/angular';
               />
             }
             @case ('richtext') {
-              <volt-textarea [id]="path()" [value]="jsonValue()" (valueChange)="emitJson($event)" />
+              <forge-richtext-editor [value]="value()" (valueChange)="valueChange.emit($event)" />
             }
             @case ('json') {
               <volt-textarea [id]="path()" [value]="jsonValue()" (valueChange)="emitJson($event)" />
@@ -185,24 +191,25 @@ import type { BlockMeta, FieldMeta } from '@forge-cms/angular';
               </select>
             }
             @case ('relation') {
-              <volt-input
-                [id]="path()"
-                type="text"
-                [value]="relationValue()"
-                (valueChange)="emitRelation($event)"
-                [placeholder]="
-                  f.relation?.many === true ? 'Comma-separated IDs' : 'Related document ID'
-                "
-              />
+              @if (f.relation; as relation) {
+                <forge-relation-picker
+                  [inputId]="path()"
+                  [collection]="relation.collection"
+                  [many]="relation.many"
+                  [value]="value()"
+                  (valueChange)="valueChange.emit($event)"
+                />
+              }
             }
             @case ('upload') {
-              <volt-input
-                [id]="path()"
-                type="text"
-                [value]="stringValue()"
-                (valueChange)="valueChange.emit($event)"
-                placeholder="Uploaded document ID"
-              />
+              @if (f.relation; as relation) {
+                <forge-upload-picker
+                  [inputId]="path()"
+                  [collection]="relation.collection"
+                  [value]="value()"
+                  (valueChange)="valueChange.emit($event)"
+                />
+              }
             }
             @case ('number') {
               <volt-input

@@ -10,6 +10,12 @@ export {
   type HandlerOptions
 } from './handlers.js';
 
+// Serving stored files (spec 040)
+export { handleFile, type FileHandlerOptions } from './files.js';
+
+// Field defaults and auto-slugs (spec 040)
+export { applyFieldDefaults, applyAutoSlugs } from './defaults.js';
+
 // Local API (spec 019) — the transport-free way to run CMS operations from server code.
 export {
   find,

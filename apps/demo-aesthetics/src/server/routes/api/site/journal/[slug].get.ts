@@ -1,6 +1,5 @@
 import { createError, defineEventHandler, getRouterParam } from 'h3';
 import { getServerRuntime } from '../../../../api/runtime';
-import { populateUploads } from '../../../../api/uploads';
 import { toPostDetail } from '../../../../api/mappers';
 import type { PostDetail } from '../../../../../shared/site-content';
 
@@ -23,6 +22,5 @@ export default defineEventHandler(async (event): Promise<{ data: PostDetail }> =
     throw createError({ statusCode: 404, statusMessage: 'Post not found' });
   }
 
-  const [withCover] = await populateUploads(runtime, [record], ['coverImage']);
-  return { data: toPostDetail(withCover ?? record) };
+  return { data: toPostDetail(record) };
 });

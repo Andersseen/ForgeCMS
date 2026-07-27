@@ -31,7 +31,8 @@ import {
   LmnSunIcon,
   LmnUsersIcon
 } from 'lumen-icons';
-import type { ForgeAdminConfig } from './config.js';
+import { DEFAULT_ADMIN_NAV } from './config.js';
+import type { ForgeAdminConfig, ForgeAdminNavGroup, ForgeAdminNavItem } from './config.js';
 import { ThemeService } from './theme.service.js';
 
 interface BreadcrumbItem {
@@ -101,42 +102,45 @@ const AUTH_TOKEN_KEY = 'forge-auth-token';
         </volt-sidebar-header>
 
         <volt-sidebar-content>
-          <volt-sidebar-group label="Content">
-            <volt-sidebar-item routerLink="/admin" [exact]="true" label="Dashboard">
-              <lmn-chart-bar slot="icon" [size]="16" />
-            </volt-sidebar-item>
-            <volt-sidebar-item routerLink="/admin/collections" label="Collections">
-              <lmn-squares-2x2 slot="icon" [size]="16" />
-            </volt-sidebar-item>
-            <volt-sidebar-item routerLink="/admin/media" label="Media Library">
-              <lmn-photo slot="icon" [size]="16" />
-            </volt-sidebar-item>
-          </volt-sidebar-group>
-
-          <div class="px-3 my-2">
-            <volt-separator />
-          </div>
-
-          <volt-sidebar-group label="Users & Access">
-            @if (canManageUsers(currentUser())) {
-              <volt-sidebar-item routerLink="/admin/users" label="Users">
-                <lmn-users slot="icon" [size]="16" />
-              </volt-sidebar-item>
+          @for (group of navGroups(); track $index) {
+            @if (visibleItems(group).length > 0) {
+              @if (!$first) {
+                <div class="px-3 my-2">
+                  <volt-separator />
+                </div>
+              }
+              <volt-sidebar-group [label]="group.label ?? ''">
+                @for (item of visibleItems(group); track item.routerLink) {
+                  <volt-sidebar-item
+                    [routerLink]="item.routerLink"
+                    [exact]="item.exact ?? false"
+                    [label]="item.label"
+                  >
+                    @switch (item.icon) {
+                      @case ('collections') {
+                        <lmn-squares-2x2 slot="icon" [size]="16" />
+                      }
+                      @case ('media') {
+                        <lmn-photo slot="icon" [size]="16" />
+                      }
+                      @case ('users') {
+                        <lmn-users slot="icon" [size]="16" />
+                      }
+                      @case ('api') {
+                        <lmn-code-bracket slot="icon" [size]="16" />
+                      }
+                      @case ('settings') {
+                        <lmn-cog slot="icon" [size]="16" />
+                      }
+                      @default {
+                        <lmn-chart-bar slot="icon" [size]="16" />
+                      }
+                    }
+                  </volt-sidebar-item>
+                }
+              </volt-sidebar-group>
             }
-            <volt-sidebar-item routerLink="/admin/api" label="API Keys">
-              <lmn-code-bracket slot="icon" [size]="16" />
-            </volt-sidebar-item>
-          </volt-sidebar-group>
-
-          <div class="px-3 my-2">
-            <volt-separator />
-          </div>
-
-          <volt-sidebar-group label="System">
-            <volt-sidebar-item routerLink="/admin/settings" label="Settings">
-              <lmn-cog slot="icon" [size]="16" />
-            </volt-sidebar-item>
-          </volt-sidebar-group>
+          }
         </volt-sidebar-content>
 
         <volt-sidebar-footer>
@@ -241,6 +245,17 @@ const AUTH_TOKEN_KEY = 'forge-auth-token';
 })
 export class ForgeAdminLayoutComponent {
   readonly config = input<ForgeAdminConfig>();
+
+  /** Configured navigation, or the built-in default. */
+  protected readonly navGroups = computed<ForgeAdminNavGroup[]>(
+    () => this.config()?.nav ?? DEFAULT_ADMIN_NAV
+  );
+
+  /** Hides admin-only entries from editors and viewers. */
+  protected visibleItems(group: ForgeAdminNavGroup): ForgeAdminNavItem[] {
+    const isAdmin = canManageUsers(this.currentUser());
+    return group.items.filter((item) => item.adminOnly !== true || isAdmin);
+  }
 
   sidebarService = inject(VoltSidebarService);
   themeService = inject(ThemeService);

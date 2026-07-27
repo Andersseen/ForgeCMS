@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import type { OnInit } from '@angular/core';
 import { EmptyStateComponent, PageHeaderComponent } from '@forge-cms/admin';
-import { AdminApiService } from '../../services/admin-api.service';
+import { CmsApiService } from '@forge-cms/angular';
 
 interface MediaDoc extends Record<string, unknown> {
   id: string;
@@ -31,9 +31,9 @@ interface MediaDoc extends Record<string, unknown> {
       <div class="rounded-xl border border-dashed border-border bg-card p-5">
         <label class="block text-sm font-medium">Upload an image</label>
         <p class="mt-1 text-xs text-muted-foreground">
-          Goes through the storage adapter (in-memory locally, R2 when the binding exists). Uploaded
-          files are served from memory, so they disappear on reload — seeded images live in
-          <code>public/images</code>.
+          Goes through the storage adapter (in-memory locally, R2 when the binding exists) and is
+          served back by <code>handleFile</code>. Local uploads live in memory, so they disappear on
+          reload — seeded images live in <code>public/images</code>.
         </p>
         <div class="mt-3 flex flex-wrap items-center gap-3">
           <input
@@ -89,7 +89,7 @@ interface MediaDoc extends Record<string, unknown> {
   `
 })
 export class AdminMediaPage implements OnInit {
-  private readonly api = inject(AdminApiService);
+  private readonly api = inject(CmsApiService);
 
   protected readonly documents = signal<MediaDoc[]>([]);
   protected readonly loading = signal(true);
@@ -118,7 +118,7 @@ export class AdminMediaPage implements OnInit {
     this.uploading.set(true);
     this.uploadError.set(null);
     try {
-      await this.api.uploadMedia(file, this.alt());
+      await this.api.uploadFile('media', file, { alt: this.alt(), filename: file.name });
       this.file.set(null);
       this.alt.set('');
       await this.load();
@@ -132,7 +132,7 @@ export class AdminMediaPage implements OnInit {
   private async load(): Promise<void> {
     this.loading.set(true);
     try {
-      this.documents.set(await this.api.listDocuments<MediaDoc>('media', { limit: 100 }));
+      this.documents.set(await this.api.getDocuments<MediaDoc>('media', { limit: 100 }));
     } finally {
       this.loading.set(false);
     }

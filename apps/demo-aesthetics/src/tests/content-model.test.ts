@@ -240,10 +240,13 @@ describe('pages', () => {
   });
 });
 
-describe('hooks and trusted server calls', () => {
-  it('cannot tell a trusted seed apart from a public request (finding 19)', async () => {
-    // Same data, same hook, no `user` in either case — the only difference is `overrideAccess`,
-    // which the hook is never told about. Both come back `pending`.
+describe('hooks and trusted server calls (finding 19, fixed by spec 040)', () => {
+  /**
+   * Both calls are anonymous — no `user` either way. The only difference is `overrideAccess`, which
+   * hooks could not see until spec 040: the clinic taking a booking over the phone kept being
+   * downgraded to `pending` by the rule that exists to stop visitors self-confirming.
+   */
+  it('lets the clinic write its own booking straight to confirmed', async () => {
     const trusted = await cms.create({
       collection: 'bookings',
       data: {
@@ -254,14 +257,64 @@ describe('hooks and trusted server calls', () => {
       }
     });
 
-    expect(trusted.status).toBe('pending');
+    expect(trusted.status).toBe('confirmed');
+  });
 
-    // The update path is not hooked, so this is the workaround the seed uses.
-    const fixed = await cms.update({
+  it('still forces a visitor’s booking to pending', async () => {
+    const fromTheStreet = await cms.create({
       collection: 'bookings',
-      id: String(trusted.id),
-      data: { status: 'confirmed' }
+      ...AS_VISITOR,
+      data: {
+        name: 'Walk-in',
+        email: 'walkin@example.com',
+        preferredDate: new Date().toISOString()
+      }
     });
-    expect(fixed.status).toBe('confirmed');
+
+    expect(fromTheStreet.status).toBe('pending');
+  });
+});
+
+describe('slugs and defaults come from the schema (finding 1, fixed by spec 040)', () => {
+  it('generates a slug with no hook in the collection definition', async () => {
+    const created = await cms.create({
+      collection: 'services',
+      data: {
+        name: 'Láser facial — sesión completa',
+        summary: 'Checks that autoGenerate does the work.',
+        durationMinutes: 45,
+        price: 80
+      }
+    });
+
+    expect(created.slug).toBe('laser-facial-sesion-completa');
+  });
+
+  it('applies defaultValue without a hook', async () => {
+    const created = await cms.create({
+      collection: 'bookings',
+      data: {
+        name: 'Default check',
+        email: 'defaults@example.com',
+        preferredDate: new Date().toISOString()
+      }
+    });
+
+    expect(created.source).toBe('website');
+  });
+});
+
+describe('uploads are populated by depth (finding 9, fixed by spec 040)', () => {
+  it('returns the media document for a service image', async () => {
+    const { docs } = await cms.find({
+      collection: 'services',
+      where: { slug: 'signature-hydraglow-facial' },
+      limit: 1,
+      depth: 1,
+      ...AS_VISITOR
+    });
+
+    const image = docs[0]?.image as Record<string, unknown>;
+    expect(image.url).toBe('/images/signature-facial.svg');
   });
 });

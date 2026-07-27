@@ -6,7 +6,6 @@ import {
   ForgeCollectionFormComponent,
   PageHeaderComponent
 } from '@forge-cms/admin';
-import { AdminApiService } from '../../services/admin-api.service';
 
 /**
  * Site settings, edited as a single document.
@@ -50,7 +49,6 @@ import { AdminApiService } from '../../services/admin-api.service';
 })
 export class AdminSettingsPage implements OnInit {
   private readonly cms = inject(CmsApiService);
-  private readonly admin = inject(AdminApiService);
 
   protected readonly collection = signal<CollectionMeta | null>(null);
   protected readonly document = signal<Record<string, unknown> | null>(null);
@@ -69,7 +67,7 @@ export class AdminSettingsPage implements OnInit {
       const collections = await this.cms.getCollections();
       this.collection.set(collections.find((entry) => entry.slug === 'site_settings') ?? null);
 
-      const [settings] = await this.admin.listDocuments('site_settings', { limit: 1 });
+      const [settings] = await this.cms.getDocuments('site_settings', { limit: 1 });
       this.document.set(settings ?? null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load settings');

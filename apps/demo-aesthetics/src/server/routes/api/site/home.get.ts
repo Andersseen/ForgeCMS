@@ -1,6 +1,5 @@
 import { defineEventHandler } from 'h3';
 import { getServerRuntime } from '../../../api/runtime';
-import { populateUploads } from '../../../api/uploads';
 import {
   toPageContent,
   toPromotion,
@@ -39,7 +38,6 @@ export default defineEventHandler(async (event): Promise<{ data: HomePayload }> 
     runtime.find({ collection: 'site_settings', limit: 1, ...asVisitor })
   ]);
 
-  const servicesWithImages = await populateUploads(runtime, services.docs, ['image']);
   const [page] = pages.docs;
   const [promotion] = promotions.docs;
   const [siteSettings] = settings.docs;
@@ -47,7 +45,7 @@ export default defineEventHandler(async (event): Promise<{ data: HomePayload }> 
   return {
     data: {
       page: page ? toPageContent(page) : null,
-      featuredServices: servicesWithImages.map(toServiceSummary),
+      featuredServices: services.docs.map(toServiceSummary),
       testimonials: testimonials.docs.map(toTestimonial),
       promotion: promotion ? toPromotion(promotion) : null,
       settings: siteSettings ? toSiteSettings(siteSettings) : null

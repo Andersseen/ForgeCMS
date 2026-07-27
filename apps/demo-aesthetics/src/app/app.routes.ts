@@ -43,10 +43,47 @@ export const routes: Routes = [
   {
     path: 'admin',
     loadComponent: () => import('@forge-cms/admin').then((m) => m.ForgeAdminLayoutComponent),
-    // The layout's `config` is a signal input, and the layout is a routed component — so the only
-    // way to reach it is route `data` + `withComponentInputBinding()`. It sets the sidebar title;
-    // the nav items themselves are hardcoded in the package (finding 20).
-    data: { config: { title: 'Lumea Aesthetics' } },
+    // Sidebar title *and* navigation come from the app (spec 042): a clinic opens the booking
+    // inbox every morning, so that is the first item, and there is no "API Keys" page to link to.
+    data: {
+      config: {
+        title: 'Lumea Aesthetics',
+        nav: [
+          {
+            label: 'Clinic',
+            items: [
+              { label: 'Overview', routerLink: '/admin', icon: 'dashboard', exact: true },
+              { label: 'Bookings', routerLink: '/admin/collections/bookings', icon: 'collections' },
+              {
+                label: 'Treatments',
+                routerLink: '/admin/collections/services',
+                icon: 'collections'
+              }
+            ]
+          },
+          {
+            label: 'Content',
+            items: [
+              { label: 'All collections', routerLink: '/admin/collections', icon: 'collections' },
+              { label: 'Media', routerLink: '/admin/media', icon: 'media' }
+            ]
+          },
+          {
+            label: 'Administration',
+            items: [
+              {
+                label: 'Staff accounts',
+                routerLink: '/admin/users',
+                icon: 'users',
+                adminOnly: true
+              },
+              { label: 'API', routerLink: '/admin/api', icon: 'api' },
+              { label: 'Clinic settings', routerLink: '/admin/settings', icon: 'settings' }
+            ]
+          }
+        ]
+      }
+    },
     children: [
       {
         path: '',
