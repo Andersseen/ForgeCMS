@@ -1,12 +1,9 @@
-import { defineEventHandler } from 'h3';
-import { getServerRuntime } from '../../../api/runtime';
+import { definePublicSiteRoute } from '../../../api/public-route';
 import { toPostSummary } from '../../../api/mappers';
 import type { PostSummary } from '../../../../shared/site-content';
 
 /** The journal index — published posts, newest first. */
-export default defineEventHandler(async (event): Promise<{ data: PostSummary[] }> => {
-  const runtime = await getServerRuntime(event.context.cloudflare?.env);
-
+export default definePublicSiteRoute(async (runtime): Promise<PostSummary[]> => {
   const posts = await runtime.find({
     collection: 'posts',
     sort: 'publishedAt',
@@ -17,5 +14,5 @@ export default defineEventHandler(async (event): Promise<{ data: PostSummary[] }
     user: null
   });
 
-  return { data: posts.docs.map(toPostSummary) };
+  return posts.docs.map(toPostSummary);
 });

@@ -1,12 +1,9 @@
-import { defineEventHandler } from 'h3';
-import { getServerRuntime } from '../../../api/runtime';
+import { definePublicSiteRoute } from '../../../api/public-route';
 import { toTeamMember } from '../../../api/mappers';
 import type { TeamMember } from '../../../../shared/site-content';
 
 /** The clinic team, with their treatment specialties resolved to names. */
-export default defineEventHandler(async (event): Promise<{ data: TeamMember[] }> => {
-  const runtime = await getServerRuntime(event.context.cloudflare?.env);
-
+export default definePublicSiteRoute(async (runtime): Promise<TeamMember[]> => {
   const staff = await runtime.find({
     collection: 'staff',
     where: { active: true },
@@ -18,5 +15,5 @@ export default defineEventHandler(async (event): Promise<{ data: TeamMember[] }>
     user: null
   });
 
-  return { data: staff.docs.map(toTeamMember) };
+  return staff.docs.map(toTeamMember);
 });

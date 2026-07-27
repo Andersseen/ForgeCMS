@@ -1,5 +1,4 @@
-import { defineEventHandler } from 'h3';
-import { getServerRuntime } from '../../../api/runtime';
+import { definePublicSiteRoute } from '../../../api/public-route';
 import {
   toPageContent,
   toPromotion,
@@ -17,8 +16,7 @@ import type { HomePayload } from '../../../../shared/site-content';
  * passes `overrideAccess: false` with `user: null` so the public site is subject to exactly the
  * access and draft rules an anonymous visitor would hit.
  */
-export default defineEventHandler(async (event): Promise<{ data: HomePayload }> => {
-  const runtime = await getServerRuntime(event.context.cloudflare?.env);
+export default definePublicSiteRoute(async (runtime): Promise<HomePayload> => {
   const asVisitor = { overrideAccess: false, user: null } as const;
 
   const [pages, services, testimonials, promotions, settings] = await Promise.all([
@@ -43,12 +41,10 @@ export default defineEventHandler(async (event): Promise<{ data: HomePayload }> 
   const [siteSettings] = settings.docs;
 
   return {
-    data: {
-      page: page ? toPageContent(page) : null,
-      featuredServices: services.docs.map(toServiceSummary),
-      testimonials: testimonials.docs.map(toTestimonial),
-      promotion: promotion ? toPromotion(promotion) : null,
-      settings: siteSettings ? toSiteSettings(siteSettings) : null
-    }
+    page: page ? toPageContent(page) : null,
+    featuredServices: services.docs.map(toServiceSummary),
+    testimonials: testimonials.docs.map(toTestimonial),
+    promotion: promotion ? toPromotion(promotion) : null,
+    settings: siteSettings ? toSiteSettings(siteSettings) : null
   };
 });

@@ -10,6 +10,7 @@ import {
 import { ForgeCmsRuntime } from '@forge-cms/runtime';
 import { collections } from './collections';
 import { seedContent } from './seed';
+import { setRuntimeRef } from './runtime-ref';
 
 export interface ServerEnv {
   DB?: D1Database;
@@ -51,7 +52,10 @@ export function createRuntime(env?: ServerEnv): ForgeCmsRuntime<ServerEnv> {
     ...(env !== undefined && { env })
   });
 
-  return runtime.init();
+  runtime.init();
+  // Hooks get no handle on the CMS (finding 23), and the demo's limits need to count documents.
+  setRuntimeRef(runtime as unknown as ForgeCmsRuntime<never>);
+  return runtime;
 }
 
 async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>> {

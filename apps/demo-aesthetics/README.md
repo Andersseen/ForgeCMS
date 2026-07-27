@@ -95,6 +95,25 @@ everything between cold starts.
 No migrations are needed: the runtime's `syncSchema()` creates the tables on the first request, and
 the seed runs exactly once because it checks for an existing `site_settings` row.
 
+## Running in public without going bankrupt
+
+The demo publishes its own admin password, so anyone can write to it. On a free Cloudflare plan
+(100k Worker requests/day, 100k D1 rows written/day, 10 GB in R2) that needs limits, and they all
+live in this app — `getServerRuntime` is a deployment, not a CMS feature:
+
+| Guardrail                                                  | Where                                                  | What it stops                                                                            |
+| ---------------------------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| Public reads cached 60 s per isolate, plus `cache-control` | [`public-route.ts`](src/server/api/public-route.ts)    | The marketing site hammering D1. Any write clears it, so publishing still looks instant. |
+| 12 writes/minute per IP, 240 per isolate                   | [`demo-guard.ts`](src/server/middleware/demo-guard.ts) | A loop from one machine. Per-IP, not per person — that needs accounts.                   |
+| Body ≤ 256 KB, uploads ≤ 2 MB                              | same                                                   | Oversized payloads and R2 filling up.                                                    |
+| `/api/auth/users` returns 403                              | same                                                   | Account spam, and someone deleting the demo admin.                                       |
+| Ceilings per collection, oldest pruned                     | [`demo-guards.ts`](src/server/api/demo-guards.ts)      | Unbounded growth. Writes still succeed — a demo that starts refusing bookings is broken. |
+| Floors per collection                                      | same                                                   | Someone emptying the treatment menu and leaving the site blank.                          |
+
+The numbers are all in [`demo-limits.ts`](src/server/api/demo-limits.ts). None of it is security: it
+is a spending limit. If the demo ever moves to a custom domain, a WAF rate-limiting rule (one is free
+per zone) filters abuse before it reaches the Worker and is worth adding on top.
+
 ## Not included
 
 No e2e suite — Playwright stays in `apps/www` per CONVENTIONS.md.
