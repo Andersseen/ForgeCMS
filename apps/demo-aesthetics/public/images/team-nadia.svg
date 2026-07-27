@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Nadia Kern">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#cfd6e2"/>
+      <stop offset="100%" stop-color="#8d9bb8"/>
+    </linearGradient>
+    <radialGradient id="r" cx="30%" cy="20%" r="70%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#g)"/>
+  <rect width="800" height="600" fill="url(#r)"/>
+  <g fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1.5">
+    <circle cx="620" cy="150" r="90"/>
+    <circle cx="620" cy="150" r="140"/>
+    <path d="M0 470 C 180 400, 320 520, 500 450 S 760 400, 800 430"/>
+    <path d="M0 520 C 200 460, 340 570, 520 500 S 780 460, 800 490"/>
+  </g>
+  <text x="48" y="548" font-family="Iowan Old Style, Palatino, Georgia, serif" font-size="30" fill="#ffffff" fill-opacity="0.85">Nadia Kern</text>
+</svg>

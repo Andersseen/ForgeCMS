@@ -108,6 +108,8 @@ export interface FieldHookArgs {
   collection: CollectionDefinition;
   operation: HookOperation;
   user: CmsUser | null;
+  /** `true` when the operation skipped access control. See {@link BaseHookArgs.overrideAccess}. */
+  overrideAccess?: boolean;
 }
 
 /** Returns the value to use in place of `args.value`. */
@@ -290,6 +292,15 @@ export interface BaseHookArgs {
   operation: HookOperation;
   /** The user the operation runs as; `null` for anonymous or for direct Local API calls. */
   user?: CmsUser | null;
+  /**
+   * `true` when the operation skipped access control — i.e. trusted server-side code (a seed
+   * script, a scheduled job, a Local API call) rather than a request off the network.
+   *
+   * Without this a hook cannot tell the two apart, because both arrive with `user: null`. A hook
+   * that hardens public writes ("force `status` to `pending`") must check it, or it will also
+   * rewrite what your own server code deliberately wrote.
+   */
+  overrideAccess?: boolean;
 }
 
 /**
@@ -458,6 +469,22 @@ export function defineCollection<TSlug extends string, TFields extends FieldMap>
   config: CollectionDefinition<TSlug, TFields>
 ): CollectionDefinition<TSlug, TFields> {
   return config;
+}
+
+/**
+ * Turns human text into a URL slug: `"Láser & Piel"` → `"laser-piel"`.
+ *
+ * Lives here rather than in `@forge-cms/runtime` because it is the DSL that promises the behaviour
+ * (`defineField.slug({ autoGenerate: true })`), and because apps that build slugs client-side must
+ * produce exactly the same string the server would.
+ */
+export function slugify(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 // Runtime validation

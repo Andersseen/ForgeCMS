@@ -50,7 +50,16 @@ export class InMemoryDatabaseAdapter implements DatabaseAdapter {
     data: Record<string, unknown>
   ): Promise<Record<string, unknown>> {
     const records = this.store.get(collection) ?? [];
-    const recordWithId = data.id ? data : { ...data, id: crypto.randomUUID() };
+    // Timestamps match LibSqlDatabaseAdapter and D1DatabaseAdapter. Without them a document created
+    // in local development had no `created_at` while the same write in production did, so
+    // "newest first" silently returned insertion order locally.
+    const now = new Date().toISOString();
+    const recordWithId = {
+      ...data,
+      id: data.id ?? crypto.randomUUID(),
+      created_at: data.created_at ?? now,
+      updated_at: now
+    };
     records.push(recordWithId);
     this.store.set(collection, records);
     return recordWithId;
@@ -66,7 +75,7 @@ export class InMemoryDatabaseAdapter implements DatabaseAdapter {
     if (index === -1) {
       throw new Error(`Record ${id} not found in ${collection}`);
     }
-    records[index] = { ...records[index], ...data };
+    records[index] = { ...records[index], ...data, updated_at: new Date().toISOString() };
     this.store.set(collection, records);
     return records[index];
   }

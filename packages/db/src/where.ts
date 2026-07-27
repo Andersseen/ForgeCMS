@@ -69,8 +69,13 @@ export function matchesCondition(recordValue: unknown, condition: WhereCondition
     case 'in':
       return Array.isArray(value) && value.includes(recordValue);
     case 'contains':
+      // Case-insensitive, matching SQLite's `LIKE` (which LibSqlDatabaseAdapter and
+      // D1DatabaseAdapter both compile to). It used to be case-sensitive here only, so a search box
+      // wired to `contains` found "Body & wellness" in production and nothing in local development.
       return (
-        typeof recordValue === 'string' && typeof value === 'string' && recordValue.includes(value)
+        typeof recordValue === 'string' &&
+        typeof value === 'string' &&
+        recordValue.toLowerCase().includes(value.toLowerCase())
       );
     default:
       return false;

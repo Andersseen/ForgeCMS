@@ -19,6 +19,7 @@ Node >= 22 (`.nvmrc`), pnpm `10.11.0` (via `packageManager` field). Never use np
 | `pnpm install`                         | Install deps (frozen lockfile in CI)                      |
 | `pnpm build`                           | Build all packages/apps (topological, cached by Turbo)    |
 | `pnpm dev:www` / `pnpm dev:playground` | Run the landing/admin app or the playground               |
+| `pnpm dev:demo`                        | Run the real-world demo app (`apps/demo-aesthetics`)      |
 | `pnpm test`                            | Unit tests (Vitest) across the repo                       |
 | `pnpm lint` / `pnpm typecheck`         | ESLint / `tsc --noEmit` across the repo                   |
 | `pnpm format` / `pnpm format:check`    | Prettier write / check                                    |
@@ -34,6 +35,9 @@ Node >= 22 (`.nvmrc`), pnpm `10.11.0` (via `packageManager` field). Never use np
 apps/
   www/          Analog.js landing + /admin demo UI + h3 server API (/api/v1/*) — deploys to Cloudflare Pages
   playground/   Analog.js sandbox for trying CMS APIs
+  demo-aesthetics/  Real-world demo: a clinic marketing site built on the CMS (spec 039). Its point is
+                    docs/DEMO-FINDINGS.md — gaps stay as app-side workarounds marked `FINDING n`, so
+                    never "fix" one by editing packages/* without updating that doc.
 packages/
   core/         Schema DSL (defineCollection / defineField) + runtime validation
   db/           DatabaseAdapter contract + InMemory + LibSQL(drizzle) adapters + SQL schema generator

@@ -10,6 +10,7 @@ import {
   ValidationFailedError
 } from './errors.js';
 import { documentMatches, mergeWhere, resolveAccess } from './access.js';
+import { applyAutoSlugs, applyFieldDefaults } from './defaults.js';
 import type { AccessDecision } from './access.js';
 import {
   runAfterChangeHooks,
@@ -194,6 +195,7 @@ async function prepareForRead(
   args: { user?: CmsUser | null; overrideAccess?: boolean; depth?: 0 | 1 }
 ): Promise<DatabaseRecord[]> {
   const user = args.user ?? null;
+  const overrideAccess = args.overrideAccess !== false;
   let docs = records;
 
   if (args.depth === 1) {
@@ -209,9 +211,10 @@ async function prepareForRead(
       const withFieldHooks = await runFieldHooks(collection, 'afterRead', {
         data: doc,
         operation: 'read',
-        user
+        user,
+        overrideAccess
       });
-      return runAfterReadHooks(collection, { user, doc: withFieldHooks });
+      return runAfterReadHooks(collection, { user, overrideAccess, doc: withFieldHooks });
     })
   );
 
@@ -221,8 +224,9 @@ async function prepareForRead(
 export async function find(ctx: OperationContext, args: FindArgs): Promise<PaginatedDocs> {
   const collection = getCollectionOrThrow(ctx, args.collection);
   const user = args.user ?? null;
+  const overrideAccess = args.overrideAccess !== false;
 
-  await runBeforeOperationHooks(collection, { operation: 'read', user });
+  await runBeforeOperationHooks(collection, { operation: 'read', user, overrideAccess });
 
   const decision = await checkAccess(collection, 'read', args);
 
@@ -231,7 +235,11 @@ export async function find(ctx: OperationContext, args: FindArgs): Promise<Pagin
     where,
     statusConstraint(collection, args.status, user, args.overrideAccess !== false, 'published')
   );
-  where = (await runBeforeReadHooks(collection, { user, query: where ?? {} })) as DatabaseWhere;
+  where = (await runBeforeReadHooks(collection, {
+    user,
+    overrideAccess,
+    query: where ?? {}
+  })) as DatabaseWhere;
 
   const hasWhere = where !== undefined && Object.keys(where).length > 0;
   const findOptions = {
@@ -251,7 +259,7 @@ export async function find(ctx: OperationContext, args: FindArgs): Promise<Pagin
   const docs = await prepareForRead(ctx, collection, records, args);
   const result = paginate(docs, totalDocs, args.limit, args.offset ?? 0);
 
-  await runAfterOperationHooks(collection, { operation: 'read', user, result });
+  await runAfterOperationHooks(collection, { operation: 'read', user, overrideAccess, result });
   return result;
 }
 
@@ -282,8 +290,9 @@ export async function findByID(
 ): Promise<DatabaseRecord> {
   const collection = getCollectionOrThrow(ctx, args.collection);
   const user = args.user ?? null;
+  const overrideAccess = args.overrideAccess !== false;
 
-  await runBeforeOperationHooks(collection, { operation: 'read', user });
+  await runBeforeOperationHooks(collection, { operation: 'read', user, overrideAccess });
 
   const decision = await checkAccess(collection, 'read', { ...args, id: args.id });
 
@@ -309,7 +318,7 @@ export async function findByID(
   const [doc] = await prepareForRead(ctx, collection, [record], args);
   const result = doc ?? record;
 
-  await runAfterOperationHooks(collection, { operation: 'read', user, result });
+  await runAfterOperationHooks(collection, { operation: 'read', user, overrideAccess, result });
   return result;
 }
 
@@ -334,8 +343,9 @@ export async function count(ctx: OperationContext, args: CountArgs): Promise<num
 export async function create(ctx: OperationContext, args: CreateArgs): Promise<DatabaseRecord> {
   const collection = getCollectionOrThrow(ctx, args.collection);
   const user = args.user ?? null;
+  const overrideAccess = args.overrideAccess !== false;
 
-  await runBeforeOperationHooks(collection, { operation: 'create', user });
+  await runBeforeOperationHooks(collection, { operation: 'create', user, overrideAccess });
   await checkAccess(collection, 'create', { ...args, data: args.data });
 
   if (args.overrideAccess === false) {
@@ -347,16 +357,22 @@ export async function create(ctx: OperationContext, args: CreateArgs): Promise<D
     }
   }
 
+  // Defaults and auto-slugs are resolved before any hook runs, so a hook still gets the last word
+  // and validation only ever sees the final value.
+  const seeded = applyAutoSlugs(collection, applyFieldDefaults(collection, args.data));
+
   let data = await runRejectableStage(
     async () =>
       runBeforeValidateHooks(collection, {
         operation: 'create',
         data: await runFieldHooks(collection, 'beforeValidate', {
-          data: args.data,
+          data: seeded,
           operation: 'create',
-          user
+          user,
+          overrideAccess
         }),
-        user
+        user,
+        overrideAccess
       }),
     'beforeValidate hook'
   );
@@ -373,8 +389,14 @@ export async function create(ctx: OperationContext, args: CreateArgs): Promise<D
     async () =>
       runBeforeChangeHooks(collection, {
         operation: 'create',
-        data: await runFieldHooks(collection, 'beforeChange', { data, operation: 'create', user }),
-        user
+        data: await runFieldHooks(collection, 'beforeChange', {
+          data,
+          operation: 'create',
+          user,
+          overrideAccess
+        }),
+        user,
+        overrideAccess
       }),
     'beforeChange hook'
   );
@@ -386,21 +408,23 @@ export async function create(ctx: OperationContext, args: CreateArgs): Promise<D
     data,
     result: record,
     doc: record,
-    user
+    user,
+    overrideAccess
   });
 
   const [doc] = await prepareForRead(ctx, collection, [record], args);
   const result = doc ?? record;
 
-  await runAfterOperationHooks(collection, { operation: 'create', user, result });
+  await runAfterOperationHooks(collection, { operation: 'create', user, overrideAccess, result });
   return result;
 }
 
 export async function update(ctx: OperationContext, args: UpdateArgs): Promise<DatabaseRecord> {
   const collection = getCollectionOrThrow(ctx, args.collection);
   const user = args.user ?? null;
+  const overrideAccess = args.overrideAccess !== false;
 
-  await runBeforeOperationHooks(collection, { operation: 'update', user });
+  await runBeforeOperationHooks(collection, { operation: 'update', user, overrideAccess });
 
   const existing = await ctx.adapters.database.findById(args.collection, args.id);
   if (!existing) throw notFound(args.collection, args.id);
@@ -429,13 +453,15 @@ export async function update(ctx: OperationContext, args: UpdateArgs): Promise<D
       runBeforeValidateHooks(collection, {
         operation: 'update',
         data: await runFieldHooks(collection, 'beforeValidate', {
-          data: args.data,
+          data: applyAutoSlugs(collection, args.data, existing),
           previousData: existing,
           operation: 'update',
-          user
+          user,
+          overrideAccess
         }),
         previousData: existing,
-        user
+        user,
+        overrideAccess
       }),
     'beforeValidate hook'
   );
@@ -463,10 +489,12 @@ export async function update(ctx: OperationContext, args: UpdateArgs): Promise<D
           data,
           previousData: existing,
           operation: 'update',
-          user
+          user,
+          overrideAccess
         }),
         previousData: existing,
-        user
+        user,
+        overrideAccess
       }),
     'beforeChange hook'
   );
@@ -479,13 +507,14 @@ export async function update(ctx: OperationContext, args: UpdateArgs): Promise<D
     previousData: existing,
     result: record,
     doc: record,
-    user
+    user,
+    overrideAccess
   });
 
   const [doc] = await prepareForRead(ctx, collection, [record], args);
   const result = doc ?? record;
 
-  await runAfterOperationHooks(collection, { operation: 'update', user, result });
+  await runAfterOperationHooks(collection, { operation: 'update', user, overrideAccess, result });
   return result;
 }
 
@@ -495,8 +524,9 @@ export async function deleteDocument(
 ): Promise<DatabaseRecord> {
   const collection = getCollectionOrThrow(ctx, args.collection);
   const user = args.user ?? null;
+  const overrideAccess = args.overrideAccess !== false;
 
-  await runBeforeOperationHooks(collection, { operation: 'delete', user });
+  await runBeforeOperationHooks(collection, { operation: 'delete', user, overrideAccess });
 
   const existing = await ctx.adapters.database.findById(args.collection, args.id);
   if (!existing) throw notFound(args.collection, args.id);
@@ -511,13 +541,18 @@ export async function deleteDocument(
   }
 
   await runRejectableStage(
-    () => runBeforeDeleteHooks(collection, { user, id: args.id, doc: existing }),
+    () => runBeforeDeleteHooks(collection, { user, overrideAccess, id: args.id, doc: existing }),
     'beforeDelete hook'
   );
   await ctx.adapters.database.delete(args.collection, args.id);
-  await runAfterDeleteHooks(collection, { user, id: args.id, doc: existing });
+  await runAfterDeleteHooks(collection, { user, overrideAccess, id: args.id, doc: existing });
 
-  await runAfterOperationHooks(collection, { operation: 'delete', user, result: existing });
+  await runAfterOperationHooks(collection, {
+    operation: 'delete',
+    user,
+    overrideAccess,
+    result: existing
+  });
   return existing;
 }
 

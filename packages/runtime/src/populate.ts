@@ -1,4 +1,8 @@
-import type { CollectionDefinition, RelationFieldOptions } from '@forge-cms/core';
+import type {
+  CollectionDefinition,
+  RelationFieldOptions,
+  UploadFieldOptions
+} from '@forge-cms/core';
 import type { DatabaseRecord } from '@forge-cms/db';
 import type { OperationContext } from './context.js';
 
@@ -8,10 +12,19 @@ interface RelationFieldEntry {
   many: boolean;
 }
 
+/**
+ * Every field `depth: 1` resolves: `relation` and — since spec 040 — `upload`, which is a single
+ * relation to an upload-enabled collection in everything but name. Leaving `upload` out meant every
+ * image in a populated response came back as a bare id, which no client can render.
+ */
 function getRelationFields(collection: CollectionDefinition): RelationFieldEntry[] {
   return Object.entries(collection.fields)
-    .filter(([, field]) => field.kind === 'relation')
+    .filter(([, field]) => field.kind === 'relation' || field.kind === 'upload')
     .map(([name, field]) => {
+      if (field.kind === 'upload') {
+        const options = field.options as UploadFieldOptions;
+        return { name, targetSlug: options.collection, many: false };
+      }
       const options = field.options as RelationFieldOptions;
       return { name, targetSlug: options.collection, many: options.many === true };
     });

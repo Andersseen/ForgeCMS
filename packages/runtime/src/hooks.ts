@@ -33,7 +33,7 @@ async function runSideEffects<TCtx>(
 /** Runs first on every operation, before access control resolves. */
 export async function runBeforeOperationHooks(
   collection: CollectionDefinition,
-  ctx: { operation: HookOperation; user?: CmsUser | null }
+  ctx: { operation: HookOperation; user?: CmsUser | null; overrideAccess?: boolean }
 ): Promise<void> {
   await runSideEffects(
     collection.hooks?.beforeOperation,
@@ -46,7 +46,12 @@ export async function runBeforeOperationHooks(
 /** Runs last on every operation, with whatever is about to be returned. */
 export async function runAfterOperationHooks(
   collection: CollectionDefinition,
-  ctx: { operation: HookOperation; user?: CmsUser | null; result: unknown }
+  ctx: {
+    operation: HookOperation;
+    user?: CmsUser | null;
+    overrideAccess?: boolean;
+    result: unknown;
+  }
 ): Promise<void> {
   await runSideEffects(
     collection.hooks?.afterOperation,
@@ -106,7 +111,7 @@ export async function runAfterChangeHooks(
 /** Runs once per read operation and may narrow the query before it is issued. */
 export async function runBeforeReadHooks(
   collection: CollectionDefinition,
-  ctx: { user?: CmsUser | null; query: AccessQuery }
+  ctx: { user?: CmsUser | null; overrideAccess?: boolean; query: AccessQuery }
 ): Promise<AccessQuery> {
   const hooks = collection.hooks?.beforeRead;
   if (!hooks || hooks.length === 0) return ctx.query;
@@ -121,7 +126,7 @@ export async function runBeforeReadHooks(
 /** Runs per document on the way out. Returns the document to hand to the caller. */
 export async function runAfterReadHooks(
   collection: CollectionDefinition,
-  ctx: { user?: CmsUser | null; doc: Record<string, unknown> }
+  ctx: { user?: CmsUser | null; overrideAccess?: boolean; doc: Record<string, unknown> }
 ): Promise<Record<string, unknown>> {
   const hooks = collection.hooks?.afterRead;
   if (!hooks || hooks.length === 0) return ctx.doc;
@@ -135,7 +140,12 @@ export async function runAfterReadHooks(
 
 export async function runBeforeDeleteHooks(
   collection: CollectionDefinition,
-  ctx: { user?: CmsUser | null; id: string; doc: Record<string, unknown> }
+  ctx: {
+    user?: CmsUser | null;
+    overrideAccess?: boolean;
+    id: string;
+    doc: Record<string, unknown>;
+  }
 ): Promise<void> {
   const hooks = collection.hooks?.beforeDelete;
   if (!hooks || hooks.length === 0) return;
@@ -148,7 +158,12 @@ export async function runBeforeDeleteHooks(
 
 export async function runAfterDeleteHooks(
   collection: CollectionDefinition,
-  ctx: { user?: CmsUser | null; id: string; doc: Record<string, unknown> }
+  ctx: {
+    user?: CmsUser | null;
+    overrideAccess?: boolean;
+    id: string;
+    doc: Record<string, unknown>;
+  }
 ): Promise<void> {
   await runSideEffects(
     collection.hooks?.afterDelete,
@@ -176,6 +191,7 @@ export async function runFieldHooks(
     previousData?: Record<string, unknown>;
     operation: HookOperation;
     user?: CmsUser | null;
+    overrideAccess?: boolean;
   }
 ): Promise<Record<string, unknown>> {
   const entries = Object.entries(collection.fields).filter(
@@ -194,7 +210,8 @@ export async function runFieldHooks(
         fieldName,
         collection,
         operation: ctx.operation,
-        user: ctx.user ?? null
+        user: ctx.user ?? null,
+        ...(ctx.overrideAccess !== undefined && { overrideAccess: ctx.overrideAccess })
       });
     }
     data[fieldName] = value;

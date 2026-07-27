@@ -40,13 +40,29 @@ export interface CollectionDescription {
   name: string;
   description: string;
   fieldDefinitions: FieldDescription[];
+  /** `true` when the collection has draft/published status. The admin renders a status column. */
+  drafts?: boolean;
+  /** `true` when the collection accepts multipart uploads. The admin offers a file input. */
+  upload?: boolean;
+}
+
+/** `durationMinutes` → `Duration minutes`, for fields that declare no explicit label. */
+function humaniseFieldName(name: string): string {
+  const spaced = name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ');
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
+}
+
+/** `service_categories` → `Service categories`. Slugs are what the admin shows as a title. */
+function humanise(slug: string): string {
+  const spaced = slug.replace(/[_-]+/g, ' ').trim();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
 function describeField(name: string, field: AnyField): FieldDescription {
   const base: FieldDescription = {
     name,
     kind: field.kind,
-    label: field.options.label ?? name,
+    label: field.options.label ?? humaniseFieldName(name),
     required: field.options.required ?? false
   };
 
@@ -103,9 +119,11 @@ export function describeFields(fields: FieldMap): FieldDescription[] {
 export function describeCollection(collection: CollectionDefinition): CollectionDescription {
   return {
     slug: collection.slug,
-    name: collection.slug.charAt(0).toUpperCase() + collection.slug.slice(1),
+    name: humanise(collection.slug),
     description: `Content collection for ${collection.slug}`,
-    fieldDefinitions: describeFields(collection.fields)
+    fieldDefinitions: describeFields(collection.fields),
+    ...(collection.drafts === true && { drafts: true }),
+    ...(collection.upload === true && { upload: true })
   };
 }
 
