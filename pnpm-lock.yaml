@@ -186,9 +186,21 @@ importers:
       '@angular/platform-browser':
         specifier: ^21.2.10
         version: 21.2.13(@angular/common@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.15.1))
+      '@forge-cms/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@forge-cms/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@forge-cms/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@forge-cms/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
+      '@forge-cms/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2
