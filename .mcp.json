@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "cloudflare-bindings": {
+      "type": "http",
+      "url": "https://bindings.mcp.cloudflare.com/mcp"
+    },
+    "cloudflare-observability": {
+      "type": "http",
+      "url": "https://observability.mcp.cloudflare.com/mcp"
+    },
+    "playwright": {
+      "command": "pnpm",
+      "args": ["dlx", "@playwright/mcp@latest"]
+    }
+  }
+}
