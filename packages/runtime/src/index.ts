@@ -7,6 +7,8 @@ export {
   handleCreate,
   handleUpdate,
   handleDelete,
+  handleGlobalRead,
+  handleGlobalUpdate,
   type HandlerOptions,
   DEFAULT_LIMIT,
   MAX_LIMIT
@@ -36,6 +38,15 @@ export {
   type DeleteArgs
 } from './operations.js';
 
+// Globals — singleton documents (site-wide config: nav, footer, SEO defaults).
+export {
+  getGlobal,
+  updateGlobal,
+  type GlobalBaseArgs,
+  type GetGlobalArgs,
+  type UpdateGlobalArgs
+} from './globals.js';
+
 export {
   ForgeError,
   NotFoundError,
@@ -58,7 +69,10 @@ export {
   describeCollection,
   describeCollections,
   describeFields,
+  describeGlobal,
+  describeGlobals,
   type CollectionDescription,
+  type GlobalDescription,
   type FieldDescription,
   type BlockDescription
 } from './describe.js';

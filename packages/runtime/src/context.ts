@@ -1,4 +1,4 @@
-import type { CollectionDefinition } from '@forge-cms/core';
+import type { CollectionDefinition, GlobalDefinition } from '@forge-cms/core';
 import type { AdapterSet } from './config.js';
 
 /**
@@ -11,4 +11,5 @@ import type { AdapterSet } from './config.js';
 export interface OperationContext {
   readonly adapters: AdapterSet;
   getCollection(slug: string): CollectionDefinition | undefined;
+  getGlobal(slug: string): GlobalDefinition | undefined;
 }

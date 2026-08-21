@@ -386,6 +386,27 @@ export interface CollectionDefinition<
   drafts?: boolean;
 }
 
+/**
+ * A singleton document — a single record rather than a collection of many.
+ *
+ * Globals are the right shape for site-wide configuration: navigation, footer, SEO defaults,
+ * theme settings. They share the same field DSL as collections but have exactly one document,
+ * addressed by slug rather than by id.
+ */
+export interface GlobalDefinition<
+  TSlug extends string = string,
+  TFields extends FieldMap = FieldMap
+> {
+  slug: TSlug;
+  fields: Readonly<TFields>;
+  hooks?: CollectionHooks;
+  access?: CollectionAccess;
+  /** Adds a system `_status: 'draft' | 'published'` field; unpublished globals are hidden from public reads. */
+  drafts?: boolean;
+}
+
+export type GlobalData<TGlobal extends GlobalDefinition> = InferFields<TGlobal['fields']>;
+
 export type DraftStatus = 'draft' | 'published';
 
 export type CollectionData<TCollection extends CollectionDefinition> = InferFields<
@@ -468,6 +489,12 @@ export const defineField = {
 export function defineCollection<TSlug extends string, TFields extends FieldMap>(
   config: CollectionDefinition<TSlug, TFields>
 ): CollectionDefinition<TSlug, TFields> {
+  return config;
+}
+
+export function defineGlobal<TSlug extends string, TFields extends FieldMap>(
+  config: GlobalDefinition<TSlug, TFields>
+): GlobalDefinition<TSlug, TFields> {
   return config;
 }
 

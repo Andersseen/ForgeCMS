@@ -217,4 +217,36 @@ export class CmsApiService {
     });
     if (!response.ok) throw await toApiError(response, 'Failed to delete user');
   }
+
+  // --- Globals -----------------------------------------------------------------------------
+
+  /**
+   * Reads a singleton global document. Returns `null` if the global has never been configured.
+   */
+  async getGlobal<T = Record<string, unknown>>(global: string): Promise<T | null> {
+    const response = await fetch(`${this.baseUrl}/globals/${global}`, {
+      headers: this.authHeader()
+    });
+    if (response.status === 404) return null;
+    if (!response.ok) throw await toApiError(response, `Failed to fetch global '${global}'`);
+    const result = (await response.json()) as ApiItemResponse<T>;
+    return result.data;
+  }
+
+  /**
+   * Creates or updates a singleton global document.
+   */
+  async updateGlobal<T = Record<string, unknown>>(
+    global: string,
+    data: Record<string, unknown>
+  ): Promise<T> {
+    const response = await fetch(`${this.baseUrl}/globals/${global}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw await toApiError(response, `Failed to update global '${global}'`);
+    const result = (await response.json()) as ApiItemResponse<T>;
+    return result.data;
+  }
 }

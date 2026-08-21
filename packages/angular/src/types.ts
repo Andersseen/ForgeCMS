@@ -72,6 +72,15 @@ export interface CollectionMeta {
   upload?: boolean;
 }
 
+export interface GlobalMeta {
+  slug: string;
+  name: string;
+  description: string;
+  fieldDefinitions: FieldMeta[];
+  /** The global has draft/published status. */
+  drafts?: boolean;
+}
+
 export interface ApiFieldError {
   field: string;
   message: string;

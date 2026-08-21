@@ -1,5 +1,5 @@
 import type { ForgeCmsConfig, AdapterSet } from './config.js';
-import type { CollectionDefinition } from '@forge-cms/core';
+import type { CollectionDefinition, GlobalDefinition } from '@forge-cms/core';
 import type { DatabaseRecord } from '@forge-cms/db';
 import type { OperationContext } from './context.js';
 import * as operations from './operations.js';
@@ -12,10 +12,12 @@ import type {
   PaginatedDocs,
   UpdateArgs
 } from './operations.js';
+import * as globalOps from './globals.js';
+import type { GetGlobalArgs, UpdateGlobalArgs } from './globals.js';
 
 /**
  * The CMS instance: collections bound to adapters, plus the **Local API** — `find`, `findByID`,
- * `create`, `update`, `delete`, `count`.
+ * `create`, `update`, `delete`, `count`, `getGlobal`, `updateGlobal`.
  *
  * The Local API is the primary way to use ForgeCMS from server code (an Analog.js `.server.ts`
  * route, a Nitro handler, a seed script). It runs the full pipeline — hooks, access, drafts,
@@ -44,9 +46,19 @@ export class ForgeCmsRuntime<TEnv = unknown> implements OperationContext {
     return this;
   }
 
-  /** Sync database schema for all registered collections */
+  /** Sync database schema for all registered collections and globals */
   async syncSchema(): Promise<void> {
     await this.adapters.database.syncSchema(this.config.collections);
+
+    for (const global of this.config.globals ?? []) {
+      await this.adapters.database.syncSchema([
+        {
+          slug: `_global_${global.slug}`,
+          fields: global.fields,
+          ...(global.drafts === true && { drafts: true })
+        }
+      ]);
+    }
   }
 
   /** Find a collection definition by slug */
@@ -57,6 +69,16 @@ export class ForgeCmsRuntime<TEnv = unknown> implements OperationContext {
   /** Get all registered collection definitions */
   getCollections(): readonly CollectionDefinition[] {
     return this.config.collections;
+  }
+
+  /** Find a global definition by slug */
+  getGlobal(slug: string): GlobalDefinition | undefined {
+    return this.config.globals?.find((g) => g.slug === slug);
+  }
+
+  /** Get all registered global definitions */
+  getGlobals(): readonly GlobalDefinition[] {
+    return this.config.globals ?? [];
   }
 
   // --- Local API ---------------------------------------------------------------------------
@@ -83,5 +105,15 @@ export class ForgeCmsRuntime<TEnv = unknown> implements OperationContext {
 
   delete(args: DeleteArgs): Promise<DatabaseRecord> {
     return operations.deleteDocument(this, args);
+  }
+
+  // --- Globals -----------------------------------------------------------------------------
+
+  getGlobalDocument(args: GetGlobalArgs): Promise<DatabaseRecord | null> {
+    return globalOps.getGlobal(this, args);
+  }
+
+  updateGlobalDocument(args: UpdateGlobalArgs): Promise<DatabaseRecord> {
+    return globalOps.updateGlobal(this, args);
   }
 }

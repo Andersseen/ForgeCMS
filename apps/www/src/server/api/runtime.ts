@@ -1,4 +1,4 @@
-import { defineBlock, defineCollection, defineField } from '@forge-cms/core';
+import { defineBlock, defineCollection, defineField, defineGlobal } from '@forge-cms/core';
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
 import { UsersCollectionAuthAdapter, withAuthFields } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
@@ -195,6 +195,18 @@ const collections = [
   landingPages
 ];
 
+const siteSettingsGlobal = defineGlobal({
+  slug: 'site_settings',
+  fields: {
+    siteName: defineField.text({ required: true }),
+    tagline: defineField.text(),
+    maintenanceMode: defineField.boolean(),
+    contactEmail: defineField.email()
+  }
+});
+
+const globals = [siteSettingsGlobal];
+
 let runtimePromise: Promise<ForgeCmsRuntime<ServerEnv>> | undefined;
 
 /**
@@ -219,6 +231,7 @@ async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>
 
   const runtime = new ForgeCmsRuntime<ServerEnv>({
     collections,
+    globals,
     adapters: {
       database,
       auth,

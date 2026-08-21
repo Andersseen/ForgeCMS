@@ -523,5 +523,87 @@ function extractKeyFromUrl(url: string, collectionSlug: string): string | null {
   return url.slice(idx + '/api/media/'.length);
 }
 
+// --- globals --------------------------------------------------------------------------------
+
+interface ResolvedGlobalRequest {
+  globalSlug: string;
+  user: AuthUser | null;
+}
+
+async function resolveGlobalRequest<TEnv>(
+  context: ApiContext<TEnv>,
+  options: HandlerOptions<TEnv>,
+  operation: 'read' | 'update'
+): Promise<ResolvedGlobalRequest | Response> {
+  const { runtime, requireAuth: requireAuthFlag, allowedRoles } = options;
+
+  const globalSlug = context.params?.['global'];
+  if (!globalSlug) return errorResponse('INVALID_INPUT', 'Missing global parameter', 400);
+
+  const global = runtime.getGlobal(globalSlug);
+  if (!global) return errorResponse('NOT_FOUND', `Global '${globalSlug}' not found`, 404);
+
+  const routeRoles = global.access?.[operation] === undefined ? allowedRoles : undefined;
+  const mustAuth = requireAuthFlag === true || routeRoles !== undefined;
+
+  let user: AuthUser | null = null;
+  if (mustAuth) {
+    const result = await authorize(context, runtime, routeRoles);
+    if (!result.success) return result.response;
+    user = result.user;
+  } else {
+    user = await resolveOptionalUser(context, runtime);
+  }
+
+  return { globalSlug, user };
+}
+
+export async function handleGlobalRead<TEnv = unknown>(
+  context: ApiContext<TEnv>,
+  options: HandlerOptions<TEnv>
+): Promise<Response> {
+  const resolved = await resolveGlobalRequest(context, options, 'read');
+  if (resolved instanceof Response) return resolved;
+  const { globalSlug, user } = resolved;
+
+  try {
+    const doc = await options.runtime.getGlobalDocument({
+      global: globalSlug,
+      user,
+      overrideAccess: false
+    });
+
+    if (!doc) {
+      return errorResponse('NOT_FOUND', `Global '${globalSlug}' has not been configured yet`, 404);
+    }
+
+    return jsonResponse({ data: doc });
+  } catch (err) {
+    return toErrorResponse(err, user);
+  }
+}
+
+export async function handleGlobalUpdate<TEnv = unknown>(
+  context: ApiContext<TEnv>,
+  options: HandlerOptions<TEnv>
+): Promise<Response> {
+  const resolved = await resolveGlobalRequest(context, options, 'update');
+  if (resolved instanceof Response) return resolved;
+  const { globalSlug, user } = resolved;
+
+  try {
+    const doc = await options.runtime.updateGlobalDocument({
+      global: globalSlug,
+      data: await readJsonBody(context.request),
+      user,
+      overrideAccess: false
+    });
+
+    return jsonResponse({ data: doc });
+  } catch (err) {
+    return toErrorResponse(err, user);
+  }
+}
+
 export { operations };
 export { DEFAULT_LIMIT, MAX_LIMIT };
