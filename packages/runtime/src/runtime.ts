@@ -1,5 +1,6 @@
 import type { ForgeCmsConfig, AdapterSet } from './config.js';
-import type { CollectionDefinition, GlobalDefinition } from '@forge-cms/core';
+import type { CollectionDefinition, GlobalDefinition, AnyField } from '@forge-cms/core';
+import { defineField } from '@forge-cms/core';
 import type { DatabaseRecord } from '@forge-cms/db';
 import type { OperationContext } from './context.js';
 import * as operations from './operations.js';
@@ -14,6 +15,14 @@ import type {
 } from './operations.js';
 import * as globalOps from './globals.js';
 import type { GetGlobalArgs, UpdateGlobalArgs } from './globals.js';
+import * as versionOps from './versions.js';
+import type {
+  ListVersionsArgs,
+  GetVersionArgs,
+  RestoreVersionArgs,
+  CreateVersionArgs
+} from './versions.js';
+import type { Version } from '@forge-cms/core';
 
 /**
  * The CMS instance: collections bound to adapters, plus the **Local API** — `find`, `findByID`,
@@ -58,6 +67,31 @@ export class ForgeCmsRuntime<TEnv = unknown> implements OperationContext {
           ...(global.drafts === true && { drafts: true })
         }
       ]);
+    }
+
+    // Create version tables for collections with versions enabled
+    for (const collection of this.config.collections) {
+      if (
+        collection.versions === true ||
+        (typeof collection.versions === 'object' && collection.versions !== null)
+      ) {
+        const versionFields: Record<string, AnyField> = {
+          documentId: defineField.text({ required: true }),
+          versionNumber: defineField.number({ required: true }),
+          data: defineField.json({ required: true }),
+          createdAt: defineField.date({ required: true }),
+          createdBy: defineField.text(),
+          autosave: defineField.boolean(),
+          label: defineField.text()
+        };
+
+        await this.adapters.database.syncSchema([
+          {
+            slug: `_versions_${collection.slug}`,
+            fields: versionFields
+          }
+        ]);
+      }
     }
   }
 
@@ -115,5 +149,23 @@ export class ForgeCmsRuntime<TEnv = unknown> implements OperationContext {
 
   updateGlobalDocument(args: UpdateGlobalArgs): Promise<DatabaseRecord> {
     return globalOps.updateGlobal(this, args);
+  }
+
+  // --- Versions ---------------------------------------------------------------------------
+
+  listVersions(args: ListVersionsArgs): Promise<Version[]> {
+    return versionOps.listVersions(this, args);
+  }
+
+  getVersion(args: GetVersionArgs): Promise<Version> {
+    return versionOps.getVersion(this, args);
+  }
+
+  restoreVersion(args: RestoreVersionArgs): Promise<DatabaseRecord> {
+    return versionOps.restoreVersion(this, args);
+  }
+
+  createVersion(args: CreateVersionArgs): Promise<Version> {
+    return versionOps.createVersion(this, args);
   }
 }

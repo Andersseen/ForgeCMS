@@ -26,6 +26,7 @@ import {
 } from './hooks.js';
 import { assertWritableFields, filterReadableFields, FieldAccessError } from './field-access.js';
 import { populateRecord, populateRecords } from './populate.js';
+import { createVersion, versionsEnabled } from './versions.js';
 
 /** A page of documents plus everything a paginator needs. */
 export interface PaginatedDocs<TDoc = DatabaseRecord> {
@@ -403,6 +404,16 @@ export async function create(ctx: OperationContext, args: CreateArgs): Promise<D
 
   const record = await ctx.adapters.database.create(args.collection, data);
 
+  // Create initial version if versions are enabled
+  if (versionsEnabled(collection)) {
+    await createVersion(ctx, {
+      collection: args.collection,
+      documentId: record.id as string,
+      data,
+      user
+    });
+  }
+
   await runAfterChangeHooks(collection, {
     operation: 'create',
     data,
@@ -500,6 +511,16 @@ export async function update(ctx: OperationContext, args: UpdateArgs): Promise<D
   );
 
   const record = await ctx.adapters.database.update(args.collection, args.id, data);
+
+  // Create a version snapshot if versions are enabled
+  if (versionsEnabled(collection)) {
+    await createVersion(ctx, {
+      collection: args.collection,
+      documentId: args.id,
+      data,
+      user
+    });
+  }
 
   await runAfterChangeHooks(collection, {
     operation: 'update',

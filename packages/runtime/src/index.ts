@@ -9,6 +9,9 @@ export {
   handleDelete,
   handleGlobalRead,
   handleGlobalUpdate,
+  handleListVersions,
+  handleGetVersion,
+  handleRestoreVersion,
   type HandlerOptions,
   DEFAULT_LIMIT,
   MAX_LIMIT
@@ -46,6 +49,20 @@ export {
   type GetGlobalArgs,
   type UpdateGlobalArgs
 } from './globals.js';
+
+// Versions — document history, diff, restore.
+export {
+  listVersions,
+  getVersion,
+  restoreVersion,
+  createVersion,
+  versionsEnabled,
+  autosaveEnabled,
+  type ListVersionsArgs,
+  type GetVersionArgs,
+  type RestoreVersionArgs,
+  type CreateVersionArgs
+} from './versions.js';
 
 export {
   ForgeError,

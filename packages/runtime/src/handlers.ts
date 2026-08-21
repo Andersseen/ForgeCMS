@@ -605,5 +605,89 @@ export async function handleGlobalUpdate<TEnv = unknown>(
   }
 }
 
+// --- versions -------------------------------------------------------------------------------
+
+export async function handleListVersions<TEnv = unknown>(
+  context: ApiContext<TEnv>,
+  options: HandlerOptions<TEnv>
+): Promise<Response> {
+  const resolved = await resolveRequest(context, options, 'read', true);
+  if (resolved instanceof Response) return resolved;
+  const { collectionSlug, user } = resolved;
+
+  try {
+    const url = new URL(context.request.url);
+    const limit = parseLimit(url);
+    const offset = parseOffset(url);
+
+    const versions = await options.runtime.listVersions({
+      collection: collectionSlug,
+      documentId: context.params!['id']!,
+      user,
+      overrideAccess: false,
+      ...(limit !== undefined && { limit }),
+      ...(offset !== undefined && { offset })
+    });
+
+    return jsonResponse({ data: versions });
+  } catch (err) {
+    return toErrorResponse(err, user);
+  }
+}
+
+export async function handleGetVersion<TEnv = unknown>(
+  context: ApiContext<TEnv>,
+  options: HandlerOptions<TEnv>
+): Promise<Response> {
+  const resolved = await resolveRequest(context, options, 'read', false);
+  if (resolved instanceof Response) return resolved;
+  const { collectionSlug, user } = resolved;
+
+  try {
+    const versionId = context.params?.['versionId'];
+    if (!versionId) {
+      return errorResponse('INVALID_INPUT', 'Missing versionId parameter', 400);
+    }
+
+    const version = await options.runtime.getVersion({
+      collection: collectionSlug,
+      versionId,
+      user,
+      overrideAccess: false
+    });
+
+    return jsonResponse({ data: version });
+  } catch (err) {
+    return toErrorResponse(err, user);
+  }
+}
+
+export async function handleRestoreVersion<TEnv = unknown>(
+  context: ApiContext<TEnv>,
+  options: HandlerOptions<TEnv>
+): Promise<Response> {
+  const resolved = await resolveRequest(context, options, 'update', false);
+  if (resolved instanceof Response) return resolved;
+  const { collectionSlug, user } = resolved;
+
+  try {
+    const versionId = context.params?.['versionId'];
+    if (!versionId) {
+      return errorResponse('INVALID_INPUT', 'Missing versionId parameter', 400);
+    }
+
+    const record = await options.runtime.restoreVersion({
+      collection: collectionSlug,
+      versionId,
+      user,
+      overrideAccess: false
+    });
+
+    return jsonResponse({ data: record });
+  } catch (err) {
+    return toErrorResponse(err, user);
+  }
+}
+
 export { operations };
 export { DEFAULT_LIMIT, MAX_LIMIT };

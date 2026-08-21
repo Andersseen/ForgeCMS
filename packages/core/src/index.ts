@@ -384,6 +384,11 @@ export interface CollectionDefinition<
   upload?: boolean;
   /** Adds a system `_status: 'draft' | 'published'` field; unpublished docs are hidden from public reads (spec 017). */
   drafts?: boolean;
+  /**
+   * Enables version history for this collection. Every update creates a snapshot that can be
+   * listed, compared, and restored. Autosave creates frequent drafts without publishing.
+   */
+  versions?: boolean | { autosave?: boolean };
 }
 
 /**
@@ -406,6 +411,28 @@ export interface GlobalDefinition<
 }
 
 export type GlobalData<TGlobal extends GlobalDefinition> = InferFields<TGlobal['fields']>;
+
+/**
+ * A point-in-time snapshot of a document. Versions are created automatically on every update when
+ * `versions: true` is set on the collection, or manually via the autosave mechanism.
+ */
+export interface Version {
+  id: string;
+  /** The id of the document this version belongs to. */
+  documentId: string;
+  /** Monotonically increasing version number within the document. */
+  versionNumber: number;
+  /** The full document data at this version. */
+  data: Record<string, unknown>;
+  /** When this version was created. */
+  createdAt: string;
+  /** The user who created this version (null for system/autosave). */
+  createdBy: string | null;
+  /** Whether this is an autosave (frequent, non-publishing) version. */
+  autosave: boolean;
+  /** Optional human-readable label (e.g. "Fixed typo", "Initial draft"). */
+  label?: string;
+}
 
 export type DraftStatus = 'draft' | 'published';
 
