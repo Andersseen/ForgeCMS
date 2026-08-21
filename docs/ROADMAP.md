@@ -1,6 +1,6 @@
 # ROADMAP — From typed CRUD to a real CMS for Angular / Analog.js
 
-> **Last updated: 2026-07-22.**
+> **Last updated: 2026-08-21.**
 >
 > **What this file is:** the multi-phase plan that takes ForgeCMS from "a well-engineered typed CRUD
 > over SQLite with an admin table" to a CMS a real team would run in production. It is deliberately
@@ -176,11 +176,16 @@ ForgeCMS competes with Directus, not with Payload.
 
 ## Progress
 
-| Phase                     | Status                                                            |
-| ------------------------- | ----------------------------------------------------------------- |
-| Phase 0 — Unblock         | ✅ 0.1, 0.2 done 2026-07-22 · 0.3 pending (needs npm credentials) |
-| Phase 1 — Structural core | ✅ 019, 020, 021, 022 done 2026-07-22                             |
-| Phase 2 — Content model   | ⬜ not started                                                    |
-| Phase 3 — Auth & DX       | ⬜ not started                                                    |
-| Phase 4 — Admin UI        | ⬜ not started                                                    |
-| Phase 5 — Angular moat    | ⬜ not started                                                    |
+| Phase                     | Status                                                                                          |
+| ------------------------- | ----------------------------------------------------------------------------------------------- |
+| Phase 0 — Unblock         | ✅ 0.1, 0.2 done 2026-07-22 · 0.3 pending (needs npm credentials)                               |
+| Phase 1 — Structural core | ✅ 019, 020, 021, 022 done 2026-07-22                                                           |
+| Phase 2 — Content model   | ⬜ not started                                                                                   |
+| Phase 3 — Auth & DX       | ⬜ not started                                                                                   |
+| Phase 4 — Admin UI        | ⬜ not started                                                                                   |
+| Phase 5 — Angular moat    | ⬜ not started                                                                                   |
+| Phase 0.2 — Trust         | ✅ done 2026-08-21 (hardening, validation, security, error contract, logging, upload lifecycle) |
+| Phase 0.3.1 — Globals     | ✅ done 2026-08-21 (singleton documents for site config)                                        |
+| Phase 0.3.2 — Versions    | ✅ done 2026-08-21 (document history, restore, autosave support)                                |
+| Phase 0.3.3 — Live Preview | ⬜ not started                                                                                 |
+| Phase 0.3.4 — Localization | ⬜ not started                                                                                 |
