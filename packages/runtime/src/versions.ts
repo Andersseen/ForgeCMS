@@ -158,7 +158,7 @@ export async function createVersion(
   });
 
   const lastVersionNumber =
-    existingVersions.length > 0 ? (existingVersions[0]?.versionNumber as number) ?? 0 : 0;
+    existingVersions.length > 0 ? ((existingVersions[0]?.versionNumber as number) ?? 0) : 0;
 
   const versionRecord: DatabaseRecord = {
     id: crypto.randomUUID(),
