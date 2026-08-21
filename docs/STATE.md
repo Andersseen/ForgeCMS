@@ -27,8 +27,8 @@ handlers reduced to transport, **access control as functions** returning row-lev
 `group`/`array`/`blocks` (spec 022). Spec 018 also fixed the D1 `passwordHash` bug that broke auth on
 the only production path, and gave lists real pagination metadata.
 
-**As of 2026-08-21, Phase 0.2 (Trust / Production Hardening) and Phase 0.3.1 (Globals) are complete.**
-The foundation is now safe enough for production features like Versions, Live Preview and Localization
+**As of 2026-08-21, Phase 0.2 (Trust / Production Hardening), Phase 0.3.1 (Globals), and Phase 0.3.2 (Versions) are complete.**
+The foundation is now safe enough for production features like Live Preview and Localization
 to build on. Phase 0.2 hardening work includes: strict unknown-field validation, identifier validation,
 hardened D1/LibSQL adapters, consistent API error contract, strict query parameter parsing, secure
 auth secret handling, structured logging, upload lifecycle integrity, and upload limits.
@@ -36,6 +36,12 @@ auth secret handling, structured logging, upload lifecycle integrity, and upload
 Globals use the same field DSL as collections but have exactly one document, addressed by slug.
 The Local API exposes `getGlobalDocument()` and `updateGlobalDocument()`, the HTTP layer provides
 `GET/PUT /api/v1/globals/[global]`, and the Angular client has `getGlobal()` and `updateGlobal()`.
+**Phase 0.3.2 adds Versions** — document history with automatic snapshots on create/update.
+Collections can enable versions with `versions: true` or `versions: { autosave: true }`.
+The Local API exposes `listVersions()`, `getVersion()`, `restoreVersion()`, and `createVersion()`.
+HTTP handlers provide `GET /api/v1/[collection]/[id]/versions`, `GET /api/v1/[collection]/versions/[versionId]`,
+and `POST /api/v1/[collection]/versions/[versionId]/restore`. Versions store complete document snapshots
+with metadata (versionNumber, createdAt, createdBy, autosave, label) and support restore operations.
 
 **As of 2026-07-27 there is a second app, `apps/demo-aesthetics`** (spec 039) — a real-world
 marketing site for a fictional skin clinic, built on the CMS with **no changes to any package**, to
