@@ -10,6 +10,10 @@ export interface UsersCollectionAuthEnv {
   userDatabase?: DatabaseAdapter;
 }
 
+export interface UsersCollectionAuthAdapterOptions {
+  devMode?: boolean;
+}
+
 export interface CreateUserInput {
   email: string;
   password: string;
@@ -102,16 +106,39 @@ function sanitizeUser(record: DatabaseRecord): AuthUser {
  */
 export class UsersCollectionAuthAdapter implements AuthAdapter {
   readonly name = 'users-collection';
-  private secret = DEV_SECRET;
+  private secret?: string;
   private db?: DatabaseAdapter;
   private collection = DEFAULT_COLLECTION;
+  private readonly devMode: boolean;
+
+  constructor(options: UsersCollectionAuthAdapterOptions = {}) {
+    this.devMode = options.devMode ?? false;
+  }
 
   init(env?: UsersCollectionAuthEnv): this {
-    this.secret = env?.AUTH_SECRET ?? DEV_SECRET;
+    if (env?.AUTH_SECRET) {
+      this.secret = env.AUTH_SECRET;
+    } else if (this.devMode) {
+      this.secret = DEV_SECRET;
+    } else {
+      throw new Error(
+        'UsersCollectionAuthAdapter requires AUTH_SECRET to be set. ' +
+          'In development, pass { devMode: true } to the constructor to use the built-in dev secret. ' +
+          'In production, set AUTH_SECRET as an environment variable or secret.'
+      );
+    }
+
     if (env?.userDatabase !== undefined) {
       this.db = env.userDatabase;
     }
     return this;
+  }
+
+  private getSecret(): string {
+    if (!this.secret) {
+      throw new Error('UsersCollectionAuthAdapter not initialized. Call init() first.');
+    }
+    return this.secret;
   }
 
   private getDb(): DatabaseAdapter {
@@ -125,12 +152,13 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
   }
 
   async validateSession(token: string): Promise<AuthSession | null> {
-    return validateSession(this.secret, token);
+    return validateSession(this.getSecret(), token);
   }
 
   async requireAuth(request: Request): Promise<AuthUser> {
     const token = this.extractToken(request);
-    const session = await this.validateSession(token ?? '');
+    if (!token) throw new ForgeAuthError('Unauthorized', 'unauthorized');
+    const session = await this.validateSession(token);
     if (!session) throw new ForgeAuthError('Unauthorized', 'unauthorized');
     return session.user;
   }
@@ -164,7 +192,7 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     if (!valid) return null;
 
     const user = sanitizeUser(record);
-    const token = await issueToken(this.secret, user);
+    const token = await issueToken(this.getSecret(), user);
     return { token, user };
   }
 
@@ -185,7 +213,7 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     });
 
     const user = sanitizeUser(record);
-    const token = await issueToken(this.secret, user);
+    const token = await issueToken(this.getSecret(), user);
     return { token, user };
   }
 

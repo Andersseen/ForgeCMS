@@ -1,6 +1,6 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-07-27.**
+> **Last updated: 2026-08-21.**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
@@ -26,6 +26,17 @@ handlers reduced to transport, **access control as functions** returning row-lev
 (spec 020), the **complete hook pipeline** including field hooks (spec 021), and **composite fields**
 `group`/`array`/`blocks` (spec 022). Spec 018 also fixed the D1 `passwordHash` bug that broke auth on
 the only production path, and gave lists real pagination metadata.
+
+**As of 2026-08-21, Phase 0.2 (Trust / Production Hardening) is complete.** The foundation is now
+safe enough for production features like Versions, Globals, Live Preview and Localization to build on.
+Key hardening work includes: strict unknown-field validation (rejects keys not in the schema),
+identifier validation (collection slugs and field names must match `^[a-z][a-zA-Z0-9_]*$`), hardened
+D1/LibSQL adapters (unknown columns rejected at adapter boundary), consistent API error contract
+(`{ error: { code, message, details? } }`), strict query parameter parsing (rejects invalid numbers,
+negative pagination, excessive limits), filter field validation (unknown filter fields return 400),
+secure auth secret handling (production requires explicit `AUTH_SECRET`, dev mode is opt-in),
+structured logging (`ForgeLogger` interface), upload lifecycle integrity (storage cleanup on document
+creation failure), and upload limits (configurable `maxFileSize` and `mimeTypes`).
 
 **As of 2026-07-27 there is a second app, `apps/demo-aesthetics`** (spec 039) — a real-world
 marketing site for a fictional skin clinic, built on the CMS with **no changes to any package**, to

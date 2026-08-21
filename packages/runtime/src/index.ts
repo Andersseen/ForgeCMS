@@ -7,7 +7,9 @@ export {
   handleCreate,
   handleUpdate,
   handleDelete,
-  type HandlerOptions
+  type HandlerOptions,
+  DEFAULT_LIMIT,
+  MAX_LIMIT
 } from './handlers.js';
 
 // Serving stored files (spec 040)
@@ -38,10 +40,15 @@ export {
   ForgeError,
   NotFoundError,
   InvalidInputError,
+  InvalidQueryError,
+  UnknownFieldError,
   ValidationFailedError,
   UnauthorizedError,
   AccessDeniedError,
-  isForgeError
+  isForgeError,
+  toApiErrorBody,
+  type ForgeErrorCode,
+  type ForgeApiErrorBody
 } from './errors.js';
 
 export { populateRecord, populateRecords } from './populate.js';

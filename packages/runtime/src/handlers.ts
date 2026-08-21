@@ -2,6 +2,7 @@ import type { ApiContext } from '@forge-cms/api';
 import type { ForgeCmsRuntime } from './runtime.js';
 import type { DatabaseWhere } from '@forge-cms/db';
 import type { CollectionDefinition, DraftStatus } from '@forge-cms/core';
+import { getLogger } from '@forge-cms/core';
 import type { AuthUser, UserRole } from '@forge-cms/auth';
 import { hasAnyRole } from '@forge-cms/auth';
 import * as operations from './operations.js';
@@ -9,8 +10,9 @@ import type { PaginatedDocs } from './operations.js';
 import {
   AccessDeniedError,
   InvalidInputError,
-  ValidationFailedError,
-  isForgeError
+  InvalidQueryError,
+  isForgeError,
+  toApiErrorBody
 } from './errors.js';
 
 const WHERE_OPERATORS = new Set(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'contains']);
@@ -18,10 +20,17 @@ const SYSTEM_SORT_FIELDS = new Set(['id', 'created_at', 'updated_at']);
 const RESERVED_QUERY_PARAMS = new Set(['limit', 'offset', 'sort', 'order', 'depth', 'status']);
 const WHERE_KEY_PATTERN = /^(.+)\[(\w+)\]$/;
 
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 500;
+
 export interface HandlerOptions<TEnv = unknown> {
   runtime: ForgeCmsRuntime<TEnv>;
   requireAuth?: boolean;
   allowedRoles?: UserRole[];
+  upload?: {
+    maxFileSize?: number;
+    mimeTypes?: string[];
+  };
 }
 
 function jsonResponse(data: unknown, status = 200): Response {
@@ -31,31 +40,27 @@ function jsonResponse(data: unknown, status = 200): Response {
   });
 }
 
-function errorResponse(message: string, status = 500): Response {
-  return jsonResponse({ error: message }, status);
+function errorResponse(code: string, message: string, status: number, details?: unknown): Response {
+  return jsonResponse(
+    { error: { code, message, ...(details !== undefined && { details }) } },
+    status
+  );
 }
 
-/**
- * Maps a Local API error to the HTTP envelope. An access denial with no authenticated user is
- * reported as 401 rather than 403 — the caller has not failed a permission check so much as not
- * presented credentials at all.
- */
 function toErrorResponse(err: unknown, user: AuthUser | null): Response {
-  if (err instanceof ValidationFailedError) {
-    return jsonResponse({ error: err.message, details: err.details }, err.status);
-  }
   if (err instanceof AccessDeniedError && user === null) {
-    return errorResponse('Unauthorized', 401);
+    return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
   }
   if (isForgeError(err)) {
-    return errorResponse(err.message, err.status);
+    const body = toApiErrorBody(err);
+    return jsonResponse(body, err.status);
   }
-  return errorResponse(err instanceof Error ? err.message : 'Unknown error', 500);
+  getLogger().error('Unexpected error in request handler', err);
+  return errorResponse('INTERNAL_ERROR', 'An unexpected error occurred', 500);
 }
 
 // --- request parsing -------------------------------------------------------------------------
 
-/** Coerce a raw query-param string to the value type declared by the field (bare `eq` semantics). */
 function coerceScalar(collection: CollectionDefinition, key: string, value: string): unknown {
   const field = collection.fields[key];
   if (!field) return value;
@@ -77,10 +82,14 @@ function coerceScalar(collection: CollectionDefinition, key: string, value: stri
   }
 }
 
-/**
- * Coerce raw query-param strings to a DatabaseWhere. Supports bare equality (`field=value`) and
- * bracket operator syntax (`field[gt]=value`, `field[in]=a,b,c`, ...).
- */
+function assertValidFilterField(collection: CollectionDefinition, key: string): void {
+  if (!SYSTEM_SORT_FIELDS.has(key) && !collection.fields[key]) {
+    throw new InvalidQueryError(
+      `Unknown filter field '${key}' for collection '${collection.slug}'`
+    );
+  }
+}
+
 function parseWhere(collection: CollectionDefinition, url: URL): DatabaseWhere {
   const where: DatabaseWhere = {};
 
@@ -89,14 +98,17 @@ function parseWhere(collection: CollectionDefinition, url: URL): DatabaseWhere {
 
     const match = WHERE_KEY_PATTERN.exec(rawKey);
     if (!match) {
+      assertValidFilterField(collection, rawKey);
       where[rawKey] = coerceScalar(collection, rawKey, value);
       return;
     }
 
     const [, key, operator] = match;
     if (!key || !operator || !WHERE_OPERATORS.has(operator)) {
-      throw new InvalidInputError(`Invalid filter value for field '${rawKey}'`);
+      throw new InvalidQueryError(`Invalid filter operator in '${rawKey}'`);
     }
+
+    assertValidFilterField(collection, key);
 
     if (operator === 'in') {
       where[key] = { in: value.split(',').map((v) => coerceScalar(collection, key, v)) };
@@ -118,38 +130,65 @@ function parseSort(
   if (!sortParam) return {};
 
   if (!SYSTEM_SORT_FIELDS.has(sortParam) && !collection.fields[sortParam]) {
-    throw new InvalidInputError(`Invalid sort field '${sortParam}'`);
+    throw new InvalidQueryError(
+      `Unknown sort field '${sortParam}' for collection '${collection.slug}'`
+    );
   }
 
   const orderParam = url.searchParams.get('order');
   if (orderParam === null) return { sort: sortParam };
   if (orderParam !== 'asc' && orderParam !== 'desc') {
-    throw new InvalidInputError(`Invalid sort order '${orderParam}', expected 'asc' or 'desc'`);
+    throw new InvalidQueryError(`Invalid sort order '${orderParam}', expected 'asc' or 'desc'`);
   }
 
   return { sort: sortParam, order: orderParam };
 }
 
-/** Only `0` (default) and `1` are supported. */
 function parseDepth(url: URL): 0 | 1 {
   const raw = url.searchParams.get('depth');
   if (raw === null || raw === '0') return 0;
   if (raw === '1') return 1;
-  throw new InvalidInputError(`Invalid depth '${raw}', expected '0' or '1'`);
+  throw new InvalidQueryError(`Invalid depth '${raw}', expected '0' or '1'`);
 }
 
 function parseStatus(url: URL): DraftStatus | 'all' | undefined {
   const raw = url.searchParams.get('status');
   if (raw === null) return undefined;
   if (raw === 'draft' || raw === 'published' || raw === 'all') return raw;
-  throw new InvalidInputError(`Invalid status '${raw}', expected 'draft', 'published', or 'all'`);
+  throw new InvalidQueryError(`Invalid status '${raw}', expected 'draft', 'published', or 'all'`);
 }
 
-function parseIntParam(url: URL, name: string): number | undefined {
+function parseStrictInt(
+  url: URL,
+  name: string,
+  opts: { min: number; max?: number }
+): number | undefined {
   if (!url.searchParams.has(name)) return undefined;
-  const parsed = parseInt(url.searchParams.get(name)!, 10);
-  if (Number.isNaN(parsed)) throw new InvalidInputError(`Invalid ${name} value`);
+  const raw = url.searchParams.get(name)!;
+
+  if (!/^-?\d+$/.test(raw)) {
+    throw new InvalidQueryError(`Invalid ${name} value '${raw}', expected an integer`);
+  }
+
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    throw new InvalidQueryError(`Invalid ${name} value '${raw}'`);
+  }
+  if (parsed < opts.min) {
+    throw new InvalidQueryError(`${name} must be >= ${opts.min}, got ${parsed}`);
+  }
+  if (opts.max !== undefined && parsed > opts.max) {
+    throw new InvalidQueryError(`${name} must be <= ${opts.max}, got ${parsed}`);
+  }
   return parsed;
+}
+
+function parseLimit(url: URL): number | undefined {
+  return parseStrictInt(url, 'limit', { min: 0, max: MAX_LIMIT });
+}
+
+function parseOffset(url: URL): number | undefined {
+  return parseStrictInt(url, 'offset', { min: 0 });
 }
 
 // --- auth ------------------------------------------------------------------------------------
@@ -167,17 +206,16 @@ async function authorize<TEnv>(
   try {
     user = await runtime.adapters.auth.requireAuth(context.request);
   } catch {
-    return { success: false, response: errorResponse('Unauthorized', 401) };
+    return { success: false, response: errorResponse('UNAUTHORIZED', 'Unauthorized', 401) };
   }
 
   if (allowedRoles !== undefined && !hasAnyRole(user, allowedRoles)) {
-    return { success: false, response: errorResponse('Forbidden', 403) };
+    return { success: false, response: errorResponse('FORBIDDEN', 'Forbidden', 403) };
   }
 
   return { success: true, user };
 }
 
-/** Best-effort auth so field-level read access and draft visibility still apply on public routes. */
 async function resolveOptionalUser<TEnv>(
   context: ApiContext<TEnv>,
   runtime: ForgeCmsRuntime<TEnv>
@@ -195,13 +233,6 @@ interface ResolvedRequest {
   user: AuthUser | null;
 }
 
-/**
- * Resolves the collection and the acting user, applying the route's static `allowedRoles` gate.
- *
- * A collection that declares its own `access.<operation>` rule takes over from the route gate
- * (spec 013 semantics, preserved): the Local API evaluates that rule instead, which is what allows a
- * rule to be a function returning a row-level constraint.
- */
 async function resolveRequest<TEnv>(
   context: ApiContext<TEnv>,
   options: HandlerOptions<TEnv>,
@@ -211,13 +242,14 @@ async function resolveRequest<TEnv>(
   const { runtime, requireAuth: requireAuthFlag, allowedRoles } = options;
 
   const collectionSlug = context.params?.['collection'];
-  if (!collectionSlug) return errorResponse('Missing collection parameter', 400);
+  if (!collectionSlug) return errorResponse('INVALID_INPUT', 'Missing collection parameter', 400);
   if (needsId && !context.params?.['id']) {
-    return errorResponse('Missing collection or id parameter', 400);
+    return errorResponse('INVALID_INPUT', 'Missing collection or id parameter', 400);
   }
 
   const collection = runtime.getCollection(collectionSlug);
-  if (!collection) return errorResponse(`Collection '${collectionSlug}' not found`, 404);
+  if (!collection)
+    return errorResponse('NOT_FOUND', `Collection '${collectionSlug}' not found`, 404);
 
   const routeRoles = collection.access?.[operation] === undefined ? allowedRoles : undefined;
   const mustAuth = requireAuthFlag === true || routeRoles !== undefined;
@@ -248,8 +280,8 @@ export async function handleList<TEnv = unknown>(
     const url = new URL(context.request.url);
     const where = parseWhere(collection, url);
     const { sort, order } = parseSort(collection, url);
-    const limit = parseIntParam(url, 'limit');
-    const offset = parseIntParam(url, 'offset');
+    const limit = parseLimit(url);
+    const offset = parseOffset(url);
 
     const result: PaginatedDocs = await options.runtime.find({
       collection: collectionSlug,
@@ -268,8 +300,6 @@ export async function handleList<TEnv = unknown>(
       data: result.docs,
       meta: {
         collection: collectionSlug,
-        // `count` is the length of this page and predates pagination metadata; it is kept so
-        // existing clients do not break. `totalDocs` is the number a paginator needs.
         count: result.docs.length,
         limit: result.limit,
         offset: result.offset,
@@ -312,28 +342,39 @@ export async function handleRead<TEnv = unknown>(
   }
 }
 
-/**
- * Reads a `multipart/form-data` create body: stores the `file` part through the storage adapter,
- * then keeps whichever of filename/url/contentType/filesize (plus any other form field) the
- * collection actually declares. Unknown keys are dropped rather than risking an insert against a
- * column the table does not have.
- */
 async function buildMultipartBody<TEnv>(
   context: ApiContext<TEnv>,
   runtime: ForgeCmsRuntime<TEnv>,
-  collection: CollectionDefinition
-): Promise<Record<string, unknown>> {
+  collection: CollectionDefinition,
+  uploadConfig?: { maxFileSize?: number; mimeTypes?: string[] }
+): Promise<{ data: Record<string, unknown>; storageKey: string }> {
   const formData = await context.request.formData();
   const file = formData.get('file');
   if (!(file instanceof File)) {
     throw new InvalidInputError('Missing or invalid "file" part in multipart body');
   }
 
+  if (uploadConfig?.maxFileSize !== undefined && file.size > uploadConfig.maxFileSize) {
+    throw new InvalidInputError(
+      `File size ${file.size} exceeds maximum allowed size of ${uploadConfig.maxFileSize} bytes`
+    );
+  }
+
+  if (uploadConfig?.mimeTypes !== undefined && uploadConfig.mimeTypes.length > 0) {
+    if (!uploadConfig.mimeTypes.includes(file.type)) {
+      throw new InvalidInputError(
+        `File type '${file.type}' is not allowed. Allowed types: ${uploadConfig.mimeTypes.join(', ')}`
+      );
+    }
+  }
+
   const key = `${collection.slug}/${crypto.randomUUID()}-${file.name}`;
+
   await runtime.adapters.storage.put({ key, body: file, contentType: file.type });
+
   const url = await runtime.adapters.storage.getPublicUrl(key);
 
-  const data: Record<string, unknown> = {};
+  const data: Record<string, unknown> = { _storageKey: key };
   const derived: Record<string, unknown> = {
     filename: file.name,
     url,
@@ -350,7 +391,7 @@ async function buildMultipartBody<TEnv>(
     }
   });
 
-  return data;
+  return { data, storageKey: key };
 }
 
 async function readJsonBody(request: Request): Promise<Record<string, unknown>> {
@@ -371,19 +412,39 @@ export async function handleCreate<TEnv = unknown>(
 
   try {
     const contentType = context.request.headers.get('content-type') ?? '';
-    const data =
-      collection.upload === true && contentType.includes('multipart/form-data')
-        ? await buildMultipartBody(context, options.runtime, collection)
-        : await readJsonBody(context.request);
+    let data: Record<string, unknown>;
+    let storageKey: string | undefined;
 
-    const doc = await options.runtime.create({
-      collection: collectionSlug,
-      data,
-      user,
-      overrideAccess: false
-    });
+    if (collection.upload === true && contentType.includes('multipart/form-data')) {
+      const result = await buildMultipartBody(context, options.runtime, collection, options.upload);
+      data = result.data;
+      storageKey = result.storageKey;
+    } else {
+      data = await readJsonBody(context.request);
+    }
 
-    return jsonResponse({ data: doc }, 201);
+    try {
+      const doc = await options.runtime.create({
+        collection: collectionSlug,
+        data,
+        user,
+        overrideAccess: false
+      });
+
+      return jsonResponse({ data: doc }, 201);
+    } catch (createErr) {
+      if (storageKey) {
+        try {
+          await options.runtime.adapters.storage.delete(storageKey);
+        } catch (cleanupErr) {
+          getLogger().error(
+            `Failed to clean up storage object '${storageKey}' after document creation failure`,
+            cleanupErr
+          );
+        }
+      }
+      throw createErr;
+    }
   } catch (err) {
     return toErrorResponse(err, user);
   }
@@ -418,9 +479,14 @@ export async function handleDelete<TEnv = unknown>(
 ): Promise<Response> {
   const resolved = await resolveRequest(context, options, 'delete', true);
   if (resolved instanceof Response) return resolved;
-  const { collectionSlug, user } = resolved;
+  const { collection, collectionSlug, user } = resolved;
 
   try {
+    const existing =
+      collection.upload === true
+        ? await options.runtime.adapters.database.findById(collectionSlug, context.params!['id']!)
+        : null;
+
     await options.runtime.delete({
       collection: collectionSlug,
       id: context.params!['id']!,
@@ -428,10 +494,34 @@ export async function handleDelete<TEnv = unknown>(
       overrideAccess: false
     });
 
+    if (existing && typeof existing.url === 'string') {
+      const storageKey =
+        (existing._storageKey as string) ??
+        extractKeyFromUrl(existing.url as string, collectionSlug);
+      if (storageKey) {
+        try {
+          await options.runtime.adapters.storage.delete(storageKey);
+        } catch (cleanupErr) {
+          getLogger().error(
+            `Failed to clean up storage object '${storageKey}' after document deletion`,
+            cleanupErr
+          );
+        }
+      }
+    }
+
     return new Response(null, { status: 204 });
   } catch (err) {
     return toErrorResponse(err, user);
   }
 }
 
+function extractKeyFromUrl(url: string, collectionSlug: string): string | null {
+  const prefix = `/api/media/${collectionSlug}/`;
+  const idx = url.indexOf(prefix);
+  if (idx === -1) return null;
+  return url.slice(idx + '/api/media/'.length);
+}
+
 export { operations };
+export { DEFAULT_LIMIT, MAX_LIMIT };

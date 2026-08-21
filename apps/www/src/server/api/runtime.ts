@@ -51,6 +51,7 @@ const products = defineCollection({
 
 const media = defineCollection({
   slug: 'media',
+  upload: true,
   fields: {
     filename: defineField.text({ required: true }),
     alt: defineField.text(),
@@ -211,7 +212,10 @@ export function getServerRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<Serve
 
 async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>> {
   const database = env?.DB ? new D1DatabaseAdapter() : new InMemoryDatabaseAdapter();
-  const auth = new UsersCollectionAuthAdapter().init({ ...env, userDatabase: database });
+  const auth = new UsersCollectionAuthAdapter({ devMode: !env?.AUTH_SECRET }).init({
+    ...env,
+    userDatabase: database
+  });
 
   const runtime = new ForgeCmsRuntime<ServerEnv>({
     collections,

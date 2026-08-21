@@ -1,58 +1,98 @@
 import type { ValidationError } from '@forge-cms/core';
 
-/**
- * Base class for every error the Local API throws. `status` is the HTTP status the HTTP layer maps
- * it to — the operations themselves stay transport-agnostic, but they know how serious a failure is,
- * and duplicating that judgement in the route layer is how the two drift apart.
- */
+export type ForgeErrorCode =
+  | 'NOT_FOUND'
+  | 'INVALID_INPUT'
+  | 'VALIDATION_ERROR'
+  | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
+  | 'UNKNOWN_FIELD'
+  | 'INVALID_QUERY'
+  | 'INTERNAL_ERROR';
+
 export class ForgeError extends Error {
   readonly status: number;
+  readonly code: ForgeErrorCode;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code: ForgeErrorCode) {
     super(message);
     this.name = new.target.name;
     this.status = status;
+    this.code = code;
   }
 }
 
-/** 404 — the collection or the document does not exist (or must be indistinguishable from that). */
 export class NotFoundError extends ForgeError {
   constructor(message: string) {
-    super(message, 404);
+    super(message, 404, 'NOT_FOUND');
   }
 }
 
-/** 400 — the request itself is malformed (bad JSON, unknown sort field, uncoercible filter). */
 export class InvalidInputError extends ForgeError {
   constructor(message: string) {
-    super(message, 400);
+    super(message, 400, 'INVALID_INPUT');
   }
 }
 
-/** 400 — the payload is well-formed but fails the collection's schema. */
+export class InvalidQueryError extends ForgeError {
+  constructor(message: string) {
+    super(message, 400, 'INVALID_QUERY');
+  }
+}
+
+export class UnknownFieldError extends ForgeError {
+  constructor(message: string) {
+    super(message, 400, 'UNKNOWN_FIELD');
+  }
+}
+
 export class ValidationFailedError extends ForgeError {
   readonly details: ValidationError[];
 
   constructor(details: ValidationError[]) {
-    super('Validation failed', 400);
+    super('Document validation failed', 400, 'VALIDATION_ERROR');
     this.details = details;
   }
 }
 
-/** 401 — no valid credentials were presented. */
 export class UnauthorizedError extends ForgeError {
   constructor(message = 'Unauthorized') {
-    super(message, 401);
+    super(message, 401, 'UNAUTHORIZED');
   }
 }
 
-/** 403 — credentials are valid but this user may not do this. */
 export class AccessDeniedError extends ForgeError {
   constructor(message = 'Forbidden') {
-    super(message, 403);
+    super(message, 403, 'FORBIDDEN');
   }
 }
 
 export function isForgeError(err: unknown): err is ForgeError {
   return err instanceof ForgeError;
+}
+
+export interface ForgeApiErrorBody {
+  error: {
+    code: ForgeErrorCode;
+    message: string;
+    details?: unknown;
+  };
+}
+
+export function toApiErrorBody(err: ForgeError): ForgeApiErrorBody {
+  if (err instanceof ValidationFailedError) {
+    return {
+      error: {
+        code: err.code,
+        message: err.message,
+        details: err.details
+      }
+    };
+  }
+  return {
+    error: {
+      code: err.code,
+      message: err.message
+    }
+  };
 }

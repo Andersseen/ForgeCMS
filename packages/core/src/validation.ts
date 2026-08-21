@@ -44,7 +44,8 @@ export type ValidationErrorCode =
   | 'relation_collection'
   | 'select_option'
   | 'slug_format'
-  | 'email_format';
+  | 'email_format'
+  | 'unknown_field';
 
 export interface ValidationResult {
   valid: boolean;
@@ -447,11 +448,25 @@ export function validateField(
   return errors;
 }
 
+const SYSTEM_FIELDS = new Set(['id', 'created_at', 'updated_at', '_status', '_storageKey']);
+
 export function validateCollection<TSlug extends string, TFields extends Record<string, AnyField>>(
   collection: CollectionDefinition<TSlug, TFields>,
   data: Record<string, unknown>
 ): ValidationResult {
   const errors = validateFieldMap(collection.fields, data);
+
+  for (const key of Object.keys(data)) {
+    if (!collection.fields[key] && !SYSTEM_FIELDS.has(key)) {
+      errors.push(
+        createError(
+          key,
+          'unknown_field',
+          `Unknown field "${key}" for collection "${collection.slug}"`
+        )
+      );
+    }
+  }
 
   return {
     valid: errors.length === 0,

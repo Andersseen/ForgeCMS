@@ -5,12 +5,12 @@ import { UsersCollectionAuthAdapter } from './users-collection.adapter.js';
 
 function createAdapter() {
   const db = new InMemoryDatabaseAdapter();
-  return new UsersCollectionAuthAdapter().init({ userDatabase: db });
+  return new UsersCollectionAuthAdapter({ devMode: true }).init({ userDatabase: db });
 }
 
 async function createAdapterWithUser(password = 'password123') {
   const db = new InMemoryDatabaseAdapter();
-  const adapter = new UsersCollectionAuthAdapter().init({ userDatabase: db });
+  const adapter = new UsersCollectionAuthAdapter({ devMode: true }).init({ userDatabase: db });
   await adapter.createUser({
     email: 'test@example.com',
     password,
@@ -20,7 +20,6 @@ async function createAdapterWithUser(password = 'password123') {
   return { adapter, db };
 }
 
-// Contract tests need a pre-authenticated request. We create a user and issue a token once.
 const contractAdapter = createAdapter();
 const contractUser = await contractAdapter.createUser({
   email: 'contract@example.com',
@@ -45,6 +44,27 @@ describe('UsersCollectionAuthAdapter', () => {
     const created = await createAdapterWithUser();
     adapter = created.adapter;
     db = created.db;
+  });
+
+  it('init() throws without AUTH_SECRET or devMode', () => {
+    const db = new InMemoryDatabaseAdapter();
+    expect(() => new UsersCollectionAuthAdapter().init({ userDatabase: db })).toThrow(
+      'UsersCollectionAuthAdapter requires AUTH_SECRET to be set'
+    );
+  });
+
+  it('init() succeeds with devMode', () => {
+    const db = new InMemoryDatabaseAdapter();
+    expect(() =>
+      new UsersCollectionAuthAdapter({ devMode: true }).init({ userDatabase: db })
+    ).not.toThrow();
+  });
+
+  it('init() succeeds with AUTH_SECRET', () => {
+    const db = new InMemoryDatabaseAdapter();
+    expect(() =>
+      new UsersCollectionAuthAdapter().init({ AUTH_SECRET: 'test-secret', userDatabase: db })
+    ).not.toThrow();
   });
 
   it('logs in with valid credentials', async () => {

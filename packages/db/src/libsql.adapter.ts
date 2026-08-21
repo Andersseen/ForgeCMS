@@ -28,6 +28,13 @@ import {
 import { toOperatorValue } from './where.js';
 import type { DatabaseWhere } from './where.js';
 
+const SYSTEM_COLUMNS = new Set(['id', 'created_at', 'updated_at', '_status', '_storageKey']);
+
+function assertValidColumn(key: string, collectionDef: CollectionDefinition | undefined): void {
+  if (SYSTEM_COLUMNS.has(key) || collectionDef?.fields[key]) return;
+  throw new Error(`Unknown column '${key}'`);
+}
+
 export interface LibSqlEnv {
   DATABASE_URL?: string;
 }
@@ -191,6 +198,7 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
 
     for (const [key, value] of Object.entries(data)) {
       if (key === 'id') continue;
+      assertValidColumn(key, collectionDef);
       const field = collectionDef?.fields[key];
       record[key] = field ? toDbValue(value, field.kind) : value;
     }
@@ -213,6 +221,7 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
     const updates: DatabaseRecord = { updated_at: now };
     for (const [key, value] of Object.entries(data)) {
       if (key === 'id') continue;
+      assertValidColumn(key, collectionDef);
       const field = collectionDef?.fields[key];
       updates[key] = field ? toDbValue(value, field.kind) : value;
     }

@@ -496,3 +496,22 @@ export {
   type ValidationErrorCode,
   type ValidationResult
 } from './validation.js';
+
+// Identifier validation
+export {
+  isValidIdentifier,
+  assertValidIdentifier,
+  isSystemField,
+  getSystemFields,
+  validateCollectionIdentifiers,
+  IDENTIFIER_PATTERN
+} from './identifiers.js';
+
+// Structured logging
+export {
+  type ForgeLogger,
+  getLogger,
+  setLogger,
+  createSilentLogger,
+  consoleLogger
+} from './logger.js';

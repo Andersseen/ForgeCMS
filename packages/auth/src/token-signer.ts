@@ -39,7 +39,14 @@ function getKey(secret: string): Promise<CryptoKey> {
 }
 
 export function extractToken(request: Request): string | null {
-  return request.headers.get('authorization')?.replace('Bearer ', '') ?? null;
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader) return null;
+
+  const match = /^Bearer\s+(.+)$/i.exec(authHeader);
+  if (!match?.[1]) return null;
+
+  const token = match[1].trim();
+  return token.length > 0 ? token : null;
 }
 
 export async function issueToken(secret: string, user: AuthUser): Promise<string> {
