@@ -27,6 +27,11 @@ import {
 import { assertWritableFields, filterReadableFields, FieldAccessError } from './field-access.js';
 import { populateRecord, populateRecords } from './populate.js';
 import { createVersion, versionsEnabled } from './versions.js';
+import {
+  isLocalizedCollection,
+  storeLocalizedDocument,
+  resolveLocalizedDocument
+} from './localization.js';
 
 /** A page of documents plus everything a paginator needs. */
 export interface PaginatedDocs<TDoc = DatabaseRecord> {
@@ -56,6 +61,8 @@ export interface BaseOperationArgs {
   overrideAccess?: boolean;
   /** `1` replaces relation ids with the related document. Only one level is supported. */
   depth?: 0 | 1;
+  /** Locale for reading/writing localized fields. */
+  locale?: string;
 }
 
 export interface FindArgs extends BaseOperationArgs {
@@ -193,7 +200,7 @@ async function prepareForRead(
   ctx: OperationContext,
   collection: CollectionDefinition,
   records: DatabaseRecord[],
-  args: { user?: CmsUser | null; overrideAccess?: boolean; depth?: 0 | 1 }
+  args: { user?: CmsUser | null; overrideAccess?: boolean; depth?: 0 | 1; locale?: string }
 ): Promise<DatabaseRecord[]> {
   const user = args.user ?? null;
   const overrideAccess = args.overrideAccess !== false;
@@ -205,6 +212,11 @@ async function prepareForRead(
 
   if (args.overrideAccess === false) {
     docs = await Promise.all(docs.map((doc) => filterReadableFields(doc, collection, user)));
+  }
+
+  // Resolve localized fields if locale is specified
+  if (args.locale && isLocalizedCollection(collection)) {
+    docs = docs.map((doc) => resolveLocalizedDocument(doc, collection, args.locale));
   }
 
   docs = await Promise.all(
@@ -362,12 +374,18 @@ export async function create(ctx: OperationContext, args: CreateArgs): Promise<D
   // and validation only ever sees the final value.
   const seeded = applyAutoSlugs(collection, applyFieldDefaults(collection, args.data));
 
+  // Process localized fields if the collection has locales configured
+  const processedData =
+    isLocalizedCollection(collection) && args.locale
+      ? storeLocalizedDocument(seeded, collection, args.locale)
+      : seeded;
+
   let data = await runRejectableStage(
     async () =>
       runBeforeValidateHooks(collection, {
         operation: 'create',
         data: await runFieldHooks(collection, 'beforeValidate', {
-          data: seeded,
+          data: processedData,
           operation: 'create',
           user,
           overrideAccess
@@ -459,12 +477,18 @@ export async function update(ctx: OperationContext, args: UpdateArgs): Promise<D
     }
   }
 
+  // Process localized fields if the collection has locales configured
+  const processedData =
+    isLocalizedCollection(collection) && args.locale
+      ? storeLocalizedDocument(args.data, collection, args.locale, existing)
+      : args.data;
+
   let data = await runRejectableStage(
     async () =>
       runBeforeValidateHooks(collection, {
         operation: 'update',
         data: await runFieldHooks(collection, 'beforeValidate', {
-          data: applyAutoSlugs(collection, args.data, existing),
+          data: applyAutoSlugs(collection, processedData, existing),
           previousData: existing,
           operation: 'update',
           user,

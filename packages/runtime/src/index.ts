@@ -66,6 +66,18 @@ export {
   type CreateVersionArgs
 } from './versions.js';
 
+// Localization — i18n fields, locale resolution, fallback chain.
+export {
+  resolveLocale,
+  getLocalizedValue,
+  setLocalizedValue,
+  isLocalizedCollection,
+  isLocalizedField,
+  extractLocaleFromRequest,
+  resolveLocalizedDocument,
+  storeLocalizedDocument
+} from './localization.js';
+
 export {
   ForgeError,
   NotFoundError,

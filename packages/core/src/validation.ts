@@ -65,6 +65,29 @@ function validateTextLike(
 ): ValidationError[] {
   const errors: ValidationError[] = [];
 
+  // Localized fields store values as objects with locale keys
+  if (field.options.localized === true) {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      errors.push(
+        createError(fieldName, typeCode, `Field "${fieldName}" must be an object with locale keys.`)
+      );
+      return errors;
+    }
+    // Validate each locale value
+    for (const [locale, localeValue] of Object.entries(value)) {
+      if (typeof localeValue !== 'string') {
+        errors.push(
+          createError(
+            fieldName,
+            typeCode,
+            `Field "${fieldName}" locale "${locale}" must be a ${typeLabel}.`
+          )
+        );
+      }
+    }
+    return errors;
+  }
+
   if (typeof value !== 'string') {
     errors.push(createError(fieldName, typeCode, `Field "${fieldName}" must be a ${typeLabel}.`));
     return errors;

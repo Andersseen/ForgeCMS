@@ -132,6 +132,11 @@ export interface BaseFieldOptions {
   index?: boolean;
   access?: FieldAccess;
   hooks?: FieldHooks;
+  /**
+   * When true, the field stores values per locale as `{ en: "Hello", es: "Hola" }`.
+   * The stored value is a JSON object with locale codes as keys.
+   */
+  localized?: boolean;
 }
 
 export interface TextFieldOptions extends BaseFieldOptions {
@@ -389,6 +394,12 @@ export interface CollectionDefinition<
    * listed, compared, and restored. Autosave creates frequent drafts without publishing.
    */
   versions?: boolean | { autosave?: boolean };
+  /**
+   * Supported locales for this collection. When set, fields marked with `localized: true`
+   * store values per locale. First locale is the default/fallback.
+   * Example: `['en', 'es', 'fr']`
+   */
+  locales?: string[];
 }
 
 /**
