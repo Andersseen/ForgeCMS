@@ -689,5 +689,80 @@ export async function handleRestoreVersion<TEnv = unknown>(
   }
 }
 
+// --- preview --------------------------------------------------------------------------------
+
+export interface PreviewOptions {
+  /** Allow previewing drafts without authentication (for preview tokens). */
+  allowDraftPreview?: boolean;
+}
+
+/**
+ * Generates a preview of a document by merging stored data with unsaved changes.
+ * Useful for live preview in the admin UI before saving.
+ */
+export async function handlePreview<TEnv = unknown>(
+  context: ApiContext<TEnv>,
+  options: HandlerOptions<TEnv> & PreviewOptions
+): Promise<Response> {
+  const collectionSlug = context.params?.['collection'];
+  if (!collectionSlug) {
+    return errorResponse('INVALID_INPUT', 'Missing collection parameter', 400);
+  }
+
+  const collection = options.runtime.getCollection(collectionSlug);
+  if (!collection) {
+    return errorResponse('NOT_FOUND', `Collection '${collectionSlug}' not found`, 404);
+  }
+
+  let user: AuthUser | null = null;
+  try {
+    user = await options.runtime.adapters.auth.requireAuth(context.request);
+  } catch {
+    // Preview might be allowed without auth for draft preview
+    if (!options.allowDraftPreview) {
+      return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
+    }
+  }
+
+  try {
+    const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
+    const documentId = context.params?.['id'];
+    const depth = parseDepth(new URL(context.request.url));
+
+    let previewData: Record<string, unknown>;
+    let existing: Record<string, unknown> | null = null;
+
+    if (documentId) {
+      // Preview existing document with changes
+      existing = await options.runtime.adapters.database.findById(collectionSlug, documentId);
+      if (!existing) {
+        return errorResponse('NOT_FOUND', `Document '${documentId}' not found`, 404);
+      }
+      previewData = { ...existing, ...body };
+    } else {
+      // Preview new document
+      previewData = body;
+    }
+
+    // Apply field defaults and auto-slugs
+    const { applyFieldDefaults, applyAutoSlugs } = await import('./defaults.js');
+    previewData = applyAutoSlugs(
+      collection,
+      applyFieldDefaults(collection, previewData),
+      existing ?? undefined
+    );
+
+    // Populate relations if depth > 0
+    if (depth > 0) {
+      const { populateRecord } = await import('./populate.js');
+      previewData = await populateRecord(previewData, collection, options.runtime);
+    }
+
+    return jsonResponse({ data: previewData });
+  } catch (err) {
+    return toErrorResponse(err, user);
+  }
+}
+
 export { operations };
 export { DEFAULT_LIMIT, MAX_LIMIT };

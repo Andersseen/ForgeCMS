@@ -168,4 +168,53 @@ export class ForgeCmsRuntime<TEnv = unknown> implements OperationContext {
   createVersion(args: CreateVersionArgs): Promise<Version> {
     return versionOps.createVersion(this, args);
   }
+
+  // --- Preview ----------------------------------------------------------------------------
+
+  /**
+   * Generates a preview of a document by merging stored data with unsaved changes.
+   * If id is provided, merges changes with existing document. Otherwise, previews new document.
+   */
+  async preview(args: {
+    collection: string;
+    data: Record<string, unknown>;
+    id?: string;
+    depth?: 0 | 1;
+  }): Promise<DatabaseRecord> {
+    const collection = this.getCollection(args.collection);
+    if (!collection) {
+      throw new (await import('./errors.js')).NotFoundError(
+        `Collection '${args.collection}' not found`
+      );
+    }
+
+    let previewData: Record<string, unknown>;
+    let existing: DatabaseRecord | null = null;
+
+    if (args.id) {
+      existing = await this.adapters.database.findById(args.collection, args.id);
+      if (!existing) {
+        throw new (await import('./errors.js')).NotFoundError(`Document '${args.id}' not found`);
+      }
+      previewData = { ...existing, ...args.data };
+    } else {
+      previewData = args.data;
+    }
+
+    // Apply field defaults and auto-slugs
+    const { applyFieldDefaults, applyAutoSlugs } = await import('./defaults.js');
+    previewData = applyAutoSlugs(
+      collection,
+      applyFieldDefaults(collection, previewData),
+      existing ?? undefined
+    );
+
+    // Populate relations if depth > 0
+    if (args.depth && args.depth > 0) {
+      const { populateRecord } = await import('./populate.js');
+      previewData = await populateRecord(previewData, collection, this);
+    }
+
+    return previewData;
+  }
 }

@@ -12,7 +12,9 @@ export {
   handleListVersions,
   handleGetVersion,
   handleRestoreVersion,
+  handlePreview,
   type HandlerOptions,
+  type PreviewOptions,
   DEFAULT_LIMIT,
   MAX_LIMIT
 } from './handlers.js';

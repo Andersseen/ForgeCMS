@@ -162,6 +162,30 @@ export class CmsApiService {
     return result.data;
   }
 
+  /**
+   * Generates a preview of a document by merging stored data with unsaved changes.
+   * Useful for live preview in the admin UI before saving.
+   * If id is provided, merges changes with existing document. Otherwise, previews new document.
+   */
+  async previewDocument<T = Record<string, unknown>>(
+    collection: string,
+    data: Record<string, unknown>,
+    options?: { id?: string; depth?: 0 | 1 }
+  ): Promise<T> {
+    const url = options?.id
+      ? `${this.baseUrl}/${collection}/${options.id}/preview${buildQueryString(options.depth !== undefined ? { depth: options.depth } : undefined)}`
+      : `${this.baseUrl}/${collection}/preview${buildQueryString(options?.depth !== undefined ? { depth: options.depth } : undefined)}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw await toApiError(response, 'Failed to preview document');
+    const result = (await response.json()) as ApiItemResponse<T>;
+    return result.data;
+  }
+
   async deleteDocument(collection: string, id: string): Promise<void> {
     const response = await fetch(`${this.baseUrl}/${collection}/${id}`, {
       method: 'DELETE',
