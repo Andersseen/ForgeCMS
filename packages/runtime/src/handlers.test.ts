@@ -167,7 +167,7 @@ describe('CRUD Handlers', () => {
       const body = await response.json();
 
       expect(response.status).toBe(400);
-      expect(body.error).toContain('views');
+      expect(body.error.message).toContain('views');
     });
 
     it('returns 400 for an invalid boolean filter', async () => {
@@ -178,17 +178,19 @@ describe('CRUD Handlers', () => {
       const body = await response.json();
 
       expect(response.status).toBe(400);
-      expect(body.error).toContain('published');
+      expect(body.error.message).toContain('published');
     });
 
-    it('passes through query params that are not field names unchanged', async () => {
+    it('rejects query params that are not field names', async () => {
       await runtime.adapters.database.create('posts', { title: 'Hello' });
 
       const context = createTestContext('GET', 'https://forge.test/api/posts?unknownParam=1');
       context.params = { collection: 'posts' };
 
       const response = await handleList(context, { runtime });
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.error.message).toContain('unknownParam');
     });
 
     it('filters with the gt bracket operator', async () => {
@@ -229,7 +231,7 @@ describe('CRUD Handlers', () => {
       const body = await response.json();
 
       expect(response.status).toBe(400);
-      expect(body.error).toContain('views[bogus]');
+      expect(body.error.message).toContain('views[bogus]');
     });
 
     it('sorts by a field in descending order', async () => {
@@ -258,7 +260,7 @@ describe('CRUD Handlers', () => {
       const body = await response.json();
 
       expect(response.status).toBe(400);
-      expect(body.error).toContain('nonexistent');
+      expect(body.error.message).toContain('nonexistent');
     });
 
     it('returns 400 for an invalid sort order', async () => {
@@ -272,7 +274,7 @@ describe('CRUD Handlers', () => {
       const body = await response.json();
 
       expect(response.status).toBe(400);
-      expect(body.error).toContain('sideways');
+      expect(body.error.message).toContain('sideways');
     });
   });
 
@@ -630,7 +632,7 @@ describe('CRUD Handlers', () => {
       const body = await response.json();
 
       expect(response.status).toBe(400);
-      expect(body.error).toContain('depth');
+      expect(body.error.message).toContain('depth');
     });
   });
 
@@ -775,7 +777,7 @@ describe('CRUD Handlers', () => {
       const body = await response.json();
 
       expect(response.status).toBe(403);
-      expect(body.error).toContain('internalNote');
+      expect(body.error.message).toContain('internalNote');
     });
 
     it('runs a beforeChange hook that mutates data before validation', async () => {
@@ -811,7 +813,7 @@ describe('CRUD Handlers', () => {
       const body = await response.json();
 
       expect(response.status).toBe(400);
-      expect(body.error).toContain('rejected by hook');
+      expect(body.error.message).toContain('rejected by hook');
     });
 
     it('runs an afterChange hook after a successful create', async () => {
@@ -903,7 +905,7 @@ describe('CRUD Handlers', () => {
       const body = await response.json();
 
       expect(response.status).toBe(400);
-      expect(body.error).toContain('file');
+      expect(body.error.message).toContain('file');
     });
 
     it('still accepts a plain JSON create on an upload-enabled collection', async () => {

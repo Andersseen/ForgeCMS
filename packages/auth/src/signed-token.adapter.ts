@@ -6,11 +6,14 @@ export interface SignedTokenEnv {
   AUTH_SECRET?: string;
 }
 
+export interface SignedTokenAdapterOptions {
+  devMode?: boolean;
+}
+
 /** Demo credentials published on the login page — intentional for a public demo. */
 export const DEMO_CREDENTIALS = { email: 'demo@forgecms.dev', password: 'forgecms-demo' } as const;
 
 const DEV_SECRET = 'forgecms-dev-only-signing-secret-do-not-use-in-real-deployments';
-// SHA-256 of DEMO_CREDENTIALS.password — avoids a plaintext credential in source.
 const DEMO_PASSWORD_HASH = 'aa4621ba371597dfbbdb49da1b6fc6e963c614581701f16a28803ad4b05ee70d';
 
 async function sha256Hex(input: string): Promise<string> {
@@ -20,41 +23,60 @@ async function sha256Hex(input: string): Promise<string> {
     .join('');
 }
 
-/**
- * Minimal HS256-JWT-like signed-token auth adapter, Web Crypto only (no jsonwebtoken/jose
- * dependency — consistent with CONVENTIONS.md's near-zero-runtime-deps rule, and Web Crypto works
- * identically in Node 18+ and Cloudflare Workers).
- */
 export class SignedTokenAuthAdapter implements AuthAdapter {
   readonly name = 'signed-token';
-  private secret = DEV_SECRET;
+  private secret?: string;
+  private readonly devMode: boolean;
+
+  constructor(options: SignedTokenAdapterOptions = {}) {
+    this.devMode = options.devMode ?? false;
+  }
 
   init(env?: SignedTokenEnv): this {
-    this.secret = env?.AUTH_SECRET ?? DEV_SECRET;
-    return this;
+    if (env?.AUTH_SECRET) {
+      this.secret = env.AUTH_SECRET;
+      return this;
+    }
+
+    if (this.devMode) {
+      this.secret = DEV_SECRET;
+      return this;
+    }
+
+    throw new Error(
+      'SignedTokenAuthAdapter requires AUTH_SECRET to be set. ' +
+        'In development, pass { devMode: true } to the constructor to use the built-in dev secret. ' +
+        'In production, set AUTH_SECRET as an environment variable or secret.'
+    );
+  }
+
+  private getSecret(): string {
+    if (!this.secret) {
+      throw new Error('SignedTokenAuthAdapter not initialized. Call init() first.');
+    }
+    return this.secret;
   }
 
   extractToken(request: Request): string | null {
     return extractToken(request);
   }
 
-  /** Signs a token for a given user directly — used by `login()` and by tests. */
   async issueToken(user: AuthUser): Promise<string> {
-    return issueToken(this.secret, user);
+    return issueToken(this.getSecret(), user);
   }
 
   async validateSession(token: string): Promise<AuthSession | null> {
-    return validateSession(this.secret, token);
+    return validateSession(this.getSecret(), token);
   }
 
   async requireAuth(request: Request): Promise<AuthUser> {
     const token = this.extractToken(request);
-    const session = await this.validateSession(token ?? '');
+    if (!token) throw new ForgeAuthError('Unauthorized', 'unauthorized');
+    const session = await this.validateSession(token);
     if (!session) throw new ForgeAuthError('Unauthorized', 'unauthorized');
     return session.user;
   }
 
-  /** Validates email/password against the one hardcoded demo user; returns a signed token + user, or null. */
   async login(email: string, password: string): Promise<{ token: string; user: AuthUser } | null> {
     if (email !== DEMO_CREDENTIALS.email) return null;
     const hash = await sha256Hex(password);

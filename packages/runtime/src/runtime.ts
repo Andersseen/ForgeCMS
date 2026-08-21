@@ -1,5 +1,6 @@
 import type { ForgeCmsConfig, AdapterSet } from './config.js';
-import type { CollectionDefinition } from '@forge-cms/core';
+import type { CollectionDefinition, GlobalDefinition, AnyField } from '@forge-cms/core';
+import { defineField } from '@forge-cms/core';
 import type { DatabaseRecord } from '@forge-cms/db';
 import type { OperationContext } from './context.js';
 import * as operations from './operations.js';
@@ -12,10 +13,20 @@ import type {
   PaginatedDocs,
   UpdateArgs
 } from './operations.js';
+import * as globalOps from './globals.js';
+import type { GetGlobalArgs, UpdateGlobalArgs } from './globals.js';
+import * as versionOps from './versions.js';
+import type {
+  ListVersionsArgs,
+  GetVersionArgs,
+  RestoreVersionArgs,
+  CreateVersionArgs
+} from './versions.js';
+import type { Version } from '@forge-cms/core';
 
 /**
  * The CMS instance: collections bound to adapters, plus the **Local API** — `find`, `findByID`,
- * `create`, `update`, `delete`, `count`.
+ * `create`, `update`, `delete`, `count`, `getGlobal`, `updateGlobal`.
  *
  * The Local API is the primary way to use ForgeCMS from server code (an Analog.js `.server.ts`
  * route, a Nitro handler, a seed script). It runs the full pipeline — hooks, access, drafts,
@@ -44,9 +55,44 @@ export class ForgeCmsRuntime<TEnv = unknown> implements OperationContext {
     return this;
   }
 
-  /** Sync database schema for all registered collections */
+  /** Sync database schema for all registered collections and globals */
   async syncSchema(): Promise<void> {
     await this.adapters.database.syncSchema(this.config.collections);
+
+    for (const global of this.config.globals ?? []) {
+      await this.adapters.database.syncSchema([
+        {
+          slug: `_global_${global.slug}`,
+          fields: global.fields,
+          ...(global.drafts === true && { drafts: true })
+        }
+      ]);
+    }
+
+    // Create version tables for collections with versions enabled
+    for (const collection of this.config.collections) {
+      if (
+        collection.versions === true ||
+        (typeof collection.versions === 'object' && collection.versions !== null)
+      ) {
+        const versionFields: Record<string, AnyField> = {
+          documentId: defineField.text({ required: true }),
+          versionNumber: defineField.number({ required: true }),
+          data: defineField.json({ required: true }),
+          createdAt: defineField.date({ required: true }),
+          createdBy: defineField.text(),
+          autosave: defineField.boolean(),
+          label: defineField.text()
+        };
+
+        await this.adapters.database.syncSchema([
+          {
+            slug: `_versions_${collection.slug}`,
+            fields: versionFields
+          }
+        ]);
+      }
+    }
   }
 
   /** Find a collection definition by slug */
@@ -57,6 +103,16 @@ export class ForgeCmsRuntime<TEnv = unknown> implements OperationContext {
   /** Get all registered collection definitions */
   getCollections(): readonly CollectionDefinition[] {
     return this.config.collections;
+  }
+
+  /** Find a global definition by slug */
+  getGlobal(slug: string): GlobalDefinition | undefined {
+    return this.config.globals?.find((g) => g.slug === slug);
+  }
+
+  /** Get all registered global definitions */
+  getGlobals(): readonly GlobalDefinition[] {
+    return this.config.globals ?? [];
   }
 
   // --- Local API ---------------------------------------------------------------------------
@@ -83,5 +139,82 @@ export class ForgeCmsRuntime<TEnv = unknown> implements OperationContext {
 
   delete(args: DeleteArgs): Promise<DatabaseRecord> {
     return operations.deleteDocument(this, args);
+  }
+
+  // --- Globals -----------------------------------------------------------------------------
+
+  getGlobalDocument(args: GetGlobalArgs): Promise<DatabaseRecord | null> {
+    return globalOps.getGlobal(this, args);
+  }
+
+  updateGlobalDocument(args: UpdateGlobalArgs): Promise<DatabaseRecord> {
+    return globalOps.updateGlobal(this, args);
+  }
+
+  // --- Versions ---------------------------------------------------------------------------
+
+  listVersions(args: ListVersionsArgs): Promise<Version[]> {
+    return versionOps.listVersions(this, args);
+  }
+
+  getVersion(args: GetVersionArgs): Promise<Version> {
+    return versionOps.getVersion(this, args);
+  }
+
+  restoreVersion(args: RestoreVersionArgs): Promise<DatabaseRecord> {
+    return versionOps.restoreVersion(this, args);
+  }
+
+  createVersion(args: CreateVersionArgs): Promise<Version> {
+    return versionOps.createVersion(this, args);
+  }
+
+  // --- Preview ----------------------------------------------------------------------------
+
+  /**
+   * Generates a preview of a document by merging stored data with unsaved changes.
+   * If id is provided, merges changes with existing document. Otherwise, previews new document.
+   */
+  async preview(args: {
+    collection: string;
+    data: Record<string, unknown>;
+    id?: string;
+    depth?: 0 | 1;
+  }): Promise<DatabaseRecord> {
+    const collection = this.getCollection(args.collection);
+    if (!collection) {
+      throw new (await import('./errors.js')).NotFoundError(
+        `Collection '${args.collection}' not found`
+      );
+    }
+
+    let previewData: Record<string, unknown>;
+    let existing: DatabaseRecord | null = null;
+
+    if (args.id) {
+      existing = await this.adapters.database.findById(args.collection, args.id);
+      if (!existing) {
+        throw new (await import('./errors.js')).NotFoundError(`Document '${args.id}' not found`);
+      }
+      previewData = { ...existing, ...args.data };
+    } else {
+      previewData = args.data;
+    }
+
+    // Apply field defaults and auto-slugs
+    const { applyFieldDefaults, applyAutoSlugs } = await import('./defaults.js');
+    previewData = applyAutoSlugs(
+      collection,
+      applyFieldDefaults(collection, previewData),
+      existing ?? undefined
+    );
+
+    // Populate relations if depth > 0
+    if (args.depth && args.depth > 0) {
+      const { populateRecord } = await import('./populate.js');
+      previewData = await populateRecord(previewData, collection, this);
+    }
+
+    return previewData;
   }
 }

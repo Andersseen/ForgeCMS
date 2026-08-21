@@ -28,6 +28,7 @@ export {
   type CreateUserInput,
   type FieldMeta,
   type ForgeCmsConfig,
+  type GlobalMeta,
   type ListMeta,
   type PaginatedDocuments,
   type UserRole

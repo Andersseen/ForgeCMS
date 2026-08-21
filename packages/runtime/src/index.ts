@@ -7,7 +7,16 @@ export {
   handleCreate,
   handleUpdate,
   handleDelete,
-  type HandlerOptions
+  handleGlobalRead,
+  handleGlobalUpdate,
+  handleListVersions,
+  handleGetVersion,
+  handleRestoreVersion,
+  handlePreview,
+  type HandlerOptions,
+  type PreviewOptions,
+  DEFAULT_LIMIT,
+  MAX_LIMIT
 } from './handlers.js';
 
 // Serving stored files (spec 040)
@@ -34,14 +43,64 @@ export {
   type DeleteArgs
 } from './operations.js';
 
+// Globals — singleton documents (site-wide config: nav, footer, SEO defaults).
+export {
+  getGlobal,
+  updateGlobal,
+  type GlobalBaseArgs,
+  type GetGlobalArgs,
+  type UpdateGlobalArgs
+} from './globals.js';
+
+// Versions — document history, diff, restore.
+export {
+  listVersions,
+  getVersion,
+  restoreVersion,
+  createVersion,
+  versionsEnabled,
+  autosaveEnabled,
+  type ListVersionsArgs,
+  type GetVersionArgs,
+  type RestoreVersionArgs,
+  type CreateVersionArgs
+} from './versions.js';
+
+// Localization — i18n fields, locale resolution, fallback chain.
+export {
+  resolveLocale,
+  getLocalizedValue,
+  setLocalizedValue,
+  isLocalizedCollection,
+  isLocalizedField,
+  extractLocaleFromRequest,
+  resolveLocalizedDocument,
+  storeLocalizedDocument
+} from './localization.js';
+
+// Relation integrity — cascade, restrict, set-null on delete.
+export {
+  findRelationFields,
+  findReferencingDocuments,
+  checkDeleteRestrictions,
+  handleCascadeDelete,
+  handleSetNullOnDelete,
+  findOrphanedDocuments
+} from './relation-integrity.js';
+
 export {
   ForgeError,
   NotFoundError,
   InvalidInputError,
+  InvalidQueryError,
+  UnknownFieldError,
   ValidationFailedError,
   UnauthorizedError,
   AccessDeniedError,
-  isForgeError
+  isForgeError,
+  toApiErrorBody,
+  type ForgeErrorCode,
+  type ForgeApiErrorBody
 } from './errors.js';
 
 export { populateRecord, populateRecords } from './populate.js';
@@ -51,7 +110,10 @@ export {
   describeCollection,
   describeCollections,
   describeFields,
+  describeGlobal,
+  describeGlobals,
   type CollectionDescription,
+  type GlobalDescription,
   type FieldDescription,
   type BlockDescription
 } from './describe.js';

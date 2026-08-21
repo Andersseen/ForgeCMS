@@ -44,7 +44,8 @@ export type ValidationErrorCode =
   | 'relation_collection'
   | 'select_option'
   | 'slug_format'
-  | 'email_format';
+  | 'email_format'
+  | 'unknown_field';
 
 export interface ValidationResult {
   valid: boolean;
@@ -63,6 +64,29 @@ function validateTextLike(
   typeLabel: string
 ): ValidationError[] {
   const errors: ValidationError[] = [];
+
+  // Localized fields store values as objects with locale keys
+  if (field.options.localized === true) {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      errors.push(
+        createError(fieldName, typeCode, `Field "${fieldName}" must be an object with locale keys.`)
+      );
+      return errors;
+    }
+    // Validate each locale value
+    for (const [locale, localeValue] of Object.entries(value)) {
+      if (typeof localeValue !== 'string') {
+        errors.push(
+          createError(
+            fieldName,
+            typeCode,
+            `Field "${fieldName}" locale "${locale}" must be a ${typeLabel}.`
+          )
+        );
+      }
+    }
+    return errors;
+  }
 
   if (typeof value !== 'string') {
     errors.push(createError(fieldName, typeCode, `Field "${fieldName}" must be a ${typeLabel}.`));
@@ -447,11 +471,25 @@ export function validateField(
   return errors;
 }
 
+const SYSTEM_FIELDS = new Set(['id', 'created_at', 'updated_at', '_status', '_storageKey']);
+
 export function validateCollection<TSlug extends string, TFields extends Record<string, AnyField>>(
   collection: CollectionDefinition<TSlug, TFields>,
   data: Record<string, unknown>
 ): ValidationResult {
   const errors = validateFieldMap(collection.fields, data);
+
+  for (const key of Object.keys(data)) {
+    if (!collection.fields[key] && !SYSTEM_FIELDS.has(key)) {
+      errors.push(
+        createError(
+          key,
+          'unknown_field',
+          `Unknown field "${key}" for collection "${collection.slug}"`
+        )
+      );
+    }
+  }
 
   return {
     valid: errors.length === 0,

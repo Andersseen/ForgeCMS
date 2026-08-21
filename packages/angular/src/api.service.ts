@@ -162,6 +162,30 @@ export class CmsApiService {
     return result.data;
   }
 
+  /**
+   * Generates a preview of a document by merging stored data with unsaved changes.
+   * Useful for live preview in the admin UI before saving.
+   * If id is provided, merges changes with existing document. Otherwise, previews new document.
+   */
+  async previewDocument<T = Record<string, unknown>>(
+    collection: string,
+    data: Record<string, unknown>,
+    options?: { id?: string; depth?: 0 | 1 }
+  ): Promise<T> {
+    const url = options?.id
+      ? `${this.baseUrl}/${collection}/${options.id}/preview${buildQueryString(options.depth !== undefined ? { depth: options.depth } : undefined)}`
+      : `${this.baseUrl}/${collection}/preview${buildQueryString(options?.depth !== undefined ? { depth: options.depth } : undefined)}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw await toApiError(response, 'Failed to preview document');
+    const result = (await response.json()) as ApiItemResponse<T>;
+    return result.data;
+  }
+
   async deleteDocument(collection: string, id: string): Promise<void> {
     const response = await fetch(`${this.baseUrl}/${collection}/${id}`, {
       method: 'DELETE',
@@ -216,5 +240,37 @@ export class CmsApiService {
       headers: this.getHeaders()
     });
     if (!response.ok) throw await toApiError(response, 'Failed to delete user');
+  }
+
+  // --- Globals -----------------------------------------------------------------------------
+
+  /**
+   * Reads a singleton global document. Returns `null` if the global has never been configured.
+   */
+  async getGlobal<T = Record<string, unknown>>(global: string): Promise<T | null> {
+    const response = await fetch(`${this.baseUrl}/globals/${global}`, {
+      headers: this.authHeader()
+    });
+    if (response.status === 404) return null;
+    if (!response.ok) throw await toApiError(response, `Failed to fetch global '${global}'`);
+    const result = (await response.json()) as ApiItemResponse<T>;
+    return result.data;
+  }
+
+  /**
+   * Creates or updates a singleton global document.
+   */
+  async updateGlobal<T = Record<string, unknown>>(
+    global: string,
+    data: Record<string, unknown>
+  ): Promise<T> {
+    const response = await fetch(`${this.baseUrl}/globals/${global}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw await toApiError(response, `Failed to update global '${global}'`);
+    const result = (await response.json()) as ApiItemResponse<T>;
+    return result.data;
   }
 }

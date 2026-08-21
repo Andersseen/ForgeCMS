@@ -1,4 +1,4 @@
-import { defineBlock, defineCollection, defineField } from '@forge-cms/core';
+import { defineBlock, defineCollection, defineField, defineGlobal } from '@forge-cms/core';
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
 import { UsersCollectionAuthAdapter, withAuthFields } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
@@ -51,6 +51,7 @@ const products = defineCollection({
 
 const media = defineCollection({
   slug: 'media',
+  upload: true,
   fields: {
     filename: defineField.text({ required: true }),
     alt: defineField.text(),
@@ -194,6 +195,18 @@ const collections = [
   landingPages
 ];
 
+const siteSettingsGlobal = defineGlobal({
+  slug: 'site_settings',
+  fields: {
+    siteName: defineField.text({ required: true }),
+    tagline: defineField.text(),
+    maintenanceMode: defineField.boolean(),
+    contactEmail: defineField.email()
+  }
+});
+
+const globals = [siteSettingsGlobal];
+
 let runtimePromise: Promise<ForgeCmsRuntime<ServerEnv>> | undefined;
 
 /**
@@ -211,10 +224,14 @@ export function getServerRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<Serve
 
 async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>> {
   const database = env?.DB ? new D1DatabaseAdapter() : new InMemoryDatabaseAdapter();
-  const auth = new UsersCollectionAuthAdapter().init({ ...env, userDatabase: database });
+  const auth = new UsersCollectionAuthAdapter({ devMode: !env?.AUTH_SECRET }).init({
+    ...env,
+    userDatabase: database
+  });
 
   const runtime = new ForgeCmsRuntime<ServerEnv>({
     collections,
+    globals,
     adapters: {
       database,
       auth,

@@ -28,7 +28,7 @@ export interface D1AdapterOptions {
   binding?: string;
 }
 
-const SYSTEM_COLUMNS = ['id', 'created_at', 'updated_at', '_status'];
+const SYSTEM_COLUMNS = ['id', 'created_at', 'updated_at', '_status', '_storageKey'];
 
 function assertValidColumn(key: string, collectionDef: CollectionDefinition | undefined): void {
   if (SYSTEM_COLUMNS.includes(key) || collectionDef?.fields[key]) return;
@@ -200,6 +200,7 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
 
     for (const [key, value] of Object.entries(data)) {
       if (key === 'id') continue;
+      assertValidColumn(key, collectionDef);
       const field = collectionDef?.fields[key];
       record[key] = field ? toDbValue(value, field.kind) : value;
     }
@@ -228,6 +229,7 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     const updates: DatabaseRecord = { updated_at: now };
     for (const [key, value] of Object.entries(data)) {
       if (key === 'id') continue;
+      assertValidColumn(key, collectionDef);
       const field = collectionDef?.fields[key];
       updates[key] = field ? toDbValue(value, field.kind) : value;
     }

@@ -132,6 +132,11 @@ export interface BaseFieldOptions {
   index?: boolean;
   access?: FieldAccess;
   hooks?: FieldHooks;
+  /**
+   * When true, the field stores values per locale as `{ en: "Hello", es: "Hola" }`.
+   * The stored value is a JSON object with locale codes as keys.
+   */
+  localized?: boolean;
 }
 
 export interface TextFieldOptions extends BaseFieldOptions {
@@ -153,6 +158,13 @@ export interface DateFieldOptions extends BaseFieldOptions {
 export interface RelationFieldOptions extends BaseFieldOptions {
   collection: string;
   many?: boolean;
+  /**
+   * What to do when the related document is deleted.
+   * - 'restrict': Prevent deletion if any documents reference it (default)
+   * - 'cascade': Delete all documents that reference it
+   * - 'set-null': Set the relation field to null in referencing documents
+   */
+  onDelete?: 'restrict' | 'cascade' | 'set-null';
 }
 
 export interface UploadFieldOptions extends BaseFieldOptions {
@@ -384,6 +396,60 @@ export interface CollectionDefinition<
   upload?: boolean;
   /** Adds a system `_status: 'draft' | 'published'` field; unpublished docs are hidden from public reads (spec 017). */
   drafts?: boolean;
+  /**
+   * Enables version history for this collection. Every update creates a snapshot that can be
+   * listed, compared, and restored. Autosave creates frequent drafts without publishing.
+   */
+  versions?: boolean | { autosave?: boolean };
+  /**
+   * Supported locales for this collection. When set, fields marked with `localized: true`
+   * store values per locale. First locale is the default/fallback.
+   * Example: `['en', 'es', 'fr']`
+   */
+  locales?: string[];
+}
+
+/**
+ * A singleton document — a single record rather than a collection of many.
+ *
+ * Globals are the right shape for site-wide configuration: navigation, footer, SEO defaults,
+ * theme settings. They share the same field DSL as collections but have exactly one document,
+ * addressed by slug rather than by id.
+ */
+export interface GlobalDefinition<
+  TSlug extends string = string,
+  TFields extends FieldMap = FieldMap
+> {
+  slug: TSlug;
+  fields: Readonly<TFields>;
+  hooks?: CollectionHooks;
+  access?: CollectionAccess;
+  /** Adds a system `_status: 'draft' | 'published'` field; unpublished globals are hidden from public reads. */
+  drafts?: boolean;
+}
+
+export type GlobalData<TGlobal extends GlobalDefinition> = InferFields<TGlobal['fields']>;
+
+/**
+ * A point-in-time snapshot of a document. Versions are created automatically on every update when
+ * `versions: true` is set on the collection, or manually via the autosave mechanism.
+ */
+export interface Version {
+  id: string;
+  /** The id of the document this version belongs to. */
+  documentId: string;
+  /** Monotonically increasing version number within the document. */
+  versionNumber: number;
+  /** The full document data at this version. */
+  data: Record<string, unknown>;
+  /** When this version was created. */
+  createdAt: string;
+  /** The user who created this version (null for system/autosave). */
+  createdBy: string | null;
+  /** Whether this is an autosave (frequent, non-publishing) version. */
+  autosave: boolean;
+  /** Optional human-readable label (e.g. "Fixed typo", "Initial draft"). */
+  label?: string;
 }
 
 export type DraftStatus = 'draft' | 'published';
@@ -471,6 +537,12 @@ export function defineCollection<TSlug extends string, TFields extends FieldMap>
   return config;
 }
 
+export function defineGlobal<TSlug extends string, TFields extends FieldMap>(
+  config: GlobalDefinition<TSlug, TFields>
+): GlobalDefinition<TSlug, TFields> {
+  return config;
+}
+
 /**
  * Turns human text into a URL slug: `"Láser & Piel"` → `"laser-piel"`.
  *
@@ -496,3 +568,22 @@ export {
   type ValidationErrorCode,
   type ValidationResult
 } from './validation.js';
+
+// Identifier validation
+export {
+  isValidIdentifier,
+  assertValidIdentifier,
+  isSystemField,
+  getSystemFields,
+  validateCollectionIdentifiers,
+  IDENTIFIER_PATTERN
+} from './identifiers.js';
+
+// Structured logging
+export {
+  type ForgeLogger,
+  getLogger,
+  setLogger,
+  createSilentLogger,
+  consoleLogger
+} from './logger.js';

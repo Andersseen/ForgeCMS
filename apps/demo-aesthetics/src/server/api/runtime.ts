@@ -44,7 +44,10 @@ export function createRuntime(env?: ServerEnv): ForgeCmsRuntime<ServerEnv> {
   const storage = env?.BUCKET
     ? new R2StorageAdapter({ publicUrlBase: '/api/media' })
     : new InMemoryStorageAdapter();
-  const auth = new UsersCollectionAuthAdapter().init({ ...env, userDatabase: database });
+  const auth = new UsersCollectionAuthAdapter({ devMode: !env?.AUTH_SECRET }).init({
+    ...env,
+    userDatabase: database
+  });
 
   const runtime = new ForgeCmsRuntime<ServerEnv>({
     collections,

@@ -4,6 +4,7 @@ import type {
   BlocksFieldOptions,
   CollectionDefinition,
   FieldMap,
+  GlobalDefinition,
   GroupFieldOptions,
   RelationFieldOptions,
   SelectFieldOptions,
@@ -44,6 +45,15 @@ export interface CollectionDescription {
   drafts?: boolean;
   /** `true` when the collection accepts multipart uploads. The admin offers a file input. */
   upload?: boolean;
+}
+
+export interface GlobalDescription {
+  slug: string;
+  name: string;
+  description: string;
+  fieldDefinitions: FieldDescription[];
+  /** `true` when the global has draft/published status. */
+  drafts?: boolean;
 }
 
 /** `durationMinutes` → `Duration minutes`, for fields that declare no explicit label. */
@@ -131,4 +141,18 @@ export function describeCollections(
   collections: readonly CollectionDefinition[]
 ): CollectionDescription[] {
   return collections.map(describeCollection);
+}
+
+export function describeGlobal(global: GlobalDefinition): GlobalDescription {
+  return {
+    slug: global.slug,
+    name: humanise(global.slug),
+    description: `Singleton configuration for ${global.slug}`,
+    fieldDefinitions: describeFields(global.fields),
+    ...(global.drafts === true && { drafts: true })
+  };
+}
+
+export function describeGlobals(globals: readonly GlobalDefinition[]): GlobalDescription[] {
+  return globals.map(describeGlobal);
 }
