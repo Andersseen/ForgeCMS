@@ -12,4 +12,5 @@ export interface OperationContext {
   readonly adapters: AdapterSet;
   getCollection(slug: string): CollectionDefinition | undefined;
   getGlobal(slug: string): GlobalDefinition | undefined;
+  getCollections(): readonly CollectionDefinition[];
 }

@@ -78,6 +78,16 @@ export {
   storeLocalizedDocument
 } from './localization.js';
 
+// Relation integrity — cascade, restrict, set-null on delete.
+export {
+  findRelationFields,
+  findReferencingDocuments,
+  checkDeleteRestrictions,
+  handleCascadeDelete,
+  handleSetNullOnDelete,
+  findOrphanedDocuments
+} from './relation-integrity.js';
+
 export {
   ForgeError,
   NotFoundError,

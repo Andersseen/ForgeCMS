@@ -158,6 +158,13 @@ export interface DateFieldOptions extends BaseFieldOptions {
 export interface RelationFieldOptions extends BaseFieldOptions {
   collection: string;
   many?: boolean;
+  /**
+   * What to do when the related document is deleted.
+   * - 'restrict': Prevent deletion if any documents reference it (default)
+   * - 'cascade': Delete all documents that reference it
+   * - 'set-null': Set the relation field to null in referencing documents
+   */
+  onDelete?: 'restrict' | 'cascade' | 'set-null';
 }
 
 export interface UploadFieldOptions extends BaseFieldOptions {

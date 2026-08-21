@@ -176,17 +176,17 @@ ForgeCMS competes with Directus, not with Payload.
 
 ## Progress
 
-| Phase                      | Status                                                                                          |
-| -------------------------- | ----------------------------------------------------------------------------------------------- |
-| Phase 0 — Unblock          | ✅ 0.1, 0.2 done 2026-07-22 · 0.3 pending (needs npm credentials)                               |
-| Phase 1 — Structural core  | ✅ 019, 020, 021, 022 done 2026-07-22                                                           |
-| Phase 2 — Content model    | ⬜ not started                                                                                  |
-| Phase 3 — Auth & DX        | ⬜ not started                                                                                  |
-| Phase 4 — Admin UI         | ⬜ not started                                                                                  |
-| Phase 5 — Angular moat     | ⬜ not started                                                                                  |
+| Phase                            | Status                                                                                          |
+| -------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Phase 0 — Unblock                | ✅ 0.1, 0.2 done 2026-07-22 · 0.3 pending (needs npm credentials)                               |
+| Phase 1 — Structural core        | ✅ 019, 020, 021, 022 done 2026-07-22                                                           |
+| Phase 2 — Content model          | ⬜ not started                                                                                  |
+| Phase 3 — Auth & DX              | ⬜ not started                                                                                  |
+| Phase 4 — Admin UI               | ⬜ not started                                                                                  |
+| Phase 5 — Angular moat           | ⬜ not started                                                                                  |
 | Phase 0.2 — Trust         | ✅ done 2026-08-21 (hardening, validation, security, error contract, logging, upload lifecycle) |
 | Phase 0.3.1 — Globals     | ✅ done 2026-08-21 (singleton documents for site config)                                        |
 | Phase 0.3.2 — Versions    | ✅ done 2026-08-21 (document history, restore, autosave support)                                |
 | Phase 0.3.3 — Live Preview | ✅ done 2026-08-21 (preview documents with unsaved changes)                                    |
 | Phase 0.3.4 — Localization | ✅ done 2026-08-21 (i18n fields, locale resolution, fallback chain)                            |
-| Phase 0.3.5 — Relation integrity | ⬜ not started                                                                           |
+| Phase 0.3.5 — Relation integrity | ✅ done 2026-08-21 (cascade, restrict, set-null on delete)                               |

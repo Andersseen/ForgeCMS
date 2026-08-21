@@ -32,6 +32,11 @@ import {
   storeLocalizedDocument,
   resolveLocalizedDocument
 } from './localization.js';
+import {
+  checkDeleteRestrictions,
+  handleCascadeDelete,
+  handleSetNullOnDelete
+} from './relation-integrity.js';
 
 /** A page of documents plus everything a paginator needs. */
 export interface PaginatedDocs<TDoc = DatabaseRecord> {
@@ -589,6 +594,14 @@ export async function deleteDocument(
     () => runBeforeDeleteHooks(collection, { user, overrideAccess, id: args.id, doc: existing }),
     'beforeDelete hook'
   );
+
+  // Check relation integrity constraints
+  await checkDeleteRestrictions(ctx, collection, args.id);
+
+  // Handle cascade and set-null before deleting
+  await handleCascadeDelete(ctx, collection, args.id);
+  await handleSetNullOnDelete(ctx, collection, args.id);
+
   await ctx.adapters.database.delete(args.collection, args.id);
   await runAfterDeleteHooks(collection, { user, overrideAccess, id: args.id, doc: existing });
 

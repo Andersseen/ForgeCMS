@@ -109,7 +109,7 @@ export const staff = defineCollection({
     jobTitle: defineField.text({ required: true }),
     bio: defineField.textarea(),
     photo: defineField.upload({ collection: 'media' }),
-    specialties: defineField.relation({ collection: 'services', many: true }),
+    specialties: defineField.relation({ collection: 'services', many: true, onDelete: 'set-null' }),
     credentials: defineField.array({
       label: 'Credentials',
       maxRows: 6,
@@ -140,7 +140,7 @@ export const testimonials = defineCollection({
     author: defineField.text({ required: true }),
     quote: defineField.textarea({ required: true, maxLength: 400 }),
     rating: defineField.number({ required: true, min: 1, max: 5 }),
-    service: defineField.relation({ collection: 'services' }),
+    service: defineField.relation({ collection: 'services', onDelete: 'set-null' }),
     visitedAt: defineField.date()
   }
 });
@@ -155,7 +155,7 @@ export const bookings = defineCollection({
     name: defineField.text({ required: true }),
     email: defineField.email({ required: true, index: true }),
     phone: defineField.text(),
-    service: defineField.relation({ collection: 'services', index: true }),
+    service: defineField.relation({ collection: 'services', index: true, onDelete: 'set-null' }),
     preferredDate: defineField.date({ required: true, withTime: true }),
     notes: defineField.textarea({ maxLength: 600 }),
     status: defineField.select({
@@ -220,7 +220,7 @@ export const promotions = defineCollection({
     description: defineField.textarea({ required: true }),
     discountPercent: defineField.number({ min: 1, max: 90 }),
     code: defineField.text(),
-    services: defineField.relation({ collection: 'services', many: true }),
+    services: defineField.relation({ collection: 'services', many: true, onDelete: 'set-null' }),
     validFrom: defineField.date(),
     validUntil: defineField.date(),
     active: defineField.boolean({ defaultValue: false, index: true })
