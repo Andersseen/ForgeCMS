@@ -55,13 +55,6 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/admin/api/api.page').then((m) => m.ApiPage)
       },
       {
-        path: 'translations',
-        loadComponent: () =>
-          import('./pages/admin/translations/translations.page').then(
-            (m) => m.TranslationsPage
-          )
-      },
-      {
         path: 'settings',
         loadComponent: () =>
           import('./pages/admin/settings/settings.page').then((m) => m.SettingsPage)

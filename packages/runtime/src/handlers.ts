@@ -17,15 +17,7 @@ import {
 
 const WHERE_OPERATORS = new Set(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'contains']);
 const SYSTEM_SORT_FIELDS = new Set(['id', 'created_at', 'updated_at']);
-const RESERVED_QUERY_PARAMS = new Set([
-  'limit',
-  'offset',
-  'sort',
-  'order',
-  'depth',
-  'status',
-  'locale'
-]);
+const RESERVED_QUERY_PARAMS = new Set(['limit', 'offset', 'sort', 'order', 'depth', 'status']);
 const WHERE_KEY_PATTERN = /^(.+)\[(\w+)\]$/;
 
 const DEFAULT_LIMIT = 50;
@@ -166,11 +158,6 @@ function parseStatus(url: URL): DraftStatus | 'all' | undefined {
   throw new InvalidQueryError(`Invalid status '${raw}', expected 'draft', 'published', or 'all'`);
 }
 
-function parseLocale(url: URL): string | undefined {
-  const raw = url.searchParams.get('locale');
-  return raw ?? undefined;
-}
-
 function parseStrictInt(
   url: URL,
   name: string,
@@ -296,7 +283,6 @@ export async function handleList<TEnv = unknown>(
     const limit = parseLimit(url);
     const offset = parseOffset(url);
 
-    const locale = parseLocale(url);
     const result: PaginatedDocs = await options.runtime.find({
       collection: collectionSlug,
       user,
@@ -307,8 +293,7 @@ export async function handleList<TEnv = unknown>(
       ...(offset !== undefined && { offset }),
       ...(sort !== undefined && { sort }),
       ...(order !== undefined && { order }),
-      ...(parseStatus(url) !== undefined && { status: parseStatus(url)! }),
-      ...(locale !== undefined && { locale })
+      ...(parseStatus(url) !== undefined && { status: parseStatus(url)! })
     });
 
     return jsonResponse({
@@ -341,7 +326,6 @@ export async function handleRead<TEnv = unknown>(
   try {
     const url = new URL(context.request.url);
     const status = parseStatus(url);
-    const locale = parseLocale(url);
 
     const doc = await options.runtime.findByID({
       collection: collectionSlug,
@@ -349,8 +333,7 @@ export async function handleRead<TEnv = unknown>(
       user,
       overrideAccess: false,
       depth: parseDepth(url),
-      ...(status !== undefined && { status }),
-      ...(locale !== undefined && { locale })
+      ...(status !== undefined && { status })
     });
 
     return jsonResponse({ data: doc });
@@ -429,7 +412,6 @@ export async function handleCreate<TEnv = unknown>(
 
   try {
     const contentType = context.request.headers.get('content-type') ?? '';
-    const locale = parseLocale(new URL(context.request.url));
     let data: Record<string, unknown>;
     let storageKey: string | undefined;
 
@@ -446,8 +428,7 @@ export async function handleCreate<TEnv = unknown>(
         collection: collectionSlug,
         data,
         user,
-        overrideAccess: false,
-        ...(locale !== undefined && { locale })
+        overrideAccess: false
       });
 
       return jsonResponse({ data: doc }, 201);
@@ -478,14 +459,12 @@ export async function handleUpdate<TEnv = unknown>(
   const { collectionSlug, user } = resolved;
 
   try {
-    const locale = parseLocale(new URL(context.request.url));
     const doc = await options.runtime.update({
       collection: collectionSlug,
       id: context.params!['id']!,
       data: await readJsonBody(context.request),
       user,
-      overrideAccess: false,
-      ...(locale !== undefined && { locale })
+      overrideAccess: false
     });
 
     return jsonResponse({ data: doc });

@@ -182,70 +182,6 @@ const landingPages = defineCollection({
   }
 });
 
-const translationProjects = defineCollection({
-  slug: 'translation_projects',
-  fields: {
-    name: defineField.text({ label: 'Name', required: true }),
-    slug: defineField.slug({
-      label: 'Slug',
-      sourceField: 'name',
-      autoGenerate: true,
-      required: true
-    }),
-    sourceLocale: defineField.text({ label: 'Source locale', required: true }),
-    locales: defineField.json({ label: 'Locales', required: true }),
-    description: defineField.textarea({ label: 'Description' })
-  },
-  hooks: {
-    beforeChange: [
-      async (args) => {
-        const locales = args.data['locales'];
-        const sourceLocale = args.data['sourceLocale'];
-
-        if (!Array.isArray(locales) || locales.length === 0) {
-          throw new Error('Locales must be a non-empty array');
-        }
-
-        const uniqueLocales = new Set<string>();
-        for (const locale of locales) {
-          if (typeof locale !== 'string') {
-            throw new Error('All locales must be strings');
-          }
-          if (uniqueLocales.has(locale)) {
-            throw new Error(`Duplicate locale: '${locale}'`);
-          }
-          uniqueLocales.add(locale);
-        }
-
-        const resolvedSource =
-          typeof sourceLocale === 'string' && sourceLocale.length > 0
-            ? sourceLocale
-            : args.previousData?.['sourceLocale'];
-
-        if (typeof resolvedSource === 'string' && !uniqueLocales.has(resolvedSource)) {
-          throw new Error(`Source locale '${resolvedSource}' must be one of the configured locales`);
-        }
-
-        return args.data;
-      }
-    ]
-  }
-});
-
-const translationMessages = defineCollection({
-  slug: 'translation_messages',
-  fields: {
-    project: defineField.relation({
-      label: 'Project',
-      collection: 'translation_projects',
-      required: true
-    }),
-    key: defineField.text({ label: 'Key', required: true }),
-    translations: defineField.json({ label: 'Translations', required: true }),
-    description: defineField.text({ label: 'Description' })
-  }
-});
-
 const collections = [
   pages,
   posts,
@@ -256,9 +192,7 @@ const collections = [
   forms,
   navigation,
   siteConfig,
-  landingPages,
-  translationProjects,
-  translationMessages
+  landingPages
 ];
 
 const siteSettingsGlobal = defineGlobal({

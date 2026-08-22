@@ -21,11 +21,9 @@ export interface QueryOptions {
   depth?: 0 | 1;
   /** Draft visibility on a `drafts: true` collection. Requires authentication for anything but `published`. */
   status?: 'draft' | 'published' | 'all';
-  /** Locale for reading/writing localized fields. */
-  locale?: string;
 }
 
-const RESERVED = new Set(['limit', 'offset', 'sort', 'order', 'depth', 'status', 'locale']);
+const RESERVED = new Set(['limit', 'offset', 'sort', 'order', 'depth', 'status']);
 
 function serialiseValue(value: unknown): string {
   if (Array.isArray(value)) return value.map((entry) => String(entry)).join(',');
@@ -45,7 +43,6 @@ export function buildQueryString(options?: QueryOptions): string {
   if (options.order !== undefined) params.set('order', options.order);
   if (options.depth !== undefined) params.set('depth', String(options.depth));
   if (options.status !== undefined) params.set('status', options.status);
-  if (options.locale !== undefined) params.set('locale', options.locale);
   if (options.limit !== undefined) params.set('limit', String(options.limit));
 
   const offset =

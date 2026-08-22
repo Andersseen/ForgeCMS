@@ -26,7 +26,6 @@ import {
   LmnCodeBracketIcon,
   LmnMoonIcon,
   LmnCogIcon,
-  LmnGlobeIcon,
   LmnPhotoIcon,
   LmnSquares2x2Icon,
   LmnSunIcon,
@@ -67,7 +66,6 @@ const AUTH_TOKEN_KEY = 'forge-auth-token';
     LmnCodeBracketIcon,
     LmnChartBarIcon,
     LmnCogIcon,
-    LmnGlobeIcon,
     LmnBars3Icon,
     LmnChevronRightIcon,
     LmnBellIcon,
@@ -133,9 +131,6 @@ const AUTH_TOKEN_KEY = 'forge-auth-token';
                       }
                       @case ('settings') {
                         <lmn-cog slot="icon" [size]="16" />
-                      }
-                      @case ('translations') {
-                        <lmn-globe slot="icon" [size]="16" />
                       }
                       @default {
                         <lmn-chart-bar slot="icon" [size]="16" />

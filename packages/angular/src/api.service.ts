@@ -98,7 +98,7 @@ export class CmsApiService {
   async getDocument<T = Record<string, unknown>>(
     collection: string,
     id: string,
-    options?: Pick<QueryOptions, 'depth' | 'locale'>
+    options?: Pick<QueryOptions, 'depth'>
   ): Promise<T> {
     const response = await fetch(
       `${this.baseUrl}/${collection}/${id}${buildQueryString(options)}`,
@@ -135,11 +135,9 @@ export class CmsApiService {
 
   async createDocument<T = Record<string, unknown>>(
     collection: string,
-    data: Record<string, unknown>,
-    options?: { locale?: string }
+    data: Record<string, unknown>
   ): Promise<T> {
-    const qs = options?.locale ? `?locale=${encodeURIComponent(options.locale)}` : '';
-    const response = await fetch(`${this.baseUrl}/${collection}${qs}`, {
+    const response = await fetch(`${this.baseUrl}/${collection}`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(data)
@@ -152,11 +150,9 @@ export class CmsApiService {
   async updateDocument<T = Record<string, unknown>>(
     collection: string,
     id: string,
-    data: Record<string, unknown>,
-    options?: { locale?: string }
+    data: Record<string, unknown>
   ): Promise<T> {
-    const qs = options?.locale ? `?locale=${encodeURIComponent(options.locale)}` : '';
-    const response = await fetch(`${this.baseUrl}/${collection}/${id}${qs}`, {
+    const response = await fetch(`${this.baseUrl}/${collection}/${id}`, {
       method: 'PUT',
       headers: this.getHeaders(),
       body: JSON.stringify(data)
