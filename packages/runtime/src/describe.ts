@@ -34,6 +34,7 @@ export interface FieldDescription {
   blocks?: BlockDescription[];
   minRows?: number;
   maxRows?: number;
+  localized?: boolean;
 }
 
 export interface CollectionDescription {
@@ -45,6 +46,8 @@ export interface CollectionDescription {
   drafts?: boolean;
   /** `true` when the collection accepts multipart uploads. The admin offers a file input. */
   upload?: boolean;
+  /** Supported locales when the collection has localized fields. */
+  locales?: string[];
 }
 
 export interface GlobalDescription {
@@ -73,7 +76,8 @@ function describeField(name: string, field: AnyField): FieldDescription {
     name,
     kind: field.kind,
     label: field.options.label ?? humaniseFieldName(name),
-    required: field.options.required ?? false
+    required: field.options.required ?? false,
+    ...(field.options.localized === true && { localized: true })
   };
 
   switch (field.kind) {
@@ -133,7 +137,9 @@ export function describeCollection(collection: CollectionDefinition): Collection
     description: `Content collection for ${collection.slug}`,
     fieldDefinitions: describeFields(collection.fields),
     ...(collection.drafts === true && { drafts: true }),
-    ...(collection.upload === true && { upload: true })
+    ...(collection.upload === true && { upload: true }),
+    ...(collection.locales !== undefined &&
+      collection.locales.length > 0 && { locales: collection.locales })
   };
 }
 

@@ -59,6 +59,8 @@ export interface FieldMeta {
   blocks?: BlockMeta[];
   minRows?: number;
   maxRows?: number;
+  /** `true` when the field stores per-locale values. */
+  localized?: boolean;
 }
 
 export interface CollectionMeta {
@@ -70,6 +72,8 @@ export interface CollectionMeta {
   drafts?: boolean;
   /** The collection accepts multipart uploads. */
   upload?: boolean;
+  /** Supported locales when the collection has localized fields. */
+  locales?: string[];
 }
 
 export interface GlobalMeta {

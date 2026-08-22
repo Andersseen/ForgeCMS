@@ -1,6 +1,6 @@
 # ROADMAP — From typed CRUD to a real CMS for Angular / Analog.js
 
-> **Last updated: 2026-08-21.**
+> **Last updated: 2026-08-22.**
 >
 > **What this file is:** the multi-phase plan that takes ForgeCMS from "a well-engineered typed CRUD
 > over SQLite with an admin table" to a CMS a real team would run in production. It is deliberately
@@ -190,3 +190,4 @@ ForgeCMS competes with Directus, not with Payload.
 | Phase 0.3.3 — Live Preview       | ✅ done 2026-08-21 (preview documents with unsaved changes)                                     |
 | Phase 0.3.4 — Localization       | ✅ done 2026-08-21 (i18n fields, locale resolution, fallback chain)                             |
 | Phase 0.3.5 — Relation integrity | ✅ done 2026-08-21 (cascade, restrict, set-null on delete)                                      |
+| Spec 044 — Translation Catalogs  | ✅ done 2026-08-22 (import/export JSON catalogs, multi-project, admin page, localization fixes) |

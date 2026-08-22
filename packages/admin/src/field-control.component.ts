@@ -4,7 +4,8 @@ import {
   computed,
   forwardRef,
   input,
-  output
+  output,
+  signal
 } from '@angular/core';
 import {
   VoltButton,
@@ -58,6 +59,8 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
               [value]="objectValue()[child.name]"
               [errors]="errors()"
               [path]="childPath(child.name)"
+              [locales]="locales()"
+              [activeLocale]="effectiveLocale()"
               (valueChange)="setInObject(child.name, $event)"
             />
           }
@@ -82,6 +85,8 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
                   [value]="row[child.name]"
                   [errors]="errors()"
                   [path]="rowPath($index, child.name)"
+                  [locales]="locales()"
+                  [activeLocale]="effectiveLocale()"
                   (valueChange)="setInRow($index, child.name, $event)"
                 />
               }
@@ -116,6 +121,8 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
                   [value]="row[child.name]"
                   [errors]="errors()"
                   [path]="rowPath($index, child.name)"
+                  [locales]="locales()"
+                  [activeLocale]="effectiveLocale()"
                   (valueChange)="setInRow($index, child.name, $event)"
                 />
               }
@@ -156,33 +163,57 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
             }
           </volt-label>
 
+          @if (isLocalized()) {
+            <div class="flex gap-1 mb-1">
+              @for (loc of locales(); track loc) {
+                <button
+                  type="button"
+                  class="px-2 py-0.5 text-xs rounded border transition-colors"
+                  [class]="loc === effectiveLocale()
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-transparent border-border text-muted-foreground hover:bg-muted'"
+                  (click)="setLocale(loc)"
+                >
+                  {{ loc }}
+                </button>
+              }
+            </div>
+          }
+
           @switch (f.kind) {
             @case ('textarea') {
               <volt-textarea
                 [id]="path()"
-                [value]="stringValue()"
-                (valueChange)="valueChange.emit($event)"
+                [value]="isLocalized() ? localeStringValue() : stringValue()"
+                (valueChange)="isLocalized() ? emitLocaleValue($event) : valueChange.emit($event)"
               />
             }
             @case ('richtext') {
-              <forge-richtext-editor [value]="value()" (valueChange)="valueChange.emit($event)" />
+              <forge-richtext-editor
+                [value]="isLocalized() ? localeValue() : value()"
+                (valueChange)="isLocalized() ? emitLocaleValue($event) : valueChange.emit($event)"
+              />
             }
             @case ('json') {
-              <volt-textarea [id]="path()" [value]="jsonValue()" (valueChange)="emitJson($event)" />
+              <volt-textarea
+                [id]="path()"
+                [value]="isLocalized() ? localeJsonValue() : jsonValue()"
+                (valueChange)="isLocalized() ? emitLocaleJson($event) : emitJson($event)"
+              />
             }
             @case ('boolean') {
               <volt-switch
                 [id]="path()"
-                [checked]="booleanValue()"
-                (checkedChange)="valueChange.emit($event)"
+                [checked]="isLocalized() ? localeBooleanValue() : booleanValue()"
+                (checkedChange)="isLocalized() ? emitLocaleValue($event) : valueChange.emit($event)"
               />
             }
             @case ('select') {
               <select
                 [id]="path()"
                 class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                [value]="stringValue()"
-                (change)="onSelectChange($event)"
+                [value]="isLocalized() ? localeStringValue() : stringValue()"
+                (change)="isLocalized() ? onSelectChangeLocalized($event) : onSelectChange($event)"
               >
                 <option value="">Select…</option>
                 @for (opt of f.options ?? []; track opt) {
@@ -196,8 +227,8 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
                   [inputId]="path()"
                   [collection]="relation.collection"
                   [many]="relation.many"
-                  [value]="value()"
-                  (valueChange)="valueChange.emit($event)"
+                  [value]="isLocalized() ? localeValue() : value()"
+                  (valueChange)="isLocalized() ? emitLocaleValue($event) : valueChange.emit($event)"
                 />
               }
             }
@@ -206,8 +237,8 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
                 <forge-upload-picker
                   [inputId]="path()"
                   [collection]="relation.collection"
-                  [value]="value()"
-                  (valueChange)="valueChange.emit($event)"
+                  [value]="isLocalized() ? localeValue() : value()"
+                  (valueChange)="isLocalized() ? emitLocaleValue($event) : valueChange.emit($event)"
                 />
               }
             }
@@ -215,32 +246,32 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
               <volt-input
                 [id]="path()"
                 type="number"
-                [value]="stringValue()"
-                (valueChange)="emitNumber($event)"
+                [value]="isLocalized() ? localeStringValue() : stringValue()"
+                (valueChange)="isLocalized() ? emitLocaleNumber($event) : emitNumber($event)"
               />
             }
             @case ('date') {
               <volt-input
                 [id]="path()"
                 type="date"
-                [value]="stringValue()"
-                (valueChange)="valueChange.emit($event)"
+                [value]="isLocalized() ? localeStringValue() : stringValue()"
+                (valueChange)="isLocalized() ? emitLocaleValue($event) : valueChange.emit($event)"
               />
             }
             @case ('email') {
               <volt-input
                 [id]="path()"
                 type="email"
-                [value]="stringValue()"
-                (valueChange)="valueChange.emit($event)"
+                [value]="isLocalized() ? localeStringValue() : stringValue()"
+                (valueChange)="isLocalized() ? emitLocaleValue($event) : valueChange.emit($event)"
               />
             }
             @default {
               <volt-input
                 [id]="path()"
                 type="text"
-                [value]="stringValue()"
-                (valueChange)="valueChange.emit($event)"
+                [value]="isLocalized() ? localeStringValue() : stringValue()"
+                (valueChange)="isLocalized() ? emitLocaleValue($event) : valueChange.emit($event)"
               />
             }
           }
@@ -260,8 +291,50 @@ export class ForgeFieldControlComponent {
   errors = input<Record<string, string>>({});
   /** This control's own dotted path, used for error lookup and as the input id. */
   path = input<string>('');
+  /** Available locales for localized fields. */
+  locales = input<string[]>([]);
+  /** Currently active locale for editing localized fields. */
+  activeLocale = input<string>('');
 
   valueChange = output<unknown>();
+
+  protected readonly localLocale = signal<string>('');
+
+  protected readonly effectiveLocale = computed(() => {
+    const local = this.localLocale();
+    if (local) return local;
+    const parent = this.activeLocale();
+    if (parent) return parent;
+    const available = this.locales();
+    return available[0] ?? 'en';
+  });
+
+  protected readonly isLocalized = computed(() => {
+    return this.field().localized === true && this.locales().length > 0;
+  });
+
+  protected readonly localeValue = computed(() => {
+    if (!this.isLocalized()) return this.value();
+    const val = this.value();
+    if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
+      return (val as Record<string, unknown>)[this.effectiveLocale()];
+    }
+    return undefined;
+  });
+
+  protected setLocale(locale: string): void {
+    this.localLocale.set(locale);
+  }
+
+  protected emitLocaleValue(newValue: unknown): void {
+    const existing = this.value();
+    const obj =
+      typeof existing === 'object' && existing !== null && !Array.isArray(existing)
+        ? { ...(existing as Record<string, unknown>) }
+        : {};
+    obj[this.effectiveLocale()] = newValue;
+    this.valueChange.emit(obj);
+  }
 
   protected readonly error = computed(() => this.errors()[this.path()]);
 
@@ -270,10 +343,23 @@ export class ForgeFieldControlComponent {
     return value === undefined || value === null ? '' : String(value);
   });
 
+  protected readonly localeStringValue = computed(() => {
+    const value = this.localeValue();
+    return value === undefined || value === null ? '' : String(value);
+  });
+
   protected readonly booleanValue = computed(() => Boolean(this.value()));
+
+  protected readonly localeBooleanValue = computed(() => Boolean(this.localeValue()));
 
   protected readonly jsonValue = computed(() => {
     const value = this.value();
+    if (value === undefined || value === null) return '';
+    return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+  });
+
+  protected readonly localeJsonValue = computed(() => {
+    const value = this.localeValue();
     if (value === undefined || value === null) return '';
     return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
   });
@@ -352,10 +438,16 @@ export class ForgeFieldControlComponent {
     this.valueChange.emit((event.target as HTMLSelectElement).value);
   }
 
+  protected onSelectChangeLocalized(event: Event): void {
+    this.emitLocaleValue((event.target as HTMLSelectElement).value);
+  }
+
   protected emitNumber(raw: string): void {
-    // An empty input means "unset", not 0 — coercing it would silently write a value the user
-    // never typed.
     this.valueChange.emit(raw === '' ? undefined : Number(raw));
+  }
+
+  protected emitLocaleNumber(raw: string): void {
+    this.emitLocaleValue(raw === '' ? undefined : Number(raw));
   }
 
   protected emitRelation(raw: string): void {
@@ -372,12 +464,18 @@ export class ForgeFieldControlComponent {
   }
 
   protected emitJson(raw: string): void {
-    // Keep the raw string when it is not yet valid JSON: the user is mid-edit, and replacing their
-    // text with a parse failure would make the field impossible to type into.
     try {
       this.valueChange.emit(raw === '' ? undefined : JSON.parse(raw));
     } catch {
       this.valueChange.emit(raw);
+    }
+  }
+
+  protected emitLocaleJson(raw: string): void {
+    try {
+      this.emitLocaleValue(raw === '' ? undefined : JSON.parse(raw));
+    } catch {
+      this.emitLocaleValue(raw);
     }
   }
 }

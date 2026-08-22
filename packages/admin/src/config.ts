@@ -7,7 +7,8 @@ export type ForgeAdminNavIcon =
   | 'media'
   | 'users'
   | 'api'
-  | 'settings';
+  | 'settings'
+  | 'translations';
 
 export interface ForgeAdminNavItem {
   label: string;
@@ -56,7 +57,8 @@ export const DEFAULT_ADMIN_NAV: ForgeAdminNavGroup[] = [
     items: [
       { label: 'Dashboard', routerLink: '/admin', icon: 'dashboard', exact: true },
       { label: 'Collections', routerLink: '/admin/collections', icon: 'collections' },
-      { label: 'Media Library', routerLink: '/admin/media', icon: 'media' }
+      { label: 'Media Library', routerLink: '/admin/media', icon: 'media' },
+      { label: 'Translations', routerLink: '/admin/translations', icon: 'translations' }
     ]
   },
   {
