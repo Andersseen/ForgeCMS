@@ -98,7 +98,7 @@ export class CmsApiService {
   async getDocument<T = Record<string, unknown>>(
     collection: string,
     id: string,
-    options?: Pick<QueryOptions, 'depth'>
+    options?: Pick<QueryOptions, 'depth' | 'locale'>
   ): Promise<T> {
     const response = await fetch(
       `${this.baseUrl}/${collection}/${id}${buildQueryString(options)}`,
@@ -135,9 +135,10 @@ export class CmsApiService {
 
   async createDocument<T = Record<string, unknown>>(
     collection: string,
-    data: Record<string, unknown>
+    data: Record<string, unknown>,
+    options?: Pick<QueryOptions, 'locale'>
   ): Promise<T> {
-    const response = await fetch(`${this.baseUrl}/${collection}`, {
+    const response = await fetch(`${this.baseUrl}/${collection}${buildQueryString(options)}`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(data)
@@ -150,13 +151,17 @@ export class CmsApiService {
   async updateDocument<T = Record<string, unknown>>(
     collection: string,
     id: string,
-    data: Record<string, unknown>
+    data: Record<string, unknown>,
+    options?: Pick<QueryOptions, 'locale'>
   ): Promise<T> {
-    const response = await fetch(`${this.baseUrl}/${collection}/${id}`, {
-      method: 'PUT',
-      headers: this.getHeaders(),
-      body: JSON.stringify(data)
-    });
+    const response = await fetch(
+      `${this.baseUrl}/${collection}/${id}${buildQueryString(options)}`,
+      {
+        method: 'PUT',
+        headers: this.getHeaders(),
+        body: JSON.stringify(data)
+      }
+    );
     if (!response.ok) throw await toApiError(response, 'Failed to update document');
     const result = (await response.json()) as ApiItemResponse<T>;
     return result.data;
