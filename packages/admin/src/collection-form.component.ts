@@ -37,6 +37,7 @@ import { normaliseReferences } from './references.js';
               [value]="formValue()[field.name]"
               [errors]="fieldErrors()"
               [path]="field.name"
+              [locales]="locales()"
               (valueChange)="setValue(field.name, $event)"
             />
           }
@@ -57,6 +58,8 @@ export class ForgeCollectionFormComponent {
   initialValue = input<Record<string, unknown>>({});
   fieldErrors = input<Record<string, string>>({});
   submitLabel = input('Save');
+  /** Locales the owning collection supports; forwarded so localized fields can offer a picker. */
+  locales = input<string[]>([]);
 
   save = output<Record<string, unknown>>();
   cancel = output<void>();

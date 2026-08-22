@@ -59,6 +59,7 @@ import { LmnArrowLeftIcon } from 'lumen-icons';
             [initialValue]="editingDoc() ?? {}"
             [fieldErrors]="fieldErrors()"
             [submitLabel]="editingDoc() ? 'Save' : 'Create'"
+            [locales]="col.locales ?? []"
             (save)="onSave($event)"
             (cancel)="closeForm()"
           />

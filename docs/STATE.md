@@ -1,6 +1,6 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-08-21.**
+> **Last updated: 2026-08-22.**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
@@ -58,6 +58,33 @@ Remaining gap: nothing is published to npm yet (ROADMAP Phase 0.3,
 blocked on nothing now except an actual publish step requiring registry credentials), and the demo
 has never been wired to real Cloudflare bindings end-to-end in production (D1 persistence, spec 005,
 is done and locally-verified but its production deploy is unconfirmed from this environment).
+
+**As of 2026-08-22, spec 044 finishes localization propagation.** A first attempt at a translation-
+catalog-management feature (commit `8d0169d`) was reverted 3 minutes later (`597a146`) for a real
+architectural mistake, not a bug: it added `translation_projects`/`translation_messages` collections
+to `apps/www`'s own runtime and — worse — edited `packages/admin/src/config.ts`'s
+`DEFAULT_ADMIN_NAV`, which would have shipped a "Translations" nav link to every `@forge-cms/admin`
+consumer regardless of whether it uses this feature. The maintainer's direction going into spec 044
+sharpened this further: ForgeCMS itself must stay generic, and any such feature must not merely avoid
+touching shared config — it must not live in, ship from, or be built as part of this repository at
+all. **This repo therefore only ships the generic capability**, all of it in `packages/*` (plus one
+wiring line in `apps/www`), with **zero translation-specific code anywhere in this codebase**:
+`FieldDescription.localized`/`CollectionDescription.locales` now propagate through `describe.ts`;
+`?locale=` is parsed and forwarded on **all four** HTTP verbs (list/read were already done, spec 044
+adds create/update); the Angular `QueryOptions`/`FieldMeta`/`CollectionMeta`/`CmsApiService` mirror
+that; and `ForgeFieldControlComponent` renders a locale-tab picker for any `localized` field when the
+owning collection has `locales` (wired into `apps/www/.../collection-detail.page.ts` too — `?locale=`
+is exercised for real there, not just by a demo). The translation-catalog use case that motivated all
+this was built and fully verified (`pnpm lint/typecheck/test/build` green, 69 tests, a full
+login→create→import→export workflow walked through in a real browser) as a throwaway proof, then
+moved to a sibling directory outside this repo (`../forgecms-i18n-catalogs-reference`, not a
+workspace member, not tracked here) before anything was committed — it is not part of ForgeCMS, the
+same way a real consumer's app would depend on ForgeCMS rather than live inside it. `(project, key)`
+compound uniqueness (which `unique: true` cannot express — single-field only) was enforced in a
+`beforeChange` hook via the same "hooks get no runtime handle" `runtime-ref` workaround
+`apps/demo-aesthetics` uses (finding 23) — a generic gap worth remembering if it recurs. See
+[docs/specs/044-translation-catalog-management.md](specs/044-translation-catalog-management.md) for
+the full design (including the parts that now live outside this repo).
 
 ## Package status
 
