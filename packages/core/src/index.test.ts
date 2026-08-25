@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { defineCollection, defineField, slugify, type CollectionData } from './index';
+import {
+  defineBlock,
+  defineCollection,
+  defineField,
+  defineGlobal,
+  slugify,
+  type CollectionData
+} from './index';
 
 describe('core schema DSL', () => {
   it('defines a typed collection', () => {
@@ -25,6 +32,55 @@ describe('core schema DSL', () => {
     expect(posts.slug).toBe('posts');
     expect(posts.fields.title.kind).toBe('text');
     expect(example.title).toBe('Hello ForgeCMS');
+  });
+
+  it('rejects unsafe collection and field identifiers early', () => {
+    expect(() =>
+      defineCollection({
+        slug: 'posts";',
+        fields: { title: defineField.text() }
+      })
+    ).toThrow('Collection slug');
+
+    expect(() =>
+      defineCollection({
+        slug: 'posts',
+        fields: { 'field.name': defineField.text() }
+      })
+    ).toThrow('Field name "field.name"');
+  });
+
+  it('rejects unsafe nested field and block identifiers', () => {
+    expect(() =>
+      defineCollection({
+        slug: 'pages',
+        fields: {
+          hero: defineField.group({
+            fields: { 'bad field': defineField.text() }
+          })
+        }
+      })
+    ).toThrow('hero.bad field');
+
+    expect(() =>
+      defineCollection({
+        slug: 'pages',
+        fields: {
+          layout: defineField.blocks({
+            blocks: [defineBlock({ slug: '123copy', fields: { title: defineField.text() } })]
+          })
+        }
+      })
+    ).toThrow('Block slug');
+  });
+
+  it('rejects unsafe global identifiers early', () => {
+    expect(() =>
+      defineGlobal({
+        slug: 'site.config',
+        fields: { title: defineField.text() }
+      })
+    ).toThrow('Global slug');
   });
 });
 

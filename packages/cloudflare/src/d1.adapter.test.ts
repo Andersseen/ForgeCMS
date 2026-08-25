@@ -73,10 +73,12 @@ class MockD1PreparedStatement implements D1PreparedStatement {
 
   async first<T = unknown>(): Promise<T | null> {
     if (this.query.match(/SELECT\s+COUNT\s*\(/i)) {
-      const tableMatch = this.query.match(/FROM\s+"([^"]+)"/i);
-      const table = tableMatch?.[1] ?? '';
+      const { table, conditions } = this.parseSelect();
       const rows = this.getTableRows(table);
-      return { count: rows.size } as T;
+      const count = Array.from(rows.values()).filter((r) =>
+        this.matchesConditions(r, conditions)
+      ).length;
+      return { count } as T;
     }
 
     const { table, conditions } = this.parseSelect();
@@ -521,6 +523,27 @@ describe('D1DatabaseAdapter', () => {
         where: { title: { contains: 'et' } }
       });
       expect(results.map((r) => r.id)).toEqual(['p2']);
+    });
+
+    it('ANDs multiple operators on the same field', async () => {
+      const results = await adapter.findMany({
+        collection: 'posts',
+        where: { views: { gte: 50, lte: 50 } }
+      });
+      expect(results.map((r) => r.id)).toEqual(['p2']);
+      expect(await adapter.count('posts', { views: { gte: 50, lte: 50 } })).toBe(1);
+    });
+
+    it('rejects unsafe collection strings that were not registered', async () => {
+      await expect(adapter.findById('posts"; DROP TABLE posts; --', 'p1')).rejects.toThrow(
+        'not registered'
+      );
+      await expect(adapter.delete('posts"; DROP TABLE posts; --', 'p1')).rejects.toThrow(
+        'not registered'
+      );
+      await expect(adapter.count('posts"; DROP TABLE posts; --')).rejects.toThrow(
+        'not registered'
+      );
     });
 
     it('sorts ascending and descending', async () => {

@@ -4,6 +4,7 @@
 '@forge-cms/auth': minor
 '@forge-cms/db': minor
 '@forge-cms/cloudflare': minor
+'@forge-cms/testing': minor
 ---
 
 Phase 0.2 — Trust / Production Hardening
@@ -18,7 +19,11 @@ Phase 0.2 — Trust / Production Hardening
 
 **New features:**
 
-- Identifier validation: collection slugs and field names must match `^[a-z][a-zA-Z0-9_]*$`.
+- Identifier validation: collection slugs and field names must match `^_?[a-z][a-zA-Z0-9_]*$`
+  (the leading underscore is reserved for internal tables such as globals/versions).
+- Query filters with multiple operators on one field are ANDed consistently across adapters
+  (`{ price: { gte: 10, lte: 50 } }`).
+- Field hooks now run recursively inside `group`, `array`, and `blocks` fields.
 - Structured logging: `ForgeLogger` interface with `getLogger()`/`setLogger()` in `@forge-cms/core`.
 - Upload lifecycle integrity: storage objects are cleaned up if document creation fails.
 - Upload limits: configurable `maxFileSize` and `mimeTypes` in handler options.

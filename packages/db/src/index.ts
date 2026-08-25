@@ -18,6 +18,7 @@ export {
   type DatabaseWhere,
   isWhereValue,
   toOperatorValue,
+  toOperatorValues,
   matchesCondition
 } from './where.js';
 import type { DatabaseWhere } from './where.js';

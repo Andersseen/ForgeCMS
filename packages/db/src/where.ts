@@ -35,24 +35,38 @@ export function isWhereValue(condition: WhereCondition): condition is WhereValue
   return keys.length > 0 && keys.every((key) => (WHERE_OPERATORS as string[]).includes(key));
 }
 
-/** Normalize any WhereCondition to a single `{ operator, value }` pair (eq for bare values). */
-export function toOperatorValue(condition: WhereCondition): {
+export interface OperatorValue {
   operator: WhereOperator;
   value: unknown;
-} {
+}
+
+/** Normalize any WhereCondition to one or more predicates (eq for bare values). */
+export function toOperatorValues(condition: WhereCondition): OperatorValue[] {
   if (!isWhereValue(condition)) {
-    return { operator: 'eq', value: condition };
+    return [{ operator: 'eq', value: condition }];
   }
-  const [operator] = Object.keys(condition) as WhereOperator[];
-  if (!operator) {
-    return { operator: 'eq', value: condition };
+
+  const predicates = WHERE_OPERATORS.flatMap((operator) =>
+    condition[operator] !== undefined ? [{ operator, value: condition[operator] }] : []
+  );
+  if (predicates.length === 0) {
+    return [{ operator: 'eq', value: condition }];
   }
-  return { operator, value: condition[operator] };
+  return predicates;
+}
+
+/** Normalize any WhereCondition to its first predicate. Kept for compatibility. */
+export function toOperatorValue(condition: WhereCondition): OperatorValue {
+  return toOperatorValues(condition)[0]!;
 }
 
 export function matchesCondition(recordValue: unknown, condition: WhereCondition): boolean {
-  const { operator, value } = toOperatorValue(condition);
+  return toOperatorValues(condition).every(({ operator, value }) =>
+    matchesOperator(recordValue, operator, value)
+  );
+}
 
+function matchesOperator(recordValue: unknown, operator: WhereOperator, value: unknown): boolean {
   switch (operator) {
     case 'eq':
       return recordValue === value;

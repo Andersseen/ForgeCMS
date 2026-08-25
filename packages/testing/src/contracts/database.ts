@@ -206,6 +206,15 @@ export function runDatabaseAdapterContractTests(createAdapter: () => ContractDat
         expect(results.map((r) => r.id).sort()).toEqual(['a1', 'a2']);
       });
 
+      it('ANDs multiple operators on the same field', async () => {
+        const results = await adapter.findMany({
+          collection: 'articles',
+          where: { views: { gte: 50, lte: 50 } }
+        });
+        expect(results.map((r) => r.id)).toEqual(['a2']);
+        expect(await adapter.count('articles', { views: { gte: 50, lte: 50 } })).toBe(1);
+      });
+
       it('filters with contains, ignoring case', async () => {
         await adapter.create('posts', { id: 'c1', title: 'Body & wellness' });
         const found = await adapter.findMany({

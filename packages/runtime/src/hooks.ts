@@ -1,9 +1,13 @@
 import type {
   AccessQuery,
   AnyField,
+  ArrayFieldOptions,
+  BlocksFieldOptions,
   CmsUser,
   CollectionDefinition,
   FieldHook,
+  FieldMap,
+  GroupFieldOptions,
   HookContext,
   HookOperation
 } from '@forge-cms/core';
@@ -179,10 +183,140 @@ function hooksFor(field: AnyField, name: FieldHookName): FieldHook[] | undefined
   return field.options.hooks?.[name];
 }
 
-/**
- * Threads each field's value through its own hook chain. Only top-level fields are covered: nested
- * fields inside `group`/`array`/`blocks` are validated recursively but do not run field hooks yet.
- */
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function runFieldHookChain(
+  field: AnyField,
+  name: FieldHookName,
+  ctx: {
+    value: unknown;
+    data: Record<string, unknown>;
+    previousValue?: unknown;
+    fieldName: string;
+    collection: CollectionDefinition;
+    operation: HookOperation;
+    user?: CmsUser | null;
+    overrideAccess?: boolean;
+  }
+): Promise<unknown> {
+  let value = ctx.value;
+  for (const hook of hooksFor(field, name) ?? []) {
+    value = await hook({
+      value,
+      data: ctx.data,
+      ...(ctx.previousValue !== undefined && { previousValue: ctx.previousValue }),
+      fieldName: ctx.fieldName,
+      collection: ctx.collection,
+      operation: ctx.operation,
+      user: ctx.user ?? null,
+      ...(ctx.overrideAccess !== undefined && { overrideAccess: ctx.overrideAccess })
+    });
+  }
+  return value;
+}
+
+async function runFieldMapHooks(
+  fields: FieldMap,
+  name: FieldHookName,
+  ctx: {
+    data: Record<string, unknown>;
+    previousData?: Record<string, unknown>;
+    pathPrefix?: string;
+    collection: CollectionDefinition;
+    operation: HookOperation;
+    user?: CmsUser | null;
+    overrideAccess?: boolean;
+  }
+): Promise<Record<string, unknown>> {
+  let data = { ...ctx.data };
+
+  for (const [fieldName, field] of Object.entries(fields)) {
+    const path = ctx.pathPrefix ? `${ctx.pathPrefix}.${fieldName}` : fieldName;
+    const hasOwnValue = Object.prototype.hasOwnProperty.call(data, fieldName);
+    const hasHooks = (hooksFor(field, name)?.length ?? 0) > 0;
+    let value = data[fieldName];
+    value = await runFieldHookChain(field, name, {
+      value,
+      data,
+      ...(ctx.previousData !== undefined && { previousValue: ctx.previousData[fieldName] }),
+      fieldName: path,
+      collection: ctx.collection,
+      operation: ctx.operation,
+      ...(ctx.user !== undefined && { user: ctx.user }),
+      ...(ctx.overrideAccess !== undefined && { overrideAccess: ctx.overrideAccess })
+    });
+    let shouldAssign = hasOwnValue || hasHooks;
+
+    if (field.kind === 'group' && isPlainRecord(value)) {
+      const previousValue = ctx.previousData?.[fieldName];
+      value = await runFieldMapHooks((field.options as GroupFieldOptions).fields, name, {
+        data: value,
+        ...(isPlainRecord(previousValue) && { previousData: previousValue }),
+        pathPrefix: path,
+        collection: ctx.collection,
+        operation: ctx.operation,
+        ...(ctx.user !== undefined && { user: ctx.user }),
+        ...(ctx.overrideAccess !== undefined && { overrideAccess: ctx.overrideAccess })
+      });
+      shouldAssign = true;
+    }
+
+    if (field.kind === 'array' && Array.isArray(value)) {
+      const previousRows = ctx.previousData?.[fieldName];
+      value = await Promise.all(
+        value.map(async (row, index) => {
+          if (!isPlainRecord(row)) return row;
+          const previousRow = Array.isArray(previousRows) ? previousRows[index] : undefined;
+          return runFieldMapHooks((field.options as ArrayFieldOptions).fields, name, {
+            data: row,
+            ...(isPlainRecord(previousRow) && { previousData: previousRow }),
+            pathPrefix: `${path}.${index}`,
+            collection: ctx.collection,
+            operation: ctx.operation,
+            ...(ctx.user !== undefined && { user: ctx.user }),
+            ...(ctx.overrideAccess !== undefined && { overrideAccess: ctx.overrideAccess })
+          });
+        })
+      );
+      shouldAssign = true;
+    }
+
+    if (field.kind === 'blocks' && Array.isArray(value)) {
+      const previousRows = ctx.previousData?.[fieldName];
+      const blocks = new Map(
+        (field.options as BlocksFieldOptions).blocks.map((block) => [block.slug, block])
+      );
+      value = await Promise.all(
+        value.map(async (row, index) => {
+          if (!isPlainRecord(row) || typeof row.blockType !== 'string') return row;
+          const block = blocks.get(row.blockType);
+          if (!block) return row;
+          const previousRow = Array.isArray(previousRows) ? previousRows[index] : undefined;
+          return runFieldMapHooks(block.fields as FieldMap, name, {
+            data: row,
+            ...(isPlainRecord(previousRow) && { previousData: previousRow }),
+            pathPrefix: `${path}.${index}`,
+            collection: ctx.collection,
+            operation: ctx.operation,
+            ...(ctx.user !== undefined && { user: ctx.user }),
+            ...(ctx.overrideAccess !== undefined && { overrideAccess: ctx.overrideAccess })
+          });
+        })
+      );
+      shouldAssign = true;
+    }
+
+    if (shouldAssign) {
+      data = { ...data, [fieldName]: value };
+    }
+  }
+
+  return data;
+}
+
+/** Threads every top-level and nested field's value through its hook chain. */
 export async function runFieldHooks(
   collection: CollectionDefinition,
   name: FieldHookName,
@@ -194,27 +328,5 @@ export async function runFieldHooks(
     overrideAccess?: boolean;
   }
 ): Promise<Record<string, unknown>> {
-  const entries = Object.entries(collection.fields).filter(
-    ([, field]) => (hooksFor(field, name)?.length ?? 0) > 0
-  );
-  if (entries.length === 0) return ctx.data;
-
-  const data = { ...ctx.data };
-  for (const [fieldName, field] of entries) {
-    let value = data[fieldName];
-    for (const hook of hooksFor(field, name) ?? []) {
-      value = await hook({
-        value,
-        data,
-        ...(ctx.previousData !== undefined && { previousValue: ctx.previousData[fieldName] }),
-        fieldName,
-        collection,
-        operation: ctx.operation,
-        user: ctx.user ?? null,
-        ...(ctx.overrideAccess !== undefined && { overrideAccess: ctx.overrideAccess })
-      });
-    }
-    data[fieldName] = value;
-  }
-  return data;
+  return runFieldMapHooks(collection.fields, name, { ...ctx, collection });
 }

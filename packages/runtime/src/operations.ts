@@ -239,19 +239,24 @@ async function prepareForRead(
   return docs;
 }
 
-export async function find(ctx: OperationContext, args: FindArgs): Promise<PaginatedDocs> {
-  const collection = getCollectionOrThrow(ctx, args.collection);
+async function prepareReadQuery(
+  collection: CollectionDefinition,
+  args: {
+    where?: DatabaseWhere;
+    status?: DraftStatus | 'all';
+    user?: CmsUser | null;
+    overrideAccess?: boolean;
+  },
+  defaultStatus: DraftStatus | 'all'
+): Promise<DatabaseWhere | undefined> {
   const user = args.user ?? null;
   const overrideAccess = args.overrideAccess !== false;
-
-  await runBeforeOperationHooks(collection, { operation: 'read', user, overrideAccess });
-
   const decision = await checkAccess(collection, 'read', args);
 
   let where = mergeWhere(args.where, decision.where);
   where = mergeWhere(
     where,
-    statusConstraint(collection, args.status, user, args.overrideAccess !== false, 'published')
+    statusConstraint(collection, args.status, user, args.overrideAccess !== false, defaultStatus)
   );
   where = (await runBeforeReadHooks(collection, {
     user,
@@ -259,19 +264,29 @@ export async function find(ctx: OperationContext, args: FindArgs): Promise<Pagin
     query: where ?? {}
   })) as DatabaseWhere;
 
-  const hasWhere = where !== undefined && Object.keys(where).length > 0;
+  return where !== undefined && Object.keys(where).length > 0 ? where : undefined;
+}
+
+export async function find(ctx: OperationContext, args: FindArgs): Promise<PaginatedDocs> {
+  const collection = getCollectionOrThrow(ctx, args.collection);
+  const user = args.user ?? null;
+  const overrideAccess = args.overrideAccess !== false;
+
+  await runBeforeOperationHooks(collection, { operation: 'read', user, overrideAccess });
+
+  const where = await prepareReadQuery(collection, args, 'published');
   const findOptions = {
     collection: args.collection,
     ...(args.limit !== undefined && { limit: args.limit }),
     ...(args.offset !== undefined && { offset: args.offset }),
-    ...(hasWhere && { where }),
+    ...(where !== undefined && { where }),
     ...(args.sort !== undefined && { sort: args.sort }),
     ...(args.order !== undefined && { order: args.order })
   };
 
   const [records, totalDocs] = await Promise.all([
     ctx.adapters.database.findMany(findOptions),
-    ctx.adapters.database.count(args.collection, hasWhere ? where : undefined)
+    ctx.adapters.database.count(args.collection, where)
   ]);
 
   const docs = await prepareForRead(ctx, collection, records, args);
@@ -343,19 +358,14 @@ export async function findByID(
 export async function count(ctx: OperationContext, args: CountArgs): Promise<number> {
   const collection = getCollectionOrThrow(ctx, args.collection);
   const user = args.user ?? null;
+  const overrideAccess = args.overrideAccess !== false;
 
-  const decision = await checkAccess(collection, 'read', args);
+  await runBeforeOperationHooks(collection, { operation: 'read', user, overrideAccess });
 
-  let where = mergeWhere(args.where, decision.where);
-  where = mergeWhere(
-    where,
-    statusConstraint(collection, args.status, user, args.overrideAccess !== false, 'published')
-  );
-
-  return ctx.adapters.database.count(
-    args.collection,
-    where && Object.keys(where).length > 0 ? where : undefined
-  );
+  const where = await prepareReadQuery(collection, args, 'published');
+  const result = await ctx.adapters.database.count(args.collection, where);
+  await runAfterOperationHooks(collection, { operation: 'read', user, overrideAccess, result });
+  return result;
 }
 
 export async function create(ctx: OperationContext, args: CreateArgs): Promise<DatabaseRecord> {

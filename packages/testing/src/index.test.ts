@@ -6,7 +6,7 @@ describe('testing helpers', () => {
     const collection = createTestCollection();
     const request = createTestRequest();
 
-    expect(collection.slug).toBe('test-posts');
+    expect(collection.slug).toBe('test_posts');
     expect(request.url).toBe('https://forge.test/');
   });
 });

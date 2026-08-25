@@ -121,4 +121,7 @@ Shipped 2026-07-22. Verified against the running dev server: a `landing_pages` d
 a 2-row array and 3 heterogeneous blocks round-tripped over HTTP, and an invalid payload returned
 `highlights.0.label -> required` and `sections.0 -> block_type`.
 
-Deferred (see Non-goals): nested field hooks, querying inside composite values, row reordering.
+Deferred (see Non-goals): querying inside composite values, row reordering.
+
+Follow-up completed 2026-08-25: field hooks now traverse nested `group`, `array` and `blocks`
+fields through the same hook pipeline as top-level fields.

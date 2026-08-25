@@ -119,15 +119,25 @@ function parseWhere(collection: CollectionDefinition, url: URL): DatabaseWhere {
     assertValidFilterField(collection, key);
 
     if (operator === 'in') {
-      where[key] = { in: value.split(',').map((v) => coerceScalar(collection, key, v)) };
+      where[key] = {
+        ...(isOperatorObject(where[key]) && where[key]),
+        in: value.split(',').map((v) => coerceScalar(collection, key, v))
+      };
     } else if (operator === 'eq') {
       where[key] = coerceScalar(collection, key, value);
     } else {
-      where[key] = { [operator]: coerceScalar(collection, key, value) };
+      where[key] = {
+        ...(isOperatorObject(where[key]) && where[key]),
+        [operator]: coerceScalar(collection, key, value)
+      };
     }
   });
 
   return where;
+}
+
+function isOperatorObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function parseSort(

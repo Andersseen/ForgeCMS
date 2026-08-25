@@ -1,6 +1,6 @@
 import { defineCollection, defineField } from '@forge-cms/core';
 
-export function createTestCollection(slug = 'test-posts') {
+export function createTestCollection(slug = 'test_posts') {
   return defineCollection({
     slug,
     fields: {
