@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/angular",
-  "version": "0.2.0",
+  "version": "0.0.1",
   "description": "Angular SDK and services for ForgeCMS.",
   "author": "ForgeCMS contributors",
   "license": "MIT",
@@ -25,7 +25,8 @@
   },
   "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "exports": {
     ".": {
@@ -42,7 +43,7 @@
     "clean": "rm -rf dist coverage"
   },
   "peerDependencies": {
-    "@angular/core": ">=19.0.0"
+    "@angular/core": "^21.2.0"
   },
   "devDependencies": {
     "@angular/compiler": "^21.2.10",

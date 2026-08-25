@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/admin",
-  "version": "0.2.0",
+  "version": "0.0.1",
   "description": "Angular admin components and utilities for ForgeCMS.",
   "author": "ForgeCMS contributors",
   "license": "MIT",
@@ -25,7 +25,8 @@
   },
   "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "exports": {
     ".": {
@@ -42,8 +43,10 @@
     "clean": "rm -rf dist coverage"
   },
   "peerDependencies": {
-    "@angular/core": ">=19.0.0",
-    "@angular/router": ">=19.0.0",
+    "@angular/common": "^21.2.0",
+    "@angular/core": "^21.2.0",
+    "@angular/forms": "^21.2.0",
+    "@angular/router": "^21.2.0",
     "@voltui/components": "^0.6.0",
     "lumen-icons": "^0.2.0",
     "rxjs": "^7.8.0"

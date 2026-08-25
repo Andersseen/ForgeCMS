@@ -2,7 +2,20 @@
   "$schema": "https://unpkg.com/@changesets/config@3.1.4/schema.json",
   "changelog": "@changesets/cli/changelog",
   "commit": false,
-  "fixed": [],
+  "fixed": [
+    [
+      "@forge-cms/core",
+      "@forge-cms/db",
+      "@forge-cms/auth",
+      "@forge-cms/storage",
+      "@forge-cms/api",
+      "@forge-cms/runtime",
+      "@forge-cms/cloudflare",
+      "@forge-cms/angular",
+      "@forge-cms/admin",
+      "@forge-cms/testing"
+    ]
+  ],
   "linked": [],
   "access": "public",
   "baseBranch": "main",

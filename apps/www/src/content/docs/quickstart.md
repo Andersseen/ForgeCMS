@@ -1,21 +1,77 @@
 ---
 title: Quickstart
-description: From clone to your own collection, with a working API and admin UI.
+description: Install ForgeCMS, define a collection, and run CRUD through the Local API.
 group: Getting started
 order: 2
 ---
 
-> **Read this first:** no `@forge-cms/*` package is published to npm yet, so you cannot
-> `pnpm add @forge-cms/core` into an existing app. Using ForgeCMS today means cloning the monorepo
-> and building inside it. Everything below runs against the real dev server.
+ForgeCMS `0.0.1` is an experimental first public release. Start from your own repository:
 
-## Prerequisites
+```sh
+pnpm add @forge-cms/core @forge-cms/runtime @forge-cms/db @forge-cms/auth @forge-cms/storage
+```
+
+Define a collection:
+
+```ts
+import { defineCollection, defineField } from '@forge-cms/core';
+
+export const notes = defineCollection({
+  slug: 'notes',
+  fields: {
+    title: defineField.text({ required: true }),
+    data: defineField.json()
+  }
+});
+```
+
+Create the runtime:
+
+```ts
+import { InMemoryAuthAdapter } from '@forge-cms/auth';
+import { InMemoryDatabaseAdapter } from '@forge-cms/db';
+import { ForgeCmsRuntime } from '@forge-cms/runtime';
+import { InMemoryStorageAdapter } from '@forge-cms/storage';
+import { notes } from './cms.js';
+
+export const runtime = new ForgeCmsRuntime({
+  collections: [notes],
+  adapters: {
+    database: new InMemoryDatabaseAdapter(),
+    auth: new InMemoryAuthAdapter(),
+    storage: new InMemoryStorageAdapter()
+  }
+});
+
+runtime.init();
+await runtime.syncSchema();
+```
+
+Use the Local API:
+
+```ts
+const created = await runtime.create({
+  collection: 'notes',
+  data: { title: 'Hello ForgeCMS', data: { source: 'docs' } }
+});
+
+const { docs } = await runtime.find({ collection: 'notes' });
+await runtime.delete({ collection: 'notes', id: String(created.id) });
+```
+
+`runtime.syncSchema()` is additive: it creates missing tables and adds missing columns, but it does
+not drop, rename, retype, or backfill existing data. For framework HTTP integration, build an
+`ApiContext` and call the handlers exported by `@forge-cms/runtime`.
+
+## Running the repository demo
+
+### Prerequisites
 
 - Node >= 22 (`.nvmrc`)
 - pnpm 10.11.0 — never npm or yarn, the workspace depends on pnpm's linking
 - git
 
-## 1. Clone and build
+### 1. Clone and build
 
 ```sh
 git clone https://github.com/Andersseen/ForgeCMS.git
@@ -27,7 +83,7 @@ pnpm build   # required once: @forge-cms/* resolves to packages/*/dist
 `pnpm build` is not optional on a fresh clone. TypeScript path mapping points `@forge-cms/*` at
 `packages/*/dist/index.d.ts`, so `pnpm typecheck` fails until the packages have been built once.
 
-## 2. Run an app
+### 2. Run an app
 
 ```sh
 pnpm dev:www     # landing page + /admin + the CRUD API
@@ -46,7 +102,7 @@ login at `/login`:
 Local development uses in-memory adapters, so **data resets on every reload**. That is expected;
 the deployed apps persist to Cloudflare D1.
 
-## 3. Add a collection
+### 3. Add a collection
 
 Everything lives in one file — `apps/www/src/server/api/runtime.ts`. The HTTP routes and the admin
 UI are collection-agnostic: they read whatever is registered there, so there is no second place to
@@ -74,7 +130,7 @@ Save. The runtime is built lazily per request, so the next request picks it up �
 `/admin/collections` and "testimonials" is there, with a working create/edit/delete form generated
 from those field definitions. No admin code was touched.
 
-## 4. Drive it over HTTP
+### 4. Drive it over HTTP
 
 Reads are open. Writes need a bearer token:
 
@@ -99,7 +155,7 @@ Post without `author` and you get a `400` with a per-field validation error, bec
 is enforced by `@forge-cms/core` on every write. Post without the `Authorization` header and you get
 a `401`.
 
-## 5. Query it from server code
+### 5. Query it from server code
 
 The HTTP API is for clients. From an Analog server route, skip it and call the
 [Local API](/docs/local-api) directly:

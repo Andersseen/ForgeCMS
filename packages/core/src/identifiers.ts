@@ -19,7 +19,7 @@ export function isValidIdentifier(name: string): boolean {
 export function assertValidIdentifier(name: string, context: string): void {
   if (!isValidIdentifier(name)) {
     throw new Error(
-        `Invalid identifier "${name}" in ${context}. ` +
+      `Invalid identifier "${name}" in ${context}. ` +
         `Identifiers must match ${IDENTIFIER_PATTERN.source} (start with a lowercase letter or ` +
         `one internal underscore, contain only letters, digits, and underscores).`
     );

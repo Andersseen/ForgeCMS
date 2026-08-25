@@ -5,8 +5,8 @@ group: Getting started
 order: 1
 ---
 
-ForgeCMS is a **TypeScript-native, Payload-like headless CMS for Angular and Analog.js**, built to
-run on the edge (Cloudflare Pages, D1, R2).
+ForgeCMS is a **code-first, TypeScript-native CMS foundation** with first-class Angular, Analog.js
+and Cloudflare support.
 
 You describe your content in TypeScript:
 
@@ -59,16 +59,14 @@ hop between your Analog route and your content.
 - **An Angular client and admin UI** — `CmsApiService` plus signal-based resources, and importable
   admin components (list, schema-driven form, relation/upload/richtext pickers).
 
-## What is not real yet
+## What is experimental
 
 Be honest with yourself about this list before adopting it for something that matters:
 
-- **Nothing is published to npm.** Every package version is still `0.0.0`. Using ForgeCMS today means
-  cloning the monorepo and working inside it — see [Quickstart](/docs/quickstart).
-- **No globals** (singleton documents like "site settings"). Fake one with a single-row collection.
-- **No versions or revisions.** [Drafts](/docs/collections) give you `draft`/`published` status, not
-  history, diffs or restore.
-- **No localisation.**
+- **First public release.** `0.0.1` is installable and externally smoke-tested, but API stability is
+  not guaranteed before `1.0`.
+- **Schema sync is additive.** It creates tables and adds columns, but it does not drop, rename,
+  retype, or backfill data.
 - **Query gaps** — one sort field, no `OR`, no querying inside composite JSON values, and relation
   population is one level deep (`depth: 1`).
 - **No SSR-safe client fetch.** The Angular client is browser-first; a content site that needs SSR
