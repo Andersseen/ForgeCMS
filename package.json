@@ -53,6 +53,7 @@
     "changeset": "changeset",
     "changeset:version": "changeset version",
     "release:verify": "node scripts/verify-release.mjs",
+    "release:publish-unpublished": "node scripts/publish-unpublished.mjs",
     "release": "changeset publish",
     "clean": "turbo run clean && rm -rf .turbo dist coverage"
   },

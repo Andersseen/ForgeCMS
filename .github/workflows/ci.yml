@@ -158,6 +158,16 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
 
+      # The first public release started from an empty baseline changeset, so Changesets has no
+      # version PR to consume. Publish only package versions that are still missing from npm; later
+      # normal Changesets releases will publish first, and this step will skip already-published
+      # versions.
+      - name: Publish package versions missing from npm
+        run: pnpm release:publish-unpublished
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+
   deploy:
     name: Deploy to Cloudflare Pages
     runs-on: ubuntu-latest
