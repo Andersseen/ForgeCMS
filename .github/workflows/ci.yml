@@ -1,9 +1,15 @@
 name: CI
 
-# Single pipeline: quality checks on every push/PR, then deploy on push to main.
+# Single pipeline: quality checks on every push/PR, then deploy + release on push to main.
 # Two Cloudflare Pages projects, both from this repo:
 #   forge-cms       → apps/www              (landing + generic admin)
 #   forge-cms-demo  → apps/demo-aesthetics  (the clinic demo the landing page links to)
+# Releases: Changesets. `changeset-check` blocks PRs that touch packages/* without a changeset;
+# `release` (push to main only) opens/updates a "Version Packages" PR when changesets are pending,
+# and publishes to npm once that PR is merged (i.e. only when packages/* actually changed — a
+# push to main with no pending changesets and no version bump is a no-op for this job). Needs the
+# `NPM_TOKEN` repo secret (an npm Automation or Granular Access Token scoped to the `forge-cms` org
+# with publish rights).
 
 on:
   push:
@@ -64,6 +70,87 @@ jobs:
 
       - name: E2E tests
         run: pnpm e2e:www
+
+  changeset-check:
+    name: Changeset required for packages/* changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Fails if any package under packages/* changed since origin/main with no matching
+      # .changeset/*.md file. Apps are `private: true`, so changes under apps/* never trigger this.
+      - name: Verify a changeset exists
+        run: pnpm changeset status --since=origin/main
+
+  release:
+    name: Release packages to npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: checks
+    # Same guard as deploy/deploy-demo: real pushes to main only, never PRs or forks.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # publishConfig.access is already "public" per package, but dist/ is gitignored — it must be
+      # rebuilt here, or `changeset publish` would ship packages with no `dist/` at all.
+      - name: Build all packages
+        run: pnpm build
+
+      # No pending changesets and no version bump → this step is a no-op (nothing to publish).
+      # Pending changesets → opens/updates a "Version Packages" PR instead of publishing.
+      # That PR merged (versions bumped, changesets consumed) → publishes the bumped packages.
+      - name: Create Release PR or publish to npm
+        uses: changesets/action@v1
+        with:
+          publish: pnpm changeset publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
 
   deploy:
     name: Deploy to Cloudflare Pages
