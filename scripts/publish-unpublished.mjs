@@ -50,26 +50,34 @@ for (const pkg of packages) {
 
   const specifier = `${pkg.name}@${pkg.version}`;
   const viewResult = run('npm', ['view', specifier, 'version']);
+  let published = false;
 
   if (viewResult.status === 0) {
     console.log(`${specifier} already published`);
-    continue;
-  }
-
-  if (!isNotFound(viewResult)) {
+    published = true;
+  } else if (!isNotFound(viewResult)) {
     assertOk(viewResult, `npm view ${specifier}`);
+  } else if (dryRun) {
+    console.log(`${specifier} would be published`);
+  } else {
+    console.log(`Publishing ${specifier}`);
+    const publishResult = run(
+      'pnpm',
+      ['--filter', pkg.name, 'publish', '--access', 'public', '--no-git-checks', '--provenance'],
+      { stdio: 'inherit' }
+    );
+    assertOk(publishResult, `publish ${specifier}`);
+    published = true;
   }
 
   if (dryRun) {
-    console.log(`${specifier} would be published`);
+    console.log(`${pkg.name} would be set to public access`);
     continue;
   }
 
-  console.log(`Publishing ${specifier}`);
-  const publishResult = run(
-    'pnpm',
-    ['--filter', pkg.name, 'publish', '--access', 'public', '--no-git-checks', '--provenance'],
-    { stdio: 'inherit' }
-  );
-  assertOk(publishResult, `publish ${specifier}`);
+  if (published) {
+    console.log(`Ensuring ${pkg.name} has public access`);
+    const accessResult = run('npm', ['access', 'public', pkg.name], { stdio: 'inherit' });
+    assertOk(accessResult, `npm access public ${pkg.name}`);
+  }
 }
