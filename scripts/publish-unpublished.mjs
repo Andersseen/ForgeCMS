@@ -77,7 +77,9 @@ for (const pkg of packages) {
 
   if (published) {
     console.log(`Ensuring ${pkg.name} has public access`);
-    const accessResult = run('npm', ['access', 'public', pkg.name], { stdio: 'inherit' });
-    assertOk(accessResult, `npm access public ${pkg.name}`);
+    const accessResult = run('npm', ['access', 'set', 'status=public', pkg.name], {
+      stdio: 'inherit'
+    });
+    assertOk(accessResult, `npm access set status=public ${pkg.name}`);
   }
 }
