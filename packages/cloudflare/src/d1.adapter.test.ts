@@ -541,9 +541,7 @@ describe('D1DatabaseAdapter', () => {
       await expect(adapter.delete('posts"; DROP TABLE posts; --', 'p1')).rejects.toThrow(
         'not registered'
       );
-      await expect(adapter.count('posts"; DROP TABLE posts; --')).rejects.toThrow(
-        'not registered'
-      );
+      await expect(adapter.count('posts"; DROP TABLE posts; --')).rejects.toThrow('not registered');
     });
 
     it('sorts ascending and descending', async () => {

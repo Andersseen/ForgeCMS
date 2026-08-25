@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/testing",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "Shared testing helpers for ForgeCMS packages.",
   "author": "ForgeCMS contributors",
   "license": "MIT",
@@ -25,7 +25,8 @@
   },
   "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "exports": {
     ".": {
@@ -33,8 +34,8 @@
       "default": "./dist/index.js"
     },
     "./contracts": {
-      "types": "./src/contracts/index.ts",
-      "default": "./src/contracts/index.ts"
+      "types": "./dist/contracts/index.d.ts",
+      "default": "./dist/contracts/index.js"
     }
   },
   "scripts": {
@@ -47,6 +48,9 @@
   },
   "dependencies": {
     "@forge-cms/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "vitest": "^4.0.0"
   },
   "devDependencies": {
     "typescript": "catalog:",

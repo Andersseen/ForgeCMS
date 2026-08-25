@@ -142,9 +142,7 @@ describe('LibSqlDatabaseAdapter', () => {
       await expect(adapter.findById('posts"; DROP TABLE posts; --', 'p1')).rejects.toThrow(
         'not registered'
       );
-      await expect(adapter.count('posts"; DROP TABLE posts; --')).rejects.toThrow(
-        'not registered'
-      );
+      await expect(adapter.count('posts"; DROP TABLE posts; --')).rejects.toThrow('not registered');
     });
 
     it('still supports bare-value equality', async () => {

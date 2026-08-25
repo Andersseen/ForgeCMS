@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   checks:
-    name: Lint · Typecheck · Test · Build · E2E
+    name: Lint · Typecheck · Test · Build · Pack · E2E
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -64,6 +64,9 @@ jobs:
 
       - name: Build all packages and apps
         run: pnpm build
+
+      - name: Verify packed package installation
+        run: pnpm release:verify
 
       - name: Install Playwright (chromium)
         run: pnpm --filter @forge-cms/www exec playwright install --with-deps chromium
@@ -139,6 +142,9 @@ jobs:
       # rebuilt here, or `changeset publish` would ship packages with no `dist/` at all.
       - name: Build all packages
         run: pnpm build
+
+      - name: Verify packed package installation
+        run: pnpm release:verify
 
       # No pending changesets and no version bump → this step is a no-op (nothing to publish).
       # Pending changesets → opens/updates a "Version Packages" PR instead of publishing.

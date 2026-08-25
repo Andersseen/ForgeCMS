@@ -1,129 +1,188 @@
-# QUICKSTART — try ForgeCMS in 10 minutes
+# QUICKSTART — build your first ForgeCMS
 
-> **Reality check first:** no `@forge-cms/*` package is published to npm yet (versions are bumped and
-> ready — see [STATE.md](STATE.md) — but nobody has run the actual publish command). So "add ForgeCMS
-> to _your own_ Analog app via `pnpm add`" isn't possible today. What **is** real today: a working CMS
-> runtime, CRUD API with auth-protected writes, and admin UI, all wired together in this monorepo's
-> demo app (`apps/www`). This guide uses that demo as the "Analog app" — clone the repo and you have a
-> running Analog + ForgeCMS app in the time it takes to read this page. Everything below is
-> copy-pasteable and was run against the real dev server while writing it.
+ForgeCMS `0.0.1` is the first public experimental release. This guide is for using ForgeCMS from a
+separate application repository, not for contributing to this monorepo.
 
 ## Prerequisites
 
-- Node >= 22 (see `.nvmrc`)
-- pnpm `10.11.0` (never npm/yarn — see [CLAUDE.md](../CLAUDE.md))
-- git
+- Node >= 22
+- pnpm 10
+- TypeScript with ESM output
 
-## 1. Clone and install (2 min)
-
-```sh
-git clone https://github.com/Andersseen/ForgeCMS.git
-cd forge-cms
-pnpm install
-pnpm build   # required once — tsconfig path mapping resolves @forge-cms/* to packages/*/dist
-```
-
-## 2. Run the demo (1 min)
+## 1. Install the runtime packages
 
 ```sh
-pnpm dev:www
+pnpm add @forge-cms/core @forge-cms/runtime @forge-cms/db @forge-cms/auth @forge-cms/storage
 ```
 
-Open the URL printed in your terminal (Analog's dev server, usually `http://localhost:5173`) and go
-to `/admin`. You get a dashboard, 9 seeded collections (pages, posts, products, media, users,
-categories, forms, navigation, site config), and full create/edit/delete with schema validation —
-backed by an in-memory adapter that resets on every reload (that's expected in local dev; the
-production deploy persists to Cloudflare D1). Reads are open to anyone; creating, editing, or
-deleting a document requires logging in first at `/login` with the published demo credentials
-(`demo@forgecms.dev` / `forgecms-demo`) — the UI redirects you there automatically on your first
-write attempt.
+Add Cloudflare adapters only when deploying to Workers/Pages with D1 or R2:
 
-## 3. Add your own collection (5 min)
+```sh
+pnpm add @forge-cms/cloudflare
+```
 
-This is the actual "add ForgeCMS to an app" step. Every collection lives in one file:
-[apps/www/src/server/api/runtime.ts](../apps/www/src/server/api/runtime.ts). The HTTP routes
-(`/api/v1/[collection]`) and the admin UI are both collection-agnostic — they read whatever is
-registered here, so there is no second place to wire anything up.
+## 2. Define one collection
 
-Open that file and define a collection with `defineCollection` / `defineField`:
+Create `src/cms.ts`:
 
 ```ts
-const testimonials = defineCollection({
-  slug: 'testimonials',
+import { defineCollection, defineField } from '@forge-cms/core';
+
+export const notes = defineCollection({
+  slug: 'notes',
   fields: {
-    author: defineField.text({ required: true }),
-    quote: defineField.textarea({ required: true }),
-    rating: defineField.number(),
-    featured: defineField.boolean()
+    title: defineField.text({ required: true }),
+    data: defineField.json()
   }
 });
 ```
 
-Add it to the `collections` array further down the same file:
+## 3. Create and initialize a runtime
 
 ```ts
-const collections = [
-  pages,
-  posts,
-  products,
-  media,
-  users,
-  categories,
-  forms,
-  navigation,
-  siteConfig,
-  testimonials // 👈 new
-];
+import { InMemoryAuthAdapter } from '@forge-cms/auth';
+import { InMemoryDatabaseAdapter } from '@forge-cms/db';
+import { ForgeCmsRuntime } from '@forge-cms/runtime';
+import { InMemoryStorageAdapter } from '@forge-cms/storage';
+import { notes } from './cms.js';
+
+export const runtime = new ForgeCmsRuntime({
+  collections: [notes],
+  adapters: {
+    database: new InMemoryDatabaseAdapter(),
+    auth: new InMemoryAuthAdapter(),
+    storage: new InMemoryStorageAdapter()
+  }
+});
+
+runtime.init();
+await runtime.syncSchema();
 ```
 
-Save. The dev server picks it up on the next request (the runtime is built lazily per-request, not
-at startup — see the comment on `getServerRuntime` in that file). Reload `/admin/collections` in the
-browser: "Testimonials" now appears alongside the seeded ones, with a working create/edit/delete
-form generated from the field definitions above — no admin UI code was touched.
+That is the supported bootstrap pattern for `0.0.1`: choose adapters, create `ForgeCmsRuntime`, call
+`init()`, then call `syncSchema()`.
 
-You can also drive it directly over HTTP. Writes require a Bearer token — log in first with the
-published demo credentials:
+## 4. Use the Local API
+
+```ts
+const created = await runtime.create({
+  collection: 'notes',
+  data: {
+    title: 'Hello ForgeCMS',
+    data: { mood: 'curious' }
+  }
+});
+
+const page = await runtime.find({
+  collection: 'notes',
+  limit: 10
+});
+
+await runtime.update({
+  collection: 'notes',
+  id: String(created.id),
+  data: { title: 'Updated title' }
+});
+
+await runtime.delete({
+  collection: 'notes',
+  id: String(created.id)
+});
+```
+
+Direct Local API calls are trusted server-side calls. They skip access checks by default. Pass
+`overrideAccess: false` and a `user` when you want to run an operation under normal CMS access rules,
+which is what the HTTP handlers do for network requests.
+
+## 5. Expose HTTP handlers
+
+ForgeCMS runtime handlers are framework-agnostic: they take an `ApiContext` and return a standard
+`Response`.
+
+```ts
+import type { ApiContext } from '@forge-cms/api';
+import { handleCreate, handleList } from '@forge-cms/runtime';
+import { runtime } from './runtime.js';
+
+export function listNotes(context: ApiContext) {
+  return handleList(
+    {
+      ...context,
+      params: { collection: 'notes' }
+    },
+    { runtime }
+  );
+}
+
+export function createNote(context: ApiContext) {
+  return handleCreate(
+    {
+      ...context,
+      params: { collection: 'notes' }
+    },
+    { runtime }
+  );
+}
+```
+
+Your framework adapter only needs to build `{ request, params, env }`. Analog/Nitro, Hono, Express
+via Web `Request`, and Cloudflare Workers can all call the same handlers.
+
+## Schema synchronization
+
+`runtime.syncSchema()` asks the configured database adapter to create or update the storage shape for
+registered collections and globals.
+
+For the built-in SQLite-style adapters, it is intentionally additive:
+
+- It creates missing tables.
+- It adds missing columns.
+- It creates configured indexes where supported.
+- It does not drop columns.
+- It does not rename columns.
+- It does not change column types.
+- It does not migrate or backfill existing data.
+
+This makes `syncSchema()` convenient during development and acceptable on startup for small early
+deployments, including D1-backed deployments, but it is not a complete migration system. Destructive
+schema changes still need a deliberate migration plan.
+
+## Angular and admin packages
+
+For Angular apps:
 
 ```sh
-# Log in (reads never need this — only create/update/delete do)
-TOKEN=$(curl -s -X POST http://localhost:5173/api/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email": "demo@forgecms.dev", "password": "forgecms-demo"}' \
-  | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).data.token))")
-
-# Create
-curl -X POST http://localhost:5173/api/v1/testimonials \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"author": "Ada", "quote": "It just works.", "rating": 5, "featured": true}'
-
-# List (no token needed — reads stay open)
-curl http://localhost:5173/api/v1/testimonials
-
-# Filter by any field (equality, coerced to the field's type)
-curl "http://localhost:5173/api/v1/testimonials?author=Ada"
+pnpm add @forge-cms/angular
 ```
 
-Try posting with `author` omitted — you'll get a 400 with a validation error, because `required:
-true` on the field DSL is enforced by `@forge-cms/core`'s `validateCollection` on every write. Try it
-without the `Authorization` header at all — you'll get a 401, because writes are protected.
+```ts
+import { provideForgeCms } from '@forge-cms/angular';
 
-## Available field kinds
+export const appConfig = {
+  providers: [provideForgeCms({ baseUrl: '/api' })]
+};
+```
 
-`text`, `number`, `boolean`, `date`, `relation` (`{ collection, many? }`), `json`, `select` (`{
-options }`), `slug`, `email`, `textarea`. All support `required: true`; see
-[packages/core/src/index.ts](../packages/core/src/index.ts) for the full option shapes.
+For the admin components:
 
-## What you don't get yet
+```sh
+pnpm add @forge-cms/admin @forge-cms/angular @angular/common @angular/core @angular/forms @angular/router rxjs @voltui/components lumen-icons
+```
 
-- **Real user management:** auth is one hardcoded demo user (`demo@forgecms.dev`), not a `users`
-  collection with signup/roles/permissions — fine for a public demo, not for real multi-user data.
-- **A standalone install:** see the callout at the top. Package versions are ready but nothing has
-  been published to npm yet, so "using ForgeCMS" today means cloning this repo and editing
-  `runtime.ts`, not `pnpm add`-ing packages into an app you already have.
+`@forge-cms/admin` is a component library, not a full hosted admin application. Bring its exported
+standalone components into your Angular routes and provide your own routing shell around them.
 
-## Where to go next
+## Developing ForgeCMS itself
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — how a request flows from the browser to the database adapter,
-  and the contracts (`DatabaseAdapter`, `AuthAdapter`, `StorageAdapter`) you'd implement for a new backend.
-- [STATE.md](STATE.md) — what's implemented vs. missing, package by package, and what's next.
+To work on this repository:
+
+```sh
+git clone https://github.com/Andersseen/ForgeCMS.git
+cd ForgeCMS
+pnpm install
+pnpm build
+pnpm dev:www
+```
+
+Contributor workflow and quality gates live in [../CLAUDE.md](../CLAUDE.md) and
+[CONTRIBUTING.md](../CONTRIBUTING.md).

@@ -59,11 +59,11 @@ old shape has to be rewritten.
 
 _Small, mechanical, removes things that make the project unusable or untrustworthy._
 
-| #   | Item                                                                                                        | Why now                                                                                           |
-| --- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| 0.1 | **Fix D1 `users.passwordHash`**                                                                             | Auth is broken on the only production path. `STATE.md` known issue #10, last bullet.              |
-| 0.2 | **`count(where)` + real pagination meta** (`totalDocs`, `totalPages`, `page`, `hasNextPage`, `hasPrevPage`) | `meta.count` is currently the page length, so no client can build a paginator. Blocks Phase 4.30. |
-| 0.3 | **Publish `0.1.0` to npm**                                                                                  | A CMS nobody can `pnpm add` does not exist. Needs registry credentials — a human step.            |
+| #   | Item                                                                                                        | Why now                                                                                             |
+| --- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 0.1 | **Fix D1 `users.passwordHash`**                                                                             | Auth is broken on the only production path. `STATE.md` known issue #10, last bullet.                |
+| 0.2 | **`count(where)` + real pagination meta** (`totalDocs`, `totalPages`, `page`, `hasNextPage`, `hasPrevPage`) | `meta.count` is currently the page length, so no client can build a paginator. Blocks Phase 4.30.   |
+| 0.3 | **Prepare and publish `0.0.1` to npm**                                                                      | A CMS nobody can `pnpm add` does not exist. Needs packed-artifact verification and registry access. |
 
 ---
 
