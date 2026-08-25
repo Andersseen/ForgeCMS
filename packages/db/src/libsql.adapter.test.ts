@@ -129,6 +129,24 @@ describe('LibSqlDatabaseAdapter', () => {
       expect(results.map((r) => r.id)).toEqual(['p2']);
     });
 
+    it('ANDs multiple operators on the same field', async () => {
+      const results = await adapter.findMany({
+        collection: 'posts',
+        where: { views: { gte: 50, lte: 50 } }
+      });
+      expect(results.map((r) => r.id)).toEqual(['p2']);
+      expect(await adapter.count('posts', { views: { gte: 50, lte: 50 } })).toBe(1);
+    });
+
+    it('rejects unsafe collection strings that were not registered', async () => {
+      await expect(adapter.findById('posts"; DROP TABLE posts; --', 'p1')).rejects.toThrow(
+        'not registered'
+      );
+      await expect(adapter.count('posts"; DROP TABLE posts; --')).rejects.toThrow(
+        'not registered'
+      );
+    });
+
     it('still supports bare-value equality', async () => {
       const results = await adapter.findMany({ collection: 'posts', where: { title: 'Alpha' } });
       expect(results.map((r) => r.id)).toEqual(['p1']);

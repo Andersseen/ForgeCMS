@@ -1,4 +1,5 @@
 import type { CollectionDefinition, AnyField } from '@forge-cms/core';
+import { validateCollectionIdentifiers } from '@forge-cms/core';
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
 
@@ -86,7 +87,15 @@ export function fromDbValue(value: unknown, kind: AnyField['kind']): unknown {
   }
 }
 
+function assertValidCollectionSchema(collection: CollectionDefinition): void {
+  const errors = validateCollectionIdentifiers(collection);
+  if (errors.length > 0) {
+    throw new Error(errors.join('\n'));
+  }
+}
+
 export function generateCreateTableSql(collection: CollectionDefinition): string {
+  assertValidCollectionSchema(collection);
   const fieldColumns = Object.entries(collection.fields)
     .map(([name, field]) => `"${name}" ${fieldKindToSqlType(field)}`)
     .join(', ');
@@ -105,6 +114,7 @@ export function generateAddColumnSql(
   collection: CollectionDefinition,
   existingColumns: Iterable<string>
 ): string[] {
+  assertValidCollectionSchema(collection);
   const existing = new Set(existingColumns);
   const statements: string[] = [];
 
@@ -122,6 +132,7 @@ export function generateAddColumnSql(
 const tableCache = new Map<string, SQLiteTable>();
 
 export function getOrCreateDrizzleTable(collection: CollectionDefinition): SQLiteTable {
+  assertValidCollectionSchema(collection);
   const cached = tableCache.get(collection.slug);
   if (cached) return cached;
 

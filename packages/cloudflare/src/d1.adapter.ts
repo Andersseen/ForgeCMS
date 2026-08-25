@@ -10,7 +10,7 @@ import {
   generateAddColumnSql,
   toDbValue,
   fromDbValue,
-  toOperatorValue
+  toOperatorValues
 } from '@forge-cms/db';
 import type { D1Database } from './bindings.js';
 
@@ -60,8 +60,10 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     return this.db;
   }
 
-  private getCollectionDef(collection: string): CollectionDefinition | undefined {
-    return this.collections.get(collection);
+  private getCollectionDef(collection: string): CollectionDefinition {
+    const def = this.collections.get(collection);
+    if (!def) throw new Error(`Collection '${collection}' not registered. Call syncSchema first.`);
+    return def;
   }
 
   async syncSchema(collections: CollectionDefinition[]): Promise<void> {
@@ -100,6 +102,7 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
 
   async findById(collection: string, id: string): Promise<DatabaseRecord | null> {
     const db = this.getDb();
+    this.getCollectionDef(collection);
     const stmt = db.prepare(`SELECT * FROM "${collection}" WHERE id = ?`).bind(id);
     const result = await stmt.first<DatabaseRecord>();
     if (!result) return null;
@@ -119,41 +122,42 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     if (!where || Object.keys(where).length === 0) return { clause: '', bindings };
 
     const collectionDef = this.getCollectionDef(collection);
-    const conditions = Object.entries(where).map(([key, condition]) => {
+    const conditions = Object.entries(where).flatMap(([key, condition]) => {
       assertValidColumn(key, collectionDef);
       const field = collectionDef?.fields[key];
-      const { operator, value } = toOperatorValue(condition);
       const coerce = (v: unknown) => (field ? toDbValue(v, field.kind) : v);
 
-      switch (operator) {
-        case 'ne':
-          bindings.push(coerce(value));
-          return `"${key}" != ?`;
-        case 'gt':
-          bindings.push(coerce(value));
-          return `"${key}" > ?`;
-        case 'gte':
-          bindings.push(coerce(value));
-          return `"${key}" >= ?`;
-        case 'lt':
-          bindings.push(coerce(value));
-          return `"${key}" < ?`;
-        case 'lte':
-          bindings.push(coerce(value));
-          return `"${key}" <= ?`;
-        case 'in': {
-          const values = (value as unknown[]).map(coerce);
-          bindings.push(...values);
-          return `"${key}" IN (${values.map(() => '?').join(', ')})`;
+      return toOperatorValues(condition).map(({ operator, value }) => {
+        switch (operator) {
+          case 'ne':
+            bindings.push(coerce(value));
+            return `"${key}" != ?`;
+          case 'gt':
+            bindings.push(coerce(value));
+            return `"${key}" > ?`;
+          case 'gte':
+            bindings.push(coerce(value));
+            return `"${key}" >= ?`;
+          case 'lt':
+            bindings.push(coerce(value));
+            return `"${key}" < ?`;
+          case 'lte':
+            bindings.push(coerce(value));
+            return `"${key}" <= ?`;
+          case 'in': {
+            const values = (value as unknown[]).map(coerce);
+            bindings.push(...values);
+            return `"${key}" IN (${values.map(() => '?').join(', ')})`;
+          }
+          case 'contains':
+            bindings.push(`%${value as string}%`);
+            return `"${key}" LIKE ?`;
+          case 'eq':
+          default:
+            bindings.push(coerce(value));
+            return `"${key}" = ?`;
         }
-        case 'contains':
-          bindings.push(`%${value as string}%`);
-          return `"${key}" LIKE ?`;
-        case 'eq':
-        default:
-          bindings.push(coerce(value));
-          return `"${key}" = ?`;
-      }
+      });
     });
 
     return { clause: ` WHERE ${conditions.join(' AND ')}`, bindings };
@@ -250,11 +254,13 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
 
   async delete(collection: string, id: string): Promise<void> {
     const db = this.getDb();
+    this.getCollectionDef(collection);
     await db.prepare(`DELETE FROM "${collection}" WHERE id = ?`).bind(id).run();
   }
 
   async count(collection: string, where?: DatabaseWhere): Promise<number> {
     const db = this.getDb();
+    this.getCollectionDef(collection);
     const { clause, bindings } = this.buildWhereClause(collection, where);
     const sql = `SELECT COUNT(*) as count FROM "${collection}"${clause}`;
     const stmt = db.prepare(sql);

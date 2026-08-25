@@ -1,3 +1,5 @@
+import { validateCollectionIdentifiers, validateGlobalIdentifiers } from './identifiers.js';
+
 export type FieldKind =
   | 'text'
   | 'number'
@@ -534,12 +536,20 @@ export const defineField = {
 export function defineCollection<TSlug extends string, TFields extends FieldMap>(
   config: CollectionDefinition<TSlug, TFields>
 ): CollectionDefinition<TSlug, TFields> {
+  const errors = validateCollectionIdentifiers(config);
+  if (errors.length > 0) {
+    throw new Error(errors.join('\n'));
+  }
   return config;
 }
 
 export function defineGlobal<TSlug extends string, TFields extends FieldMap>(
   config: GlobalDefinition<TSlug, TFields>
 ): GlobalDefinition<TSlug, TFields> {
+  const errors = validateGlobalIdentifiers(config);
+  if (errors.length > 0) {
+    throw new Error(errors.join('\n'));
+  }
   return config;
 }
 
@@ -576,6 +586,7 @@ export {
   isSystemField,
   getSystemFields,
   validateCollectionIdentifiers,
+  validateGlobalIdentifiers,
   IDENTIFIER_PATTERN
 } from './identifiers.js';
 

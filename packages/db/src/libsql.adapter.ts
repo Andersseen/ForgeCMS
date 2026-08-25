@@ -25,7 +25,7 @@ import {
   sql,
   count as drizzleCount
 } from 'drizzle-orm';
-import { toOperatorValue } from './where.js';
+import { toOperatorValues } from './where.js';
 import type { DatabaseWhere } from './where.js';
 
 const SYSTEM_COLUMNS = new Set(['id', 'created_at', 'updated_at', '_status', '_storageKey']);
@@ -123,32 +123,35 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
   private buildWhereCondition(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     table: any,
+    collectionDef: CollectionDefinition | undefined,
     where: DatabaseWhere | undefined
   ): ReturnType<typeof and> | undefined {
     if (!where || Object.keys(where).length === 0) return undefined;
 
-    const conditions = Object.entries(where).map(([key, condition]) => {
+    const conditions = Object.entries(where).flatMap(([key, condition]) => {
+      assertValidColumn(key, collectionDef);
       const column = table[key];
-      const { operator, value } = toOperatorValue(condition);
-      switch (operator) {
-        case 'ne':
-          return ne(column, value);
-        case 'gt':
-          return gt(column, value);
-        case 'gte':
-          return gte(column, value);
-        case 'lt':
-          return lt(column, value);
-        case 'lte':
-          return lte(column, value);
-        case 'in':
-          return inArray(column, value as unknown[]);
-        case 'contains':
-          return like(column, `%${value as string}%`);
-        case 'eq':
-        default:
-          return eq(column, value);
-      }
+      return toOperatorValues(condition).map(({ operator, value }) => {
+        switch (operator) {
+          case 'ne':
+            return ne(column, value);
+          case 'gt':
+            return gt(column, value);
+          case 'gte':
+            return gte(column, value);
+          case 'lt':
+            return lt(column, value);
+          case 'lte':
+            return lte(column, value);
+          case 'in':
+            return inArray(column, value as unknown[]);
+          case 'contains':
+            return like(column, `%${value as string}%`);
+          case 'eq':
+          default:
+            return eq(column, value);
+        }
+      });
     });
 
     return and(...conditions);
@@ -156,15 +159,17 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
 
   async findMany(options: FindManyOptions): Promise<DatabaseRecord[]> {
     const db = this.getDb();
+    const collectionDef = this.getCollectionDef(options.collection);
     const table = this.getTable(options.collection);
     let query = db.select().from(table);
 
-    const whereCondition = this.buildWhereCondition(table, options.where);
+    const whereCondition = this.buildWhereCondition(table, collectionDef, options.where);
     if (whereCondition !== undefined) {
       query = query.where(whereCondition) as typeof query;
     }
 
     if (options.sort) {
+      assertValidColumn(options.sort, collectionDef);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sortColumn = (table as any)[options.sort];
       query = query.orderBy(
@@ -247,10 +252,11 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
 
   async count(collection: string, where?: DatabaseWhere): Promise<number> {
     const db = this.getDb();
+    const collectionDef = this.getCollectionDef(collection);
     const table = this.getTable(collection);
     let query = db.select({ count: drizzleCount() }).from(table);
 
-    const whereCondition = this.buildWhereCondition(table, where);
+    const whereCondition = this.buildWhereCondition(table, collectionDef, where);
     if (whereCondition !== undefined) {
       query = query.where(whereCondition) as typeof query;
     }

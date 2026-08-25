@@ -208,6 +208,25 @@ describe('CRUD Handlers', () => {
       expect(body.data[0].title).toBe('Popular');
     });
 
+    it('ANDs multiple bracket operators for the same field', async () => {
+      await runtime.adapters.database.create('posts', { title: 'Low', views: 1 });
+      await runtime.adapters.database.create('posts', { title: 'Middle', views: 9 });
+      await runtime.adapters.database.create('posts', { title: 'High', views: 20 });
+
+      const context = createTestContext(
+        'GET',
+        'https://forge.test/api/posts?views[gte]=5&views[lte]=10'
+      );
+      context.params = { collection: 'posts' };
+
+      const response = await handleList(context, { runtime });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.data.map((r: { title: string }) => r.title)).toEqual(['Middle']);
+      expect(body.meta.totalDocs).toBe(1);
+    });
+
     it('filters with the in bracket operator, splitting on commas', async () => {
       await runtime.adapters.database.create('posts', { id: 'a', title: 'A' });
       await runtime.adapters.database.create('posts', { id: 'b', title: 'B' });

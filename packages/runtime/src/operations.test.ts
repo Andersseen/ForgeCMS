@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { defineCollection, defineField } from '@forge-cms/core';
+import { defineBlock, defineCollection, defineField } from '@forge-cms/core';
 import type { CmsUser } from '@forge-cms/core';
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
 import { InMemoryAuthAdapter } from '@forge-cms/auth';
@@ -157,6 +157,22 @@ describe('Local API — write operations', () => {
 
     expect(await runtime.count({ collection: 'posts' })).toBe(2);
     expect(await runtime.count({ collection: 'posts', where: { views: { gt: 5 } } })).toBe(1);
+  });
+
+  it('ANDs multiple operators on one field', async () => {
+    await runtime.create({ collection: 'posts', data: { title: 'A', views: 1 } });
+    await runtime.create({ collection: 'posts', data: { title: 'B', views: 9 } });
+    await runtime.create({ collection: 'posts', data: { title: 'C', views: 20 } });
+
+    const result = await runtime.find({
+      collection: 'posts',
+      where: { views: { gte: 5, lte: 10 } }
+    });
+
+    expect(result.docs.map((doc) => doc.title)).toEqual(['B']);
+    expect(
+      await runtime.count({ collection: 'posts', where: { views: { gte: 5, lte: 10 } } })
+    ).toBe(1);
   });
 });
 
@@ -399,6 +415,26 @@ describe('Hook pipeline (spec 021)', () => {
     expect(result.docs.map((d) => d.title)).toEqual(['live']);
   });
 
+  it('runs beforeRead for count so totals match find', async () => {
+    const filtered = defineCollection({
+      slug: 'filtered_count',
+      fields: { title: defineField.text(), archived: defineField.boolean() },
+      hooks: { beforeRead: [(ctx) => ({ ...ctx.query, archived: false })] }
+    });
+
+    const runtime = buildRuntime([filtered]);
+    await runtime.create({
+      collection: 'filtered_count',
+      data: { title: 'live', archived: false }
+    });
+    await runtime.create({
+      collection: 'filtered_count',
+      data: { title: 'gone', archived: true }
+    });
+
+    expect(await runtime.count({ collection: 'filtered_count' })).toBe(1);
+  });
+
   it('lets afterRead transform each document', async () => {
     const computed = defineCollection({
       slug: 'computed',
@@ -502,6 +538,54 @@ describe('Hook pipeline (spec 021)', () => {
 
     expect(created.title).toBe('spaced');
     expect(created.shout).toBe('SPACED!');
+  });
+
+  it('runs field-level hooks inside composite fields', async () => {
+    const withNestedHooks = defineCollection({
+      slug: 'nested_hooks',
+      fields: {
+        hero: defineField.group({
+          fields: {
+            eyebrow: defineField.text({
+              hooks: { beforeChange: [({ value }) => String(value).trim()] }
+            })
+          }
+        }),
+        items: defineField.array({
+          fields: {
+            label: defineField.text({
+              hooks: { beforeChange: [({ value }) => String(value).toUpperCase()] }
+            })
+          }
+        }),
+        layout: defineField.blocks({
+          blocks: [
+            defineBlock({
+              slug: 'copy',
+              fields: {
+                heading: defineField.text({
+                  hooks: { afterRead: [({ value }) => `${String(value)}!`] }
+                })
+              }
+            })
+          ]
+        })
+      }
+    });
+
+    const runtime = buildRuntime([withNestedHooks]);
+    const created = await runtime.create({
+      collection: 'nested_hooks',
+      data: {
+        hero: { eyebrow: '  hello  ' },
+        items: [{ label: 'first' }],
+        layout: [{ blockType: 'copy', heading: 'Welcome' }]
+      }
+    });
+
+    expect(created.hero).toEqual({ eyebrow: 'hello' });
+    expect(created.items).toEqual([{ label: 'FIRST' }]);
+    expect(created.layout).toEqual([{ blockType: 'copy', heading: 'Welcome!' }]);
   });
 });
 
