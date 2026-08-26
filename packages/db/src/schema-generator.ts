@@ -1,5 +1,5 @@
 import type { CollectionDefinition, AnyField } from '@forge-cms/core';
-import { validateCollectionIdentifiers } from '@forge-cms/core';
+import { validateCollectionIdentifiers, validateCollectionIndexes } from '@forge-cms/core';
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
 
@@ -88,7 +88,10 @@ export function fromDbValue(value: unknown, kind: AnyField['kind']): unknown {
 }
 
 function assertValidCollectionSchema(collection: CollectionDefinition): void {
-  const errors = validateCollectionIdentifiers(collection);
+  const errors = [
+    ...validateCollectionIdentifiers(collection),
+    ...validateCollectionIndexes(collection)
+  ];
   if (errors.length > 0) {
     throw new Error(errors.join('\n'));
   }
@@ -127,6 +130,61 @@ export function generateAddColumnSql(
   }
 
   return statements;
+}
+
+/** One SQL index, normalized from either a field-level `unique`/`index` option or an `indexes` entry. */
+export interface ResolvedIndex {
+  name: string;
+  fields: string[];
+  unique: boolean;
+}
+
+function indexName(collectionSlug: string, fields: string[]): string {
+  return `idx_${collectionSlug}_${fields.join('_')}`;
+}
+
+/**
+ * Normalizes every index a collection declares — single-field `unique: true`/`index: true` on a field
+ * plus collection-level `indexes` — into one deterministically-named list. Naming matches the
+ * pre-existing single-field convention exactly (`idx_<collection>_<field>`), so collections that only
+ * ever used field-level options generate the same index names as before.
+ */
+export function resolveCollectionIndexes(collection: CollectionDefinition): ResolvedIndex[] {
+  assertValidCollectionSchema(collection);
+  const indexes: ResolvedIndex[] = [];
+
+  for (const [fieldName, field] of Object.entries(collection.fields)) {
+    if (field.options.unique === true || field.options.index === true) {
+      indexes.push({
+        name: indexName(collection.slug, [fieldName]),
+        fields: [fieldName],
+        unique: field.options.unique === true
+      });
+    }
+  }
+
+  for (const index of collection.indexes ?? []) {
+    indexes.push({
+      name: indexName(collection.slug, index.fields),
+      fields: index.fields,
+      unique: index.unique === true
+    });
+  }
+
+  return indexes;
+}
+
+/**
+ * Generates `CREATE [UNIQUE ]INDEX IF NOT EXISTS` statements for every index a collection declares.
+ * Shared by `LibSqlDatabaseAdapter` (this package) and `D1DatabaseAdapter` (`@forge-cms/cloudflare`,
+ * which already depends on this package) so the two SQLite-backed adapters cannot diverge.
+ */
+export function generateIndexSql(collection: CollectionDefinition): string[] {
+  return resolveCollectionIndexes(collection).map((index) => {
+    const uniqueClause = index.unique ? 'UNIQUE ' : '';
+    const columns = index.fields.map((f) => `"${f}"`).join(', ');
+    return `CREATE ${uniqueClause}INDEX IF NOT EXISTS "${index.name}" ON "${collection.slug}" (${columns})`;
+  });
 }
 
 const tableCache = new Map<string, SQLiteTable>();

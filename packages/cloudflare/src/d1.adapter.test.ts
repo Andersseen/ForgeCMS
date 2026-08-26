@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { defineCollection, defineField } from '@forge-cms/core';
+import { runDatabaseAdapterConstraintContractTests } from '@forge-cms/testing/contracts';
 import { D1DatabaseAdapter } from './d1.adapter.js';
 import type { D1Database, D1PreparedStatement, D1Result } from './bindings.js';
 
@@ -9,15 +10,25 @@ interface ParsedCondition {
   values: unknown[];
 }
 
+interface MockIndex {
+  table: string;
+  columns: string[];
+  unique: boolean;
+}
+
 /** Simple in-memory mock of D1Database for unit testing */
 class MockD1Database implements D1Database {
   private tables = new Map<string, Map<string, Record<string, unknown>>>();
   /** Tracks column names per table, populated from CREATE TABLE / ALTER TABLE exec() calls,
    *  so PRAGMA table_info (used by additive migrations) reflects reality. */
   private schemas = new Map<string, Set<string>>();
+  /** Tracks indexes created via `CREATE [UNIQUE] INDEX`, so insert/update can enforce uniqueness the
+   *  same way real SQLite/D1 would — this is what makes the adapter's constraint-error translation
+   *  code path exercisable in a unit test, rather than only hand-constructed. */
+  private indexes: MockIndex[] = [];
 
   prepare(query: string): MockD1PreparedStatement {
-    return new MockD1PreparedStatement(query, this.tables, this.schemas);
+    return new MockD1PreparedStatement(query, this.tables, this.schemas, this.indexes);
   }
 
   async exec(query: string): Promise<{ count: number; duration: number }> {
@@ -41,7 +52,20 @@ class MockD1Database implements D1Database {
       return { count: 0, duration: 0 };
     }
 
-    // CREATE INDEX and other statements are no-ops in this mock.
+    const indexMatch = query.match(
+      /CREATE\s+(UNIQUE\s+)?INDEX IF NOT EXISTS\s+"[^"]+"\s+ON\s+"([^"]+)"\s*\(([^)]*)\)/i
+    );
+    if (indexMatch) {
+      const [, uniqueFlag, table, columnsPart] = indexMatch;
+      const columns = columnsPart!
+        .split(',')
+        .map((c) => c.trim().match(/^"([^"]+)"/)?.[1])
+        .filter((c): c is string => Boolean(c));
+      this.indexes.push({ table: table!, columns, unique: Boolean(uniqueFlag) });
+      return { count: 0, duration: 0 };
+    }
+
+    // Any other statement is a no-op in this mock.
     return { count: 0, duration: 0 };
   }
 
@@ -54,16 +78,45 @@ class MockD1PreparedStatement implements D1PreparedStatement {
   private query: string;
   private tables: Map<string, Map<string, Record<string, unknown>>>;
   private schemas: Map<string, Set<string>>;
+  private indexes: MockIndex[];
   private bindings: unknown[] = [];
 
   constructor(
     query: string,
     tables: Map<string, Map<string, Record<string, unknown>>>,
-    schemas: Map<string, Set<string>>
+    schemas: Map<string, Set<string>>,
+    indexes: MockIndex[]
   ) {
     this.query = query;
     this.tables = tables;
     this.schemas = schemas;
+    this.indexes = indexes;
+  }
+
+  /**
+   * Mirrors SQLite: a row conflicts with a unique index only when every indexed column is non-null
+   * and equal on both rows. Throws a message shaped like a real SQLite/D1 constraint error so the
+   * adapter's `toUniqueConstraintError` parsing is exercised for real.
+   */
+  private assertNoUniqueConflict(
+    table: string,
+    candidate: Record<string, unknown>,
+    excludeId?: string
+  ): void {
+    const rows = this.getTableRows(table);
+    for (const index of this.indexes) {
+      if (index.table !== table || !index.unique) continue;
+      if (index.columns.some((c) => candidate[c] === null || candidate[c] === undefined)) continue;
+
+      for (const row of rows.values()) {
+        if (excludeId !== undefined && row.id === excludeId) continue;
+        if (index.columns.every((c) => row[c] === candidate[c])) {
+          throw new Error(
+            `D1_ERROR: UNIQUE constraint failed: ${index.columns.map((c) => `${table}.${c}`).join(', ')}`
+          );
+        }
+      }
+    }
   }
 
   bind(...values: unknown[]): MockD1PreparedStatement {
@@ -260,6 +313,7 @@ class MockD1PreparedStatement implements D1PreparedStatement {
       record[col] = typeof value === 'boolean' ? (value ? 1 : 0) : value;
     });
 
+    this.assertNoUniqueConflict(table, record);
     rows.set(record.id as string, record);
     return { results: [record as T], success: true };
   }
@@ -273,14 +327,17 @@ class MockD1PreparedStatement implements D1PreparedStatement {
     const existing = rows.get(id);
     if (!existing) return { results: [], success: false };
 
+    const merged = { ...existing };
     const setMatch = this.query.match(/SET\s+(.+)\s+WHERE/i);
     if (setMatch) {
       const setCols = setMatch[1]!.split(',').map((c) => c.trim().match(/"([^"]+)"/)?.[1]);
       setCols.forEach((col, i) => {
-        if (col) existing[col!] = this.bindings[i];
+        if (col) merged[col!] = this.bindings[i];
       });
     }
 
+    this.assertNoUniqueConflict(table, merged, id);
+    Object.assign(existing, merged);
     return { results: [existing as T], success: true };
   }
 
@@ -293,6 +350,12 @@ class MockD1PreparedStatement implements D1PreparedStatement {
     return { results: [], success: true };
   }
 }
+
+runDatabaseAdapterConstraintContractTests(() => {
+  const adapter = new D1DatabaseAdapter();
+  adapter.init({ DB: new MockD1Database() });
+  return adapter;
+});
 
 describe('D1DatabaseAdapter', () => {
   let adapter: D1DatabaseAdapter;

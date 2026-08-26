@@ -8,6 +8,7 @@ export type ForgeErrorCode =
   | 'FORBIDDEN'
   | 'UNKNOWN_FIELD'
   | 'INVALID_QUERY'
+  | 'UNIQUE_CONSTRAINT'
   | 'INTERNAL_ERROR';
 
 export class ForgeError extends Error {
@@ -67,6 +68,29 @@ export class AccessDeniedError extends ForgeError {
   }
 }
 
+/**
+ * A `create`/`update` would violate a unique index — whether field-level `unique: true` or a
+ * collection-level compound `indexes` entry. Every `DatabaseAdapter` (InMemory, libSQL, D1) surfaces
+ * its own uniqueness conflict as `@forge-cms/db`'s `UniqueConstraintError`; `operations.ts` catches
+ * that and rethrows this one, so callers only ever see this single, adapter-independent error.
+ */
+export class UniqueConstraintError extends ForgeError {
+  readonly collection: string;
+  readonly fields: string[];
+
+  constructor(collection: string, fields: string[]) {
+    super(
+      fields.length > 0
+        ? `A document with this ${fields.join('/')} combination already exists`
+        : 'This document already exists',
+      409,
+      'UNIQUE_CONSTRAINT'
+    );
+    this.collection = collection;
+    this.fields = fields;
+  }
+}
+
 export function isForgeError(err: unknown): err is ForgeError {
   return err instanceof ForgeError;
 }
@@ -86,6 +110,15 @@ export function toApiErrorBody(err: ForgeError): ForgeApiErrorBody {
         code: err.code,
         message: err.message,
         details: err.details
+      }
+    };
+  }
+  if (err instanceof UniqueConstraintError) {
+    return {
+      error: {
+        code: err.code,
+        message: err.message,
+        details: { collection: err.collection, fields: err.fields }
       }
     };
   }

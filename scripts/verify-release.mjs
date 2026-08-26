@@ -212,14 +212,22 @@ function verifyRuntimeConsumer(tarballs) {
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
 import { InMemoryAuthAdapter } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
-import { ForgeCmsRuntime } from '@forge-cms/runtime';
+import { ForgeCmsRuntime, UniqueConstraintError } from '@forge-cms/runtime';
 
 const notes = defineCollection({
   slug: 'notes',
   fields: {
     title: defineField.text({ required: true }),
-    data: defineField.json()
-  }
+    data: defineField.json(),
+    group: defineField.text({ required: true }),
+    key: defineField.text({ required: true })
+  },
+  indexes: [
+    {
+      fields: ['group', 'key'],
+      unique: true
+    }
+  ]
 });
 
 const runtime = new ForgeCmsRuntime({
@@ -236,7 +244,7 @@ await runtime.syncSchema();
 
 const created = await runtime.create({
   collection: 'notes',
-  data: { title: 'First note', data: { source: 'packed-artifact' } }
+  data: { title: 'First note', data: { source: 'packed-artifact' }, group: 'g1', key: 'k1' }
 });
 
 const listed = await runtime.find({ collection: 'notes' });
@@ -249,9 +257,29 @@ const updated = await runtime.update({
 });
 if (updated.title !== 'Updated note') throw new Error('Update did not persist');
 
+// Compound unique index (spec 046): the exact (group, key) combination must be rejected.
+let conflictError;
+try {
+  await runtime.create({
+    collection: 'notes',
+    data: { title: 'Duplicate', group: 'g1', key: 'k1' }
+  });
+} catch (err) {
+  conflictError = err;
+}
+if (!(conflictError instanceof UniqueConstraintError)) {
+  throw new Error('Expected a UniqueConstraintError for a duplicate (group, key) combination');
+}
+if (conflictError.status !== 409 || conflictError.code !== 'UNIQUE_CONSTRAINT') {
+  throw new Error('UniqueConstraintError did not carry the expected status/code');
+}
+
+// A different key in the same group must still be allowed.
+await runtime.create({ collection: 'notes', data: { title: 'Other key', group: 'g1', key: 'k2' } });
+
 await runtime.delete({ collection: 'notes', id: String(created.id) });
 const afterDelete = await runtime.find({ collection: 'notes' });
-if (afterDelete.docs.length !== 0) throw new Error('Expected no notes after delete');
+if (afterDelete.docs.length !== 1) throw new Error('Expected one note (the other key) after delete');
 
 console.log('runtime consumer ok');
 `

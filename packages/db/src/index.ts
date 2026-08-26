@@ -3,11 +3,14 @@ import type { CollectionDefinition } from '@forge-cms/core';
 export { InMemoryDatabaseAdapter } from './in-memory.adapter.js';
 export { LibSqlDatabaseAdapter } from './libsql.adapter.js';
 export {
+  type ResolvedIndex,
   fieldKindToSqlType,
   toDbValue,
   fromDbValue,
   generateCreateTableSql,
   generateAddColumnSql,
+  resolveCollectionIndexes,
+  generateIndexSql,
   getOrCreateDrizzleTable,
   clearTableCache
 } from './schema-generator.js';
@@ -21,6 +24,12 @@ export {
   toOperatorValues,
   matchesCondition
 } from './where.js';
+export {
+  UniqueConstraintError,
+  isUniqueConstraintError,
+  parseSqliteUniqueConstraintMessage,
+  toUniqueConstraintError
+} from './constraint-error.js';
 import type { DatabaseWhere } from './where.js';
 
 export type DatabaseRecord = Record<string, unknown>;

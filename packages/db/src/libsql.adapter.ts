@@ -4,10 +4,12 @@ import {
   getOrCreateDrizzleTable,
   generateCreateTableSql,
   generateAddColumnSql,
+  generateIndexSql,
   toDbValue,
   fromDbValue,
   clearTableCache
 } from './schema-generator.js';
+import { toUniqueConstraintError } from './constraint-error.js';
 import { drizzle } from 'drizzle-orm/libsql';
 import { createClient, type Client } from '@libsql/client';
 import {
@@ -88,13 +90,8 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
         await db.run(sql.raw(alterSql));
       }
 
-      // Create indexes for fields marked with index: true
-      for (const [fieldName, field] of Object.entries(collection.fields)) {
-        if (field.options.index === true || field.options.unique === true) {
-          const uniqueClause = field.options.unique === true ? 'UNIQUE' : '';
-          const indexSql = `CREATE ${uniqueClause} INDEX IF NOT EXISTS "idx_${collection.slug}_${fieldName}" ON "${collection.slug}" ("${fieldName}")`;
-          await db.run(sql.raw(indexSql));
-        }
+      for (const indexSql of generateIndexSql(collection)) {
+        await db.run(sql.raw(indexSql));
       }
     }
   }
@@ -208,8 +205,12 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
       record[key] = field ? toDbValue(value, field.kind) : value;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await db.insert(table).values(record as any);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await db.insert(table).values(record as any);
+    } catch (err) {
+      throw toUniqueConstraintError(err, collection) ?? err;
+    }
     return this.findById(collection, record.id as string) as Promise<DatabaseRecord>;
   }
 
@@ -231,12 +232,16 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
       updates[key] = field ? toDbValue(value, field.kind) : value;
     }
 
-    await db
-      .update(table)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .set(updates as any)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .where(eq((table as any)['id'], id));
+    try {
+      await db
+        .update(table)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .set(updates as any)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .where(eq((table as any)['id'], id));
+    } catch (err) {
+      throw toUniqueConstraintError(err, collection) ?? err;
+    }
 
     const updated = await this.findById(collection, id);
     if (!updated) throw new Error(`Record ${id} not found in ${collection}`);

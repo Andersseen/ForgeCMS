@@ -8,9 +8,11 @@ import type {
 import {
   generateCreateTableSql,
   generateAddColumnSql,
+  generateIndexSql,
   toDbValue,
   fromDbValue,
-  toOperatorValues
+  toOperatorValues,
+  toUniqueConstraintError
 } from '@forge-cms/db';
 import type { D1Database } from './bindings.js';
 
@@ -81,13 +83,8 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
         await db.exec(alterSql);
       }
 
-      // Create indexes for fields marked with index: true or unique: true
-      for (const [fieldName, field] of Object.entries(collection.fields)) {
-        if (field.options.index === true || field.options.unique === true) {
-          const uniqueClause = field.options.unique === true ? 'UNIQUE' : '';
-          const indexSql = `CREATE ${uniqueClause} INDEX IF NOT EXISTS "idx_${collection.slug}_${fieldName}" ON "${collection.slug}" ("${fieldName}")`;
-          await db.exec(indexSql);
-        }
+      for (const indexSql of generateIndexSql(collection)) {
+        await db.exec(indexSql);
       }
     }
   }
@@ -214,10 +211,14 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     const columns = keys.map((k) => `"${k}"`).join(', ');
     const sql = `INSERT INTO "${collection}" (${columns}) VALUES (${placeholders})`;
 
-    await db
-      .prepare(sql)
-      .bind(...Object.values(record))
-      .run();
+    try {
+      await db
+        .prepare(sql)
+        .bind(...Object.values(record))
+        .run();
+    } catch (err) {
+      throw toUniqueConstraintError(err, collection) ?? err;
+    }
     return this.findById(collection, record.id as string) as Promise<DatabaseRecord>;
   }
 
@@ -242,10 +243,14 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     const setClause = keys.map((k) => `"${k}" = ?`).join(', ');
     const sql = `UPDATE "${collection}" SET ${setClause} WHERE id = ?`;
 
-    await db
-      .prepare(sql)
-      .bind(...Object.values(updates), id)
-      .run();
+    try {
+      await db
+        .prepare(sql)
+        .bind(...Object.values(updates), id)
+        .run();
+    } catch (err) {
+      throw toUniqueConstraintError(err, collection) ?? err;
+    }
 
     const updated = await this.findById(collection, id);
     if (!updated) throw new Error(`Record ${id} not found in ${collection}`);
