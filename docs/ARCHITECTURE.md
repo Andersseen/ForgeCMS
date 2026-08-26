@@ -127,10 +127,14 @@ run the matching suite in its test file.** This is what makes adapters swappable
   body that sets the field from another role.
 - `validateCollection(definition, data)` → `{ valid, errors: ValidationError[] }` used by write handlers.
 - `db`'s schema-generator maps field kinds to SQLite column types and generates
-  `CREATE TABLE IF NOT EXISTS` (+ indexes for `index: true` / `unique: true` in D1). `syncSchema` also
-  runs an additive migration (spec 014): it introspects the existing table via `PRAGMA table_info` and
-  issues `ALTER TABLE ... ADD COLUMN` for any field in the definition that isn't a column yet. It never
-  drops or retypes columns — removing a field from a collection leaves an orphan column, on purpose.
+  `CREATE TABLE IF NOT EXISTS` (+ indexes for `index: true` / `unique: true`, and for collection-level
+  `indexes: [{ fields, unique? }]` compound constraints, spec 046 — one shared `generateIndexSql` used
+  by both D1 and libSQL). `syncSchema` also runs an additive migration (spec 014): it introspects the
+  existing table via `PRAGMA table_info` and issues `ALTER TABLE ... ADD COLUMN` for any field in the
+  definition that isn't a column yet. It never drops or retypes columns — removing a field from a
+  collection leaves an orphan column, on purpose. A unique-index conflict on any adapter (including
+  `InMemoryDatabaseAdapter`, which enforces the same semantics in-process) surfaces as
+  `@forge-cms/runtime`'s `UniqueConstraintError` (`409`, code `UNIQUE_CONSTRAINT`).
 
 ## Build & tooling architecture
 

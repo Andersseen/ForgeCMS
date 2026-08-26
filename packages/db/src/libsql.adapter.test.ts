@@ -1,6 +1,13 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { defineCollection, defineField } from '@forge-cms/core';
+import { runDatabaseAdapterConstraintContractTests } from '@forge-cms/testing/contracts';
 import { LibSqlDatabaseAdapter } from './libsql.adapter.js';
+
+runDatabaseAdapterConstraintContractTests(() => {
+  const adapter = new LibSqlDatabaseAdapter('file::memory:');
+  adapter.init();
+  return adapter;
+});
 
 describe('LibSqlDatabaseAdapter', () => {
   let adapter: LibSqlDatabaseAdapter;

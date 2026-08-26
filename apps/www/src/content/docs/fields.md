@@ -7,15 +7,15 @@ order: 2
 
 Fields are created with `defineField.<kind>(options)`. Every kind accepts these base options:
 
-| Option         | Type          | Meaning                                                                    |
-| -------------- | ------------- | -------------------------------------------------------------------------- |
-| `label`        | `string`      | Admin UI label. Defaults to a humanised field name                         |
-| `required`     | `boolean`     | Enforced on every write by `validateCollection`                            |
-| `defaultValue` | `unknown`     | Applied on **create** when the incoming value is `undefined`               |
-| `unique`       | `boolean`     | Reflected in the generated schema                                          |
-| `index`        | `boolean`     | Creates an index on the column                                             |
-| `access`       | `FieldAccess` | Per-field read/write rules — see [Access control](/docs/access-control)    |
-| `hooks`        | `FieldHooks`  | `beforeValidate` / `beforeChange` / `afterRead` — see [Hooks](/docs/hooks) |
+| Option         | Type          | Meaning                                                                                                                      |
+| -------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `label`        | `string`      | Admin UI label. Defaults to a humanised field name                                                                           |
+| `required`     | `boolean`     | Enforced on every write by `validateCollection`                                                                              |
+| `defaultValue` | `unknown`     | Applied on **create** when the incoming value is `undefined`                                                                 |
+| `unique`       | `boolean`     | Single-field unique index. For a constraint spanning multiple fields, see [Collections § Indexes](/docs/collections#indexes) |
+| `index`        | `boolean`     | Creates an index on the column                                                                                               |
+| `access`       | `FieldAccess` | Per-field read/write rules — see [Access control](/docs/access-control)                                                      |
+| `hooks`        | `FieldHooks`  | `beforeValidate` / `beforeChange` / `afterRead` — see [Hooks](/docs/hooks)                                                   |
 
 ## Scalar kinds
 

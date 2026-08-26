@@ -3,6 +3,8 @@ import { defineCollection, defineField } from '@forge-cms/core';
 import {
   generateCreateTableSql,
   generateAddColumnSql,
+  generateIndexSql,
+  resolveCollectionIndexes,
   fieldKindToSqlType,
   toDbValue,
   fromDbValue
@@ -184,5 +186,112 @@ describe('composite fields (spec 022)', () => {
     const statements = generateAddColumnSql(landing, ['id', 'created_at', 'updated_at', 'title']);
     expect(statements).toContain('ALTER TABLE "landing" ADD COLUMN "seo" TEXT');
     expect(statements).toContain('ALTER TABLE "landing" ADD COLUMN "sections" TEXT');
+  });
+});
+
+describe('index generation (spec 046)', () => {
+  it('generates no indexes for a collection with none declared', () => {
+    const posts = defineCollection({ slug: 'posts', fields: { title: defineField.text() } });
+    expect(resolveCollectionIndexes(posts)).toEqual([]);
+    expect(generateIndexSql(posts)).toEqual([]);
+  });
+
+  it('keeps generating the same single-field index name/SQL as before (no regression)', () => {
+    const posts = defineCollection({
+      slug: 'posts',
+      fields: {
+        slug: defineField.slug({ index: true }),
+        email: defineField.email({ unique: true })
+      }
+    });
+
+    expect(resolveCollectionIndexes(posts)).toEqual([
+      { name: 'idx_posts_slug', fields: ['slug'], unique: false },
+      { name: 'idx_posts_email', fields: ['email'], unique: true }
+    ]);
+
+    const sql = generateIndexSql(posts);
+    expect(sql).toContain('CREATE INDEX IF NOT EXISTS "idx_posts_slug" ON "posts" ("slug")');
+    expect(sql).toContain(
+      'CREATE UNIQUE INDEX IF NOT EXISTS "idx_posts_email" ON "posts" ("email")'
+    );
+  });
+
+  it('generates a deterministic compound index name from field order', () => {
+    const catalogs = defineCollection({
+      slug: 'catalogs',
+      fields: {
+        project: defineField.relation({ collection: 'projects', required: true }),
+        locale: defineField.text({ required: true }),
+        namespace: defineField.text()
+      },
+      indexes: [{ fields: ['project', 'locale', 'namespace'], unique: true }]
+    });
+
+    expect(resolveCollectionIndexes(catalogs)).toEqual([
+      {
+        name: 'idx_catalogs_project_locale_namespace',
+        fields: ['project', 'locale', 'namespace'],
+        unique: true
+      }
+    ]);
+    expect(generateIndexSql(catalogs)).toEqual([
+      'CREATE UNIQUE INDEX IF NOT EXISTS "idx_catalogs_project_locale_namespace" ON "catalogs" ("project", "locale", "namespace")'
+    ]);
+  });
+
+  it('generates a non-unique compound index without the UNIQUE keyword', () => {
+    const events = defineCollection({
+      slug: 'events',
+      fields: { tenant: defineField.text({ required: true }), kind: defineField.text() },
+      indexes: [{ fields: ['tenant', 'kind'] }]
+    });
+
+    expect(generateIndexSql(events)).toEqual([
+      'CREATE INDEX IF NOT EXISTS "idx_events_tenant_kind" ON "events" ("tenant", "kind")'
+    ]);
+  });
+
+  it('names a compound index differently when field order differs', () => {
+    const a = defineCollection({
+      slug: 'x',
+      fields: { a: defineField.text(), b: defineField.text() },
+      indexes: [{ fields: ['a', 'b'] }]
+    });
+    const b = defineCollection({
+      slug: 'x',
+      fields: { a: defineField.text(), b: defineField.text() },
+      indexes: [{ fields: ['b', 'a'] }]
+    });
+
+    expect(resolveCollectionIndexes(a)[0]?.name).toBe('idx_x_a_b');
+    expect(resolveCollectionIndexes(b)[0]?.name).toBe('idx_x_b_a');
+  });
+
+  it('combines field-level and collection-level indexes in one list', () => {
+    const catalogs = defineCollection({
+      slug: 'catalogs',
+      fields: {
+        slug: defineField.slug({ unique: true }),
+        project: defineField.text({ required: true }),
+        locale: defineField.text({ required: true })
+      },
+      indexes: [{ fields: ['project', 'locale'], unique: true }]
+    });
+
+    expect(resolveCollectionIndexes(catalogs)).toEqual([
+      { name: 'idx_catalogs_slug', fields: ['slug'], unique: true },
+      { name: 'idx_catalogs_project_locale', fields: ['project', 'locale'], unique: true }
+    ]);
+  });
+
+  it('throws for an invalid index definition (referencing db-level identifier validation)', () => {
+    expect(() =>
+      generateIndexSql({
+        slug: 'catalogs',
+        fields: { project: defineField.text() },
+        indexes: [{ fields: ['doesNotExist'] }]
+      })
+    ).toThrow('references unknown field "doesNotExist"');
   });
 });

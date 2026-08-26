@@ -97,6 +97,7 @@ export {
   ValidationFailedError,
   UnauthorizedError,
   AccessDeniedError,
+  UniqueConstraintError,
   isForgeError,
   toApiErrorBody,
   type ForgeErrorCode,

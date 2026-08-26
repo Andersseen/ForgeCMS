@@ -1,12 +1,14 @@
 import { validateCollection } from '@forge-cms/core';
 import type { CmsUser, CollectionDefinition, DraftStatus } from '@forge-cms/core';
 import type { DatabaseRecord, DatabaseWhere } from '@forge-cms/db';
+import { isUniqueConstraintError as isDbUniqueConstraintError } from '@forge-cms/db';
 import type { OperationContext } from './context.js';
 import {
   AccessDeniedError,
   ForgeError,
   InvalidInputError,
   NotFoundError,
+  UniqueConstraintError,
   ValidationFailedError
 } from './errors.js';
 import { documentMatches, mergeWhere, resolveAccess } from './access.js';
@@ -110,6 +112,21 @@ function getCollectionOrThrow(ctx: OperationContext, slug: string): CollectionDe
 
 function notFound(slug: string, id: string): NotFoundError {
   return new NotFoundError(`Record '${id}' not found in '${slug}'`);
+}
+
+/**
+ * Runs a database write, converting `@forge-cms/db`'s adapter-level `UniqueConstraintError` into this
+ * package's `ForgeError` subclass. `@forge-cms/db` and `@forge-cms/cloudflare` cannot depend on
+ * `@forge-cms/runtime` (see ARCHITECTURE.md's dependency graph), so every adapter throws the same
+ * db-level error and this is the one place that translates it for callers.
+ */
+async function runWrite<T>(collection: string, op: () => Promise<T>): Promise<T> {
+  try {
+    return await op();
+  } catch (err) {
+    if (isDbUniqueConstraintError(err)) throw new UniqueConstraintError(collection, err.fields);
+    throw err;
+  }
 }
 
 /**
@@ -435,7 +452,9 @@ export async function create(ctx: OperationContext, args: CreateArgs): Promise<D
     'beforeChange hook'
   );
 
-  const record = await ctx.adapters.database.create(args.collection, data);
+  const record = await runWrite(args.collection, () =>
+    ctx.adapters.database.create(args.collection, data)
+  );
 
   // Create initial version if versions are enabled
   if (versionsEnabled(collection)) {
@@ -549,7 +568,9 @@ export async function update(ctx: OperationContext, args: UpdateArgs): Promise<D
     'beforeChange hook'
   );
 
-  const record = await ctx.adapters.database.update(args.collection, args.id, data);
+  const record = await runWrite(args.collection, () =>
+    ctx.adapters.database.update(args.collection, args.id, data)
+  );
 
   // Create a version snapshot if versions are enabled
   if (versionsEnabled(collection)) {

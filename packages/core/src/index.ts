@@ -1,4 +1,5 @@
 import { validateCollectionIdentifiers, validateGlobalIdentifiers } from './identifiers.js';
+import { validateCollectionIndexes } from './collection-indexes.js';
 
 export type FieldKind =
   | 'text'
@@ -409,6 +410,19 @@ export interface CollectionDefinition<
    * Example: `['en', 'es', 'fr']`
    */
   locales?: string[];
+  /**
+   * Collection-level indexes, for constraints that span more than one field. Field order matters —
+   * it is the column order of the generated SQL index. Single-field `unique`/`index` on
+   * {@link BaseFieldOptions} keep working unchanged; this is additive sugar for the multi-field case.
+   */
+  indexes?: CollectionIndex[];
+}
+
+/** One collection-level index. See {@link CollectionDefinition.indexes}. */
+export interface CollectionIndex {
+  /** Field order matters: it is the column order in the generated SQL index. */
+  fields: string[];
+  unique?: boolean;
 }
 
 /**
@@ -536,7 +550,7 @@ export const defineField = {
 export function defineCollection<TSlug extends string, TFields extends FieldMap>(
   config: CollectionDefinition<TSlug, TFields>
 ): CollectionDefinition<TSlug, TFields> {
-  const errors = validateCollectionIdentifiers(config);
+  const errors = [...validateCollectionIdentifiers(config), ...validateCollectionIndexes(config)];
   if (errors.length > 0) {
     throw new Error(errors.join('\n'));
   }
@@ -589,6 +603,9 @@ export {
   validateGlobalIdentifiers,
   IDENTIFIER_PATTERN
 } from './identifiers.js';
+
+// Collection index validation
+export { validateCollectionIndexes } from './collection-indexes.js';
 
 // Structured logging
 export {
