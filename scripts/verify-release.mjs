@@ -230,8 +230,18 @@ const notes = defineCollection({
   ]
 });
 
+// Typed Local API (spec 047): a typed JSON generic and full slug/field/return-type inference,
+// proven through the packed public exports only (no deep imports).
+const articles = defineCollection({
+  slug: 'articles',
+  fields: {
+    title: defineField.text({ required: true }),
+    metadata: defineField.json<{ featured: boolean }>()
+  }
+});
+
 const runtime = new ForgeCmsRuntime({
-  collections: [notes],
+  collections: [notes, articles],
   adapters: {
     database: new InMemoryDatabaseAdapter(),
     auth: new InMemoryAuthAdapter(),
@@ -280,6 +290,31 @@ await runtime.create({ collection: 'notes', data: { title: 'Other key', group: '
 await runtime.delete({ collection: 'notes', id: String(created.id) });
 const afterDelete = await runtime.find({ collection: 'notes' });
 if (afterDelete.docs.length !== 1) throw new Error('Expected one note (the other key) after delete');
+
+// Typed Local API (spec 047): defineCollection's inference reaches find/create/update through the
+// packed public surface. These assignments only compile if the packed types are actually inferred
+// (an untyped/'any' fallback would not narrow 'title' to string or 'metadata' to the JSON generic).
+const article = await runtime.create({
+  collection: 'articles',
+  data: { title: 'Typed Forge', metadata: { featured: true } }
+});
+const articleTitle: string = article.title;
+const articleFeatured: boolean = article.metadata.featured;
+if (articleTitle !== 'Typed Forge' || articleFeatured !== true) {
+  throw new Error('Typed article create did not round-trip as expected');
+}
+
+// Compile-time-only negative assertions: declared but never invoked, so they cannot affect the
+// runtime assertions above. Removing any @ts-expect-error here would fail 'tsc -p tsconfig.json'.
+async function typedLocalApiRejections(rt: typeof runtime) {
+  // @ts-expect-error - unknown collection is rejected
+  await rt.find({ collection: 'does-not-exist' });
+  // @ts-expect-error - wrong field value type is rejected
+  await rt.create({ collection: 'articles', data: { metadata: 'not-an-object' } });
+  // @ts-expect-error - unknown field name is rejected
+  await rt.create({ collection: 'articles', data: { nope: 1 } });
+}
+void typedLocalApiRejections;
 
 console.log('runtime consumer ok');
 `

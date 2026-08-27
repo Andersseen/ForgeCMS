@@ -1,5 +1,13 @@
 import type { ForgeCmsConfig, AdapterSet } from './config.js';
-import type { CollectionDefinition, GlobalDefinition, AnyField } from '@forge-cms/core';
+import type {
+  CollectionBySlug,
+  CollectionDefinition,
+  CollectionDocument,
+  CollectionRegistry,
+  CollectionSlug,
+  GlobalDefinition,
+  AnyField
+} from '@forge-cms/core';
 import { defineField } from '@forge-cms/core';
 import type { DatabaseRecord } from '@forge-cms/db';
 import type { OperationContext } from './context.js';
@@ -10,9 +18,18 @@ import type {
   DeleteArgs,
   FindArgs,
   FindByIDArgs,
-  PaginatedDocs,
   UpdateArgs
 } from './operations.js';
+import type {
+  TypedCountArgs,
+  TypedCreateArgs,
+  TypedDeleteArgs,
+  TypedFindArgs,
+  TypedFindByIDArgs,
+  TypedPaginatedDocs,
+  TypedPreviewArgs,
+  TypedUpdateArgs
+} from './typed-api.js';
 import * as globalOps from './globals.js';
 import type { GetGlobalArgs, UpdateGlobalArgs } from './globals.js';
 import * as versionOps from './versions.js';
@@ -37,11 +54,14 @@ import type { Version } from '@forge-cms/core';
  * direct call comes from trusted server code. Pass `overrideAccess: false` together with a `user` to
  * run an operation as that user — which is exactly what the HTTP layer does.
  */
-export class ForgeCmsRuntime<TEnv = unknown> implements OperationContext {
-  readonly config: ForgeCmsConfig<TEnv>;
+export class ForgeCmsRuntime<
+  TEnv = unknown,
+  TCollections extends CollectionRegistry = CollectionDefinition[]
+> implements OperationContext {
+  readonly config: ForgeCmsConfig<TEnv, TCollections>;
   readonly adapters: AdapterSet;
 
-  constructor(config: ForgeCmsConfig<TEnv>) {
+  constructor(config: ForgeCmsConfig<TEnv, TCollections>) {
     this.config = config;
     this.adapters = config.adapters;
   }
@@ -116,29 +136,57 @@ export class ForgeCmsRuntime<TEnv = unknown> implements OperationContext {
   }
 
   // --- Local API ---------------------------------------------------------------------------
+  //
+  // Each method delegates to the untyped `operations.*` function (unchanged, no runtime behavior
+  // difference) and casts only the return value — `args` widens into the untyped parameter type with
+  // no cast needed, since a narrower/more-specific object always satisfies a wider one. The cast on
+  // the way out is the one isolated, justified spot per collection: `operations.*` genuinely returns
+  // the right shape at runtime, it just doesn't carry the type to prove it statically.
 
-  find(args: FindArgs): Promise<PaginatedDocs> {
-    return operations.find(this, args);
+  find<TSlug extends CollectionSlug<TCollections>>(
+    args: TypedFindArgs<TCollections, TSlug>
+  ): Promise<TypedPaginatedDocs<TCollections, TSlug>> {
+    return operations.find(this, args as FindArgs) as Promise<
+      TypedPaginatedDocs<TCollections, TSlug>
+    >;
   }
 
-  findByID(args: FindByIDArgs): Promise<DatabaseRecord> {
-    return operations.findByID(this, args);
+  findByID<TSlug extends CollectionSlug<TCollections>>(
+    args: TypedFindByIDArgs<TCollections, TSlug>
+  ): Promise<CollectionDocument<CollectionBySlug<TCollections, TSlug>>> {
+    return operations.findByID(this, args as FindByIDArgs) as Promise<
+      CollectionDocument<CollectionBySlug<TCollections, TSlug>>
+    >;
   }
 
-  count(args: CountArgs): Promise<number> {
-    return operations.count(this, args);
+  count<TSlug extends CollectionSlug<TCollections>>(
+    args: TypedCountArgs<TCollections, TSlug>
+  ): Promise<number> {
+    return operations.count(this, args as CountArgs);
   }
 
-  create(args: CreateArgs): Promise<DatabaseRecord> {
-    return operations.create(this, args);
+  create<TSlug extends CollectionSlug<TCollections>>(
+    args: TypedCreateArgs<TCollections, TSlug>
+  ): Promise<CollectionDocument<CollectionBySlug<TCollections, TSlug>>> {
+    return operations.create(this, args as CreateArgs) as Promise<
+      CollectionDocument<CollectionBySlug<TCollections, TSlug>>
+    >;
   }
 
-  update(args: UpdateArgs): Promise<DatabaseRecord> {
-    return operations.update(this, args);
+  update<TSlug extends CollectionSlug<TCollections>>(
+    args: TypedUpdateArgs<TCollections, TSlug>
+  ): Promise<CollectionDocument<CollectionBySlug<TCollections, TSlug>>> {
+    return operations.update(this, args as UpdateArgs) as Promise<
+      CollectionDocument<CollectionBySlug<TCollections, TSlug>>
+    >;
   }
 
-  delete(args: DeleteArgs): Promise<DatabaseRecord> {
-    return operations.deleteDocument(this, args);
+  delete<TSlug extends CollectionSlug<TCollections>>(
+    args: TypedDeleteArgs<TCollections, TSlug>
+  ): Promise<CollectionDocument<CollectionBySlug<TCollections, TSlug>>> {
+    return operations.deleteDocument(this, args as DeleteArgs) as Promise<
+      CollectionDocument<CollectionBySlug<TCollections, TSlug>>
+    >;
   }
 
   // --- Globals -----------------------------------------------------------------------------
@@ -175,12 +223,9 @@ export class ForgeCmsRuntime<TEnv = unknown> implements OperationContext {
    * Generates a preview of a document by merging stored data with unsaved changes.
    * If id is provided, merges changes with existing document. Otherwise, previews new document.
    */
-  async preview(args: {
-    collection: string;
-    data: Record<string, unknown>;
-    id?: string;
-    depth?: 0 | 1;
-  }): Promise<DatabaseRecord> {
+  async preview<TSlug extends CollectionSlug<TCollections>>(
+    args: TypedPreviewArgs<TCollections, TSlug>
+  ): Promise<CollectionDocument<CollectionBySlug<TCollections, TSlug>>> {
     const collection = this.getCollection(args.collection);
     if (!collection) {
       throw new (await import('./errors.js')).NotFoundError(
@@ -215,6 +260,18 @@ export class ForgeCmsRuntime<TEnv = unknown> implements OperationContext {
       previewData = await populateRecord(previewData, collection, this);
     }
 
-    return previewData;
+    return previewData as CollectionDocument<CollectionBySlug<TCollections, TSlug>>;
   }
 }
+
+/**
+ * The HTTP-transport-facing view of a runtime. Collection slugs at this boundary are plain runtime
+ * strings from a URL and can never be statically narrowed, so this pins the registry to `any` rather
+ * than the class's own concrete broad default. Assigning a genuinely-typed `ForgeCmsRuntime<Env,
+ * MyCollections>` instance into `ForgeCmsRuntime<Env>` (i.e. `ForgeCmsRuntime<Env,
+ * CollectionDefinition[]>`) fails TypeScript's structural check of the typed methods' return types;
+ * assigning it here does not, and nothing downstream needs to change once a value's static type is
+ * this alias — see spec 047's Design section for the full explanation.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- deliberate escape hatch, see comment above
+export type AnyForgeCmsRuntime<TEnv = unknown> = ForgeCmsRuntime<TEnv, any>;

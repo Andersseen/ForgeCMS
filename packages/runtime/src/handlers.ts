@@ -1,5 +1,5 @@
 import type { ApiContext } from '@forge-cms/api';
-import type { ForgeCmsRuntime } from './runtime.js';
+import type { AnyForgeCmsRuntime, ForgeCmsRuntime } from './runtime.js';
 import type { DatabaseWhere } from '@forge-cms/db';
 import type { CollectionDefinition, DraftStatus } from '@forge-cms/core';
 import { getLogger } from '@forge-cms/core';
@@ -32,7 +32,7 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 500;
 
 export interface HandlerOptions<TEnv = unknown> {
-  runtime: ForgeCmsRuntime<TEnv>;
+  runtime: AnyForgeCmsRuntime<TEnv>;
   requireAuth?: boolean;
   allowedRoles?: UserRole[];
   upload?: {
