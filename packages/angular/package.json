@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/angular",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Angular SDK and services for ForgeCMS.",
   "author": "ForgeCMS contributors",
   "license": "MIT",

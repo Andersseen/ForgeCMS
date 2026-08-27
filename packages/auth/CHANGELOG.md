@@ -1,5 +1,12 @@
 # @forge-cms/auth
 
+## 0.0.2
+
+### Patch Changes
+
+- Updated dependencies [18f25f8]
+  - @forge-cms/core@0.0.2
+
 ## 0.2.0
 
 ### Minor Changes
