@@ -399,6 +399,12 @@ try {
     tarballs.push({ name: packageName, path: packed });
   }
 
+  // Public packages are versioned together via Changesets' `fixed` group (.changeset/config.json),
+  // so every packed tarball must carry the exact same version as every other one — not a specific
+  // hardcoded number, which would only ever match the very first release and break every release
+  // after it (see the 0.0.1 -> 0.0.2 CI failure this replaced).
+  let expectedVersion;
+
   for (const tarball of tarballs) {
     const extractDir = join(workDir, `extract-${tarballs.indexOf(tarball)}`);
     run('mkdir', ['-p', extractDir]);
@@ -407,8 +413,15 @@ try {
     const packageDir = join(extractDir, 'package');
     const pkg = readJson(join(packageDir, 'package.json'));
     if (!publicPackages.includes(pkg.name)) fail(`Unexpected packed package ${pkg.name}`);
-    if (pkg.version !== '0.0.1')
-      fail(`${pkg.name} packed version is ${pkg.version}, expected 0.0.1`);
+
+    if (expectedVersion === undefined) {
+      expectedVersion = pkg.version;
+    } else if (pkg.version !== expectedVersion) {
+      fail(
+        `${pkg.name} packed version is ${pkg.version}, but ${tarballs[0].name} is ${expectedVersion} — ` +
+          'the fixed public package group has diverged.'
+      );
+    }
 
     assertNoWorkspaceProtocols(pkg, pkg.name);
     assertPackedContents(pkg, listFiles(packageDir), packageDir);
