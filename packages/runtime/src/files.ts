@@ -1,8 +1,8 @@
 import type { ApiContext } from '@forge-cms/api';
-import type { ForgeCmsRuntime } from './runtime.js';
+import type { AnyForgeCmsRuntime } from './runtime.js';
 
 export interface FileHandlerOptions<TEnv = unknown> {
-  runtime: ForgeCmsRuntime<TEnv>;
+  runtime: AnyForgeCmsRuntime<TEnv>;
   /** `cache-control` for a hit. Defaults to a conservative minute. */
   cacheControl?: string;
 }

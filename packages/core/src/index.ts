@@ -474,6 +474,58 @@ export type CollectionData<TCollection extends CollectionDefinition> = InferFiel
   TCollection['fields']
 >;
 
+/**
+ * An ordered/unordered set of registered collections, as `ForgeCmsConfig.collections` carries it.
+ * Mutable (not `readonly`) to match `DatabaseAdapter.syncSchema`'s existing parameter type — the
+ * union-of-specific-collection-types inference `CollectionSlug`/`CollectionBySlug` rely on works the
+ * same either way, since both index with `[number]` rather than relying on tuple positions.
+ */
+export type CollectionRegistry = CollectionDefinition[];
+
+/** The union of registered collection slugs. `string` when the registry itself is untyped/broad. */
+export type CollectionSlug<TCollections extends CollectionRegistry> = TCollections[number]['slug'];
+
+/**
+ * Registered collections keyed by slug. For a broad/untyped registry (`TCollections[number]`'s slug is
+ * plain `string`, not a union of literals), key-remapping over a non-literal key produces an
+ * **index-signature** type (`{ [x: string]: CollectionDefinition<string, FieldMap> }`) rather than a
+ * `never`-prone `Extract`. That is what lets {@link CollectionBySlug} fall back gracefully instead of
+ * resolving to `never` for a broad registry — and, unlike an `Extract<...> extends never ? ... : ...`
+ * conditional, a plain indexed-access lookup on this mapped type does not turn into a deferred
+ * conditional type, which matters: TypeScript structurally compares two *different* concrete
+ * `ForgeCmsRuntime<Env, TCollections>` instantiations (e.g. assigning a narrowly-typed runtime to a
+ * variable declared with the class's own broad default) whenever one is used where the other is
+ * expected, and a deferred conditional type in a method's return position broke exactly that
+ * comparison during implementation (see spec 047).
+ */
+type CollectionMap<TCollections extends CollectionRegistry> = {
+  [TCollection in TCollections[number] as TCollection['slug']]: TCollection;
+};
+
+/** The specific collection definition for one slug. */
+export type CollectionBySlug<
+  TCollections extends CollectionRegistry,
+  TSlug extends CollectionSlug<TCollections>
+> = CollectionMap<TCollections>[TSlug] extends infer TCollection extends CollectionDefinition
+  ? TCollection
+  : never;
+
+/** Standard document metadata every stored record carries, alongside its declared fields. */
+export interface DocumentMeta {
+  id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** The full typed shape of a stored document: declared fields plus standard metadata. */
+export type CollectionDocument<TCollection extends CollectionDefinition> =
+  CollectionData<TCollection> & DocumentMeta;
+
+/** A typed create/update payload: any subset of the collection's declared fields. */
+export type CollectionInput<TCollection extends CollectionDefinition> = Partial<
+  CollectionData<TCollection>
+>;
+
 function createField<
   TKind extends FieldKind,
   TValue,
@@ -501,8 +553,16 @@ export const defineField = {
   relation(options: RelationFieldOptions): RelationField {
     return createField<'relation', string | string[], RelationFieldOptions>('relation', options);
   },
-  json(options: JsonFieldOptions = {}): JsonField {
-    return createField<'json', unknown, JsonFieldOptions>('json', options);
+  /**
+   * `defineField.json()` infers `unknown`, same as before. A consumer-provided generic
+   * (`defineField.json<CatalogContent>()`) is a **compile-time annotation only** — it carries a type
+   * through `InferFields`/`CollectionData` for DX, but does not add runtime shape validation. Callers
+   * remain responsible for validating untrusted JSON at runtime.
+   */
+  json<TValue = unknown>(
+    options: JsonFieldOptions = {}
+  ): FieldDefinition<'json', TValue, JsonFieldOptions> {
+    return createField<'json', TValue, JsonFieldOptions>('json', options);
   },
   select(options: SelectFieldOptions): SelectField {
     return createField<'select', string, SelectFieldOptions>('select', options);

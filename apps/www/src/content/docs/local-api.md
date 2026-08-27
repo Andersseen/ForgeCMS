@@ -26,6 +26,44 @@ const { docs, totalDocs, hasNextPage } = await runtime.find({
 });
 ```
 
+## Typed inference
+
+`defineCollection`'s schema feeds straight into every Local API method's types — no codegen, no
+`as const` required:
+
+```ts
+const posts = defineCollection({
+  slug: 'posts',
+  fields: {
+    title: defineField.text({ required: true }),
+    views: defineField.number(),
+    metadata: defineField.json<{ featured: boolean }>()
+  }
+});
+
+const runtime = new ForgeCmsRuntime({ collections: [posts, authors], adapters });
+
+const page = await runtime.find({ collection: 'posts' });
+page.docs[0].title; // string
+page.docs[0].metadata.featured; // boolean
+
+const created = await runtime.create({
+  collection: 'posts',
+  data: { title: 'Hello', views: 1 } // unknown fields/wrong value types are a compile error
+});
+created.title; // string
+
+runtime.find({ collection: 'does-not-exist' }); // compile error: not a registered collection
+```
+
+`defineField.json<T>()` is a **compile-time annotation only** — `T` flows through `find`/`create`/
+`update`'s inferred types, but nothing validates that the stored JSON actually matches `T` at
+runtime. `defineField.json()` (no type argument) still infers `unknown`, exactly as before; keep
+validating untrusted JSON yourself. A runtime built from a widened/dynamic `CollectionDefinition[]`
+(or a `ForgeCmsRuntime<TEnv>` given only its environment type) still compiles and still works —
+every method just accepts a plain `string` and returns a loosely-typed document, the same shape the
+Local API always returned.
+
 ## Shared arguments
 
 Every method accepts these:
