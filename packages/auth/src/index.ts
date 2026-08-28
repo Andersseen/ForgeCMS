@@ -5,6 +5,16 @@ export { SignedTokenAuthAdapter, DEMO_CREDENTIALS } from './signed-token.adapter
 export type { SignedTokenEnv } from './signed-token.adapter.js';
 export { UsersCollectionAuthAdapter } from './users-collection.adapter.js';
 export type { UsersCollectionAuthEnv, CreateUserInput } from './users-collection.adapter.js';
+export { ApiKeyAuthAdapter } from './api-key.adapter.js';
+export type {
+  ApiKeyAuthEnv,
+  ApiKeyAuthAdapterOptions,
+  ApiKey,
+  CreateApiKeyInput,
+  CreateApiKeyResult
+} from './api-key.adapter.js';
+export { CompositeAuthAdapter } from './composite.adapter.js';
+export { hasScope, hasAnyScope, hasAllScopes } from './scopes.js';
 export { AUTH_USER_FIELDS, withAuthFields } from './user-fields.js';
 export type { UserRole } from './roles.js';
 export {
@@ -33,6 +43,8 @@ export interface AuthUser {
   name?: string;
   role?: string;
   roles?: string[];
+  /** Generic scope strings for machine (or any) principals — see `hasScope`/`hasAnyScope`/`hasAllScopes`. */
+  scopes?: string[];
   metadata?: Record<string, unknown>;
 }
 
@@ -47,4 +59,6 @@ export interface AuthAdapter<TUser extends AuthUser = AuthUser> {
   extractToken(request: Request): string | null;
   validateSession(token: string): Promise<AuthSession<TUser> | null>;
   requireAuth(request: Request): Promise<TUser>;
+  /** Optional schema/table bootstrap, invoked by `ForgeCmsRuntime.syncSchema()`. */
+  syncSchema?(): Promise<void>;
 }

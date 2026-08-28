@@ -36,6 +36,31 @@ describe('ForgeCmsRuntime', () => {
     await expect(runtime.syncSchema()).resolves.toBeUndefined();
   });
 
+  it('calls an auth adapter optional syncSchema() during runtime.syncSchema()', async () => {
+    const posts = defineCollection({
+      slug: 'posts',
+      fields: { title: defineField.text({ required: true }) }
+    });
+
+    let called = false;
+    const auth = new InMemoryAuthAdapter();
+    (auth as InMemoryAuthAdapter & { syncSchema?: () => Promise<void> }).syncSchema = async () => {
+      called = true;
+    };
+
+    const runtime = new ForgeCmsRuntime({
+      collections: [posts],
+      adapters: {
+        database: new InMemoryDatabaseAdapter(),
+        auth,
+        storage: new InMemoryStorageAdapter()
+      }
+    });
+    runtime.init();
+    await runtime.syncSchema();
+    expect(called).toBe(true);
+  });
+
   it('finds a collection by slug', () => {
     const runtime = createTestRuntime();
     const posts = runtime.getCollection('posts');
