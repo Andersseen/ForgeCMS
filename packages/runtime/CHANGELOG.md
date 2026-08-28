@@ -1,5 +1,67 @@
 # @forge-cms/runtime
 
+## 0.1.0
+
+### Minor Changes
+
+- a2c5837: feat: add typed collection Local API (spec 047)
+  - `ForgeCmsRuntime` now takes a second, defaulted type parameter that preserves the registered
+    collection schemas: `find`/`findByID`/`count`/`create`/`update`/`delete`/`preview` infer typed
+    collection slugs (autocomplete + compile-time rejection of unknown slugs), typed write payloads
+    (unknown fields/wrong value types are compile errors), and typed returned documents (declared
+    fields plus `id`/`created_at`/`updated_at`) — with **zero runtime behavior change**.
+  - `@forge-cms/core` gains the small reusable type utilities this relies on: `CollectionRegistry`,
+    `CollectionSlug`, `CollectionBySlug`, `CollectionDocument`, `CollectionInput`, `DocumentMeta`,
+    reusing `CollectionData`/`InferFields`/`FieldValue` rather than a parallel type system.
+  - `defineField.json<TValue>()` is now generic — a compile-time-only annotation that carries a
+    consumer-provided type through `CollectionData`/`CollectionDocument` (`defineField.json()` still
+    infers `unknown`, exactly as before; no runtime JSON-shape validation is added).
+  - `sort` and `where` keys on `find`/`count` are constrained to the collection's declared fields plus
+    standard document metadata, so `sort: 'doesNotExist'` is a compile error.
+  - Fully backward compatible: a broad/untyped `CollectionDefinition[]` registry, or
+    `new ForgeCmsRuntime<TEnv>(...)` given only an environment type, still compiles and still accepts
+    any collection string, returning a loosely-typed (not `any`) document — the same shape the Local
+    API always returned. Adapters (`DatabaseAdapter`/`D1DatabaseAdapter`/`LibSqlDatabaseAdapter`/
+    `InMemoryDatabaseAdapter`) and HTTP handlers required no generic redesign — the handler-facing
+    runtime type is pinned to accept any collection registry, since request-time collection slugs are
+    plain strings that can never be statically narrowed.
+
+### Patch Changes
+
+- 73050f1: feat: add machine auth (API keys) alongside human auth (spec 048)
+  - `@forge-cms/auth` gains `ApiKeyAuthAdapter` — a generic, secure machine-credential primitive.
+    Secrets are 256-bit random values from Web Crypto (`crypto.getRandomValues`), never persisted;
+    only a SHA-256 digest is stored, compared in constant time. The plaintext secret
+    (`<prefix>_<id>_<secret>`, prefix configurable, default `'forge'`) is returned exactly once, at
+    creation; `listApiKeys`/`getApiKey` never expose the hash or plaintext. Keys support generic
+    `scopes: string[]` and consumer-defined `metadata`, plus `expiresAt`/`revokedAt` — an expired or
+    revoked key fails authentication the same generic, non-leaking way an unrecognized one does.
+    Persists through the configured `DatabaseAdapter` in an internal system collection
+    (`_forge_api_keys`) that is never part of a consumer's `config.collections`, so it cannot be
+    reached through generic `/api/v1/*` CRUD.
+  - `@forge-cms/auth` gains `CompositeAuthAdapter`, so an application can authenticate human sessions
+    and machine API keys through one configured `AuthAdapter` (`new CompositeAuthAdapter([userAuth,
+apiKeyAuth])`) with no adapter-specific branching anywhere in `@forge-cms/runtime`.
+  - `@forge-cms/auth` gains `hasScope`/`hasAnyScope`/`hasAllScopes` — lightweight helpers over
+    `user.scopes`, so existing `access` functions can express `hasScope(user, 'articles:read')`
+    exactly like a role check. Scopes are opaque consumer strings; there is no scope-name registry and
+    no automatic scope-to-CRUD mapping.
+  - `AuthUser` (`@forge-cms/auth`) and the structurally-identical `CmsUser` (`@forge-cms/core`) both
+    gain an optional `scopes?: string[]`. `AuthAdapter` gains an optional
+    `syncSchema?(): Promise<void>` lifecycle hook, now called by `ForgeCmsRuntime.syncSchema()` — this
+    is what lets `ApiKeyAuthAdapter` provision its own table with no manual SQL. Both changes are
+    additive and backward compatible; every existing adapter keeps working unchanged.
+  - No consumer/domain-specific concepts (projects, catalogs, translations, locales) were added — this
+    is a fully generic machine-auth foundation, per the standing rule from spec 044.
+
+- Updated dependencies [73050f1]
+- Updated dependencies [a2c5837]
+  - @forge-cms/auth@0.1.0
+  - @forge-cms/core@0.1.0
+  - @forge-cms/api@0.1.0
+  - @forge-cms/db@0.1.0
+  - @forge-cms/storage@0.1.0
+
 ## 0.0.2
 
 ### Patch Changes

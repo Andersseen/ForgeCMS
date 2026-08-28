@@ -1,5 +1,13 @@
 # @forge-cms/testing
 
+## 0.1.0
+
+### Patch Changes
+
+- Updated dependencies [73050f1]
+- Updated dependencies [a2c5837]
+  - @forge-cms/core@0.1.0
+
 ## 0.0.2
 
 ### Patch Changes
