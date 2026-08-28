@@ -210,7 +210,12 @@ function verifyRuntimeConsumer(tarballs) {
     join(srcDir, 'index.ts'),
     `import { defineCollection, defineField } from '@forge-cms/core';
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
-import { InMemoryAuthAdapter } from '@forge-cms/auth';
+import {
+  InMemoryAuthAdapter,
+  ApiKeyAuthAdapter,
+  CompositeAuthAdapter,
+  hasScope
+} from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import { ForgeCmsRuntime, UniqueConstraintError } from '@forge-cms/runtime';
 
@@ -315,6 +320,42 @@ async function typedLocalApiRejections(rt: typeof runtime) {
   await rt.create({ collection: 'articles', data: { nope: 1 } });
 }
 void typedLocalApiRejections;
+
+// Machine auth (spec 048): ApiKeyAuthAdapter + CompositeAuthAdapter + hasScope through the packed
+// public surface only (no deep imports), proving a human strategy and an API key can coexist behind
+// one configured AuthAdapter.
+const machineAuthDb = new InMemoryDatabaseAdapter();
+const humanAuth = new InMemoryAuthAdapter();
+const apiKeyAuth = new ApiKeyAuthAdapter();
+const composedAuth = new CompositeAuthAdapter([humanAuth, apiKeyAuth]);
+composedAuth.init({ apiKeyDatabase: machineAuthDb });
+await composedAuth.syncSchema();
+
+const { secret } = await apiKeyAuth.createApiKey({
+  name: 'packed-artifact-key',
+  scopes: ['notes:read'],
+  metadata: { source: 'packed-artifact' }
+});
+
+const machineRequest = new Request('https://forge.test', {
+  headers: { authorization: \`Bearer \${secret}\` }
+});
+const machineUser = await composedAuth.requireAuth(machineRequest);
+if (machineUser.role !== 'machine') throw new Error('Expected the API key to resolve to a machine principal');
+if (!hasScope(machineUser, 'notes:read')) throw new Error('Expected machine principal to carry its configured scope');
+if (hasScope(machineUser, 'notes:write')) throw new Error('Machine principal must not carry an unconfigured scope');
+if (machineUser.metadata?.source !== 'packed-artifact') {
+  throw new Error('Expected consumer-defined metadata to reach the authenticated principal');
+}
+
+const unauthenticatedRequest = new Request('https://forge.test');
+let compositeRejected = false;
+try {
+  await composedAuth.requireAuth(unauthenticatedRequest);
+} catch {
+  compositeRejected = true;
+}
+if (!compositeRejected) throw new Error('Expected an unauthenticated request to be rejected');
 
 console.log('runtime consumer ok');
 `

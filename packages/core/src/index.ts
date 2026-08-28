@@ -38,6 +38,8 @@ export interface CmsUser {
   name?: string;
   role?: string;
   roles?: string[];
+  /** Generic scope strings for machine (or any) principals — see `@forge-cms/auth`'s `hasScope`. */
+  scopes?: string[];
   metadata?: Record<string, unknown>;
 }
 

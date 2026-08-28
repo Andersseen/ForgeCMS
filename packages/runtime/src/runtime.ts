@@ -78,6 +78,7 @@ export class ForgeCmsRuntime<
   /** Sync database schema for all registered collections and globals */
   async syncSchema(): Promise<void> {
     await this.adapters.database.syncSchema(this.config.collections);
+    await this.adapters.auth.syncSchema?.();
 
     for (const global of this.config.globals ?? []) {
       await this.adapters.database.syncSchema([
