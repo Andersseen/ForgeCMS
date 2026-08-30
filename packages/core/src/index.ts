@@ -1,4 +1,8 @@
-import { validateCollectionIdentifiers, validateGlobalIdentifiers } from './identifiers.js';
+import {
+  isReservedForgeSlug,
+  validateCollectionIdentifiers,
+  validateGlobalIdentifiers
+} from './identifiers.js';
 import { validateCollectionIndexes } from './collection-indexes.js';
 
 export type FieldKind =
@@ -609,10 +613,29 @@ export const defineField = {
   }
 } as const;
 
+/**
+ * The reserved-Forge-prefix check lives here rather than inside `validateCollectionIdentifiers` —
+ * see the comment on `RESERVED_SLUG_PREFIX` in `identifiers.ts` for why. This is specifically the
+ * boundary where a *consumer* registers a collection/global, which is where a colliding slug like
+ * `_forge_api_keys` must be rejected.
+ */
+function reservedSlugError(kind: 'Collection' | 'Global', slug: string): string[] {
+  return isReservedForgeSlug(slug)
+    ? [
+        `${kind} slug "${slug}" uses the reserved Forge internal prefix "_forge_" and cannot be ` +
+          `registered as a consumer ${kind.toLowerCase()}.`
+      ]
+    : [];
+}
+
 export function defineCollection<TSlug extends string, TFields extends FieldMap>(
   config: CollectionDefinition<TSlug, TFields>
 ): CollectionDefinition<TSlug, TFields> {
-  const errors = [...validateCollectionIdentifiers(config), ...validateCollectionIndexes(config)];
+  const errors = [
+    ...validateCollectionIdentifiers(config),
+    ...validateCollectionIndexes(config),
+    ...reservedSlugError('Collection', config.slug)
+  ];
   if (errors.length > 0) {
     throw new Error(errors.join('\n'));
   }
@@ -622,7 +645,10 @@ export function defineCollection<TSlug extends string, TFields extends FieldMap>
 export function defineGlobal<TSlug extends string, TFields extends FieldMap>(
   config: GlobalDefinition<TSlug, TFields>
 ): GlobalDefinition<TSlug, TFields> {
-  const errors = validateGlobalIdentifiers(config);
+  const errors = [
+    ...validateGlobalIdentifiers(config),
+    ...reservedSlugError('Global', config.slug)
+  ];
   if (errors.length > 0) {
     throw new Error(errors.join('\n'));
   }
@@ -661,6 +687,7 @@ export {
   assertValidIdentifier,
   isSystemField,
   getSystemFields,
+  isReservedForgeSlug,
   validateCollectionIdentifiers,
   validateGlobalIdentifiers,
   IDENTIFIER_PATTERN

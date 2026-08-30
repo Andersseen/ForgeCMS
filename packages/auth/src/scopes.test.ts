@@ -39,4 +39,36 @@ describe('scope helpers', () => {
     expect(hasAllScopes(machine, ['articles:read', 'articles:write'])).toBe(true);
     expect(hasAllScopes(machine, ['articles:read', 'articles:delete'])).toBe(false);
   });
+
+  describe('documented empty-array semantics', () => {
+    it('hasAnyScope([]) is always false — nothing in an empty list can match', () => {
+      expect(hasAnyScope(machine, [])).toBe(false);
+      expect(hasAnyScope(null, [])).toBe(false);
+      expect(hasAnyScope(undefined, [])).toBe(false);
+    });
+
+    it('hasAllScopes([]) is always true — vacuously, "all of zero required scopes"', () => {
+      expect(hasAllScopes(machine, [])).toBe(true);
+      expect(hasAllScopes(noScopes, [])).toBe(true);
+      expect(hasAllScopes(null, [])).toBe(true);
+      expect(hasAllScopes(undefined, [])).toBe(true);
+    });
+  });
+
+  it('duplicate scopes on the user do not change the result either way', () => {
+    const withDuplicates: AuthUser = {
+      id: 'key-3',
+      role: 'machine',
+      scopes: ['articles:read', 'articles:read', 'articles:write']
+    };
+    expect(hasScope(withDuplicates, 'articles:read')).toBe(true);
+    expect(hasAllScopes(withDuplicates, ['articles:read', 'articles:write'])).toBe(true);
+    expect(hasAnyScope(withDuplicates, ['articles:delete'])).toBe(false);
+  });
+
+  it('a human user (no role of "machine") is checked identically — scopes are role-agnostic', () => {
+    const human: AuthUser = { id: 'user-1', role: 'editor', scopes: ['articles:read'] };
+    expect(hasScope(human, 'articles:read')).toBe(true);
+    expect(hasScope(human, 'articles:write')).toBe(false);
+  });
 });

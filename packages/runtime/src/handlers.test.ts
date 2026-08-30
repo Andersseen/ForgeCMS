@@ -1,7 +1,13 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { defineCollection, defineField } from '@forge-cms/core';
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
-import { InMemoryAuthAdapter, type AuthUser } from '@forge-cms/auth';
+import {
+  InMemoryAuthAdapter,
+  ForgeAuthError,
+  type AuthAdapter,
+  type AuthSession,
+  type AuthUser
+} from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import { ForgeCmsRuntime } from './runtime.js';
 import { handleList, handleRead, handleCreate, handleUpdate, handleDelete } from './handlers.js';
@@ -1205,5 +1211,147 @@ describe('CRUD Handlers', () => {
       const body = await response.json();
       expect(body.data.some((r: { id: string }) => r.id === created.id)).toBe(true);
     });
+  });
+});
+
+/**
+ * An `AuthAdapter` that behaves like a real one for a *missing* credential (throws `ForgeAuthError`,
+ * same as `InMemoryAuthAdapter`), but throws a plain internal error — simulating a real DB outage or
+ * misconfiguration — the moment it actually has to validate a *provided* one. Used to prove the HTTP
+ * boundary keeps a genuine 500 distinct from a 401, on both the required-auth and optional-auth paths.
+ */
+class ThrowingAuthAdapter implements AuthAdapter {
+  readonly name = 'throwing';
+  init(): this {
+    return this;
+  }
+  extractToken(request: Request): string | null {
+    return request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? null;
+  }
+  async validateSession(token: string): Promise<AuthSession | null> {
+    if (!token) return null;
+    throw new Error('simulated database outage');
+  }
+  async requireAuth(request: Request): Promise<AuthUser> {
+    const token = this.extractToken(request);
+    if (!token) throw new ForgeAuthError('Unauthorized', 'unauthorized');
+    throw new Error('simulated database outage');
+  }
+}
+
+function createThrowingAuthRuntime() {
+  const posts = defineCollection({
+    slug: 'posts',
+    fields: { title: defineField.text({ required: true }) }
+  });
+
+  return new ForgeCmsRuntime({
+    collections: [posts],
+    adapters: {
+      database: new InMemoryDatabaseAdapter(),
+      auth: new ThrowingAuthAdapter(),
+      storage: new InMemoryStorageAdapter()
+    }
+  });
+}
+
+// 401 vs 403 vs 500 at the HTTP boundary (branch acceptance criterion #8): an unexpected error from
+// the auth adapter — a DB outage, a misconfiguration — must never be downgraded to a misleading 401,
+// on either the "auth required" path or the "auth optional" (anonymous-allowed) path.
+describe('HTTP auth boundary: 401 vs 403 vs 500', () => {
+  it('a database failure during a required-auth check surfaces as 500, not 401', async () => {
+    const runtime = createThrowingAuthRuntime();
+    const context = createTestContext('GET', 'https://forge.test/api/posts', undefined, 'anything');
+    context.params = { collection: 'posts' };
+
+    const response = await handleList(context, { runtime, requireAuth: true });
+
+    expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(body.error.code).toBe('INTERNAL_ERROR');
+  });
+
+  it('a database failure while resolving an optional user surfaces as 500, not a silent anonymous 200', async () => {
+    const runtime = createThrowingAuthRuntime();
+    // No `requireAuth` flag: this collection allows anonymous reads, so the handler would normally
+    // fall back to `resolveOptionalUser` and proceed as anonymous on a rejected credential. A
+    // credential *header being present* here is what forces the adapter to actually run and fail —
+    // this must not be swallowed into "no user" the way an actually-missing header correctly is.
+    const context = createTestContext('GET', 'https://forge.test/api/posts', undefined, 'anything');
+    context.params = { collection: 'posts' };
+
+    const response = await handleList(context, { runtime });
+
+    expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(body.error.code).toBe('INTERNAL_ERROR');
+  });
+
+  it('a missing credential on a required-auth route is still a clean 401', async () => {
+    const runtime = createThrowingAuthRuntime();
+    const context = createTestContext('GET', 'https://forge.test/api/posts');
+    context.params = { collection: 'posts' };
+
+    const response = await handleList(context, { runtime, requireAuth: true });
+    expect(response.status).toBe(401);
+  });
+
+  it('no credential at all on an anonymous-allowed route still succeeds (no adapter call needed)', async () => {
+    const runtime = createThrowingAuthRuntime();
+    const context = createTestContext('GET', 'https://forge.test/api/posts');
+    context.params = { collection: 'posts' };
+
+    const response = await handleList(context, { runtime });
+    expect(response.status).toBe(200);
+  });
+
+  it('a 500 response body never echoes the internal error message or the presented credential', async () => {
+    // `toErrorResponse` returns a fixed generic message for any non-`ForgeError` — it never
+    // interpolates `err.message` into the client-facing body, so even an adapter/DB driver error
+    // whose own message happened to embed the credential could not leak it through the response.
+    const secretMarker = 'super-secret-token-should-never-leak-abc123';
+    class LeakyAuthAdapter implements AuthAdapter {
+      readonly name = 'leaky';
+      init(): this {
+        return this;
+      }
+      extractToken(request: Request): string | null {
+        return request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? null;
+      }
+      async validateSession(): Promise<AuthSession | null> {
+        return null;
+      }
+      async requireAuth(request: Request): Promise<AuthUser> {
+        const token = this.extractToken(request) ?? '';
+        throw new Error(`simulated internal failure while validating token '${token}'`);
+      }
+    }
+
+    const posts = defineCollection({
+      slug: 'posts',
+      fields: { title: defineField.text({ required: true }) }
+    });
+    const runtime = new ForgeCmsRuntime({
+      collections: [posts],
+      adapters: {
+        database: new InMemoryDatabaseAdapter(),
+        auth: new LeakyAuthAdapter(),
+        storage: new InMemoryStorageAdapter()
+      }
+    });
+    const context = createTestContext(
+      'GET',
+      'https://forge.test/api/posts',
+      undefined,
+      secretMarker
+    );
+    context.params = { collection: 'posts' };
+
+    const response = await handleList(context, { runtime, requireAuth: true });
+    expect(response.status).toBe(500);
+
+    const bodyText = JSON.stringify(await response.json());
+    expect(bodyText).not.toContain(secretMarker);
+    expect(bodyText).toContain('INTERNAL_ERROR');
   });
 });

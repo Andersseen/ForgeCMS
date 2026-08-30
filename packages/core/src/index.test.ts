@@ -82,6 +82,44 @@ describe('core schema DSL', () => {
       })
     ).toThrow('Global slug');
   });
+
+  describe('reserved Forge internal namespace', () => {
+    it('rejects a consumer collection slug using the _forge_ prefix', () => {
+      expect(() =>
+        defineCollection({
+          slug: '_forge_api_keys',
+          fields: { title: defineField.text() }
+        })
+      ).toThrow(/reserved Forge internal prefix/);
+
+      expect(() =>
+        defineCollection({
+          slug: '_forge_anything_else',
+          fields: { title: defineField.text() }
+        })
+      ).toThrow(/reserved Forge internal prefix/);
+    });
+
+    it('rejects a consumer global slug using the _forge_ prefix', () => {
+      expect(() =>
+        defineGlobal({
+          slug: '_forge_settings',
+          fields: { title: defineField.text() }
+        })
+      ).toThrow(/reserved Forge internal prefix/);
+    });
+
+    it('does not reject an ordinary single-underscore-prefixed slug', () => {
+      // Only the literal `_forge_` prefix is reserved — a consumer's own internal-looking slug
+      // (single leading underscore, not `_forge_`) is a valid identifier and stays allowed.
+      expect(() =>
+        defineCollection({
+          slug: '_archive',
+          fields: { title: defineField.text() }
+        })
+      ).not.toThrow();
+    });
+  });
 });
 
 describe('slugify', () => {

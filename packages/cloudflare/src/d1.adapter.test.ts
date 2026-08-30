@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { defineCollection, defineField } from '@forge-cms/core';
 import { runDatabaseAdapterConstraintContractTests } from '@forge-cms/testing/contracts';
+import { ApiKeyAuthAdapter } from '@forge-cms/auth';
 import { D1DatabaseAdapter } from './d1.adapter.js';
 import type { D1Database, D1PreparedStatement, D1Result } from './bindings.js';
 
@@ -620,5 +621,99 @@ describe('D1DatabaseAdapter', () => {
         "Unknown column 'nonexistent'"
       );
     });
+  });
+});
+
+// Adapter parity (branch acceptance criterion #10): machine auth is backed by `DatabaseAdapter`, and
+// must behave identically whether that's InMemory, libSQL, or D1 — JSON scope-array serialization,
+// null handling on optional fields, and lifecycle writes (create/update) in particular. This reuses
+// the same `MockD1Database` the adapter's own suite above uses rather than a new testing framework.
+describe('ApiKeyAuthAdapter on D1DatabaseAdapter (adapter parity)', () => {
+  it('creates, authenticates, and round-trips scopes/metadata through real D1 SQL', async () => {
+    const db = new D1DatabaseAdapter().init({ DB: new MockD1Database() });
+    const apiKeyAuth = new ApiKeyAuthAdapter().init({ apiKeyDatabase: db });
+    await apiKeyAuth.syncSchema();
+
+    const { apiKey, secret } = await apiKeyAuth.createApiKey({
+      name: 'ci-bot',
+      scopes: ['articles:read', 'articles:write'],
+      metadata: { tenantId: 'acme' }
+    });
+
+    // JSON scopes array round-trips through a real TEXT column, not just an in-memory JS array.
+    const fetched = await apiKeyAuth.getApiKey(apiKey.id);
+    expect(fetched?.scopes).toEqual(['articles:read', 'articles:write']);
+    expect(fetched?.metadata).toEqual({ tenantId: 'acme' });
+
+    const request = new Request('https://forge.test', {
+      headers: { authorization: `Bearer ${secret}` }
+    });
+    const user = await apiKeyAuth.requireAuth(request);
+    expect(user.role).toBe('machine');
+    expect(user.scopes).toEqual(['articles:read', 'articles:write']);
+  });
+
+  it('null-handles optional fields (no expiresAt/metadata) the same as InMemory/libSQL', async () => {
+    const db = new D1DatabaseAdapter().init({ DB: new MockD1Database() });
+    const apiKeyAuth = new ApiKeyAuthAdapter().init({ apiKeyDatabase: db });
+    await apiKeyAuth.syncSchema();
+
+    const { apiKey } = await apiKeyAuth.createApiKey({ name: 'no-extras' });
+    const fetched = await apiKeyAuth.getApiKey(apiKey.id);
+
+    expect(fetched?.expiresAt).toBeUndefined();
+    expect(fetched?.metadata).toBeUndefined();
+    expect(fetched?.revokedAt).toBeUndefined();
+    expect(fetched?.scopes).toEqual([]);
+  });
+
+  it('an expired or revoked key fails authentication, same as every other adapter', async () => {
+    const db = new D1DatabaseAdapter().init({ DB: new MockD1Database() });
+    const apiKeyAuth = new ApiKeyAuthAdapter().init({ apiKeyDatabase: db });
+    await apiKeyAuth.syncSchema();
+
+    const { apiKey, secret } = await apiKeyAuth.createApiKey({ name: 'ci-bot' });
+    await apiKeyAuth.revokeApiKey(apiKey.id);
+
+    const request = new Request('https://forge.test', {
+      headers: { authorization: `Bearer ${secret}` }
+    });
+    await expect(apiKeyAuth.requireAuth(request)).rejects.toThrow();
+  });
+
+  it('revoking a key is idempotent through D1 the same way it is through InMemory', async () => {
+    const db = new D1DatabaseAdapter().init({ DB: new MockD1Database() });
+    const apiKeyAuth = new ApiKeyAuthAdapter().init({ apiKeyDatabase: db });
+    await apiKeyAuth.syncSchema();
+
+    const { apiKey } = await apiKeyAuth.createApiKey({ name: 'ci-bot' });
+    await apiKeyAuth.revokeApiKey(apiKey.id);
+    const first = await apiKeyAuth.getApiKey(apiKey.id);
+    await apiKeyAuth.revokeApiKey(apiKey.id);
+    const second = await apiKeyAuth.getApiKey(apiKey.id);
+
+    expect(second?.revokedAt).toBe(first?.revokedAt);
+  });
+
+  it('sharing the same D1DatabaseAdapter instance as the main runtime does not break consumer collections', async () => {
+    // Regression for the syncSchema-clobbering bug this branch fixed (see in-memory/libsql/D1
+    // syncSchema no longer clearing the adapter's collection registry).
+    const posts = defineCollection({
+      slug: 'posts',
+      fields: { title: defineField.text({ required: true }) }
+    });
+    const mockDb = new MockD1Database();
+    const sharedDb = new D1DatabaseAdapter().init({ DB: mockDb });
+
+    await sharedDb.syncSchema([posts]);
+    await sharedDb.create('posts', { title: 'Before auth sync' });
+
+    const apiKeyAuth = new ApiKeyAuthAdapter().init({ apiKeyDatabase: sharedDb });
+    await apiKeyAuth.syncSchema();
+
+    await expect(sharedDb.create('posts', { title: 'After auth sync' })).resolves.toMatchObject({
+      title: 'After auth sync'
+    });
+    await expect(sharedDb.findMany({ collection: 'posts' })).resolves.toHaveLength(2);
   });
 });

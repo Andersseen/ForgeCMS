@@ -61,4 +61,13 @@ export interface AuthAdapter<TUser extends AuthUser = AuthUser> {
   requireAuth(request: Request): Promise<TUser>;
   /** Optional schema/table bootstrap, invoked by `ForgeCmsRuntime.syncSchema()`. */
   syncSchema?(): Promise<void>;
+  /**
+   * Optional cheap, synchronous format check: does this token even look like one of ours? Lets
+   * `CompositeAuthAdapter` skip an adapter's `requireAuth()` (a DB round-trip, an HMAC verification —
+   * work that can only fail) when a token is obviously shaped for a different strategy. Adapters
+   * without this method are always attempted, exactly as before it existed — fully optional and
+   * backward compatible, and never required for a custom/third-party `AuthAdapter` to work correctly
+   * inside a `CompositeAuthAdapter`.
+   */
+  canHandleToken?(token: string): boolean;
 }
