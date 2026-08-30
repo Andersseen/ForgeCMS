@@ -1,6 +1,6 @@
 import type { AuthAdapter, AuthSession, AuthUser } from './index.js';
 import { ForgeAuthError } from './index.js';
-import { extractToken, issueToken, validateSession } from './token-signer.js';
+import { extractToken, issueToken, looksLikeSignedToken, validateSession } from './token-signer.js';
 
 export interface SignedTokenEnv {
   AUTH_SECRET?: string;
@@ -59,6 +59,11 @@ export class SignedTokenAuthAdapter implements AuthAdapter {
 
   extractToken(request: Request): string | null {
     return extractToken(request);
+  }
+
+  /** Cheap format check for `CompositeAuthAdapter` routing — see `AuthAdapter.canHandleToken`. */
+  canHandleToken(token: string): boolean {
+    return looksLikeSignedToken(token);
   }
 
   async issueToken(user: AuthUser): Promise<string> {

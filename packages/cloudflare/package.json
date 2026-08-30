@@ -50,6 +50,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250514.0",
+    "@forge-cms/auth": "workspace:*",
     "@forge-cms/testing": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "typescript": "catalog:",

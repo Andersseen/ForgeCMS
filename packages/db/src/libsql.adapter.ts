@@ -77,7 +77,10 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
 
   async syncSchema(collections: CollectionDefinition[]): Promise<void> {
     const db = this.getDb();
-    this.collections.clear();
+    // Upserts by slug rather than clearing first: an `AuthAdapter.syncSchema()` (e.g.
+    // `ApiKeyAuthAdapter`) calls this again with just its own internal collection, often on the same
+    // adapter instance as the main runtime — clearing here would unregister every consumer collection
+    // the first call just registered, and every subsequent query for it would throw "not registered".
     clearTableCache();
 
     for (const collection of collections) {

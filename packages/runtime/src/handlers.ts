@@ -4,7 +4,7 @@ import type { DatabaseWhere } from '@forge-cms/db';
 import type { CollectionDefinition, DraftStatus } from '@forge-cms/core';
 import { getLogger } from '@forge-cms/core';
 import type { AuthUser, UserRole } from '@forge-cms/auth';
-import { hasAnyRole } from '@forge-cms/auth';
+import { ForgeAuthError, hasAnyRole } from '@forge-cms/auth';
 import * as operations from './operations.js';
 import type { PaginatedDocs } from './operations.js';
 import {
@@ -228,8 +228,15 @@ async function authorize<TEnv>(
   let user: AuthUser;
   try {
     user = await runtime.adapters.auth.requireAuth(context.request);
-  } catch {
-    return { success: false, response: errorResponse('UNAUTHORIZED', 'Unauthorized', 401) };
+  } catch (err) {
+    // Only an expected auth rejection (missing/invalid/expired/revoked credential) is a 401. Any
+    // other error — a DB outage, a misconfigured adapter — is a server fault and must propagate to
+    // the outer handler try/catch, which maps it to a 500. Downgrading it to 401 here would hide a
+    // real infrastructure failure behind a misleading "unauthenticated" response.
+    if (err instanceof ForgeAuthError) {
+      return { success: false, response: errorResponse('UNAUTHORIZED', 'Unauthorized', 401) };
+    }
+    throw err;
   }
 
   if (allowedRoles !== undefined && !hasAnyRole(user, allowedRoles)) {
@@ -245,8 +252,11 @@ async function resolveOptionalUser<TEnv>(
 ): Promise<AuthUser | null> {
   try {
     return await runtime.adapters.auth.requireAuth(context.request);
-  } catch {
-    return null;
+  } catch (err) {
+    // Same rule as `authorize`: no credential, or one the adapter rejects, means anonymous. An
+    // unexpected internal error must still propagate rather than be silently treated as "no user".
+    if (err instanceof ForgeAuthError) return null;
+    throw err;
   }
 }
 
@@ -277,16 +287,23 @@ async function resolveRequest<TEnv>(
   const routeRoles = collection.access?.[operation] === undefined ? allowedRoles : undefined;
   const mustAuth = requireAuthFlag === true || routeRoles !== undefined;
 
-  let user: AuthUser | null = null;
-  if (mustAuth) {
-    const result = await authorize(context, runtime, routeRoles);
-    if (!result.success) return result.response;
-    user = result.user;
-  } else {
-    user = await resolveOptionalUser(context, runtime);
-  }
+  try {
+    let user: AuthUser | null = null;
+    if (mustAuth) {
+      const result = await authorize(context, runtime, routeRoles);
+      if (!result.success) return result.response;
+      user = result.user;
+    } else {
+      user = await resolveOptionalUser(context, runtime);
+    }
 
-  return { collection, collectionSlug, user };
+    return { collection, collectionSlug, user };
+  } catch (err) {
+    // `authorize`/`resolveOptionalUser` only throw an unexpected (non-auth-rejection) error here —
+    // this function is called before any handler's own try/catch, so it must convert that itself
+    // rather than let it escape as an unhandled rejection.
+    return toErrorResponse(err, null);
+  }
 }
 
 // --- handlers --------------------------------------------------------------------------------
@@ -577,16 +594,20 @@ async function resolveGlobalRequest<TEnv>(
   const routeRoles = global.access?.[operation] === undefined ? allowedRoles : undefined;
   const mustAuth = requireAuthFlag === true || routeRoles !== undefined;
 
-  let user: AuthUser | null = null;
-  if (mustAuth) {
-    const result = await authorize(context, runtime, routeRoles);
-    if (!result.success) return result.response;
-    user = result.user;
-  } else {
-    user = await resolveOptionalUser(context, runtime);
-  }
+  try {
+    let user: AuthUser | null = null;
+    if (mustAuth) {
+      const result = await authorize(context, runtime, routeRoles);
+      if (!result.success) return result.response;
+      user = result.user;
+    } else {
+      user = await resolveOptionalUser(context, runtime);
+    }
 
-  return { globalSlug, user };
+    return { globalSlug, user };
+  } catch (err) {
+    return toErrorResponse(err, null);
+  }
 }
 
 export async function handleGlobalRead<TEnv = unknown>(
@@ -748,7 +769,8 @@ export async function handlePreview<TEnv = unknown>(
   let user: AuthUser | null = null;
   try {
     user = await options.runtime.adapters.auth.requireAuth(context.request);
-  } catch {
+  } catch (err) {
+    if (!(err instanceof ForgeAuthError)) return toErrorResponse(err, null);
     // Preview might be allowed without auth for draft preview
     if (!options.allowDraftPreview) {
       return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);

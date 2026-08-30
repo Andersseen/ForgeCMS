@@ -160,7 +160,12 @@ export class InMemoryDatabaseAdapter implements DatabaseAdapter {
   async syncSchema(collections: CollectionDefinition[]): Promise<void> {
     // No real table/index DDL to run, but the collection definitions are kept so create/update can
     // enforce the same unique-index semantics D1/libSQL would (see resolveCollectionIndexes above).
-    this.collections.clear();
+    //
+    // Upserts by slug rather than clearing first: `ApiKeyAuthAdapter.syncSchema()` (and any other
+    // `AuthAdapter.syncSchema()`) calls this same method again with just its own internal collection,
+    // often on the very same adapter instance as the main runtime (`apiKeyDatabase: database`). A
+    // clear-then-repopulate here would unregister every consumer collection the first call just
+    // registered, silently disabling unique-constraint enforcement for all of them.
     for (const collection of collections) {
       this.collections.set(collection.slug, collection);
     }

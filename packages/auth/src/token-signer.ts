@@ -38,6 +38,18 @@ function getKey(secret: string): Promise<CryptoKey> {
   );
 }
 
+/**
+ * Cheap format check shared by every token-signer-based adapter (`SignedTokenAuthAdapter`,
+ * `UsersCollectionAuthAdapter`): a signed token is exactly `<payload>.<signature>`, two non-empty
+ * base64url segments. Used for `AuthAdapter.canHandleToken` — lets `CompositeAuthAdapter` skip an
+ * HMAC verification for a token shaped for a different strategy (e.g. an API key, which never
+ * contains a `.`).
+ */
+export function looksLikeSignedToken(token: string): boolean {
+  const parts = token.split('.');
+  return parts.length === 2 && parts.every((part) => part.length > 0);
+}
+
 export function extractToken(request: Request): string | null {
   const authHeader = request.headers.get('authorization');
   if (!authHeader) return null;

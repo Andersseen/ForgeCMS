@@ -124,8 +124,11 @@ describe('ApiKeyAuthAdapter', () => {
     });
 
     it('an expired key fails', async () => {
-      const { secret } = await adapter.createApiKey({
-        name: 'ci-bot',
+      // createApiKey now rejects an already-past expiresAt (see the 'creation validation' suite
+      // below), so a key that has expired *since* creation is simulated by writing directly to
+      // storage — bypassing that creation-time check the same way time passing would.
+      const { apiKey, secret } = await adapter.createApiKey({ name: 'ci-bot' });
+      await db.update('_forge_api_keys', apiKey.id, {
         expiresAt: new Date(Date.now() - 1000).toISOString()
       });
       const request = new Request('https://forge.test', {
@@ -143,6 +146,39 @@ describe('ApiKeyAuthAdapter', () => {
         headers: { authorization: `Bearer ${secret}` }
       });
       await expect(adapter.requireAuth(request)).resolves.toBeTruthy();
+    });
+
+    it('a deleted key fails the same generic way as an unknown one', async () => {
+      const { apiKey, secret } = await adapter.createApiKey({ name: 'ci-bot' });
+      await adapter.deleteApiKey(apiKey.id);
+      const request = new Request('https://forge.test', {
+        headers: { authorization: `Bearer ${secret}` }
+      });
+      await expect(adapter.requireAuth(request)).rejects.toThrow();
+    });
+
+    it('a wrong prefix fails', async () => {
+      const { secret } = await adapter.createApiKey({ name: 'ci-bot' });
+      const request = new Request('https://forge.test', {
+        headers: { authorization: `Bearer wrongprefix${secret.slice('forge'.length)}` }
+      });
+      await expect(adapter.requireAuth(request)).rejects.toThrow();
+    });
+
+    it('a truncated secret fails', async () => {
+      const { secret } = await adapter.createApiKey({ name: 'ci-bot' });
+      const truncated = secret.slice(0, -10);
+      const request = new Request('https://forge.test', {
+        headers: { authorization: `Bearer ${truncated}` }
+      });
+      await expect(adapter.requireAuth(request)).rejects.toThrow();
+    });
+
+    it('a token with an extra separator but a wrong id fails cleanly', async () => {
+      const request = new Request('https://forge.test', {
+        headers: { authorization: 'Bearer forge_not-a-real-id_extra_secret_parts' }
+      });
+      await expect(adapter.requireAuth(request)).rejects.toThrow();
     });
   });
 
@@ -194,6 +230,75 @@ describe('ApiKeyAuthAdapter', () => {
       const after = await adapter.getApiKey(apiKey.id);
       expect(after?.lastUsedAt).toBeTruthy();
     });
+
+    it('is not rewritten on a second authentication within the throttle window', async () => {
+      const { apiKey, secret } = await adapter.createApiKey({ name: 'ci-bot' });
+      const request = () =>
+        new Request('https://forge.test', { headers: { authorization: `Bearer ${secret}` } });
+
+      await adapter.requireAuth(request());
+      const first = await adapter.getApiKey(apiKey.id);
+
+      await adapter.requireAuth(request());
+      const second = await adapter.getApiKey(apiKey.id);
+
+      expect(second?.lastUsedAt).toBe(first?.lastUsedAt);
+    });
+
+    it('is rewritten once the throttle window has passed', async () => {
+      const throttled = new ApiKeyAuthAdapter({ lastUsedAtThrottleMs: 0 }).init({
+        apiKeyDatabase: db
+      });
+      await throttled.syncSchema();
+      const { apiKey, secret } = await throttled.createApiKey({ name: 'ci-bot' });
+      const request = () =>
+        new Request('https://forge.test', { headers: { authorization: `Bearer ${secret}` } });
+
+      await throttled.requireAuth(request());
+      const first = await throttled.getApiKey(apiKey.id);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await throttled.requireAuth(request());
+      const second = await throttled.getApiKey(apiKey.id);
+
+      expect(second?.lastUsedAt).not.toBe(first?.lastUsedAt);
+    });
+  });
+
+  describe('creation validation', () => {
+    it('rejects an empty or whitespace-only name', async () => {
+      await expect(adapter.createApiKey({ name: '' })).rejects.toThrow(/name/i);
+      await expect(adapter.createApiKey({ name: '   ' })).rejects.toThrow(/name/i);
+    });
+
+    it('rejects an unparseable expiresAt', async () => {
+      await expect(
+        adapter.createApiKey({ name: 'ci-bot', expiresAt: 'not-a-date' })
+      ).rejects.toThrow(/expiresAt/i);
+    });
+
+    it('rejects an expiresAt that is already in the past', async () => {
+      await expect(
+        adapter.createApiKey({
+          name: 'ci-bot',
+          expiresAt: new Date(Date.now() - 1000).toISOString()
+        })
+      ).rejects.toThrow(/expiresAt/i);
+    });
+
+    it('rejects an expiresAt equal to now', async () => {
+      const now = new Date();
+      await expect(
+        adapter.createApiKey({ name: 'ci-bot', expiresAt: now.toISOString() })
+      ).rejects.toThrow(/expiresAt/i);
+    });
+
+    it('normalizes scopes: trims, drops empty strings, and dedupes preserving order', async () => {
+      const { apiKey } = await adapter.createApiKey({
+        name: 'ci-bot',
+        scopes: [' articles:read ', 'articles:write', 'articles:read', '', '   ']
+      });
+      expect(apiKey.scopes).toEqual(['articles:read', 'articles:write']);
+    });
   });
 
   describe('revocation and deletion', () => {
@@ -204,11 +309,48 @@ describe('ApiKeyAuthAdapter', () => {
       expect(after?.revokedAt).toBeTruthy();
     });
 
+    it('revoking twice is idempotent and keeps the original revokedAt', async () => {
+      const { apiKey } = await adapter.createApiKey({ name: 'ci-bot' });
+      await adapter.revokeApiKey(apiKey.id);
+      const first = await adapter.getApiKey(apiKey.id);
+
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await adapter.revokeApiKey(apiKey.id);
+      const second = await adapter.getApiKey(apiKey.id);
+
+      expect(second?.revokedAt).toBe(first?.revokedAt);
+    });
+
+    it('revoking a nonexistent key throws', async () => {
+      await expect(adapter.revokeApiKey('00000000-0000-0000-0000-000000000000')).rejects.toThrow();
+    });
+
     it('delete removes the record entirely', async () => {
       const { apiKey } = await adapter.createApiKey({ name: 'ci-bot' });
       await adapter.deleteApiKey(apiKey.id);
       const after = await adapter.getApiKey(apiKey.id);
       expect(after).toBeNull();
+    });
+
+    it('deleting an already-missing key is a silent no-op', async () => {
+      await expect(
+        adapter.deleteApiKey('00000000-0000-0000-0000-000000000000')
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('canHandleToken (CompositeAuthAdapter routing)', () => {
+    it('recognizes its own token shape', async () => {
+      const { secret } = await adapter.createApiKey({ name: 'ci-bot' });
+      expect(adapter.canHandleToken(secret)).toBe(true);
+    });
+
+    it('rejects tokens shaped for a different strategy or malformed', () => {
+      expect(adapter.canHandleToken('not-an-api-key-token')).toBe(false);
+      expect(adapter.canHandleToken('some.signed.token')).toBe(false);
+      expect(adapter.canHandleToken('forge_')).toBe(false);
+      expect(adapter.canHandleToken('forge_only-id-no-secret')).toBe(false);
+      expect(adapter.canHandleToken('')).toBe(false);
     });
   });
 });

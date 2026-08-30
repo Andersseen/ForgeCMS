@@ -12,6 +12,23 @@ const IDENTIFIER_PATTERN = /^_?[a-z][a-zA-Z0-9_]*$/;
 
 const SYSTEM_FIELD_NAMES = new Set(['id', 'created_at', 'updated_at', '_status', '_storageKey']);
 
+/**
+ * Prefix reserved for Forge's own internal system collections (e.g. `_forge_api_keys`, machine auth's
+ * key store). Those are built directly as plain objects rather than through `defineCollection`/
+ * `defineGlobal` — the one legitimate user of this prefix, and the only reason this check lives there
+ * rather than in `validateCollectionIdentifiers`/`validateGlobalIdentifiers` below: those two are also
+ * reused by `@forge-cms/db`'s schema generator as a defense-in-depth check on *every* collection
+ * definition it is handed, Forge-internal ones included, so a reserved-prefix rejection there would
+ * reject Forge's own internal collections too. `defineCollection`/`defineGlobal` is specifically the
+ * boundary where a *consumer* registers their own collection or global, so that is where a colliding
+ * slug is rejected instead of silently shadowing or corrupting Forge-internal storage.
+ */
+const RESERVED_SLUG_PREFIX = '_forge_';
+
+export function isReservedForgeSlug(slug: string): boolean {
+  return slug.startsWith(RESERVED_SLUG_PREFIX);
+}
+
 export function isValidIdentifier(name: string): boolean {
   return IDENTIFIER_PATTERN.test(name);
 }

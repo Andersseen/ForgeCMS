@@ -1,6 +1,6 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-08-28.**
+> **Last updated: 2026-08-30.**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
@@ -192,6 +192,39 @@ docs page, `apps/www/src/content/docs/machine-auth.md`. `scripts/verify-release.
 through the packed public exports only. See
 [docs/specs/048-machine-auth-api-keys.md](specs/048-machine-auth-api-keys.md).
 
+**As of 2026-08-30, spec 049 hardens auth and runtime for real external consumers — a stabilization
+branch, no new features.** Audited `@forge-cms/auth`, `@forge-cms/runtime`'s HTTP/access boundary,
+`@forge-cms/db`/`@forge-cms/cloudflare` adapters, and `@forge-cms/core`'s access types against the
+16-point acceptance brief in `docs/specs/049-auth-runtime-hardening.md`; classified every finding as a
+bug, security hardening, contract inconsistency, test gap, doc gap, or no-change-needed rather than
+rewriting anything speculatively. The one severe finding: `InMemoryDatabaseAdapter`,
+`LibSqlDatabaseAdapter`, and `D1DatabaseAdapter` all cleared their internal collection registry on
+every `syncSchema()` call; because `ApiKeyAuthAdapter` is meant to share the main `DatabaseAdapter`
+instance (`apiKeyDatabase: database`, the documented and tested wiring), `ForgeCmsRuntime.syncSchema()`
+calling `auth.syncSchema?.()` right after registering consumer collections silently wiped them out —
+D1/libSQL then threw "not registered" on the next request, and InMemory silently stopped enforcing
+unique constraints. `syncSchema()` now upserts by slug instead of clearing first, on all three
+adapters. Two more real bugs: `CompositeAuthAdapter.requireAuth()` swallowed _any_ exception from a
+child adapter (now only an expected `ForgeAuthError` falls through to the next strategy; an unexpected
+one, e.g. a DB outage, propagates), and `@forge-cms/runtime`'s HTTP handlers
+(`authorize`/`resolveOptionalUser`/`handlePreview`) had the identical bug one layer up — the fix that
+matters most in practice, since a real consumer talks to HTTP, not the adapter directly. Security
+hardening: `AuthAdapter` gained an optional `canHandleToken?(token)` so `CompositeAuthAdapter` can skip
+a strategy that obviously doesn't own a token (no wasted DB round-trip/HMAC verify), implemented by
+`ApiKeyAuthAdapter` and the signed-token-based adapters, fully backward compatible; `createApiKey` now
+validates `name`/`expiresAt` and normalizes `scopes`; `revokeApiKey` is idempotent; `lastUsedAt` writes
+are throttled (5 min default) instead of firing on every request; `_forge_*` is now a reserved
+collection/global-slug prefix rejected by `defineCollection`/`defineGlobal`. Everything else audited —
+secret handling, timing-safe comparison, scope-helper semantics, delete/update-of-missing-id
+conventions, the `AuthUser`/`CmsUser` structural contract — was already correct and got regression
+tests rather than churn. New coverage: `packages/runtime/src/machine-auth-integration.test.ts`
+(machine principals reaching real collection/field/row-level access and the shared-adapter syncSchema
+fix, through the actual runtime + HTTP pipeline, not just adapter-level unit tests), a 401-vs-403-vs-500
+HTTP boundary suite in `handlers.test.ts`, and DB-adapter parity tests for `ApiKeyAuthAdapter` across
+InMemory, libSQL, and D1 (`packages/auth/src/api-key.adapter.db-parity.test.ts`,
+`packages/cloudflare/src/d1.adapter.test.ts`). No HTTP management routes, admin UI, or any other
+feature expansion — see the spec's non-goals.
+
 ## Package status
 
 | Package                 | Status                           | What exists                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | What's missing                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
@@ -328,6 +361,14 @@ passwordHash`~~ — **fixed 2026-07-22, spec 018.** `@forge-cms/auth` now export
     referentially checked on delete (a deleted author leaves posts pointing at a dead id). Spec 021's
     `beforeDelete`/`afterDelete` hooks now make both expressible in userland, but neither is built in
     — ROADMAP item 027.
+17. ~~`DatabaseAdapter.syncSchema()` cleared its internal collection registry on every call~~ — **found
+    and fixed 2026-08-30, spec 049.** Harmless as long as `syncSchema()` was only ever called once with
+    the full collection set — which is what every existing app/test did — but a second call with a
+    _different_ set (exactly what `ApiKeyAuthAdapter.syncSchema()` does when it shares the main
+    `DatabaseAdapter` instance, the documented wiring) silently unregistered every consumer collection:
+    D1/libSQL then threw "not registered" on the next request, InMemory silently stopped enforcing
+    unique constraints. All three adapters (`InMemoryDatabaseAdapter`, `LibSqlDatabaseAdapter`,
+    `D1DatabaseAdapter`) now upsert by slug instead of clearing first.
 
 ## What's next
 

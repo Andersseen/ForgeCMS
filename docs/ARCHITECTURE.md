@@ -75,7 +75,19 @@ value (`eq`) or an operator object (`{ gt: 10 }`, one or more of `eq`/`ne`/`gt`/
 ### AuthAdapter (`@forge-cms/auth`)
 
 `name`, `init(env)`, `extractToken(request)`, `validateSession(token)` → `AuthSession | null`,
-`requireAuth(request)` → `AuthUser` or throws `ForgeAuthError`.
+`requireAuth(request)` → `AuthUser` or throws `ForgeAuthError`. Two optional methods, both additive and
+backward compatible — an adapter omitting either behaves exactly as if neither existed:
+`syncSchema?()` (schema/table bootstrap, called by `ForgeCmsRuntime.syncSchema()`) and
+`canHandleToken?(token)` (a cheap, synchronous "is this token even shaped like mine?" check;
+`CompositeAuthAdapter` consults it to skip a strategy that obviously isn't a token's owner before
+paying for a DB round-trip or signature verification).
+
+`CompositeAuthAdapter` composes multiple `AuthAdapter`s behind one: `requireAuth()` tries each in
+order, falling through to the next only on an _expected_ rejection (`ForgeAuthError`) — any other
+thrown error (a DB outage, a misconfigured child adapter) propagates immediately rather than being
+reinterpreted as "unauthenticated". The HTTP layer (`handlers.ts`) follows the same rule at its own
+`auth.requireAuth()` call sites, which is what keeps a database failure a `500` rather than a
+misleading `401`.
 
 ### StorageAdapter (`@forge-cms/storage`)
 
