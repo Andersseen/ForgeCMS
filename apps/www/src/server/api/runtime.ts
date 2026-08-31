@@ -24,6 +24,8 @@ const pages = defineCollection({
 
 const posts = defineCollection({
   slug: 'posts',
+  drafts: true,
+  admin: { useAsTitle: 'title' },
   fields: {
     title: defineField.text({ required: true }),
     slug: defineField.slug({ required: true }),
@@ -300,7 +302,8 @@ async function seedIfEmpty(runtime: ForgeCmsRuntime): Promise<void> {
     tags: ['cms', 'angular'],
     category: 'tutorial',
     publishedAt: new Date().toISOString(),
-    author: 'admin'
+    author: 'admin',
+    _status: 'published'
   });
 
   await db.create('products', {

@@ -48,6 +48,10 @@ export interface CollectionDescription {
   upload?: boolean;
   /** Supported locales when the collection has localized fields. */
   locales?: string[];
+  /** Field name whose value the admin should use as a document's display title (spec 052). */
+  useAsTitle?: string;
+  /** Field names the admin should show as list columns (spec 052). Presentational hint only. */
+  defaultColumns?: string[];
 }
 
 export interface GlobalDescription {
@@ -131,15 +135,19 @@ export function describeFields(fields: FieldMap): FieldDescription[] {
 }
 
 export function describeCollection(collection: CollectionDefinition): CollectionDescription {
+  const admin = collection.admin;
   return {
     slug: collection.slug,
-    name: humanise(collection.slug),
-    description: `Content collection for ${collection.slug}`,
+    name: admin?.label ?? humanise(collection.slug),
+    description: admin?.description ?? `Content collection for ${collection.slug}`,
     fieldDefinitions: describeFields(collection.fields),
     ...(collection.drafts === true && { drafts: true }),
     ...(collection.upload === true && { upload: true }),
     ...(collection.locales !== undefined &&
-      collection.locales.length > 0 && { locales: collection.locales })
+      collection.locales.length > 0 && { locales: collection.locales }),
+    ...(admin?.useAsTitle !== undefined && { useAsTitle: admin.useAsTitle }),
+    ...(admin?.defaultColumns !== undefined &&
+      admin.defaultColumns.length > 0 && { defaultColumns: admin.defaultColumns })
   };
 }
 

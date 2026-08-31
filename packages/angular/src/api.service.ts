@@ -186,6 +186,18 @@ export class CmsApiService {
   }
 
   /**
+   * Sets a `drafts: true` document's `_status` (spec 052). Thin convenience over
+   * {@link updateDocument} — every draft/publish UI otherwise repeats the same `{ _status }` literal.
+   */
+  async setDocumentStatus<T = Record<string, unknown>>(
+    collection: string,
+    id: string,
+    status: 'draft' | 'published'
+  ): Promise<T> {
+    return this.updateDocument<T>(collection, id, { _status: status });
+  }
+
+  /**
    * Generates a preview of a document by merging stored data with unsaved changes.
    * Useful for live preview in the admin UI before saving.
    * If id is provided, merges changes with existing document. Otherwise, previews new document.

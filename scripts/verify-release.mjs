@@ -493,12 +493,31 @@ function verifyAngularConsumer(tarballs) {
   writeFileSync(
     join(srcDir, 'index.ts'),
     `import { Component, inject } from '@angular/core';
+import type { Routes } from '@angular/router';
 import { CmsApiService, provideForgeCms, type QueryOptions } from '@forge-cms/angular';
 import {
   ForgeAdminLayoutComponent,
   ForgeCollectionListComponent,
+  ForgeCollectionWorkspaceComponent,
+  ForgeDocumentEditorComponent,
+  ForgeCollectionsIndexComponent,
+  ForgeConfirmDialogComponent,
+  forgeAdminContentRoutes,
   type ForgeAdminConfig
 } from '@forge-cms/admin';
+
+// Embeddable content admin (spec 052): the content-CRUD orchestration layer's real, final public
+// names, importable from the packed public entry only (no deep imports into src/), usable as
+// Angular route \`component:\` values — the exact shape a host consumer's own routes file would use.
+const contentRoutes: Routes = [
+  { path: 'collections', component: ForgeCollectionsIndexComponent },
+  { path: 'collections/:collection', component: ForgeCollectionWorkspaceComponent },
+  { path: 'collections/:collection/new', component: ForgeDocumentEditorComponent }
+];
+void contentRoutes;
+const generatedRoutes: Routes = forgeAdminContentRoutes();
+void generatedRoutes;
+void ForgeConfirmDialogComponent;
 
 const providers = provideForgeCms({ baseUrl: '/api' });
 

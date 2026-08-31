@@ -422,6 +422,23 @@ export interface CollectionDefinition<
    * {@link BaseFieldOptions} keep working unchanged; this is additive sugar for the multi-field case.
    */
   indexes?: CollectionIndex[];
+  /**
+   * Presentational hints for admin UIs (spec 052). Purely additive metadata — never validated
+   * against document data, never affects the generated DB schema.
+   */
+  admin?: CollectionAdminOptions;
+}
+
+/** See {@link CollectionDefinition.admin}. */
+export interface CollectionAdminOptions {
+  /** Overrides the humanized-slug label an admin UI would otherwise derive. */
+  label?: string;
+  /** Overrides the default description an admin UI would otherwise derive. */
+  description?: string;
+  /** Name of the field whose value should be used as a document's display title. */
+  useAsTitle?: string;
+  /** Field names to show as list columns. Presentational hint only, not enforced. */
+  defaultColumns?: string[];
 }
 
 /** One collection-level index. See {@link CollectionDefinition.indexes}. */

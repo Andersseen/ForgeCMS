@@ -14,7 +14,7 @@ import { LmnPencilIcon, LmnPlusIcon, LmnTrashIcon } from 'lumen-icons';
 import { PageHeaderComponent } from './page-header.component.js';
 import { EmptyStateComponent } from './empty-state.component.js';
 import { toCellView } from './cell-value.js';
-import { shortId } from './document-label.js';
+import { documentLabel, shortId } from './document-label.js';
 
 const MAX_COLUMNS = 6;
 
@@ -77,7 +77,7 @@ export interface StatusChangeRequest {
       <volt-table>
         <volt-table-header>
           <volt-table-row>
-            <volt-table-head>ID</volt-table-head>
+            <volt-table-head>{{ titleLabel() }}</volt-table-head>
             @if (showStatus()) {
               <volt-table-head>Status</volt-table-head>
             }
@@ -105,8 +105,17 @@ export interface StatusChangeRequest {
         <volt-table-body>
           @for (doc of documents(); track doc['id']) {
             <volt-table-row>
-              <volt-table-cell class="font-mono text-xs text-muted-foreground">
-                {{ shortId(asString(doc['id'])) }}
+              <volt-table-cell>
+                @if (collection().useAsTitle; as titleField) {
+                  <span class="block truncate">{{ documentLabel(doc, titleField) }}</span>
+                  <span class="block font-mono text-xs text-muted-foreground">
+                    {{ shortId(asString(doc['id'])) }}
+                  </span>
+                } @else {
+                  <span class="font-mono text-xs text-muted-foreground">
+                    {{ shortId(asString(doc['id'])) }}
+                  </span>
+                }
               </volt-table-cell>
 
               @if (showStatus()) {
@@ -168,6 +177,7 @@ export interface StatusChangeRequest {
                       (click)="edit.emit(doc)"
                     >
                       <lmn-pencil [size]="14" />
+                      <span class="sr-only">Edit</span>
                     </volt-button>
                     <volt-button
                       variant="ghost"
@@ -176,6 +186,7 @@ export interface StatusChangeRequest {
                       (click)="delete.emit(doc)"
                     >
                       <lmn-trash [size]="14" />
+                      <span class="sr-only">Delete</span>
                     </volt-button>
                   </div>
                 }
@@ -234,11 +245,23 @@ export class ForgeCollectionListComponent {
   statusChange = output<StatusChangeRequest>();
 
   protected readonly shortId = shortId;
+  protected readonly documentLabel = documentLabel;
   protected readonly asString = (value: unknown): string =>
     value === undefined ? '' : String(value);
 
+  /** The configured title field's label, or "ID" when the collection has none. */
+  protected readonly titleLabel = computed<string>(() => {
+    const useAsTitle = this.collection().useAsTitle;
+    if (useAsTitle === undefined) return 'ID';
+    const field = this.collection().fieldDefinitions.find((f) => f.name === useAsTitle);
+    return field?.label ?? 'Title';
+  });
+
+  /** Generic columns, minus the field already shown as the row title. */
   protected readonly columns = computed<FieldMeta[]>(() =>
-    this.collection().fieldDefinitions.slice(0, MAX_COLUMNS)
+    this.collection()
+      .fieldDefinitions.filter((field) => field.name !== this.collection().useAsTitle)
+      .slice(0, MAX_COLUMNS)
   );
 
   /** Only a `drafts: true` collection has a status to show. */

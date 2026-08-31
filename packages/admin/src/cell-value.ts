@@ -62,7 +62,7 @@ export function toCellView(field: FieldMeta, value: unknown): CellView {
 
     case 'relation': {
       if (Array.isArray(value)) {
-        const labels = value.map(documentLabel);
+        const labels = value.map((item) => documentLabel(item));
         return labels.length <= 2
           ? { kind: 'text', text: labels.join(', ') }
           : { kind: 'count', text: `${labels[0]} +${labels.length - 1}` };
