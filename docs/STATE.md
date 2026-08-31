@@ -388,16 +388,14 @@ still build and pass its own tests unchanged, since every `@forge-cms/*` change 
 edit — which broke the moment `posts` gained a status column, since the publish/unpublish button now
 takes index 0) to cover the full create → list (titled, not a raw id) → edit → publish → filter
 Draft/Published/All → delete-with-confirmation → disappears flow, plus the unsaved-changes prompt and
-the anonymous-read-only case, all against a real browser. **One acceptance-criterion gap, found and
-not silently worked around**: the spec assumed existing "packed-package verification" /
-"external consumer verification" tooling to extend — none exists anywhere in this repo (`scripts/`
-has no such script, no CI job references it). Verified instead as a one-off, manual `pnpm pack` of
-`@forge-cms/core`/`@forge-cms/angular`/`@forge-cms/admin` into tarballs, installed into a throwaway
-fixture package (outside the workspace) importing `ForgeCollectionWorkspaceComponent`/
-`ForgeDocumentEditorComponent`/`ForgeCollectionsIndexComponent`/`ForgeConfirmDialogComponent`/
-`forgeAdminContentRoutes` from the public entry only, `tsc --noEmit` clean — but this is **not**
-wired into CI or committed anywhere; building that permanently is future work, not part of this
-branch. Left explicitly untouched per the spec's non-goals: users/API-keys/settings admin UI, the
+the anonymous-read-only case, all against a real browser. `scripts/verify-release.mjs`'s
+`verifyAngularConsumer` (run via `pnpm release:verify`, already wired into both the `checks` and
+`release` CI jobs — this repo already had real packed-package/external-consumer verification, an
+earlier draft of this entry wrongly claimed otherwise before that script was actually found) was
+extended to also compile `ForgeCollectionWorkspaceComponent`/`ForgeDocumentEditorComponent`/
+`ForgeCollectionsIndexComponent`/`ForgeConfirmDialogComponent`/`forgeAdminContentRoutes` from the
+real packed `@forge-cms/admin` tarball via `ngc`, as real Angular route `component:` values. Left
+explicitly untouched per the spec's non-goals: users/API-keys/settings admin UI, the
 media library, bulk actions, saved filters, and any Analog-specific routing package. See
 [docs/specs/052-embeddable-content-admin.md](specs/052-embeddable-content-admin.md).
 

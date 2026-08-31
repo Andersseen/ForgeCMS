@@ -298,9 +298,10 @@ version — this is optional dogfood-strength proof, not a blocking acceptance i
       list → edit → save → publish → filter drafts/published → delete → disappears (plus an
       unsaved-changes-prompt case and an anonymous-read-only case)
 - [x] Packed-package + external Angular consumer compile fixture importing
-      `ForgeCollectionWorkspaceComponent`, `ForgeDocumentEditorComponent`, `forgeAdminContentRoutes`
-      from `@forge-cms/admin`'s public entry only — done as a one-off manual verification (see
-      Outcome; no such tooling existed to "extend" as originally assumed)
+      `ForgeCollectionWorkspaceComponent`, `ForgeDocumentEditorComponent`, `ForgeCollectionsIndexComponent`,
+      `ForgeConfirmDialogComponent`, `forgeAdminContentRoutes` from `@forge-cms/admin`'s public entry
+      only — extended `scripts/verify-release.mjs`'s existing `verifyAngularConsumer` (run via
+      `pnpm release:verify`, already wired into both the `checks` and `release` CI jobs)
 - [x] `docs/specs/052-*.md` implementation plan ticked off; `docs/STATE.md` and `docs/ROADMAP.md`
       updated ("core content admin is embeddable"; list users/API-keys/settings/media-library-polish
       as remaining)
@@ -387,18 +388,19 @@ pre-existing accessibility gaps directly adjacent to the new code — its edit/d
 no accessible name at all — fixed with `sr-only` text; the new `ForgeConfirmDialogComponent` was
 built with `role="dialog"`/`aria-modal`/`aria-labelledby` from the start.
 
-One acceptance criterion diverged from the plan, surfaced rather than silently worked around per
-SDD.md: the spec assumed existing "packed-package verification" / "external consumer verification"
-tooling to extend (mirroring language from spec 050/051's changelog entries) — none actually exists
-anywhere in this repo (no `scripts/verify-release.mjs`-equivalent for `@forge-cms/admin`, no CI job
-references any such thing). Verified instead as a one-off manual check: `pnpm pack` on
-`@forge-cms/core`/`@forge-cms/angular`/`@forge-cms/admin`, installed into a throwaway fixture package
-outside the workspace, `tsc --noEmit` (with `skipLibCheck` to isolate from `@voltui/components`'
-own unrelated transitive Angular-version mismatch) against a file importing
-`ForgeCollectionWorkspaceComponent`/`ForgeDocumentEditorComponent`/`ForgeCollectionsIndexComponent`/
-`ForgeConfirmDialogComponent`/`forgeAdminContentRoutes` from the packed public entry only — clean.
-This is **not** committed or wired into CI; making it permanent is future work, not part of this
-branch.
+**Correction to an earlier draft of this Outcome**: this section originally claimed no
+packed-package/external-consumer verification tooling existed anywhere in this repo, and verified
+the acceptance criterion with a one-off, uncommitted manual `pnpm pack`+`tsc` check instead. That
+claim was wrong — a research gap, not a repo gap: `scripts/verify-release.mjs` (run via `pnpm
+release:verify`) already existed, already packs every public package into real tarballs, installs
+them into throwaway fixture consumers, and — in `verifyAngularConsumer` — already compiled an
+`@forge-cms/admin` consumer via `ngc`; it's already wired into both the `checks` and `release` CI
+jobs (`.github/workflows/ci.yml`). Once found, `verifyAngularConsumer` was properly extended (not
+worked around) to also import and use `ForgeCollectionWorkspaceComponent`,
+`ForgeDocumentEditorComponent`, `ForgeCollectionsIndexComponent`, and `ForgeConfirmDialogComponent`,
+and to call `forgeAdminContentRoutes()` and assign its result to `Routes` — all as real Angular route
+`component:` values, the exact shape a host's own routes file would use. `pnpm release:verify` run
+locally, real packed tarballs, real `ngc` compilation: passed.
 
 `apps/demo-aesthetics` was not migrated to the new layer (allowed by the non-goals) — confirmed to
 still build and pass its own tests unchanged, since every package-side change here is additive.
