@@ -1,5 +1,12 @@
 # @forge-cms/admin
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [d63d93f]
+  - @forge-cms/angular@0.1.1
+
 ## 0.1.0
 
 ### Patch Changes
