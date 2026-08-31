@@ -1,20 +1,231 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { defineCollection, defineField } from '@forge-cms/core';
-import { runDatabaseAdapterConstraintContractTests } from '@forge-cms/testing/contracts';
+import {
+  runDatabaseAdapterConstraintContractTests,
+  runDatabaseAdapterQueryContractTests
+} from '@forge-cms/testing/contracts';
 import { ApiKeyAuthAdapter } from '@forge-cms/auth';
 import { D1DatabaseAdapter } from './d1.adapter.js';
 import type { D1Database, D1PreparedStatement, D1Result } from './bindings.js';
-
-interface ParsedCondition {
-  key: string;
-  op: '=' | '!=' | '>' | '>=' | '<' | '<=' | 'IN' | 'LIKE';
-  values: unknown[];
-}
 
 interface MockIndex {
   table: string;
   columns: string[];
   unique: boolean;
+}
+
+type ParsedWhereNode =
+  | { type: 'and'; children: ParsedWhereNode[] }
+  | { type: 'or'; children: ParsedWhereNode[] }
+  | { type: 'cmp'; key: string; op: '=' | '!=' | '>' | '>=' | '<' | '<='; value: unknown }
+  | { type: 'in'; key: string; values: unknown[] }
+  | { type: 'like'; key: string; value: string }
+  | { type: 'jsonEachContains'; key: string; value: unknown }
+  | { type: 'const'; value: boolean };
+
+/**
+ * A small recursive-descent parser for the parenthesized `and`/`or` WHERE clauses
+ * `D1DatabaseAdapter`'s `buildWhereExpression` generates (spec 050) — e.g.
+ * `("status" = ?) AND (("category" = ?) OR ("featured" = ?))`. Not a general SQL parser: it only
+ * understands the exact shapes that adapter produces — flat `AND`-joined leaves, and `(...)`-wrapped
+ * `AND`/`OR` groups — including leaves that carry their own internal parens (`IN (?, ?)`,
+ * `EXISTS (SELECT 1 FROM json_each(...) WHERE value = ?)`).
+ */
+class WhereClauseParser {
+  private i = 0;
+  private bindingIdx: number;
+
+  constructor(
+    private readonly text: string,
+    private readonly bindings: unknown[],
+    startBindingIdx: number
+  ) {
+    this.bindingIdx = startBindingIdx;
+  }
+
+  parse(): { node: ParsedWhereNode; nextBindingIdx: number } {
+    const node = this.parseOr();
+    return { node, nextBindingIdx: this.bindingIdx };
+  }
+
+  private skipWs(): void {
+    while (this.i < this.text.length && /\s/.test(this.text[this.i]!)) this.i++;
+  }
+
+  private matchKeyword(word: 'AND' | 'OR'): boolean {
+    this.skipWs();
+    const slice = this.text.slice(this.i, this.i + word.length);
+    if (slice.toUpperCase() !== word) return false;
+    const after = this.text[this.i + word.length];
+    if (after !== undefined && !/\s/.test(after)) return false;
+    this.i += word.length;
+    return true;
+  }
+
+  private peeksKeywordAt(pos: number): boolean {
+    for (const word of ['AND', 'OR'] as const) {
+      const slice = this.text.slice(pos, pos + word.length);
+      if (slice.toUpperCase() === word) {
+        const after = this.text[pos + word.length];
+        if (after === undefined || /\s/.test(after)) return true;
+      }
+    }
+    return false;
+  }
+
+  private parseOr(): ParsedWhereNode {
+    const children = [this.parseAnd()];
+    for (;;) {
+      const save = this.i;
+      if (this.matchKeyword('OR')) {
+        children.push(this.parseAnd());
+      } else {
+        this.i = save;
+        break;
+      }
+    }
+    return children.length === 1 ? children[0]! : { type: 'or', children };
+  }
+
+  private parseAnd(): ParsedWhereNode {
+    const children = [this.parsePrimary()];
+    for (;;) {
+      const save = this.i;
+      if (this.matchKeyword('AND')) {
+        children.push(this.parsePrimary());
+      } else {
+        this.i = save;
+        break;
+      }
+    }
+    return children.length === 1 ? children[0]! : { type: 'and', children };
+  }
+
+  private parsePrimary(): ParsedWhereNode {
+    this.skipWs();
+    if (this.text[this.i] === '(') {
+      this.i++;
+      const node = this.parseOr();
+      this.skipWs();
+      if (this.text[this.i] === ')') this.i++;
+      return node;
+    }
+    return this.parseLeaf();
+  }
+
+  private parseLeaf(): ParsedWhereNode {
+    this.skipWs();
+    const start = this.i;
+    let depth = 0;
+    while (this.i < this.text.length) {
+      const ch = this.text[this.i]!;
+      if (ch === '(') {
+        depth++;
+        this.i++;
+        continue;
+      }
+      if (ch === ')') {
+        if (depth === 0) break;
+        depth--;
+        this.i++;
+        continue;
+      }
+      if (depth === 0 && /\s/.test(ch)) {
+        let j = this.i;
+        while (j < this.text.length && /\s/.test(this.text[j]!)) j++;
+        if (this.peeksKeywordAt(j)) break;
+      }
+      this.i++;
+    }
+    return this.toLeafNode(this.text.slice(start, this.i).trim());
+  }
+
+  private nextValue(): unknown {
+    return this.bindings[this.bindingIdx++];
+  }
+
+  private toLeafNode(text: string): ParsedWhereNode {
+    const existsMatch = text.match(
+      /^EXISTS\s*\(SELECT 1 FROM json_each\("([^"]+)"\)\s*WHERE\s+value\s*=\s*\?\)$/i
+    );
+    if (existsMatch) {
+      return { type: 'jsonEachContains', key: existsMatch[1]!, value: this.nextValue() };
+    }
+
+    const inMatch = text.match(/^"([^"]+)"\s+IN\s*\(([^)]*)\)$/i);
+    if (inMatch) {
+      const placeholderCount = (inMatch[2]!.match(/\?/g) ?? []).length;
+      const values = Array.from({ length: placeholderCount }, () => this.nextValue());
+      return { type: 'in', key: inMatch[1]!, values };
+    }
+
+    const likeMatch = text.match(/^"([^"]+)"\s+LIKE\s+\?$/i);
+    if (likeMatch) {
+      return { type: 'like', key: likeMatch[1]!, value: this.nextValue() as string };
+    }
+
+    const cmpMatch = text.match(/^"?([A-Za-z_][A-Za-z0-9_]*)"?\s*(!=|>=|<=|>|<|=)\s*\?$/);
+    if (cmpMatch) {
+      return {
+        type: 'cmp',
+        key: cmpMatch[1]!,
+        op: cmpMatch[2] as '=' | '!=' | '>' | '>=' | '<' | '<=',
+        value: this.nextValue()
+      };
+    }
+
+    // The constant D1DatabaseAdapter emits for an empty `or: []` group — always false (spec 050).
+    if (text === '0') return { type: 'const', value: false };
+    if (text === '1') return { type: 'const', value: true };
+
+    throw new Error(`MockD1Database: could not parse WHERE fragment: ${text}`);
+  }
+}
+
+function evalWhereNode(row: Record<string, unknown>, node: ParsedWhereNode | undefined): boolean {
+  if (!node) return true;
+  switch (node.type) {
+    case 'and':
+      return node.children.every((child) => evalWhereNode(row, child));
+    case 'or':
+      return node.children.some((child) => evalWhereNode(row, child));
+    case 'const':
+      return node.value;
+    case 'in':
+      return node.values.includes(row[node.key]);
+    case 'like': {
+      const pattern = String(node.value).replace(/^%|%$/g, '');
+      const rowValue = row[node.key];
+      return typeof rowValue === 'string' && rowValue.includes(pattern);
+    }
+    case 'jsonEachContains': {
+      const raw = row[node.key];
+      if (typeof raw !== 'string') return false;
+      try {
+        const parsed = JSON.parse(raw) as unknown[];
+        return Array.isArray(parsed) && parsed.some((v) => v === node.value);
+      } catch {
+        return false;
+      }
+    }
+    case 'cmp': {
+      const rowValue = row[node.key];
+      switch (node.op) {
+        case '=':
+          return rowValue === node.value;
+        case '!=':
+          return rowValue !== node.value;
+        case '>':
+          return (rowValue as number) > (node.value as number);
+        case '>=':
+          return (rowValue as number) >= (node.value as number);
+        case '<':
+          return (rowValue as number) < (node.value as number);
+        case '<=':
+          return (rowValue as number) <= (node.value as number);
+      }
+    }
+  }
 }
 
 /** Simple in-memory mock of D1Database for unit testing */
@@ -127,18 +338,16 @@ class MockD1PreparedStatement implements D1PreparedStatement {
 
   async first<T = unknown>(): Promise<T | null> {
     if (this.query.match(/SELECT\s+COUNT\s*\(/i)) {
-      const { table, conditions } = this.parseSelect();
+      const { table, whereNode } = this.parseSelect();
       const rows = this.getTableRows(table);
-      const count = Array.from(rows.values()).filter((r) =>
-        this.matchesConditions(r, conditions)
-      ).length;
+      const count = Array.from(rows.values()).filter((r) => evalWhereNode(r, whereNode)).length;
       return { count } as T;
     }
 
-    const { table, conditions } = this.parseSelect();
+    const { table, whereNode } = this.parseSelect();
     const rows = this.getTableRows(table);
     for (const row of rows.values()) {
-      if (this.matchesConditions(row, conditions)) {
+      if (evalWhereNode(row, whereNode)) {
         return row as T;
       }
     }
@@ -168,19 +377,22 @@ class MockD1PreparedStatement implements D1PreparedStatement {
       };
     }
 
-    const { table, conditions, orderBy, limit, offset } = this.parseSelect();
+    const { table, whereNode, orderBy, limit, offset } = this.parseSelect();
     const rows = this.getTableRows(table);
-    let results = Array.from(rows.values()).filter((r) => this.matchesConditions(r, conditions));
+    let results = Array.from(rows.values()).filter((r) => evalWhereNode(r, whereNode));
 
-    if (orderBy) {
-      const direction = orderBy.direction === 'DESC' ? -1 : 1;
+    if (orderBy && orderBy.length > 0) {
       results = [...results].sort((a, b) => {
-        const aValue = a[orderBy.column];
-        const bValue = b[orderBy.column];
-        if (aValue === bValue) return 0;
-        if (aValue === undefined || aValue === null) return 1;
-        if (bValue === undefined || bValue === null) return -1;
-        return ((aValue as string | number) < (bValue as string | number) ? -1 : 1) * direction;
+        for (const { column, direction } of orderBy) {
+          const dir = direction === 'DESC' ? -1 : 1;
+          const aValue = a[column];
+          const bValue = b[column];
+          if (aValue === bValue) continue;
+          if (aValue === undefined || aValue === null) return 1;
+          if (bValue === undefined || bValue === null) return -1;
+          return ((aValue as string | number) < (bValue as string | number) ? -1 : 1) * dir;
+        }
+        return 0;
       });
     }
 
@@ -204,53 +416,31 @@ class MockD1PreparedStatement implements D1PreparedStatement {
 
   private parseSelect(): {
     table: string;
-    conditions: ParsedCondition[];
-    orderBy?: { column: string; direction: 'ASC' | 'DESC' };
+    whereNode?: ParsedWhereNode;
+    orderBy?: { column: string; direction: 'ASC' | 'DESC' }[];
     limit?: number;
     offset?: number;
   } {
     const tableMatch = this.query.match(/FROM\s+"([^"]+)"/i);
     const table: string = tableMatch?.[1] ?? '';
 
-    const conditions: ParsedCondition[] = [];
     let bindingIdx = 0;
+    let whereNode: ParsedWhereNode | undefined;
 
     const whereMatch = this.query.match(/WHERE\s+(.+?)(?:\s+ORDER BY|\s+LIMIT|\s+OFFSET|$)/i);
     if (whereMatch) {
-      for (const part of whereMatch[1]!.split(' AND ')) {
-        const inMatch = part.match(/"([^"]+)"\s+IN\s*\(([^)]*)\)/i);
-        if (inMatch) {
-          const placeholderCount = (inMatch[2]!.match(/\?/g) ?? []).length;
-          const values = this.bindings.slice(bindingIdx, bindingIdx + placeholderCount);
-          bindingIdx += placeholderCount;
-          conditions.push({ key: inMatch[1]!, op: 'IN', values });
-          continue;
-        }
-        const likeMatch = part.match(/"([^"]+)"\s+LIKE\s+\?/i);
-        if (likeMatch) {
-          conditions.push({
-            key: likeMatch[1]!,
-            op: 'LIKE',
-            values: [this.bindings[bindingIdx++]]
-          });
-          continue;
-        }
-        // Column name may or may not be quoted: findMany quotes it, but findById/update/delete
-        // build `WHERE id = ?` unquoted.
-        const cmpMatch = part.match(/"?([A-Za-z_][A-Za-z0-9_]*)"?\s*(!=|>=|<=|>|<|=)\s*\?/);
-        if (cmpMatch) {
-          conditions.push({
-            key: cmpMatch[1]!,
-            op: cmpMatch[2] as ParsedCondition['op'],
-            values: [this.bindings[bindingIdx++]]
-          });
-        }
-      }
+      const parser = new WhereClauseParser(whereMatch[1]!.trim(), this.bindings, bindingIdx);
+      const parsed = parser.parse();
+      whereNode = parsed.node;
+      bindingIdx = parsed.nextBindingIdx;
     }
 
-    const orderMatch = this.query.match(/ORDER BY\s+"([^"]+)"\s+(ASC|DESC)/i);
+    const orderMatch = this.query.match(/ORDER BY\s+(.+?)(?:\s+LIMIT|\s+OFFSET|$)/i);
     const orderBy = orderMatch
-      ? { column: orderMatch[1]!, direction: orderMatch[2]!.toUpperCase() as 'ASC' | 'DESC' }
+      ? orderMatch[1]!.split(',').flatMap((part) => {
+          const m = part.trim().match(/"([^"]+)"\s+(ASC|DESC)/i);
+          return m ? [{ column: m[1]!, direction: m[2]!.toUpperCase() as 'ASC' | 'DESC' }] : [];
+        })
       : undefined;
 
     let limit: number | undefined;
@@ -264,39 +454,11 @@ class MockD1PreparedStatement implements D1PreparedStatement {
 
     return {
       table,
-      conditions,
+      ...(whereNode && { whereNode }),
       ...(orderBy && { orderBy }),
       ...(limit !== undefined && { limit }),
       ...(offset !== undefined && { offset })
     };
-  }
-
-  private matchesConditions(row: Record<string, unknown>, conditions: ParsedCondition[]): boolean {
-    return conditions.every((c) => {
-      const rowValue = row[c.key];
-      switch (c.op) {
-        case '=':
-          return rowValue === c.values[0];
-        case '!=':
-          return rowValue !== c.values[0];
-        case '>':
-          return (rowValue as number) > (c.values[0] as number);
-        case '>=':
-          return (rowValue as number) >= (c.values[0] as number);
-        case '<':
-          return (rowValue as number) < (c.values[0] as number);
-        case '<=':
-          return (rowValue as number) <= (c.values[0] as number);
-        case 'IN':
-          return c.values.includes(rowValue);
-        case 'LIKE': {
-          const pattern = String(c.values[0]).replace(/^%|%$/g, '');
-          return typeof rowValue === 'string' && rowValue.includes(pattern);
-        }
-        default:
-          return false;
-      }
-    });
   }
 
   private handleInsert<T>(): D1Result<T> {
@@ -353,6 +515,12 @@ class MockD1PreparedStatement implements D1PreparedStatement {
 }
 
 runDatabaseAdapterConstraintContractTests(() => {
+  const adapter = new D1DatabaseAdapter();
+  adapter.init({ DB: new MockD1Database() });
+  return adapter;
+});
+
+runDatabaseAdapterQueryContractTests(() => {
   const adapter = new D1DatabaseAdapter();
   adapter.init({ DB: new MockD1Database() });
   return adapter;

@@ -1,6 +1,5 @@
 import type {
   AccessArgs,
-  AccessQuery,
   AccessRule,
   CmsUser,
   CollectionDefinition,
@@ -8,7 +7,7 @@ import type {
   FieldAccessRule
 } from '@forge-cms/core';
 import type { DatabaseWhere } from '@forge-cms/db';
-import { matchesCondition } from '@forge-cms/db';
+import { isWhereGroup, matchesWhere } from '@forge-cms/db';
 
 /**
  * The outcome of an access check. `allowed: false` denies outright; `allowed: true` with a `where`
@@ -53,22 +52,32 @@ export async function resolveAccess(
   return { allowed: true, where: result as DatabaseWhere };
 }
 
-/** AND-merges an access constraint into a user-supplied query. Access conditions always win. */
+function isEmptyWhere(where: DatabaseWhere | undefined): boolean {
+  return !where || (!isWhereGroup(where) && Object.keys(where).length === 0);
+}
+
+/**
+ * AND-merges an access constraint into a user-supplied query, as a nested `and` group rather than a
+ * shallow key-overwrite (spec 050 §3/§9) — `constraint` is always the first branch, `base` (however
+ * deeply nested, however many `or`s it contains) is always the second, so a consumer `or` can never
+ * escape the access constraint: it is never hoisted to the top level.
+ */
 export function mergeWhere(
   base: DatabaseWhere | undefined,
   constraint: DatabaseWhere | undefined
 ): DatabaseWhere | undefined {
-  if (!constraint || Object.keys(constraint).length === 0) return base;
-  if (!base || Object.keys(base).length === 0) return constraint;
-  return { ...base, ...constraint };
+  if (isEmptyWhere(constraint)) return base;
+  if (isEmptyWhere(base)) return constraint;
+  return { and: [constraint as DatabaseWhere, base as DatabaseWhere] };
 }
 
 /**
- * Checks an already-loaded document against an access constraint. Used for update/delete, where the
- * constraint cannot be pushed into the query because the document is addressed by id.
+ * Checks an already-loaded document against an access constraint (flat or nested `and`/`or`). Used
+ * for update/delete, where the constraint cannot be pushed into the query because the document is
+ * addressed by id.
  */
-export function documentMatches(doc: Record<string, unknown>, where: AccessQuery): boolean {
-  return Object.entries(where).every(([key, condition]) => matchesCondition(doc[key], condition));
+export function documentMatches(doc: Record<string, unknown>, where: DatabaseWhere): boolean {
+  return matchesWhere(doc, where);
 }
 
 /** Resolves a field-level rule. `undefined` means unrestricted. */

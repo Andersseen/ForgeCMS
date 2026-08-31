@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { buildQueryString } from './query.js';
-import type { QueryOptions } from './query.js';
+import type { QueryOptions, QueryWhere } from './query.js';
 import {
   ApiAuthError,
   ApiValidationError,
@@ -93,6 +93,24 @@ export class CmsApiService {
     if (!response.ok) throw await toApiError(response, `Failed to fetch ${collection}`);
     const result = (await response.json()) as ApiListResponse<T>;
     return { docs: result.data, meta: result.meta };
+  }
+
+  /**
+   * The first document matching `where`, or `null` if none does (spec 050 §18). No dedicated server
+   * route: this calls the existing list endpoint with `limit: 1` and returns its first result — the
+   * Local API's `findOne()` is the important primitive; this is client convenience over it.
+   */
+  async findOne<T = Record<string, unknown>>(
+    collection: string,
+    where?: QueryWhere,
+    options?: Omit<QueryOptions, 'where' | 'limit' | 'offset' | 'page'>
+  ): Promise<T | null> {
+    const { docs } = await this.listDocuments<T>(collection, {
+      ...options,
+      ...(where !== undefined && { where }),
+      limit: 1
+    });
+    return docs[0] ?? null;
   }
 
   async getDocument<T = Record<string, unknown>>(

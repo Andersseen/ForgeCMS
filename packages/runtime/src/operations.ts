@@ -1,6 +1,6 @@
 import { validateCollection } from '@forge-cms/core';
-import type { CmsUser, CollectionDefinition, DraftStatus } from '@forge-cms/core';
-import type { DatabaseRecord, DatabaseWhere } from '@forge-cms/db';
+import type { AccessQuery, CmsUser, CollectionDefinition, DraftStatus } from '@forge-cms/core';
+import type { DatabaseRecord, DatabaseWhere, SortInput } from '@forge-cms/db';
 import { isUniqueConstraintError as isDbUniqueConstraintError } from '@forge-cms/db';
 import type { OperationContext } from './context.js';
 import {
@@ -12,6 +12,7 @@ import {
   ValidationFailedError
 } from './errors.js';
 import { documentMatches, mergeWhere, resolveAccess } from './access.js';
+import { validateSort, validateWhere } from './query-validation.js';
 import { applyAutoSlugs, applyFieldDefaults } from './defaults.js';
 import type { AccessDecision } from './access.js';
 import {
@@ -76,7 +77,8 @@ export interface FindArgs extends BaseOperationArgs {
   where?: DatabaseWhere;
   limit?: number;
   offset?: number;
-  sort?: string;
+  sort?: SortInput;
+  /** Only meaningful when `sort` is a plain field name; a multi-field `sort` carries its own per-field order. */
   order?: 'asc' | 'desc';
   /** Only meaningful on a `drafts: true` collection. Defaults to `published`. */
   status?: DraftStatus | 'all';
@@ -84,6 +86,14 @@ export interface FindArgs extends BaseOperationArgs {
 
 export interface FindByIDArgs extends BaseOperationArgs {
   id: string;
+}
+
+/** Same read pipeline as {@link find}, narrowed to at most one document (spec 050 §5). */
+export interface FindOneArgs extends BaseOperationArgs {
+  where?: DatabaseWhere;
+  sort?: SortInput;
+  order?: 'asc' | 'desc';
+  status?: DraftStatus | 'all';
 }
 
 export interface CountArgs extends BaseOperationArgs {
@@ -268,6 +278,11 @@ async function prepareReadQuery(
 ): Promise<DatabaseWhere | undefined> {
   const user = args.user ?? null;
   const overrideAccess = args.overrideAccess !== false;
+
+  // Validate the caller-supplied `where` before it is ever merged with a (trusted) access constraint
+  // or reaches an adapter — the one gate shared by find/count/findOne (spec 050 §4/§8).
+  validateWhere(collection, args.where);
+
   const decision = await checkAccess(collection, 'read', args);
 
   let where = mergeWhere(args.where, decision.where);
@@ -275,10 +290,14 @@ async function prepareReadQuery(
     where,
     statusConstraint(collection, args.status, user, args.overrideAccess !== false, defaultStatus)
   );
+  // `runBeforeReadHooks` speaks core's public, deliberately-flat `AccessQuery` hook contract; `where`
+  // here is the richer runtime-internal `DatabaseWhere` (possibly a nested and/or group after
+  // mergeWhere) — cast at the boundary in both directions, same as `resolveAccess` does the same
+  // crossing in reverse.
   where = (await runBeforeReadHooks(collection, {
     user,
     overrideAccess,
-    query: where ?? {}
+    query: (where ?? {}) as AccessQuery
   })) as DatabaseWhere;
 
   return where !== undefined && Object.keys(where).length > 0 ? where : undefined;
@@ -290,6 +309,7 @@ export async function find(ctx: OperationContext, args: FindArgs): Promise<Pagin
   const overrideAccess = args.overrideAccess !== false;
 
   await runBeforeOperationHooks(collection, { operation: 'read', user, overrideAccess });
+  validateSort(collection, args.sort);
 
   const where = await prepareReadQuery(collection, args, 'published');
   const findOptions = {
@@ -308,6 +328,41 @@ export async function find(ctx: OperationContext, args: FindArgs): Promise<Pagin
 
   const docs = await prepareForRead(ctx, collection, records, args);
   const result = paginate(docs, totalDocs, args.limit, args.offset ?? 0);
+
+  await runAfterOperationHooks(collection, { operation: 'read', user, overrideAccess, result });
+  return result;
+}
+
+/**
+ * Same read pipeline as {@link find} (access, hooks, drafts, locale, relation population), narrowed
+ * to the first matching document — or `null` rather than throwing when there is none (spec 050 §4).
+ * Unlike `find`, this never calls `count()`: there is no pagination metadata to compute, so the query
+ * goes straight to the adapter with `limit: 1` (a real database-side `LIMIT`, not "fetch everything and
+ * take the first" — spec 050 §21).
+ */
+export async function findOne(
+  ctx: OperationContext,
+  args: FindOneArgs
+): Promise<DatabaseRecord | null> {
+  const collection = getCollectionOrThrow(ctx, args.collection);
+  const user = args.user ?? null;
+  const overrideAccess = args.overrideAccess !== false;
+
+  await runBeforeOperationHooks(collection, { operation: 'read', user, overrideAccess });
+  validateSort(collection, args.sort);
+
+  const where = await prepareReadQuery(collection, args, 'published');
+  const findOptions = {
+    collection: args.collection,
+    limit: 1,
+    ...(where !== undefined && { where }),
+    ...(args.sort !== undefined && { sort: args.sort }),
+    ...(args.order !== undefined && { order: args.order })
+  };
+
+  const records = await ctx.adapters.database.findMany(findOptions);
+  const docs = await prepareForRead(ctx, collection, records, args);
+  const result = docs[0] ?? null;
 
   await runAfterOperationHooks(collection, { operation: 'read', user, overrideAccess, result });
   return result;

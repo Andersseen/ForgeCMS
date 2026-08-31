@@ -1,11 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineBlock, defineCollection, defineField } from '@forge-cms/core';
 import type { CmsUser } from '@forge-cms/core';
-import { InMemoryDatabaseAdapter } from '@forge-cms/db';
+import { InMemoryDatabaseAdapter, LibSqlDatabaseAdapter } from '@forge-cms/db';
+import type { DatabaseAdapter } from '@forge-cms/db';
 import { InMemoryAuthAdapter } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import { ForgeCmsRuntime } from './runtime.js';
-import { AccessDeniedError, NotFoundError, ValidationFailedError } from './errors.js';
+import {
+  AccessDeniedError,
+  InvalidQueryError,
+  NotFoundError,
+  UnknownFieldError,
+  ValidationFailedError
+} from './errors.js';
 
 const admin: CmsUser = { id: 'u-admin', role: 'admin' };
 const author: CmsUser = { id: 'u-author', role: 'editor' };
@@ -21,6 +28,25 @@ function buildRuntime(collections: Parameters<typeof defineCollection>[0][]) {
     }
   });
   runtime.init();
+  return runtime;
+}
+
+/** Same as {@link buildRuntime}, but on a caller-supplied database adapter — used to prove a fix
+ * behaves identically on a real SQL adapter, not just InMemory (spec 050 hardening). */
+async function buildRuntimeOn(
+  database: DatabaseAdapter,
+  collections: Parameters<typeof defineCollection>[0][]
+) {
+  const runtime = new ForgeCmsRuntime({
+    collections,
+    adapters: {
+      database,
+      auth: new InMemoryAuthAdapter(),
+      storage: new InMemoryStorageAdapter()
+    }
+  });
+  runtime.init();
+  await runtime.syncSchema();
   return runtime;
 }
 
@@ -322,6 +348,93 @@ describe('Access control as functions (spec 020)', () => {
     ).rejects.toThrow(NotFoundError);
   });
 
+  it("a nested `or` in the caller's where cannot escape the access constraint (spec 050 §9)", async () => {
+    const tenantScoped = defineCollection({
+      slug: 'tenant_scoped',
+      fields: {
+        title: defineField.text(),
+        tenantId: defineField.text(),
+        status: defineField.text()
+      },
+      access: {
+        read: ({ user }) => ({ tenantId: (user as unknown as { tenantId?: string })?.tenantId })
+      }
+    });
+    const scopedRuntime = buildRuntime([tenantScoped]);
+    await scopedRuntime.create({
+      collection: 'tenant_scoped',
+      data: { title: 'Mine', tenantId: 'acme', status: 'draft' }
+    });
+    await scopedRuntime.create({
+      collection: 'tenant_scoped',
+      data: { title: "Someone else's", tenantId: 'other-co', status: 'published' }
+    });
+
+    const tenantUser = { id: 'u-tenant', role: 'viewer', tenantId: 'acme' } as unknown as CmsUser;
+
+    // A consumer `or` that would, taken alone, match the other tenant's document too — it must not
+    // escape the AND-composed tenantId constraint (mergeWhere nests it as
+    // `{ and: [accessConstraint, requestedWhere] }`, never a top-level `or`).
+    const result = await scopedRuntime.find({
+      collection: 'tenant_scoped',
+      user: tenantUser,
+      overrideAccess: false,
+      where: { or: [{ status: 'published' }, { status: 'draft' }] }
+    });
+
+    expect(result.docs).toHaveLength(1);
+    expect(result.docs[0]?.title).toBe('Mine');
+    expect(result.totalDocs).toBe(1);
+  });
+
+  it('an access rule that legitimately resolves to `{ or: [] }` denies all — identically on InMemory and real SQL (spec 050 hardening)', async () => {
+    // A natural multi-tenant rule: read whatever tenant the user belongs to. For a user in zero
+    // tenants, `user.tenants.map(...)` is `[]`, so the rule resolves to `{ or: [] }` — "no branch can
+    // ever be true", i.e. deny-all. This constraint is never validated (validateWhere only checks the
+    // caller's own `where`), so the adapters themselves must interpret an empty `or` the same way
+    // `matchesWhere` does — not silently drop it as "no constraint at all", which would return every
+    // row instead of none.
+    const membersScoped = defineCollection({
+      slug: 'members_scoped',
+      fields: { title: defineField.text(), tenantId: defineField.text() },
+      access: {
+        read: ({ user }) => ({
+          or: ((user as unknown as { tenants?: string[] })?.tenants ?? []).map((t) => ({
+            tenantId: t
+          }))
+        })
+      }
+    });
+
+    const tenantlessUser = { id: 'u-none', role: 'viewer', tenants: [] } as unknown as CmsUser;
+
+    for (const database of [
+      new InMemoryDatabaseAdapter(),
+      new LibSqlDatabaseAdapter('file::memory:')
+    ]) {
+      const scopedRuntime = await buildRuntimeOn(database, [membersScoped]);
+      await scopedRuntime.create({
+        collection: 'members_scoped',
+        data: { title: 'Secret', tenantId: 'acme' }
+      });
+
+      const result = await scopedRuntime.find({
+        collection: 'members_scoped',
+        user: tenantlessUser,
+        overrideAccess: false
+      });
+      expect(result.docs).toEqual([]);
+      expect(result.totalDocs).toBe(0);
+
+      const counted = await scopedRuntime.count({
+        collection: 'members_scoped',
+        user: tenantlessUser,
+        overrideAccess: false
+      });
+      expect(counted).toBe(0);
+    }
+  });
+
   it('still supports role arrays unchanged', async () => {
     const adminOnly = defineCollection({
       slug: 'admin_only',
@@ -346,6 +459,219 @@ describe('Access control as functions (spec 020)', () => {
         overrideAccess: false
       })
     ).rejects.toThrow(AccessDeniedError);
+  });
+});
+
+describe('Query completeness (spec 050)', () => {
+  const articles = defineCollection({
+    slug: 'articles',
+    fields: {
+      title: defineField.text({ required: true }),
+      category: defineField.text(),
+      status: defineField.text(),
+      featured: defineField.boolean(),
+      views: defineField.number(),
+      tags: defineField.relation({ collection: 'tags', many: true })
+    }
+  });
+
+  let runtime: ForgeCmsRuntime;
+
+  beforeEach(async () => {
+    runtime = buildRuntime([articles]);
+    await runtime.create({
+      collection: 'articles',
+      data: {
+        title: 'Published News',
+        category: 'news',
+        status: 'published',
+        featured: false,
+        views: 50,
+        tags: ['a', 'b']
+      }
+    });
+    await runtime.create({
+      collection: 'articles',
+      data: {
+        title: 'Published Featured',
+        category: 'opinion',
+        status: 'published',
+        featured: true,
+        views: 10,
+        tags: ['b']
+      }
+    });
+    await runtime.create({
+      collection: 'articles',
+      data: {
+        title: 'Draft News',
+        category: 'news',
+        status: 'draft',
+        featured: false,
+        views: 200,
+        tags: []
+      }
+    });
+  });
+
+  describe('findOne', () => {
+    it('returns the first matching document', async () => {
+      const doc = await runtime.findOne({ collection: 'articles', where: { category: 'opinion' } });
+      expect(doc?.title).toBe('Published Featured');
+    });
+
+    it('returns null rather than throwing when nothing matches', async () => {
+      const doc = await runtime.findOne({ collection: 'articles', where: { category: 'nope' } });
+      expect(doc).toBeNull();
+    });
+
+    it('runs the same access pipeline as find', async () => {
+      const scoped = defineCollection({
+        slug: 'scoped_findone',
+        fields: { title: defineField.text(), ownerId: defineField.text() },
+        access: { read: ({ user }) => ({ ownerId: user?.id }) }
+      });
+      const scopedRuntime = buildRuntime([scoped]);
+      await scopedRuntime.create({
+        collection: 'scoped_findone',
+        data: { title: 'Mine', ownerId: author.id }
+      });
+      await scopedRuntime.create({
+        collection: 'scoped_findone',
+        data: { title: 'Theirs', ownerId: otherAuthor.id }
+      });
+
+      const doc = await scopedRuntime.findOne({
+        collection: 'scoped_findone',
+        user: author,
+        overrideAccess: false
+      });
+      expect(doc?.title).toBe('Mine');
+    });
+  });
+
+  it('finds with a nested `and`/`or` where', async () => {
+    const result = await runtime.find({
+      collection: 'articles',
+      where: {
+        and: [{ status: 'published' }, { or: [{ category: 'news' }, { featured: true }] }]
+      }
+    });
+    expect(result.docs.map((d) => d.title).sort()).toEqual([
+      'Published Featured',
+      'Published News'
+    ]);
+  });
+
+  it('count() matches find() for the same nested where', async () => {
+    const where = {
+      and: [{ status: 'published' }, { or: [{ category: 'news' }, { featured: true }] }]
+    };
+    const found = await runtime.find({ collection: 'articles', where });
+    const counted = await runtime.count({ collection: 'articles', where });
+    expect(counted).toBe(found.totalDocs);
+    expect(counted).toBe(2);
+  });
+
+  it('sorts by multiple fields', async () => {
+    const result = await runtime.find({
+      collection: 'articles',
+      sort: [
+        { field: 'featured', order: 'desc' },
+        { field: 'views', order: 'asc' }
+      ]
+    });
+    expect(result.docs.map((d) => d.title)).toEqual([
+      'Published Featured',
+      'Published News',
+      'Draft News'
+    ]);
+  });
+
+  it('filters relation-array membership with containsValue', async () => {
+    const result = await runtime.find({
+      collection: 'articles',
+      where: { tags: { containsValue: 'a' } }
+    });
+    expect(result.docs.map((d) => d.title)).toEqual(['Published News']);
+  });
+
+  it('rejects containsValue on a non-relation field as a stable ForgeError, not an adapter leak', async () => {
+    await expect(
+      runtime.find({ collection: 'articles', where: { title: { containsValue: 'x' } } })
+    ).rejects.toThrow(InvalidQueryError);
+  });
+
+  it('rejects an unknown filter field as UnknownFieldError, not a leaked adapter Error', async () => {
+    await expect(
+      runtime.find({ collection: 'articles', where: { doesNotExist: 1 } })
+    ).rejects.toThrow(UnknownFieldError);
+  });
+
+  it('rejects an unknown sort field', async () => {
+    await expect(runtime.find({ collection: 'articles', sort: 'doesNotExist' })).rejects.toThrow(
+      UnknownFieldError
+    );
+  });
+
+  it('rejects an empty `and`/`or` group', async () => {
+    await expect(runtime.find({ collection: 'articles', where: { and: [] } })).rejects.toThrow(
+      InvalidQueryError
+    );
+    await expect(runtime.find({ collection: 'articles', where: { or: [] } })).rejects.toThrow(
+      InvalidQueryError
+    );
+  });
+
+  it('is sortable by `_status` on a drafts-enabled collection', async () => {
+    const draftable = defineCollection({
+      slug: 'draftable',
+      fields: { title: defineField.text() },
+      drafts: true
+    });
+    const r = buildRuntime([draftable]);
+    await r.create({ collection: 'draftable', data: { title: 'A', _status: 'published' } });
+    await r.create({ collection: 'draftable', data: { title: 'B', _status: 'draft' } });
+
+    await expect(
+      r.find({ collection: 'draftable', sort: '_status', status: 'all' })
+    ).resolves.toBeTruthy();
+  });
+
+  it('rejects an operator typo mixed with a valid operator, instead of silently matching nothing', async () => {
+    // WhereCondition's type is `unknown | WhereValue`, so this is not a compile-time error — the
+    // point of this test is the runtime rejection.
+    await expect(
+      runtime.find({
+        collection: 'articles',
+        where: { title: { eq: 'Published News', contians: 'x' } }
+      })
+    ).rejects.toThrow(InvalidQueryError);
+  });
+
+  it('still allows a bare object as an equality value (e.g. matching a JSON-shaped field verbatim)', async () => {
+    // No key in the condition looks like a where-operator, so it is a literal value comparison, not
+    // a malformed operator object — must not be rejected as "unknown operator".
+    await expect(
+      runtime.find({ collection: 'articles', where: { category: { notAnOperator: 'x' } } })
+    ).resolves.toBeTruthy();
+  });
+
+  it('ANDs a flat key with a sibling `or` group instead of silently dropping the flat key', async () => {
+    // Before the spec 050 hardening fix, an object carrying both a flat key and `or` treated the
+    // whole node as "just a group" and silently ignored the flat key.
+    const result = await runtime.find({
+      collection: 'articles',
+      where: { status: 'draft', or: [{ category: 'news' }, { featured: true }] }
+    });
+    expect(result.docs.map((d) => d.title)).toEqual(['Draft News']);
+  });
+
+  it('rejects a malformed sort entry instead of crashing into a 500', async () => {
+    await expect(
+      // @ts-expect-error - deliberately malformed for the test
+      runtime.find({ collection: 'articles', sort: [null] })
+    ).rejects.toThrow(InvalidQueryError);
   });
 });
 

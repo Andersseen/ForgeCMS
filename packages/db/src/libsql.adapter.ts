@@ -22,12 +22,14 @@ import {
   inArray,
   like,
   and,
+  or,
   asc,
   desc,
   sql,
-  count as drizzleCount
+  count as drizzleCount,
+  type SQL
 } from 'drizzle-orm';
-import { toOperatorValues } from './where.js';
+import { toOperatorValues, normalizeSort } from './where.js';
 import type { DatabaseWhere } from './where.js';
 
 const SYSTEM_COLUMNS = new Set(['id', 'created_at', 'updated_at', '_status', '_storageKey']);
@@ -119,42 +121,76 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
     return this.hydrateRecord(result[0] as DatabaseRecord, collection);
   }
 
-  /** Translates a DatabaseWhere into a single drizzle condition, or undefined when there is none. */
+  /**
+   * Translates a DatabaseWhere (flat or nested and/or) into a single drizzle condition, or undefined
+   * when there is none. Every key at a level is AND-ed together, whatever it means — a flat column
+   * condition, or (for `and`/`or`) a nested group — so `and`/`or` can sit alongside flat keys in the
+   * same object without one silently winning (spec 050 hardening). An empty `or: []` compiles to a
+   * constant-false condition (the empty-disjunction identity `matchesWhere` also uses), not "no
+   * condition" — an access-rule constraint that legitimately narrows to zero matches (e.g.
+   * `{ or: user.tenants.map(...) }` for a tenant-less user) must not silently become "no filter at
+   * all" once it reaches SQL.
+   */
   private buildWhereCondition(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     table: any,
     collectionDef: CollectionDefinition | undefined,
     where: DatabaseWhere | undefined
-  ): ReturnType<typeof and> | undefined {
+  ): SQL | undefined {
     if (!where || Object.keys(where).length === 0) return undefined;
 
-    const conditions = Object.entries(where).flatMap(([key, condition]) => {
+    const parts: SQL[] = [];
+
+    for (const [key, value] of Object.entries(where)) {
+      if (key === 'and' || key === 'or') {
+        const children = (value as DatabaseWhere[])
+          .map((child) => this.buildWhereCondition(table, collectionDef, child))
+          .filter((c): c is SQL => c !== undefined);
+        if (key === 'or') {
+          parts.push(children.length > 0 ? or(...children)! : sql`0`);
+        } else if (children.length > 0) {
+          parts.push(and(...children)!);
+        }
+        continue;
+      }
+
       assertValidColumn(key, collectionDef);
       const column = table[key];
-      return toOperatorValues(condition).map(({ operator, value }) => {
+      for (const { operator, value: opValue } of toOperatorValues(value)) {
         switch (operator) {
           case 'ne':
-            return ne(column, value);
+            parts.push(ne(column, opValue));
+            break;
           case 'gt':
-            return gt(column, value);
+            parts.push(gt(column, opValue));
+            break;
           case 'gte':
-            return gte(column, value);
+            parts.push(gte(column, opValue));
+            break;
           case 'lt':
-            return lt(column, value);
+            parts.push(lt(column, opValue));
+            break;
           case 'lte':
-            return lte(column, value);
+            parts.push(lte(column, opValue));
+            break;
           case 'in':
-            return inArray(column, value as unknown[]);
+            parts.push(inArray(column, opValue as unknown[]));
+            break;
           case 'contains':
-            return like(column, `%${value as string}%`);
+            parts.push(like(column, `%${opValue as string}%`));
+            break;
+          case 'containsValue':
+            parts.push(sql`EXISTS (SELECT 1 FROM json_each(${column}) WHERE value = ${opValue})`);
+            break;
           case 'eq':
           default:
-            return eq(column, value);
+            parts.push(eq(column, opValue));
+            break;
         }
-      });
-    });
+      }
+    }
 
-    return and(...conditions);
+    return parts.length > 0 ? and(...parts) : undefined;
   }
 
   async findMany(options: FindManyOptions): Promise<DatabaseRecord[]> {
@@ -169,12 +205,16 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
     }
 
     if (options.sort) {
-      assertValidColumn(options.sort, collectionDef);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const sortColumn = (table as any)[options.sort];
-      query = query.orderBy(
-        options.order === 'desc' ? desc(sortColumn) : asc(sortColumn)
-      ) as typeof query;
+      const sortFields = normalizeSort(options.sort, options.order);
+      const orderBys = sortFields.map(({ field, order }) => {
+        assertValidColumn(field, collectionDef);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sortColumn = (table as any)[field];
+        return order === 'desc' ? desc(sortColumn) : asc(sortColumn);
+      });
+      if (orderBys.length > 0) {
+        query = query.orderBy(...orderBys) as typeof query;
+      }
     }
 
     if (options.limit !== undefined) {

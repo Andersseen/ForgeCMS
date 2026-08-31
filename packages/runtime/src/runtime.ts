@@ -18,6 +18,7 @@ import type {
   DeleteArgs,
   FindArgs,
   FindByIDArgs,
+  FindOneArgs,
   UpdateArgs
 } from './operations.js';
 import type {
@@ -26,6 +27,7 @@ import type {
   TypedDeleteArgs,
   TypedFindArgs,
   TypedFindByIDArgs,
+  TypedFindOneArgs,
   TypedPaginatedDocs,
   TypedPreviewArgs,
   TypedUpdateArgs
@@ -158,6 +160,18 @@ export class ForgeCmsRuntime<
     return operations.findByID(this, args as FindByIDArgs) as Promise<
       CollectionDocument<CollectionBySlug<TCollections, TSlug>>
     >;
+  }
+
+  /**
+   * The first document matching `where`, or `null` — same access/hooks/drafts/populate pipeline as
+   * {@link find}, just narrowed to one result with a database-side `LIMIT 1` (spec 050 §4/§5).
+   */
+  findOne<TSlug extends CollectionSlug<TCollections>>(
+    args: TypedFindOneArgs<TCollections, TSlug>
+  ): Promise<CollectionDocument<CollectionBySlug<TCollections, TSlug>> | null> {
+    return operations.findOne(this, args as FindOneArgs) as Promise<CollectionDocument<
+      CollectionBySlug<TCollections, TSlug>
+    > | null>;
   }
 
   count<TSlug extends CollectionSlug<TCollections>>(

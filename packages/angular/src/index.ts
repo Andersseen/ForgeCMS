@@ -34,7 +34,17 @@ export {
   type UserRole
 } from './types.js';
 
-export { buildQueryString, type QueryOptions } from './query.js';
+export {
+  buildQueryString,
+  type QueryOptions,
+  type QueryWhere,
+  type WhereFields,
+  type WhereAndGroup,
+  type WhereOrGroup,
+  type WhereCondition,
+  type SortField,
+  type SortInput
+} from './query.js';
 
 export { CmsApiService } from './api.service.js';
 

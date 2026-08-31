@@ -1,11 +1,11 @@
 ---
 title: Local API
-description: find, findByID, create, update, delete and count — the way to use ForgeCMS from server code.
+description: find, findOne, findByID, create, update, delete and count — the way to use ForgeCMS from server code.
 group: Server APIs
 order: 1
 ---
 
-The Local API is `ForgeCmsRuntime`'s six methods. Each runs the whole pipeline — access control,
+The Local API is `ForgeCmsRuntime`'s seven methods. Each runs the whole pipeline — access control,
 hooks, drafts, relation population, validation — as a plain function call, with no HTTP hop and no
 `Request` to fabricate.
 
@@ -110,19 +110,50 @@ interface PaginatedDocs {
 }
 ```
 
-`where` supports `eq` (bare value), `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `contains`:
+`where` supports `eq` (bare value), `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `contains`, plus `containsValue`
+for `relation({ many: true })` array-membership:
 
 ```ts
 where: {
   category: 'facial',                    // equality
   price: { gte: 50, lte: 200 },          // range
   id: { in: ['a', 'b', 'c'] },
-  title: { contains: 'laser' }           // case-insensitive
+  title: { contains: 'laser' },          // case-insensitive
+  specialties: { containsValue: serviceId } // relation({ many: true }) array membership
 }
 ```
 
-Limits worth knowing: **one sort field**, no `OR`, and no querying inside `group`/`array`/`blocks`
-values (they are JSON in a single column).
+### Nested `and`/`or`
+
+`and`/`or` compose recursively and combine with the field operators above — an implicit `and` across
+top-level keys still works exactly as before:
+
+```ts
+const result = await runtime.find({
+  collection: 'posts',
+  where: {
+    and: [
+      { status: 'published' },
+      {
+        or: [{ featured: true }, { views: { gte: 1000 } }]
+      }
+    ]
+  },
+  sort: [
+    { field: 'featured', order: 'desc' },
+    { field: 'created_at', order: 'desc' }
+  ]
+});
+```
+
+`sort` accepts a single field name (unchanged) or a `{ field, order }[]` for a multi-field, stable
+sort — the first field decides, ties fall through to the next. Behavior is identical across the
+InMemory, libSQL, and D1 adapters. Querying _inside_ `group`/`array`/`blocks` JSON values is still not
+supported (they are JSON in a single column) — `containsValue` only reaches `relation` arrays.
+
+An access-rule constraint (`access.read` returning a query) is always AND-composed around whatever
+`where` the caller supplies — a nested `or` in the caller's query can never widen out of a row-level
+access constraint; see [Access control](/docs/access-control).
 
 ## `findByID`
 
@@ -133,11 +164,28 @@ const post = await runtime.findByID({ collection: 'posts', id, depth: 1 });
 Throws `NotFoundError` if it does not exist — or if an access constraint excludes it, so ids are not
 leaked by a 403.
 
+## `findOne`
+
+The same read pipeline as `find` (access, hooks, drafts, locale, relation population), narrowed to at
+most one document — `null`, not a thrown error, when nothing matches:
+
+```ts
+const post = await runtime.findOne({ collection: 'posts', where: { slug: 'hello-world' } });
+post?.title; // string, typed from the collection definition — or undefined if post is null
+```
+
+Replaces the old `find({ where, limit: 1 }).docs[0]` workaround: no pagination metadata is computed,
+so it goes straight to the database with a real `LIMIT 1`.
+
 ## `count`
 
 ```ts
 const pending = await runtime.count({ collection: 'bookings', where: { status: 'pending' } });
 ```
+
+`count` shares the exact same query-preparation path as `find` — including nested `and`/`or` and
+access-rule composition — so a filtered `count` and a filtered `find` never disagree about how many
+documents match.
 
 ## `create`
 
@@ -175,13 +223,15 @@ related storage objects or clean up references.
 
 Typed, each carrying its HTTP status — so the transport layer maps them without a translation table:
 
-| Error                   | Status | Thrown when                                        |
-| ----------------------- | ------ | -------------------------------------------------- |
-| `NotFoundError`         | 404    | Unknown collection, unknown id, invisible document |
-| `InvalidInputError`     | 400    | Malformed query, bad JSON, bad multipart body      |
-| `ValidationFailedError` | 400    | Field validation failed — carries `details`        |
-| `UnauthorizedError`     | 401    | Authentication required                            |
-| `AccessDeniedError`     | 403    | Authenticated but not permitted                    |
+| Error                   | Status | Thrown when                                                                                                           |
+| ----------------------- | ------ | --------------------------------------------------------------------------------------------------------------------- |
+| `NotFoundError`         | 404    | Unknown collection, unknown id, invisible document                                                                    |
+| `InvalidInputError`     | 400    | Malformed query, bad JSON, bad multipart body                                                                         |
+| `UnknownFieldError`     | 400    | `where`/`sort` names a field the collection doesn't have                                                              |
+| `InvalidQueryError`     | 400    | Malformed `and`/`or` group (empty, wrong shape), bad operator/sort direction, `containsValue` on a non-relation field |
+| `ValidationFailedError` | 400    | Field validation failed — carries `details`                                                                           |
+| `UnauthorizedError`     | 401    | Authentication required                                                                                               |
+| `AccessDeniedError`     | 403    | Authenticated but not permitted                                                                                       |
 
 ```ts
 import { isForgeError, ValidationFailedError } from '@forge-cms/runtime';

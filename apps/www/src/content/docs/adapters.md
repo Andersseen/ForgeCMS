@@ -45,6 +45,14 @@ interface DatabaseAdapter<TRecord extends DatabaseRecord = DatabaseRecord> {
 the same `where` as `findMany` — otherwise pagination advertises pages that do not exist. The SQL
 adapters share one where-clause builder between the two so they cannot drift.
 
+`DatabaseWhere` supports nested `and`/`or` groups on top of the flat field operators, and `sort`
+accepts a single field name or a `{ field, order }[]` for a multi-field sort — see
+[Local API](/docs/local-api#find). `InMemoryDatabaseAdapter` evaluates them with a pure recursive
+`matchesWhere`, the executable reference every adapter's generated SQL is proven against by a shared
+cross-adapter contract suite (`runDatabaseAdapterQueryContractTests`,
+`@forge-cms/testing/contracts`). Writing your own `DatabaseAdapter`? Run that suite too, alongside
+`runDatabaseAdapterContractTests`.
+
 ## `AuthAdapter`
 
 ```ts

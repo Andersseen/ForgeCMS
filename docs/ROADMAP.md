@@ -117,13 +117,13 @@ ForgeCMS competes with Directus, not with Payload.
 
 ## Phase 2 — A complete content model
 
-| #   | Item                                                                                               | Notes                                                                                           |
-| --- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| 023 | **Globals** (singleton documents: nav, footer, site settings)                                      | Cheap, high return. `apps/www` already fakes one with a `site_config` collection.               |
-| 024 | **Versions & revisions** — history, diff, restore, autosave, scheduled publish                     | Spec 017 shipped `_status`, which is ~15% of versioning. Editors touching production need undo. |
-| 025 | **Localisation** — `localized: true`, `?locale=`, fallback chain                                   | Changes the storage shape. **Doing this after real data exists is materially more expensive.**  |
-| 026 | **Query completeness** — nested `and`/`or`, multi-field sort, `like`                               | Today `where` is flat AND-only with single-field sort.                                          |
-| 027 | **Referential integrity** — cascade / restrict on delete, polymorphic relations (`relationTo: []`) | Deleting an author currently leaves posts pointing at a dead id.                                |
+| #   | Item                                                                                               | Notes                                                                                                                                                                                                                             |
+| --- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 023 | **Globals** (singleton documents: nav, footer, site settings)                                      | Cheap, high return. `apps/www` already fakes one with a `site_config` collection.                                                                                                                                                 |
+| 024 | **Versions & revisions** — history, diff, restore, autosave, scheduled publish                     | Spec 017 shipped `_status`, which is ~15% of versioning. Editors touching production need undo.                                                                                                                                   |
+| 025 | **Localisation** — `localized: true`, `?locale=`, fallback chain                                   | Changes the storage shape. **Doing this after real data exists is materially more expensive.**                                                                                                                                    |
+| 026 | ~~**Query completeness** — nested `and`/`or`, multi-field sort, `like`~~                           | **Done, spec 050.** Nested `and`/`or`, multi-field sort, `findOne`, and relation-array `containsValue`, identical across InMemory/libSQL/D1. `like`-as-a-distinct-operator wasn't needed — `contains` already compiles to `LIKE`. |
+| 027 | **Referential integrity** — cascade / restrict on delete, polymorphic relations (`relationTo: []`) | Deleting an author currently leaves posts pointing at a dead id.                                                                                                                                                                  |
 
 ---
 
@@ -176,18 +176,19 @@ ForgeCMS competes with Directus, not with Payload.
 
 ## Progress
 
-| Phase                            | Status                                                                                           |
-| -------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Phase 0 — Unblock                | ✅ 0.1, 0.2 done 2026-07-22 · 0.3 pending (needs npm credentials)                                |
-| Phase 1 — Structural core        | ✅ 019, 020, 021, 022 done 2026-07-22                                                            |
-| Phase 2 — Content model          | ⬜ not started                                                                                   |
-| Phase 3 — Auth & DX              | ⬜ not started                                                                                   |
-| Phase 4 — Admin UI               | ⬜ not started                                                                                   |
-| Phase 5 — Angular moat           | ⬜ not started                                                                                   |
-| Phase 0.2 — Trust                | ✅ done 2026-08-21 (hardening, validation, security, error contract, logging, upload lifecycle)  |
-| Phase 0.3.1 — Globals            | ✅ done 2026-08-21 (singleton documents for site config)                                         |
-| Phase 0.3.2 — Versions           | ✅ done 2026-08-21 (document history, restore, autosave support)                                 |
-| Phase 0.3.3 — Live Preview       | ✅ done 2026-08-21 (preview documents with unsaved changes)                                      |
-| Phase 0.3.4 — Localization       | ✅ done 2026-08-21 (i18n fields, locale resolution, fallback chain)                              |
-| Phase 0.3.5 — Relation integrity | ✅ done 2026-08-21 (cascade, restrict, set-null on delete)                                       |
-| Spec 044 — Locale propagation    | ✅ done 2026-08-22 (`?locale=` + metadata now reach all 4 HTTP verbs, Angular client, and admin) |
+| Phase                            | Status                                                                                                                                                                             |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase 0 — Unblock                | ✅ 0.1, 0.2 done 2026-07-22 · 0.3 pending (needs npm credentials)                                                                                                                  |
+| Phase 1 — Structural core        | ✅ 019, 020, 021, 022 done 2026-07-22                                                                                                                                              |
+| Phase 2 — Content model          | 🟡 026 (query completeness) done 2026-08-30, spec 050 — globals/versions/localisation/relation integrity landed earlier as Phase 0.3.x; the rest of Phase 2 is otherwise unstarted |
+| Phase 3 — Auth & DX              | ⬜ not started                                                                                                                                                                     |
+| Phase 4 — Admin UI               | ⬜ not started                                                                                                                                                                     |
+| Phase 5 — Angular moat           | ⬜ not started                                                                                                                                                                     |
+| Phase 0.2 — Trust                | ✅ done 2026-08-21 (hardening, validation, security, error contract, logging, upload lifecycle)                                                                                    |
+| Phase 0.3.1 — Globals            | ✅ done 2026-08-21 (singleton documents for site config)                                                                                                                           |
+| Phase 0.3.2 — Versions           | ✅ done 2026-08-21 (document history, restore, autosave support)                                                                                                                   |
+| Phase 0.3.3 — Live Preview       | ✅ done 2026-08-21 (preview documents with unsaved changes)                                                                                                                        |
+| Phase 0.3.4 — Localization       | ✅ done 2026-08-21 (i18n fields, locale resolution, fallback chain)                                                                                                                |
+| Phase 0.3.5 — Relation integrity | ✅ done 2026-08-21 (cascade, restrict, set-null on delete)                                                                                                                         |
+| Spec 044 — Locale propagation    | ✅ done 2026-08-22 (`?locale=` + metadata now reach all 4 HTTP verbs, Angular client, and admin)                                                                                   |
+| Spec 050 — Query completeness    | ✅ done 2026-08-30 (nested `and`/`or`, multi-field sort, `findOne`, `containsValue`, identical across InMemory/libSQL/D1)                                                          |

@@ -301,6 +301,117 @@ describe('CRUD Handlers', () => {
       expect(response.status).toBe(400);
       expect(body.error.message).toContain('sideways');
     });
+
+    describe('?where= structured query (spec 050)', () => {
+      it('accepts a nested and/or filter', async () => {
+        await runtime.adapters.database.create('posts', {
+          title: 'Match',
+          published: true,
+          views: 5
+        });
+        await runtime.adapters.database.create('posts', {
+          title: 'No match',
+          published: false,
+          views: 5
+        });
+
+        const where = encodeURIComponent(
+          JSON.stringify({ and: [{ published: true }, { views: { gte: 1 } }] })
+        );
+        const context = createTestContext('GET', `https://forge.test/api/posts?where=${where}`);
+        context.params = { collection: 'posts' };
+
+        const response = await handleList(context, { runtime });
+        const body = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(body.data).toHaveLength(1);
+        expect(body.data[0].title).toBe('Match');
+      });
+
+      it('returns 400 for malformed JSON', async () => {
+        const context = createTestContext('GET', 'https://forge.test/api/posts?where=not-json');
+        context.params = { collection: 'posts' };
+
+        const response = await handleList(context, { runtime });
+        expect(response.status).toBe(400);
+      });
+
+      it('returns 400 when where is not a JSON object', async () => {
+        const context = createTestContext(
+          'GET',
+          `https://forge.test/api/posts?where=${encodeURIComponent('[1,2,3]')}`
+        );
+        context.params = { collection: 'posts' };
+
+        const response = await handleList(context, { runtime });
+        expect(response.status).toBe(400);
+      });
+
+      it('returns 400 for an oversized where parameter', async () => {
+        const huge = encodeURIComponent(JSON.stringify({ title: 'x'.repeat(5000) }));
+        const context = createTestContext('GET', `https://forge.test/api/posts?where=${huge}`);
+        context.params = { collection: 'posts' };
+
+        const response = await handleList(context, { runtime });
+        expect(response.status).toBe(400);
+      });
+
+      it('returns 400 for an unknown field inside a nested where', async () => {
+        const where = encodeURIComponent(JSON.stringify({ and: [{ doesNotExist: 1 }] }));
+        const context = createTestContext('GET', `https://forge.test/api/posts?where=${where}`);
+        context.params = { collection: 'posts' };
+
+        const response = await handleList(context, { runtime });
+        expect(response.status).toBe(400);
+      });
+    });
+
+    describe('sort= multi-field JSON array (spec 050)', () => {
+      it('sorts by multiple fields', async () => {
+        await runtime.adapters.database.create('posts', {
+          title: 'A',
+          published: true,
+          views: 50
+        });
+        await runtime.adapters.database.create('posts', {
+          title: 'B',
+          published: true,
+          views: 10
+        });
+        await runtime.adapters.database.create('posts', {
+          title: 'C',
+          published: false,
+          views: 5
+        });
+
+        const sort = encodeURIComponent(
+          JSON.stringify([
+            { field: 'published', order: 'desc' },
+            { field: 'views', order: 'asc' }
+          ])
+        );
+        const context = createTestContext('GET', `https://forge.test/api/posts?sort=${sort}`);
+        context.params = { collection: 'posts' };
+
+        const response = await handleList(context, { runtime });
+        const body = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(body.data.map((r: { title: string }) => r.title)).toEqual(['B', 'A', 'C']);
+      });
+
+      it('returns 400 (not a 500 crash) for a malformed sort entry', async () => {
+        const context = createTestContext(
+          'GET',
+          `https://forge.test/api/posts?sort=${encodeURIComponent('[null]')}`
+        );
+        context.params = { collection: 'posts' };
+
+        const response = await handleList(context, { runtime });
+        expect(response.status).toBe(400);
+      });
+    });
   });
 
   describe('handleRead', () => {
