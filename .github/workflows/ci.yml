@@ -65,6 +65,13 @@ jobs:
       - name: Build all packages and apps
         run: pnpm build
 
+      # Real local Cloudflare Workers runtime (D1 + R2 via Miniflare/workerd) — no account, no
+      # credentials, no remote resources. Kept as its own step (not folded into "Unit tests" above)
+      # since it's slower and exercises a different pool; needs the build above for workspace
+      # package resolution (@forge-cms/* imports resolve through dist/, per tsconfig.base.json).
+      - name: Cloudflare runtime integration tests
+        run: pnpm test:cloudflare
+
       - name: Verify packed package installation
         run: pnpm release:verify
 

@@ -126,6 +126,19 @@ pnpm exec wrangler pages dev apps/www/dist/analog/public --d1 DB --r2 BUCKET
 That runs the actual production build with local emulations of D1 and R2 — worth doing before
 shipping, because the Vite dev server uses in-memory adapters and cannot reproduce SQL-level bugs.
 
+## What's actually verified against real Cloudflare bindings
+
+`@forge-cms/cloudflare`'s adapters ship with two layers of tests: a fast unit suite (`pnpm
+--filter @forge-cms/cloudflare test`) against a hand-written D1/R2 mock, and a slower integration
+suite (`pnpm test:cloudflare`, `@cloudflare/vitest-plugin`) that runs the same adapters — schema
+sync, compound unique indexes, nested `and`/`or` queries, `containsValue`, JSON round-tripping,
+machine auth, one full HTTP request/response path, and R2 — against a **real local D1 and R2
+binding** (Miniflare/workerd), with no Cloudflare account, credentials, or remote resources
+required. That's what "locally verified against real Workers bindings" means throughout this repo's
+docs: proven against the real engine running on your machine or in CI, not a simulation of it. It is
+**not** the same claim as a verified remote production deployment — that's still only checked by the
+`curl`-and-inspect step above, run by a maintainer after a real deploy.
+
 ## Other platforms
 
 Nothing outside `@forge-cms/cloudflare` is Cloudflare-specific. Any Nitro preset (Node, Vercel,

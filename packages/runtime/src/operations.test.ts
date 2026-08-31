@@ -945,3 +945,117 @@ describe('Drafts through the Local API', () => {
     expect(trusted.docs).toHaveLength(2);
   });
 });
+
+// spec 051: storage-object cleanup on delete used to live only in `handlers.ts` (the HTTP layer),
+// so a Local API caller (server code, a hook, a seed script) deleting an upload-enabled document
+// orphaned its underlying storage object. Moved into `deleteDocument` itself so every caller gets it.
+describe('Local API delete cleans up upload storage objects (spec 051)', () => {
+  const media = defineCollection({
+    slug: 'media',
+    fields: {
+      filename: defineField.text({ required: true }),
+      url: defineField.text({ required: true }),
+      contentType: defineField.text()
+    },
+    upload: true
+  });
+
+  function buildMediaRuntime() {
+    const storage = new InMemoryStorageAdapter();
+    const runtime = new ForgeCmsRuntime({
+      collections: [media],
+      adapters: {
+        database: new InMemoryDatabaseAdapter(),
+        auth: new InMemoryAuthAdapter(),
+        storage
+      }
+    });
+    runtime.init();
+    return { runtime, storage };
+  }
+
+  it('deletes the storage object when an upload-enabled document is deleted through the Local API', async () => {
+    const { runtime, storage } = buildMediaRuntime();
+    await storage.put({ key: 'media/hello.txt', body: new TextEncoder().encode('hello') });
+
+    const doc = await runtime.create({
+      collection: 'media',
+      // `_storageKey` is a system field (like `id`/`_status`), not part of the collection's
+      // declared, typed fields — the typed Local API's `InferFields` deliberately excludes it.
+      data: {
+        _storageKey: 'media/hello.txt',
+        filename: 'hello.txt',
+        url: '/api/media/media/hello.txt',
+        contentType: 'text/plain'
+      } as Record<string, unknown>
+    });
+
+    expect(await storage.get('media/hello.txt')).not.toBeNull();
+    await runtime.delete({ collection: 'media', id: doc.id as string });
+    expect(await storage.get('media/hello.txt')).toBeNull();
+  });
+
+  it('falls back to a URL-derived key when an older record has no _storageKey', async () => {
+    const { runtime, storage } = buildMediaRuntime();
+    await storage.put({ key: 'media/legacy.txt', body: new TextEncoder().encode('legacy') });
+
+    const doc = await runtime.create({
+      collection: 'media',
+      data: {
+        filename: 'legacy.txt',
+        url: '/api/media/media/legacy.txt',
+        contentType: 'text/plain'
+      }
+    });
+
+    await runtime.delete({ collection: 'media', id: doc.id as string });
+    expect(await storage.get('media/legacy.txt')).toBeNull();
+  });
+
+  it('does not touch storage when deleting a document from a non-upload collection', async () => {
+    const runtime = buildRuntime([posts]);
+    const created = await runtime.create({ collection: 'posts', data: { title: 'Hello' } });
+    await expect(
+      runtime.delete({ collection: 'posts', id: created.id as string })
+    ).resolves.toBeTruthy();
+  });
+
+  it('never deletes the storage object when access rules reject the delete', async () => {
+    const guardedMedia = defineCollection({
+      slug: 'guarded_media',
+      fields: {
+        filename: defineField.text({ required: true }),
+        url: defineField.text({ required: true })
+      },
+      upload: true,
+      access: { delete: () => false }
+    });
+    const storage = new InMemoryStorageAdapter();
+    const runtime = new ForgeCmsRuntime({
+      collections: [guardedMedia],
+      adapters: {
+        database: new InMemoryDatabaseAdapter(),
+        auth: new InMemoryAuthAdapter(),
+        storage
+      }
+    });
+    runtime.init();
+    await storage.put({ key: 'guarded/keep.txt', body: new TextEncoder().encode('keep') });
+
+    const doc = await runtime.create({
+      collection: 'guarded_media',
+      data: {
+        _storageKey: 'guarded/keep.txt',
+        filename: 'keep.txt',
+        url: '/api/media/keep.txt'
+      } as Record<string, unknown>
+    });
+
+    await expect(
+      runtime.delete({ collection: 'guarded_media', id: doc.id as string, overrideAccess: false })
+    ).rejects.toThrow(AccessDeniedError);
+    // The document is still there (delete was rejected before it reached the database), and so is
+    // its storage object — a denied delete must never orphan-delete the underlying file.
+    expect(await storage.get('guarded/keep.txt')).not.toBeNull();
+  });
+});

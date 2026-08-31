@@ -1,0 +1,22 @@
+{
+  // Test-only Wrangler config for the real-Workers-runtime integration suite
+  // (`pnpm test:cloudflare`, packages/cloudflare/vitest.workers.config.ts). Never deployed, no
+  // account/credentials — @cloudflare/vitest-plugin provisions local D1/R2 bindings via Miniflare.
+  // No `compatibility_date` on purpose: letting the plugin infer the latest one bundled with its
+  // own Miniflare/workerd keeps this config from going stale (matches Cloudflare's own examples).
+  "name": "forge-cms-cloudflare-test",
+  "main": "test/workers/fixtures/worker.ts",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "forge-cms-test",
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "forge-cms-test-media"
+    }
+  ]
+}

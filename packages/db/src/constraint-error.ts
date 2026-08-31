@@ -31,6 +31,14 @@ export function isUniqueConstraintError(err: unknown): err is UniqueConstraintEr
  * Parses SQLite's standard `UNIQUE constraint failed: table.col1, table.col2` message. Both D1 and
  * libSQL are backed by SQLite and wrap this same message (D1 prefixes it with `D1_ERROR:`, libSQL
  * with `SQLITE_CONSTRAINT`), so one parser covers both.
+ *
+ * A real D1 binding additionally appends a trailing diagnostic suffix *after* the column list itself
+ * — `table.col1, table.col2: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_UNIQUE)` — that plain
+ * SQLite/libSQL never emits (found only once tested against a real local D1 binding, spec 051; the
+ * hand-rolled D1 test mock's crafted error strings never included it, so this went unnoticed). Each
+ * comma-separated part is truncated at its own first `:` before being split into `table.column`, or
+ * the last column name gets corrupted with that trailing suffix — which then propagates into
+ * `UniqueConstraintError.fields` and leaks through the public HTTP error response's `details`.
  */
 export function parseSqliteUniqueConstraintMessage(
   message: string
@@ -41,7 +49,8 @@ export function parseSqliteUniqueConstraintMessage(
   const columns: string[] = [];
   let table = '';
   for (const part of match[1].split(',')) {
-    const [rawTable, rawColumn] = part.split('.').map((s) => s.trim());
+    const withoutTrailingDiagnostic = part.split(':')[0] ?? part;
+    const [rawTable, rawColumn] = withoutTrailingDiagnostic.split('.').map((s) => s.trim());
     if (rawTable && rawColumn) {
       table = rawTable;
       columns.push(rawColumn);

@@ -590,14 +590,11 @@ export async function handleDelete<TEnv = unknown>(
 ): Promise<Response> {
   const resolved = await resolveRequest(context, options, 'delete', true);
   if (resolved instanceof Response) return resolved;
-  const { collection, collectionSlug, user } = resolved;
+  const { collectionSlug, user } = resolved;
 
   try {
-    const existing =
-      collection.upload === true
-        ? await options.runtime.adapters.database.findById(collectionSlug, context.params!['id']!)
-        : null;
-
+    // Storage-object cleanup for upload-enabled collections lives in the Local API
+    // (`operations.ts`'s `deleteDocument`), not here — this stays transport-only.
     await options.runtime.delete({
       collection: collectionSlug,
       id: context.params!['id']!,
@@ -605,33 +602,10 @@ export async function handleDelete<TEnv = unknown>(
       overrideAccess: false
     });
 
-    if (existing && typeof existing.url === 'string') {
-      const storageKey =
-        (existing._storageKey as string) ??
-        extractKeyFromUrl(existing.url as string, collectionSlug);
-      if (storageKey) {
-        try {
-          await options.runtime.adapters.storage.delete(storageKey);
-        } catch (cleanupErr) {
-          getLogger().error(
-            `Failed to clean up storage object '${storageKey}' after document deletion`,
-            cleanupErr
-          );
-        }
-      }
-    }
-
     return new Response(null, { status: 204 });
   } catch (err) {
     return toErrorResponse(err, user);
   }
-}
-
-function extractKeyFromUrl(url: string, collectionSlug: string): string | null {
-  const prefix = `/api/media/${collectionSlug}/`;
-  const idx = url.indexOf(prefix);
-  if (idx === -1) return null;
-  return url.slice(idx + '/api/media/'.length);
 }
 
 // --- globals --------------------------------------------------------------------------------
