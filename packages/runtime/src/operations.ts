@@ -1,4 +1,4 @@
-import { validateCollection } from '@forge-cms/core';
+import { getLogger, validateCollection } from '@forge-cms/core';
 import type { AccessQuery, CmsUser, CollectionDefinition, DraftStatus } from '@forge-cms/core';
 import type { DatabaseRecord, DatabaseWhere, SortInput } from '@forge-cms/db';
 import { isUniqueConstraintError as isDbUniqueConstraintError } from '@forge-cms/db';
@@ -654,6 +654,25 @@ export async function update(ctx: OperationContext, args: UpdateArgs): Promise<D
   return result;
 }
 
+const MEDIA_URL_PREFIX = '/api/media/';
+
+/**
+ * Resolves the storage key a stored upload's underlying object lives under: the `_storageKey` every
+ * upload-created document carries, or (for an older/manually-created record without one) a fallback
+ * parsed from its `url`, matching the default `/api/media/<collection>/<key>` shape `handleFile` and
+ * every `StorageAdapter`'s default `getPublicUrl` use.
+ */
+function resolveStorageKey(collectionSlug: string, doc: DatabaseRecord): string | null {
+  const storageKey = doc._storageKey;
+  if (typeof storageKey === 'string' && storageKey.length > 0) return storageKey;
+
+  const url = doc.url;
+  if (typeof url !== 'string') return null;
+  const prefix = `${MEDIA_URL_PREFIX}${collectionSlug}/`;
+  const idx = url.indexOf(prefix);
+  return idx === -1 ? null : url.slice(idx + MEDIA_URL_PREFIX.length);
+}
+
 export async function deleteDocument(
   ctx: OperationContext,
   args: DeleteArgs
@@ -688,7 +707,27 @@ export async function deleteDocument(
   await handleCascadeDelete(ctx, collection, args.id);
   await handleSetNullOnDelete(ctx, collection, args.id);
 
+  // The database delete must succeed — and only then does the underlying storage object get
+  // removed. Deleting the object first (or on a rejected/failed database delete) would orphan the
+  // document from its file; deleting it only after confirms the document is really gone.
   await ctx.adapters.database.delete(args.collection, args.id);
+
+  if (collection.upload === true) {
+    const storageKey = resolveStorageKey(args.collection, existing);
+    if (storageKey) {
+      try {
+        await ctx.adapters.storage.delete(storageKey);
+      } catch (cleanupErr) {
+        // The document is already gone; failing the whole operation over cleanup would be worse
+        // than a best-effort delete that gets logged and left for manual follow-up.
+        getLogger().error(
+          `Failed to clean up storage object '${storageKey}' after document deletion`,
+          cleanupErr
+        );
+      }
+    }
+  }
+
   await runAfterDeleteHooks(collection, { user, overrideAccess, id: args.id, doc: existing });
 
   await runAfterOperationHooks(collection, {

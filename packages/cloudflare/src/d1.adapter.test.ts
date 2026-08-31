@@ -307,8 +307,12 @@ class MockD1PreparedStatement implements D1PreparedStatement {
 
   /**
    * Mirrors SQLite: a row conflicts with a unique index only when every indexed column is non-null
-   * and equal on both rows. Throws a message shaped like a real SQLite/D1 constraint error so the
-   * adapter's `toUniqueConstraintError` parsing is exercised for real.
+   * and equal on both rows. Throws a message shaped like a real SQLite/D1 constraint error — including
+   * the trailing `: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_UNIQUE)` diagnostic suffix a real D1
+   * binding appends after the column list (found only once tested against real D1, spec 051; omitted
+   * here originally, which let a column-name-corruption bug in `parseSqliteUniqueConstraintMessage` go
+   * unnoticed by every mock-based test) — so the adapter's `toUniqueConstraintError` parsing is
+   * exercised against the real shape, not a simplified one.
    */
   private assertNoUniqueConflict(
     table: string,
@@ -323,8 +327,9 @@ class MockD1PreparedStatement implements D1PreparedStatement {
       for (const row of rows.values()) {
         if (excludeId !== undefined && row.id === excludeId) continue;
         if (index.columns.every((c) => row[c] === candidate[c])) {
+          const columns = index.columns.map((c) => `${table}.${c}`).join(', ');
           throw new Error(
-            `D1_ERROR: UNIQUE constraint failed: ${index.columns.map((c) => `${table}.${c}`).join(', ')}`
+            `D1_ERROR: UNIQUE constraint failed: ${columns}: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_UNIQUE)`
           );
         }
       }

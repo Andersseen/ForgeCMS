@@ -11,6 +11,10 @@
       "dependsOn": ["^build"],
       "outputs": []
     },
+    "test:cloudflare": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
     "test:watch": {
       "cache": false,
       "persistent": true
