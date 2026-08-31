@@ -74,6 +74,10 @@ export interface CollectionMeta {
   upload?: boolean;
   /** Supported locales when the collection has localized fields. */
   locales?: string[];
+  /** Field name whose value the admin should use as a document's display title (spec 052). */
+  useAsTitle?: string;
+  /** Field names the admin should show as list columns (spec 052). Presentational hint only. */
+  defaultColumns?: string[];
 }
 
 export interface GlobalMeta {

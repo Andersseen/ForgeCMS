@@ -25,6 +25,18 @@
 >
 > The ordering argument that survives: the client and the admin were the expensive part, not the
 > core — so finish 036 (SSR) and 038 (typed documents) before more Phase 2 feature work.
+>
+> **Update (2026-08-31, spec 052):** the audit for "embeddable content admin" found `@forge-cms/admin`
+> had zero orchestration layer — `collectionResource`/`documentResource` (036) existed but had no real
+> consumer, and every host (`apps/www`, `apps/demo-aesthetics`) hand-rolled the same query-state/CRUD
+> glue independently (and had already started diverging). Spec 052 closed most of the remaining part
+> of **033 (list view)** — pagination/sort/search/status-filter now live in a reusable
+> `ForgeCollectionWorkspaceComponent`, not per-host code — and added the create/edit/delete
+> orchestration **033 didn't originally scope** (`ForgeDocumentEditorComponent`,
+> `ForgeConfirmDialogComponent`, `forgeAdminContentRoutes()`). Still open from 033: configurable
+> columns, saved filters, bulk actions. Still open from 032: a real WYSIWYG, conditional fields. Users/
+> API-keys/settings/media-library admin (part of what a "complete Phase 4" would eventually need)
+> remains entirely out of scope — deliberately, per spec 052's non-goals.
 
 ## The thesis
 
@@ -140,12 +152,12 @@ ForgeCMS competes with Directus, not with Payload.
 
 ## Phase 4 — An admin a non-developer can use
 
-| #   | Item                                                                                                   | Notes                                                                                                                    |
-| --- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| 032 | **Field widgets** — real richtext editor, media picker with previews, **relation picker with search**  | The relation field is currently a text input where you paste a UUID by hand. Specs 015/016 shipped kinds with no editor. |
-| 033 | **List view** — pagination controls, clickable sort, configurable columns, saved filters, bulk actions | Depends on 0.2.                                                                                                          |
-| 034 | **Conditional fields** (`admin.condition`), sidebar placement, custom component API                    |                                                                                                                          |
-| 035 | **Live preview + a real dashboard**                                                                    |                                                                                                                          |
+| #   | Item                                                                                                   | Notes                                                                                                                                                                                                   |
+| --- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 032 | **Field widgets** — real richtext editor, media picker with previews, **relation picker with search**  | The relation field is currently a text input where you paste a UUID by hand. Specs 015/016 shipped kinds with no editor.                                                                                |
+| 033 | **List view** — pagination controls, clickable sort, configurable columns, saved filters, bulk actions | Depends on 0.2. **Pagination/sort/search/status-filter orchestration done, spec 052 (2026-08-31)** — `ForgeCollectionWorkspaceComponent`. Remaining: configurable columns, saved filters, bulk actions. |
+| 034 | **Conditional fields** (`admin.condition`), sidebar placement, custom component API                    |                                                                                                                                                                                                         |
+| 035 | **Live preview + a real dashboard**                                                                    |                                                                                                                                                                                                         |
 
 ---
 
@@ -176,19 +188,20 @@ ForgeCMS competes with Directus, not with Payload.
 
 ## Progress
 
-| Phase                            | Status                                                                                                                                                                             |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Phase 0 — Unblock                | ✅ 0.1, 0.2 done 2026-07-22 · 0.3 pending (needs npm credentials)                                                                                                                  |
-| Phase 1 — Structural core        | ✅ 019, 020, 021, 022 done 2026-07-22                                                                                                                                              |
-| Phase 2 — Content model          | 🟡 026 (query completeness) done 2026-08-30, spec 050 — globals/versions/localisation/relation integrity landed earlier as Phase 0.3.x; the rest of Phase 2 is otherwise unstarted |
-| Phase 3 — Auth & DX              | ⬜ not started                                                                                                                                                                     |
-| Phase 4 — Admin UI               | ⬜ not started                                                                                                                                                                     |
-| Phase 5 — Angular moat           | ⬜ not started                                                                                                                                                                     |
-| Phase 0.2 — Trust                | ✅ done 2026-08-21 (hardening, validation, security, error contract, logging, upload lifecycle)                                                                                    |
-| Phase 0.3.1 — Globals            | ✅ done 2026-08-21 (singleton documents for site config)                                                                                                                           |
-| Phase 0.3.2 — Versions           | ✅ done 2026-08-21 (document history, restore, autosave support)                                                                                                                   |
-| Phase 0.3.3 — Live Preview       | ✅ done 2026-08-21 (preview documents with unsaved changes)                                                                                                                        |
-| Phase 0.3.4 — Localization       | ✅ done 2026-08-21 (i18n fields, locale resolution, fallback chain)                                                                                                                |
-| Phase 0.3.5 — Relation integrity | ✅ done 2026-08-21 (cascade, restrict, set-null on delete)                                                                                                                         |
-| Spec 044 — Locale propagation    | ✅ done 2026-08-22 (`?locale=` + metadata now reach all 4 HTTP verbs, Angular client, and admin)                                                                                   |
-| Spec 050 — Query completeness    | ✅ done 2026-08-30 (nested `and`/`or`, multi-field sort, `findOne`, `containsValue`, identical across InMemory/libSQL/D1)                                                          |
+| Phase                               | Status                                                                                                                                                                                                                                                       |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Phase 0 — Unblock                   | ✅ 0.1, 0.2 done 2026-07-22 · 0.3 pending (needs npm credentials)                                                                                                                                                                                            |
+| Phase 1 — Structural core           | ✅ 019, 020, 021, 022 done 2026-07-22                                                                                                                                                                                                                        |
+| Phase 2 — Content model             | 🟡 026 (query completeness) done 2026-08-30, spec 050 — globals/versions/localisation/relation integrity landed earlier as Phase 0.3.x; the rest of Phase 2 is otherwise unstarted                                                                           |
+| Phase 3 — Auth & DX                 | ⬜ not started                                                                                                                                                                                                                                               |
+| Phase 4 — Admin UI                  | 🟡 032 (field widgets) partly done spec 042 · 033 (list view) mostly done spec 042 + 052 — see item notes above; remaining: configurable columns, saved filters, bulk actions, conditional fields, live preview, users/API-keys/settings/media-library admin |
+| Phase 5 — Angular moat              | ⬜ not started                                                                                                                                                                                                                                               |
+| Phase 0.2 — Trust                   | ✅ done 2026-08-21 (hardening, validation, security, error contract, logging, upload lifecycle)                                                                                                                                                              |
+| Phase 0.3.1 — Globals               | ✅ done 2026-08-21 (singleton documents for site config)                                                                                                                                                                                                     |
+| Phase 0.3.2 — Versions              | ✅ done 2026-08-21 (document history, restore, autosave support)                                                                                                                                                                                             |
+| Phase 0.3.3 — Live Preview          | ✅ done 2026-08-21 (preview documents with unsaved changes)                                                                                                                                                                                                  |
+| Phase 0.3.4 — Localization          | ✅ done 2026-08-21 (i18n fields, locale resolution, fallback chain)                                                                                                                                                                                          |
+| Phase 0.3.5 — Relation integrity    | ✅ done 2026-08-21 (cascade, restrict, set-null on delete)                                                                                                                                                                                                   |
+| Spec 044 — Locale propagation       | ✅ done 2026-08-22 (`?locale=` + metadata now reach all 4 HTTP verbs, Angular client, and admin)                                                                                                                                                             |
+| Spec 052 — Embeddable content admin | ✅ done 2026-08-31 (`ForgeCollectionsIndexComponent`/`ForgeCollectionWorkspaceComponent`/`ForgeDocumentEditorComponent`/`forgeAdminContentRoutes()`; `apps/www` dogfoods it)                                                                                 |
+| Spec 050 — Query completeness       | ✅ done 2026-08-30 (nested `and`/`or`, multi-field sort, `findOne`, `containsValue`, identical across InMemory/libSQL/D1)                                                                                                                                    |

@@ -88,6 +88,13 @@ describe('document helpers', () => {
     expect(documentLabel(null)).toBe('—');
   });
 
+  it('prefers an explicit useAsTitle field over the heuristic list', () => {
+    expect(documentLabel({ id: 'x', title: 'Peel', name: 'Fallback' }, 'name')).toBe('Fallback');
+    // Falls back to the heuristic list when the named field is missing or empty.
+    expect(documentLabel({ id: 'x', title: 'Peel' }, 'missingField')).toBe('Peel');
+    expect(documentLabel({ id: 'x', title: 'Peel', name: '  ' }, 'name')).toBe('Peel');
+  });
+
   it('only treats image-like objects as previewable', () => {
     expect(documentImageUrl({ url: '/a.png' })).toBe('/a.png');
     expect(documentImageUrl({ url: '/a.pdf', contentType: 'application/pdf' })).toBeNull();

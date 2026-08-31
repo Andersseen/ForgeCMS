@@ -213,3 +213,17 @@ describe('CmsApiService — uploads', () => {
     expect(result).toEqual({ id: 'm1', filename: 'a.png' });
   });
 });
+
+describe('CmsApiService — draft/publish', () => {
+  it('setDocumentStatus PUTs just the _status field to the document endpoint', async () => {
+    const api = createService();
+    respond = () => jsonResponse({ data: { id: 'p1', _status: 'published' } });
+
+    const result = await api.setDocumentStatus('posts', 'p1', 'published');
+
+    expect(calls[0]!.url).toBe('/api/v1/posts/p1');
+    expect(calls[0]!.init?.method).toBe('PUT');
+    expect(JSON.parse(calls[0]!.init?.body as string)).toEqual({ _status: 'published' });
+    expect(result).toEqual({ id: 'p1', _status: 'published' });
+  });
+});

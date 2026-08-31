@@ -4,12 +4,24 @@
  */
 const LABEL_FIELDS = ['title', 'name', 'label', 'filename', 'heading', 'email', 'author', 'slug'];
 
-/** Extracts something human from a document, falling back to a shortened id. */
-export function documentLabel(doc: unknown): string {
+/**
+ * Extracts something human from a document, falling back to a shortened id.
+ *
+ * `useAsTitle` (a collection's `admin.useAsTitle`, spec 052) wins over the heuristic field list
+ * when it names a field the document actually has a non-empty string value for — an explicit config
+ * beats a guess.
+ */
+export function documentLabel(doc: unknown, useAsTitle?: string): string {
   if (typeof doc === 'string') return shortId(doc);
   if (typeof doc !== 'object' || doc === null) return '—';
 
   const record = doc as Record<string, unknown>;
+
+  if (useAsTitle !== undefined) {
+    const value = record[useAsTitle];
+    if (typeof value === 'string' && value.trim() !== '') return value;
+  }
+
   for (const field of LABEL_FIELDS) {
     const value = record[field];
     if (typeof value === 'string' && value.trim() !== '') return value;

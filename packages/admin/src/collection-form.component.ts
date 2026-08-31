@@ -63,6 +63,8 @@ export class ForgeCollectionFormComponent {
 
   save = output<Record<string, unknown>>();
   cancel = output<void>();
+  /** Emits once, `true`, the first time a field is edited — lets a host offer an unsaved-changes guard. */
+  dirtyChange = output<boolean>();
 
   // `initialValue` arrives via a signal input bound to the parent's editing state; snapshotting it
   // once in a field initializer captures whatever it was at construction time (often the default
@@ -74,8 +76,14 @@ export class ForgeCollectionFormComponent {
     ...this.edits()
   }));
 
+  private dirtyEmitted = false;
+
   setValue(name: string, value: unknown): void {
     this.edits.update((current) => ({ ...current, [name]: value }));
+    if (!this.dirtyEmitted) {
+      this.dirtyEmitted = true;
+      this.dirtyChange.emit(true);
+    }
   }
 
   onSubmit(event: Event): void {
