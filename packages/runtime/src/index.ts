@@ -29,6 +29,7 @@ export { applyFieldDefaults, applyAutoSlugs } from './defaults.js';
 export {
   find,
   findByID,
+  findOne,
   count,
   create,
   update,
@@ -37,6 +38,7 @@ export {
   type BaseOperationArgs,
   type FindArgs,
   type FindByIDArgs,
+  type FindOneArgs,
   type CountArgs,
   type CreateArgs,
   type UpdateArgs,

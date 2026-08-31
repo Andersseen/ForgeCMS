@@ -18,11 +18,23 @@ export {
   type WhereOperator,
   type WhereValue,
   type WhereCondition,
+  type WhereFields,
+  type WhereAndGroup,
+  type WhereOrGroup,
   type DatabaseWhere,
+  type SortField,
+  type SortInput,
+  WHERE_OPERATORS,
   isWhereValue,
+  isWhereAndGroup,
+  isWhereOrGroup,
+  isWhereGroup,
+  isSortFieldArray,
+  normalizeSort,
   toOperatorValue,
   toOperatorValues,
-  matchesCondition
+  matchesCondition,
+  matchesWhere
 } from './where.js';
 export {
   UniqueConstraintError,
@@ -30,7 +42,7 @@ export {
   parseSqliteUniqueConstraintMessage,
   toUniqueConstraintError
 } from './constraint-error.js';
-import type { DatabaseWhere } from './where.js';
+import type { DatabaseWhere, SortInput } from './where.js';
 
 export type DatabaseRecord = Record<string, unknown>;
 
@@ -39,7 +51,8 @@ export interface FindManyOptions {
   limit?: number;
   offset?: number;
   where?: DatabaseWhere;
-  sort?: string;
+  sort?: SortInput;
+  /** Only meaningful when `sort` is a plain field name; a `SortField[]` carries its own per-field order. */
   order?: 'asc' | 'desc';
 }
 

@@ -1,7 +1,7 @@
 import type { CollectionDefinition } from '@forge-cms/core';
 import type { DatabaseAdapter, FindManyOptions } from './index.js';
-import type { DatabaseWhere } from './where.js';
-import { matchesCondition } from './where.js';
+import type { DatabaseWhere, SortInput } from './where.js';
+import { matchesWhere, normalizeSort } from './where.js';
 import type { ResolvedIndex } from './schema-generator.js';
 import { resolveCollectionIndexes } from './schema-generator.js';
 import { UniqueConstraintError } from './constraint-error.js';
@@ -44,6 +44,29 @@ function findUniqueConflict(
   return undefined;
 }
 
+/** Multi-field stable sort: the first field decides, ties fall through to the next — matches SQL `ORDER BY a, b`. */
+function sortRecords(
+  records: Record<string, unknown>[],
+  sort: SortInput,
+  legacyOrder: 'asc' | 'desc' | undefined
+): Record<string, unknown>[] {
+  const fields = normalizeSort(sort, legacyOrder);
+  if (fields.length === 0) return records;
+
+  return [...records].sort((a, b) => {
+    for (const { field, order } of fields) {
+      const direction = order === 'desc' ? -1 : 1;
+      const aValue = a[field];
+      const bValue = b[field];
+      if (aValue === bValue) continue;
+      if (aValue === undefined || aValue === null) return 1;
+      if (bValue === undefined || bValue === null) return -1;
+      return ((aValue as string | number) < (bValue as string | number) ? -1 : 1) * direction;
+    }
+    return 0;
+  });
+}
+
 export class InMemoryDatabaseAdapter implements DatabaseAdapter {
   readonly name = 'in-memory';
   private store: Map<string, Record<string, unknown>[]> = new Map();
@@ -78,21 +101,10 @@ export class InMemoryDatabaseAdapter implements DatabaseAdapter {
     let records = this.store.get(options.collection) ?? [];
     if (options.where) {
       const where = options.where;
-      records = records.filter((r) =>
-        Object.entries(where).every(([key, condition]) => matchesCondition(r[key], condition))
-      );
+      records = records.filter((r) => matchesWhere(r, where));
     }
     if (options.sort) {
-      const sortField = options.sort;
-      const direction = options.order === 'desc' ? -1 : 1;
-      records = [...records].sort((a, b) => {
-        const aValue = a[sortField];
-        const bValue = b[sortField];
-        if (aValue === bValue) return 0;
-        if (aValue === undefined || aValue === null) return 1;
-        if (bValue === undefined || bValue === null) return -1;
-        return ((aValue as string | number) < (bValue as string | number) ? -1 : 1) * direction;
-      });
+      records = sortRecords(records, options.sort, options.order);
     }
     if (options.offset) {
       records = records.slice(options.offset);
@@ -143,10 +155,8 @@ export class InMemoryDatabaseAdapter implements DatabaseAdapter {
 
   async count(collection: string, where?: DatabaseWhere): Promise<number> {
     const records = this.store.get(collection) ?? [];
-    if (!where || Object.keys(where).length === 0) return records.length;
-    return records.filter((r) =>
-      Object.entries(where).every(([key, condition]) => matchesCondition(r[key], condition))
-    ).length;
+    if (!where) return records.length;
+    return records.filter((r) => matchesWhere(r, where)).length;
   }
 
   async delete(collection: string, id: string): Promise<void> {

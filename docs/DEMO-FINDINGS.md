@@ -27,30 +27,30 @@ highest-value thing this exercise turned up is not on the roadmap as a numbered 
 that `@forge-cms/angular` cannot express a filtered, sorted, paginated, draft-aware query, so every
 consumer falls back to `fetch`.
 
-| #          | Finding                                                             | Bit us in                 | Roadmap         |
-| ---------- | ------------------------------------------------------------------- | ------------------------- | --------------- |
-| [15](#f15) | The client SDK cannot filter, sort, limit, paginate or set depth    | every page of the site    | ✅ 041          |
-| [17](#f17) | The admin cannot see drafts — the client has no `status`            | the editor screen         | ✅ 041 + 042    |
-| [9](#f9)   | `depth: 1` does not populate `upload` fields                        | every image on the site   | ✅ 040          |
-| [21](#f21) | Uploaded files are stored but never served                          | the media library         | ✅ 040          |
-| [8](#f8)   | The Local API returns `Record<string, unknown>` — inference stops   | every server route        | 038             |
-| [5](#f5)   | A route's `allowedRoles` pre-empts the collection's own access rule | the public booking form   | ⚠️ documented   |
-| [19](#f19) | Hooks cannot tell a trusted server call from a public request       | the seed, silently        | ✅ 040          |
-| [4](#f4)   | No globals                                                          | site settings             | 023             |
-| [10](#f10) | No `findBySlug`; no "relation contains id" filter                   | every `/:slug` page       | 026             |
-| [7](#f7)   | `richtext` has no editor and no renderer                            | journal + treatment copy  | ✅ 042 (editor) |
-| [16](#f16) | `blocks` rows are untyped at the render site                        | the home page             | 038             |
-| [1](#f1)   | Field options that nothing reads (`autoGenerate`, `defaultValue`)   | 5 collections             | ✅ 040          |
-| [18](#f18) | No upload method in the client SDK                                  | the media library         | ✅ 041          |
-| [6](#f6)   | No email adapter, so a booking notifies nobody                      | the booking hook          | 029             |
-| [11](#f11) | No h3/Nitro helpers — auth routes are copy-paste                    | 6 route files             | 037             |
-| [13](#f13) | The Angular linker plugin must be copied into every app             | app setup                 | 037             |
-| [12](#f12) | The auth-token localStorage key is not exported                     | app setup                 | 028             |
-| [2](#f2)   | No SSR story for a content site                                     | the whole premise         | 036/037         |
-| [3](#f3)   | No money or timezone-aware date handling                            | prices, appointment times | new             |
-| [14](#f14) | `R2StorageAdapter` hardcodes the `BUCKET` binding name              | runtime wiring            | ✅ 040          |
-| [20](#f20) | The admin sidebar's nav items are hardcoded                         | admin routing             | ✅ 042          |
-| [22](#f22) | Adapters disagree about `created_at`/`updated_at`                   | sorting by creation date  | ✅ 040          |
+| #          | Finding                                                             | Bit us in                 | Roadmap                                   |
+| ---------- | ------------------------------------------------------------------- | ------------------------- | ----------------------------------------- |
+| [15](#f15) | The client SDK cannot filter, sort, limit, paginate or set depth    | every page of the site    | ✅ 041                                    |
+| [17](#f17) | The admin cannot see drafts — the client has no `status`            | the editor screen         | ✅ 041 + 042                              |
+| [9](#f9)   | `depth: 1` does not populate `upload` fields                        | every image on the site   | ✅ 040                                    |
+| [21](#f21) | Uploaded files are stored but never served                          | the media library         | ✅ 040                                    |
+| [8](#f8)   | The Local API returns `Record<string, unknown>` — inference stops   | every server route        | 038                                       |
+| [5](#f5)   | A route's `allowedRoles` pre-empts the collection's own access rule | the public booking form   | ⚠️ documented                             |
+| [19](#f19) | Hooks cannot tell a trusted server call from a public request       | the seed, silently        | ✅ 040                                    |
+| [4](#f4)   | No globals                                                          | site settings             | 023                                       |
+| [10](#f10) | No `findBySlug`; no "relation contains id" filter                   | every `/:slug` page       | ✅ 050 (package; demo route not migrated) |
+| [7](#f7)   | `richtext` has no editor and no renderer                            | journal + treatment copy  | ✅ 042 (editor)                           |
+| [16](#f16) | `blocks` rows are untyped at the render site                        | the home page             | 038                                       |
+| [1](#f1)   | Field options that nothing reads (`autoGenerate`, `defaultValue`)   | 5 collections             | ✅ 040                                    |
+| [18](#f18) | No upload method in the client SDK                                  | the media library         | ✅ 041                                    |
+| [6](#f6)   | No email adapter, so a booking notifies nobody                      | the booking hook          | 029                                       |
+| [11](#f11) | No h3/Nitro helpers — auth routes are copy-paste                    | 6 route files             | 037                                       |
+| [13](#f13) | The Angular linker plugin must be copied into every app             | app setup                 | 037                                       |
+| [12](#f12) | The auth-token localStorage key is not exported                     | app setup                 | 028                                       |
+| [2](#f2)   | No SSR story for a content site                                     | the whole premise         | 036/037                                   |
+| [3](#f3)   | No money or timezone-aware date handling                            | prices, appointment times | new                                       |
+| [14](#f14) | `R2StorageAdapter` hardcodes the `BUCKET` binding name              | runtime wiring            | ✅ 040                                    |
+| [20](#f20) | The admin sidebar's nav items are hardcoded                         | admin routing             | ✅ 042                                    |
+| [22](#f22) | Adapters disagree about `created_at`/`updated_at`                   | sorting by creation date  | ✅ 040                                    |
 
 ---
 
@@ -196,7 +196,14 @@ Two separate holes in the query layer, both hit on one page
    operator, and a `many` relation is stored as JSON. The demo loads the whole team and filters in
    JavaScript, which is fine for three people and wrong for three hundred.
 
-**Fix:** roadmap 026, plus a `findOne`/`where`-shorthand.
+**Fix:** roadmap 026, plus a `findOne`/`where`-shorthand — **done at the package level, spec 050,
+2026-08-30**: `runtime.findOne({ collection, where })` replaces the `find({ where, limit: 1 }).docs[0]`
+pattern, and `where: { specialties: { containsValue: staffId } }` (a new `containsValue` operator,
+valid on `relation` fields) replaces "load everything and filter in JavaScript" with a real
+database-side filter on every adapter. **The demo app's route file itself was deliberately not
+touched** — spec 050 was scoped to the core query layer only, not to migrating existing consumer
+code; `services/[slug].get.ts` still uses its original workaround, and updating it to use the new
+primitives is a follow-up, not part of this fix.
 
 <a id="f7"></a>
 
@@ -390,8 +397,9 @@ Specs 040, 041 and 042 landed in this branch straight after the demo, closing 12
    demo still ships as an SPA.
 2. **038 typed documents** (findings 8, 16). The demo still hand-writes 350 lines of payload types
    and casts every block at the render site.
-3. **023 globals** (finding 4) and **026 query completeness** (finding 10) — `findBySlug` and
-   "relation contains id" are both still worked around in the demo's route files.
+3. **023 globals** (finding 4) is still open. **026 query completeness** (finding 10) shipped at the
+   package level via spec 050 — `findOne`/`containsValue` now exist — but the demo's route file
+   itself still uses its original workaround; migrating it is a follow-up, not done here.
 4. **029 email** (finding 6). A booking form that notifies nobody is not finished.
 5. **037 framework integration** (findings 11, 13) — the route files and the Angular linker plugin
    are still copied per app.

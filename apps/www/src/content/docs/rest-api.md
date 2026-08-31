@@ -56,8 +56,27 @@ curl "…/api/v1/products?id[in]=a,b,c"
 curl "…/api/v1/products?name[contains]=laser"     # case-insensitive
 ```
 
-Operators: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in` (comma-separated), `contains`. An unknown
-operator is a `400`.
+Operators: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in` (comma-separated), `contains`, `containsValue`
+(relation-array membership, `relation({ many: true })` fields only). An unknown operator is a `400`.
+
+### Nested queries (`?where=`)
+
+For anything beyond flat implicit-AND, pass a URL-encoded JSON object as `where` — it **replaces**
+the flat filter parameters above for that request:
+
+```sh
+curl -G "…/api/v1/posts" --data-urlencode 'where={
+  "and": [
+    { "status": "published" },
+    { "or": [{ "featured": true }, { "views": { "gte": 1000 } }] }
+  ]
+}'
+```
+
+Strictly validated: malformed JSON, a non-object value, an unknown field, an unknown operator, an
+empty `and: []`/`or: []`, or nesting deeper than 6 levels are all a `400` — nothing reaches SQL
+unvalidated, and no adapter/SQL detail leaks into the error message. The parameter is capped at 4096
+characters.
 
 ### Sorting
 
@@ -65,8 +84,15 @@ operator is a `400`.
 curl "…/api/v1/posts?sort=publishedAt&order=desc"
 ```
 
-One field only. It must be a declared field or one of `id`, `created_at`, `updated_at`; anything
-else is a `400`. `order` must be `asc` or `desc`.
+A field name must be a declared field, `id`/`created_at`/`updated_at`, or `_status` (on a
+`drafts: true` collection); anything else is a `400`. `order` must be `asc` or `desc`.
+
+For a multi-field sort, pass a URL-encoded JSON array instead of a plain field name — each entry
+carries its own `order`, and the standalone `order` parameter is ignored:
+
+```sh
+curl -G "…/api/v1/posts" --data-urlencode 'sort=[{"field":"featured","order":"desc"},{"field":"created_at","order":"desc"}]'
+```
 
 ### Pagination
 
@@ -96,8 +122,8 @@ curl "…/api/v1/posts?status=draft"   # requires authentication
 curl "…/api/v1/posts?status=all"     # requires authentication
 ```
 
-Reserved parameter names — `limit`, `offset`, `sort`, `order`, `depth`, `status` — cannot be used as
-filter field names.
+Reserved parameter names — `limit`, `offset`, `sort`, `order`, `depth`, `status`, `where` — cannot be
+used as filter field names.
 
 ## Authentication
 

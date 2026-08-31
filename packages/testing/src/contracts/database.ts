@@ -380,3 +380,249 @@ export function runDatabaseAdapterConstraintContractTests(
     });
   });
 }
+
+// --- Query completeness & adapter parity (spec 050) ---------------------------------------------
+
+type QueryWhereCondition = unknown | Record<string, unknown>;
+type QueryWhereFields = Record<string, QueryWhereCondition>;
+interface QueryWhereAndGroup {
+  and: QueryWhere[];
+}
+interface QueryWhereOrGroup {
+  or: QueryWhere[];
+}
+type QueryWhere = QueryWhereFields | QueryWhereAndGroup | QueryWhereOrGroup;
+interface QuerySortField {
+  field: string;
+  order?: 'asc' | 'desc';
+}
+type QuerySortInput = string | QuerySortField[];
+
+interface ContractQueryDatabaseAdapter {
+  readonly name: string;
+  findMany(options: {
+    collection: string;
+    limit?: number;
+    offset?: number;
+    where?: QueryWhere;
+    sort?: QuerySortInput;
+    order?: 'asc' | 'desc';
+  }): Promise<Record<string, unknown>[]>;
+  create(collection: string, data: Record<string, unknown>): Promise<Record<string, unknown>>;
+  count(collection: string, where?: QueryWhere): Promise<number>;
+  syncSchema(collections: unknown[]): Promise<void>;
+}
+
+/**
+ * Proves nested `and`/`or` boolean queries, multi-field sort, and relation-array membership
+ * (`containsValue`) find/count identically across every `DatabaseAdapter` (spec 050 §15). One shared
+ * `articles` dataset, one shared set of query cases, run from InMemory, a real libSQL `:memory:`
+ * database, and the D1 mock — an adapter-behavior divergence here would otherwise only surface as a
+ * production bug on whichever adapter wasn't exercised.
+ */
+export function runDatabaseAdapterQueryContractTests(
+  createAdapter: () => ContractQueryDatabaseAdapter
+) {
+  describe('DatabaseAdapter query contract (nested and/or, multi-sort, containsValue)', () => {
+    let adapter: ContractQueryDatabaseAdapter;
+
+    const articles = defineCollection({
+      slug: 'articles',
+      fields: {
+        title: defineField.text({ required: true }),
+        category: defineField.text(),
+        status: defineField.text(),
+        featured: defineField.boolean(),
+        views: defineField.number(),
+        tags: defineField.relation({ collection: 'tags', many: true })
+      }
+    });
+
+    beforeEach(async () => {
+      adapter = createAdapter();
+      await adapter.syncSchema([articles]);
+
+      await adapter.create('articles', {
+        id: 'q1',
+        title: 'Published News',
+        category: 'news',
+        status: 'published',
+        featured: false,
+        views: 50,
+        tags: ['a', 'b']
+      });
+      await adapter.create('articles', {
+        id: 'q2',
+        title: 'Published Featured',
+        category: 'opinion',
+        status: 'published',
+        featured: true,
+        views: 10,
+        tags: ['b', 'c']
+      });
+      await adapter.create('articles', {
+        id: 'q3',
+        title: 'Draft News',
+        category: 'news',
+        status: 'draft',
+        featured: false,
+        views: 200,
+        tags: ['c']
+      });
+      await adapter.create('articles', {
+        id: 'q4',
+        title: 'Draft Featured',
+        category: 'opinion',
+        status: 'draft',
+        featured: true,
+        views: 5,
+        tags: []
+      });
+    });
+
+    it('still supports flat implicit-AND across fields (backward compatibility)', async () => {
+      const results = await adapter.findMany({
+        collection: 'articles',
+        where: { status: 'published', category: 'news' }
+      });
+      expect(results.map((r) => r.id)).toEqual(['q1']);
+    });
+
+    it('ANDs a top-level `and` group', async () => {
+      const results = await adapter.findMany({
+        collection: 'articles',
+        where: { and: [{ status: 'published' }, { category: 'news' }] }
+      });
+      expect(results.map((r) => r.id)).toEqual(['q1']);
+    });
+
+    it('ORs a top-level `or` group', async () => {
+      const results = await adapter.findMany({
+        collection: 'articles',
+        where: { or: [{ category: 'news' }, { featured: true }] }
+      });
+      expect(results.map((r) => r.id).sort()).toEqual(['q1', 'q2', 'q3', 'q4']);
+    });
+
+    it('nests an `or` inside an `and`', async () => {
+      const results = await adapter.findMany({
+        collection: 'articles',
+        where: {
+          and: [{ status: 'published' }, { or: [{ category: 'news' }, { featured: true }] }]
+        }
+      });
+      expect(results.map((r) => r.id).sort()).toEqual(['q1', 'q2']);
+    });
+
+    it('nests an `and` inside an `or`', async () => {
+      const results = await adapter.findMany({
+        collection: 'articles',
+        where: {
+          or: [
+            { and: [{ status: 'draft' }, { featured: true }] },
+            { and: [{ status: 'published' }, { category: 'news' }] }
+          ]
+        }
+      });
+      expect(results.map((r) => r.id).sort()).toEqual(['q1', 'q4']);
+    });
+
+    it('composes nested groups with field operators', async () => {
+      const results = await adapter.findMany({
+        collection: 'articles',
+        where: { and: [{ status: { eq: 'published' } }, { views: { gte: 10 } }] }
+      });
+      expect(results.map((r) => r.id).sort()).toEqual(['q1', 'q2']);
+    });
+
+    it('count() matches find() under the same nested filter', async () => {
+      const where: QueryWhere = {
+        and: [{ status: 'published' }, { or: [{ category: 'news' }, { featured: true }] }]
+      };
+      const found = await adapter.findMany({ collection: 'articles', where });
+      const counted = await adapter.count('articles', where);
+      expect(counted).toBe(found.length);
+      expect(counted).toBe(2);
+    });
+
+    it('sorts by multiple fields, first field wins ties', async () => {
+      const results = await adapter.findMany({
+        collection: 'articles',
+        sort: [
+          { field: 'featured', order: 'desc' },
+          { field: 'views', order: 'asc' }
+        ]
+      });
+      expect(results.map((r) => r.id)).toEqual(['q4', 'q2', 'q1', 'q3']);
+    });
+
+    it('keeps single-field sort working (backward compatibility)', async () => {
+      const results = await adapter.findMany({
+        collection: 'articles',
+        sort: 'views',
+        order: 'asc'
+      });
+      expect(results.map((r) => r.id)).toEqual(['q4', 'q2', 'q1', 'q3']);
+    });
+
+    it('filters relation-array membership with containsValue', async () => {
+      const results = await adapter.findMany({
+        collection: 'articles',
+        where: { tags: { containsValue: 'b' } }
+      });
+      expect(results.map((r) => r.id).sort()).toEqual(['q1', 'q2']);
+    });
+
+    it('containsValue finds nothing against an empty relation array', async () => {
+      const results = await adapter.findMany({
+        collection: 'articles',
+        where: { tags: { containsValue: 'z' } }
+      });
+      expect(results).toEqual([]);
+    });
+
+    it('combines containsValue with a nested group', async () => {
+      const results = await adapter.findMany({
+        collection: 'articles',
+        where: { and: [{ status: 'published' }, { tags: { containsValue: 'c' } }] }
+      });
+      expect(results.map((r) => r.id)).toEqual(['q2']);
+    });
+
+    // Empty groups: an access-rule constraint that legitimately narrows to zero possibilities (e.g.
+    // `{ or: user.tenants.map(...) }` for a tenant-less user) is never validated the way caller-supplied
+    // `where` is — the adapter itself must interpret an empty group correctly, matching the standard
+    // empty-conjunction/-disjunction identities `matchesWhere` (the InMemory reference) already uses.
+    // A real bug once had libSQL/D1 compile an empty `or` to "no filter" (all rows) instead of "no
+    // match" (spec 050 hardening).
+    it('an empty `or: []` matches nothing, identically to `matchesWhere`', async () => {
+      const results = await adapter.findMany({ collection: 'articles', where: { or: [] } });
+      expect(results).toEqual([]);
+      expect(await adapter.count('articles', { or: [] })).toBe(0);
+    });
+
+    it('an empty `and: []` matches everything, identically to `matchesWhere`', async () => {
+      const results = await adapter.findMany({ collection: 'articles', where: { and: [] } });
+      expect(results.map((r) => r.id).sort()).toEqual(['q1', 'q2', 'q3', 'q4']);
+      expect(await adapter.count('articles', { and: [] })).toBe(4);
+    });
+
+    it('an empty `or: []` nested inside an `and` still zeroes out the whole result', async () => {
+      const results = await adapter.findMany({
+        collection: 'articles',
+        where: { and: [{ status: 'published' }, { or: [] }] }
+      });
+      expect(results).toEqual([]);
+    });
+
+    // Mixed keys: `and`/`or` are reserved keys, not the only key a where node may carry — a sibling
+    // flat field must stay AND-ed in, not silently dropped (spec 050 hardening).
+    it('ANDs a flat key with a sibling `or` group instead of dropping the flat key', async () => {
+      const results = await adapter.findMany({
+        collection: 'articles',
+        where: { status: 'draft', or: [{ category: 'news' }, { featured: true }] }
+      });
+      expect(results.map((r) => r.id).sort()).toEqual(['q3', 'q4']);
+    });
+  });
+}

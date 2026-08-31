@@ -101,6 +101,55 @@ describe('CmsApiService — querying', () => {
 
     expect(new URL(calls[0]!.url, 'http://localhost').searchParams.get('status')).toBe('all');
   });
+
+  it('serializes a nested and/or where through the shared query helper (spec 050)', async () => {
+    const api = createService();
+    await api.getDocuments('services', {
+      where: {
+        and: [{ status: 'published' }, { or: [{ featured: true }, { views: { gte: 100 } }] }]
+      }
+    });
+
+    const url = new URL(calls[0]!.url, 'http://localhost');
+    expect(JSON.parse(url.searchParams.get('where')!)).toEqual({
+      and: [{ status: 'published' }, { or: [{ featured: true }, { views: { gte: 100 } }] }]
+    });
+  });
+
+  it('serializes a multi-field sort as JSON (spec 050)', async () => {
+    const api = createService();
+    await api.getDocuments('services', {
+      sort: [
+        { field: 'featured', order: 'desc' },
+        { field: 'created_at', order: 'desc' }
+      ]
+    });
+
+    const url = new URL(calls[0]!.url, 'http://localhost');
+    expect(JSON.parse(url.searchParams.get('sort')!)).toEqual([
+      { field: 'featured', order: 'desc' },
+      { field: 'created_at', order: 'desc' }
+    ]);
+  });
+
+  it('findOne requests limit: 1 and returns the first document, or null', async () => {
+    const api = createService();
+    respond = () => jsonResponse(listBody([{ id: '1', slug: 'hello' }]));
+
+    const doc = await api.findOne('posts', { slug: 'hello' });
+
+    const url = new URL(calls[0]!.url, 'http://localhost');
+    expect(url.searchParams.get('limit')).toBe('1');
+    expect(url.searchParams.get('slug')).toBe('hello');
+    expect(doc).toEqual({ id: '1', slug: 'hello' });
+  });
+
+  it('findOne returns null when nothing matches', async () => {
+    const api = createService();
+    respond = () => jsonResponse(listBody([]));
+
+    expect(await api.findOne('posts', { slug: 'nope' })).toBeNull();
+  });
 });
 
 describe('CmsApiService — authentication', () => {

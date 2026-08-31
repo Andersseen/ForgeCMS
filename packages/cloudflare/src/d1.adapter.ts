@@ -12,7 +12,8 @@ import {
   toDbValue,
   fromDbValue,
   toOperatorValues,
-  toUniqueConstraintError
+  toUniqueConstraintError,
+  normalizeSort
 } from '@forge-cms/db';
 import type { D1Database } from './bindings.js';
 
@@ -111,55 +112,109 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
   /**
    * Builds a parameterized `WHERE` clause (empty string when there is nothing to filter on). Column
    * names are validated against the collection's known fields before interpolation; values always go
-   * through bindings, never string concatenation.
+   * through bindings, never string concatenation. Nested `and`/`or` groups compile to parenthesized SQL
+   * (spec 050), e.g. `("status" = ?) AND (("category" = ?) OR ("featured" = ?))`.
    */
   private buildWhereClause(
     collection: string,
     where: DatabaseWhere | undefined
   ): { clause: string; bindings: unknown[] } {
-    const bindings: unknown[] = [];
-    if (!where || Object.keys(where).length === 0) return { clause: '', bindings };
-
     const collectionDef = this.getCollectionDef(collection);
-    const conditions = Object.entries(where).flatMap(([key, condition]) => {
+    const expr = this.buildWhereExpression(collectionDef, where);
+    return { clause: expr ? ` WHERE ${expr.sql}` : '', bindings: expr?.bindings ?? [] };
+  }
+
+  /**
+   * Every key at a level is AND-ed together, whatever it means — a flat column condition, or (for
+   * `and`/`or`) a nested group — so `and`/`or` can sit alongside flat keys in the same object without
+   * one silently winning (spec 050 hardening). A group's own joined SQL is always wrapped in one more
+   * paren layer here (even when it is the only part) so it composes safely with AND-precedence when
+   * combined with sibling parts — SQL's `AND` binds tighter than `OR`, so an unwrapped
+   * `"a" = ? AND "b" = ? OR "c" = ?` would parse as `("a"=? AND "b"=?) OR "c"=?`, not the intended
+   * `"a"=? AND ("b"=? OR "c"=?)`. An empty `or: []` compiles to the constant `0` (always false — the
+   * empty-disjunction identity `matchesWhere` also uses), not "no condition": an access-rule
+   * constraint that legitimately narrows to zero matches must not silently become "no filter at all"
+   * once it reaches SQL.
+   */
+  private buildWhereExpression(
+    collectionDef: CollectionDefinition,
+    where: DatabaseWhere | undefined
+  ): { sql: string; bindings: unknown[] } | undefined {
+    if (!where || Object.keys(where).length === 0) return undefined;
+
+    const parts: { sql: string; bindings: unknown[] }[] = [];
+
+    for (const [key, value] of Object.entries(where)) {
+      if (key === 'and' || key === 'or') {
+        const children = (value as DatabaseWhere[])
+          .map((child) => this.buildWhereExpression(collectionDef, child))
+          .filter((c): c is { sql: string; bindings: unknown[] } => c !== undefined);
+        if (key === 'or') {
+          parts.push(
+            children.length > 0
+              ? {
+                  sql: `(${children.map((c) => `(${c.sql})`).join(' OR ')})`,
+                  bindings: children.flatMap((c) => c.bindings)
+                }
+              : { sql: '0', bindings: [] }
+          );
+        } else if (children.length > 0) {
+          parts.push({
+            sql: `(${children.map((c) => `(${c.sql})`).join(' AND ')})`,
+            bindings: children.flatMap((c) => c.bindings)
+          });
+        }
+        continue;
+      }
+
       assertValidColumn(key, collectionDef);
       const field = collectionDef?.fields[key];
       const coerce = (v: unknown) => (field ? toDbValue(v, field.kind) : v);
+      const bindings: unknown[] = [];
 
-      return toOperatorValues(condition).map(({ operator, value }) => {
+      const conditions = toOperatorValues(value).map(({ operator, value: opValue }) => {
         switch (operator) {
           case 'ne':
-            bindings.push(coerce(value));
+            bindings.push(coerce(opValue));
             return `"${key}" != ?`;
           case 'gt':
-            bindings.push(coerce(value));
+            bindings.push(coerce(opValue));
             return `"${key}" > ?`;
           case 'gte':
-            bindings.push(coerce(value));
+            bindings.push(coerce(opValue));
             return `"${key}" >= ?`;
           case 'lt':
-            bindings.push(coerce(value));
+            bindings.push(coerce(opValue));
             return `"${key}" < ?`;
           case 'lte':
-            bindings.push(coerce(value));
+            bindings.push(coerce(opValue));
             return `"${key}" <= ?`;
           case 'in': {
-            const values = (value as unknown[]).map(coerce);
+            const values = (opValue as unknown[]).map(coerce);
             bindings.push(...values);
             return `"${key}" IN (${values.map(() => '?').join(', ')})`;
           }
           case 'contains':
-            bindings.push(`%${value as string}%`);
+            bindings.push(`%${opValue as string}%`);
             return `"${key}" LIKE ?`;
+          case 'containsValue':
+            bindings.push(opValue);
+            return `EXISTS (SELECT 1 FROM json_each("${key}") WHERE value = ?)`;
           case 'eq':
           default:
-            bindings.push(coerce(value));
+            bindings.push(coerce(opValue));
             return `"${key}" = ?`;
         }
       });
-    });
 
-    return { clause: ` WHERE ${conditions.join(' AND ')}`, bindings };
+      parts.push({ sql: conditions.join(' AND '), bindings });
+    }
+
+    if (parts.length === 0) return undefined;
+    return {
+      sql: parts.map((p) => p.sql).join(' AND '),
+      bindings: parts.flatMap((p) => p.bindings)
+    };
   }
 
   async findMany(options: FindManyOptions): Promise<DatabaseRecord[]> {
@@ -170,8 +225,16 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     let sql = `SELECT * FROM "${options.collection}"${clause}`;
 
     if (options.sort) {
-      assertValidColumn(options.sort, collectionDef);
-      sql += ` ORDER BY "${options.sort}" ${options.order === 'desc' ? 'DESC' : 'ASC'}`;
+      const sortFields = normalizeSort(options.sort, options.order);
+      if (sortFields.length > 0) {
+        const orderBy = sortFields
+          .map(({ field, order }) => {
+            assertValidColumn(field, collectionDef);
+            return `"${field}" ${order === 'desc' ? 'DESC' : 'ASC'}`;
+          })
+          .join(', ');
+        sql += ` ORDER BY ${orderBy}`;
+      }
     }
 
     if (options.limit !== undefined) {

@@ -357,6 +357,71 @@ try {
 }
 if (!compositeRejected) throw new Error('Expected an unauthenticated request to be rejected');
 
+// Query completeness & adapter parity (spec 050): nested and/or, findOne, multi-field sort, and
+// relation-array containsValue, all through the packed public surface only.
+const queryDb = new InMemoryDatabaseAdapter();
+const queryRuntime = new ForgeCmsRuntime({
+  collections: [
+    defineCollection({
+      slug: 'articles2',
+      fields: {
+        title: defineField.text({ required: true }),
+        category: defineField.text(),
+        status: defineField.text(),
+        featured: defineField.boolean(),
+        views: defineField.number(),
+        tags: defineField.relation({ collection: 'tags', many: true })
+      }
+    })
+  ],
+  adapters: { database: queryDb, auth: new InMemoryAuthAdapter(), storage: new InMemoryStorageAdapter() }
+});
+queryRuntime.init();
+await queryRuntime.syncSchema();
+
+await queryRuntime.create({
+  collection: 'articles2',
+  data: { title: 'News', category: 'news', status: 'published', featured: false, views: 50, tags: ['a'] }
+});
+await queryRuntime.create({
+  collection: 'articles2',
+  data: { title: 'Opinion', category: 'opinion', status: 'published', featured: true, views: 10, tags: ['b'] }
+});
+await queryRuntime.create({
+  collection: 'articles2',
+  data: { title: 'Draft', category: 'news', status: 'draft', featured: false, views: 200, tags: [] }
+});
+
+const nested = await queryRuntime.find({
+  collection: 'articles2',
+  where: { and: [{ status: 'published' }, { or: [{ category: 'news' }, { featured: true }] }] }
+});
+if (nested.docs.length !== 2) throw new Error('Expected a nested and/or where to match 2 documents');
+
+const sorted = await queryRuntime.find({
+  collection: 'articles2',
+  sort: [
+    { field: 'featured', order: 'desc' },
+    { field: 'views', order: 'asc' }
+  ]
+});
+if (sorted.docs.map((d) => d.title).join(',') !== 'Opinion,News,Draft') {
+  throw new Error('Expected multi-field sort to order featured desc, then views asc');
+}
+
+const one = await queryRuntime.findOne({ collection: 'articles2', where: { category: 'opinion' } });
+if (one?.title !== 'Opinion') throw new Error('Expected findOne to return the matching document');
+const none = await queryRuntime.findOne({ collection: 'articles2', where: { category: 'nope' } });
+if (none !== null) throw new Error('Expected findOne to return null for no match');
+
+const membership = await queryRuntime.find({
+  collection: 'articles2',
+  where: { tags: { containsValue: 'a' } }
+});
+if (membership.docs.length !== 1 || membership.docs[0].title !== 'News') {
+  throw new Error('Expected containsValue to filter by relation-array membership');
+}
+
 console.log('runtime consumer ok');
 `
   );
@@ -428,7 +493,7 @@ function verifyAngularConsumer(tarballs) {
   writeFileSync(
     join(srcDir, 'index.ts'),
     `import { Component, inject } from '@angular/core';
-import { CmsApiService, provideForgeCms } from '@forge-cms/angular';
+import { CmsApiService, provideForgeCms, type QueryOptions } from '@forge-cms/angular';
 import {
   ForgeAdminLayoutComponent,
   ForgeCollectionListComponent,
@@ -436,6 +501,18 @@ import {
 } from '@forge-cms/admin';
 
 const providers = provideForgeCms({ baseUrl: '/api' });
+
+// Query completeness (spec 050): nested and/or where + multi-field sort compile through the packed
+// public \`QueryOptions\` type; findOne is a real method on the packed CmsApiService.
+const queryOptions: QueryOptions = {
+  where: { and: [{ status: 'published' }, { or: [{ featured: true }, { views: { gte: 100 } }] }] },
+  sort: [{ field: 'featured', order: 'desc' }]
+};
+void queryOptions;
+async function useFindOne(api: CmsApiService) {
+  return api.findOne('posts', { slug: 'hello' });
+}
+void useFindOne;
 
 const adminConfig: ForgeAdminConfig = {
   title: 'External ForgeCMS',

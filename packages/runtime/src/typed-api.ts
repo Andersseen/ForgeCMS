@@ -13,6 +13,7 @@ import type {
   DeleteArgs,
   FindArgs,
   FindByIDArgs,
+  FindOneArgs,
   PaginatedDocs,
   UpdateArgs
 } from './operations.js';
@@ -29,10 +30,19 @@ export type TypedSortField<TCollection extends CollectionDefinition> = Extract<
   string
 >;
 
-/** A `where` clause narrowed to known field names; values stay loosely typed (see spec non-goals). */
-export type TypedWhere<TCollection extends CollectionDefinition> = Partial<
-  Record<TypedSortField<TCollection>, WhereCondition>
->;
+/**
+ * A `where` clause narrowed to known field names; values stay loosely typed (see spec non-goals).
+ * Recursive `and`/`or` groups (spec 050) keep the same field-name narrowing at every nesting level.
+ */
+export type TypedWhere<TCollection extends CollectionDefinition> =
+  | Partial<Record<TypedSortField<TCollection>, WhereCondition>>
+  | { and: TypedWhere<TCollection>[] }
+  | { or: TypedWhere<TCollection>[] };
+
+/** `sort`: a single typed field name (legacy), or a multi-field sort list (spec 050). */
+export type TypedSortInput<TCollection extends CollectionDefinition> =
+  | TypedSortField<TCollection>
+  | { field: TypedSortField<TCollection>; order?: 'asc' | 'desc' }[];
 
 export type TypedFindArgs<
   TCollections extends CollectionRegistry,
@@ -40,13 +50,23 @@ export type TypedFindArgs<
 > = Omit<FindArgs, 'collection' | 'where' | 'sort'> & {
   collection: TSlug;
   where?: TypedWhere<CollectionBySlug<TCollections, TSlug>>;
-  sort?: TypedSortField<CollectionBySlug<TCollections, TSlug>>;
+  sort?: TypedSortInput<CollectionBySlug<TCollections, TSlug>>;
 };
 
 export type TypedFindByIDArgs<
   TCollections extends CollectionRegistry,
   TSlug extends CollectionSlug<TCollections>
 > = Omit<FindByIDArgs, 'collection'> & { collection: TSlug };
+
+/** Typed `findOne` args — same shape as {@link TypedFindArgs} minus pagination (spec 050 §5). */
+export type TypedFindOneArgs<
+  TCollections extends CollectionRegistry,
+  TSlug extends CollectionSlug<TCollections>
+> = Omit<FindOneArgs, 'collection' | 'where' | 'sort'> & {
+  collection: TSlug;
+  where?: TypedWhere<CollectionBySlug<TCollections, TSlug>>;
+  sort?: TypedSortInput<CollectionBySlug<TCollections, TSlug>>;
+};
 
 export type TypedCountArgs<
   TCollections extends CollectionRegistry,

@@ -1,6 +1,6 @@
 import type { ApiContext } from '@forge-cms/api';
 import type { AnyForgeCmsRuntime, ForgeCmsRuntime } from './runtime.js';
-import type { DatabaseWhere } from '@forge-cms/db';
+import type { DatabaseWhere, SortField, SortInput } from '@forge-cms/db';
 import type { CollectionDefinition, DraftStatus } from '@forge-cms/core';
 import { getLogger } from '@forge-cms/core';
 import type { AuthUser, UserRole } from '@forge-cms/auth';
@@ -15,7 +15,17 @@ import {
   toApiErrorBody
 } from './errors.js';
 
-const WHERE_OPERATORS = new Set(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'contains']);
+const WHERE_OPERATORS = new Set([
+  'eq',
+  'ne',
+  'gt',
+  'gte',
+  'lt',
+  'lte',
+  'in',
+  'contains',
+  'containsValue'
+]);
 const SYSTEM_SORT_FIELDS = new Set(['id', 'created_at', 'updated_at']);
 const RESERVED_QUERY_PARAMS = new Set([
   'limit',
@@ -24,9 +34,17 @@ const RESERVED_QUERY_PARAMS = new Set([
   'order',
   'depth',
   'status',
-  'locale'
+  'locale',
+  'where'
 ]);
 const WHERE_KEY_PATTERN = /^(.+)\[(\w+)\]$/;
+/** Generous but bounded — a nested `?where=` is meant for a real filter, not an attack payload. */
+const MAX_WHERE_PARAM_LENGTH = 4096;
+
+/** `id`/`created_at`/`updated_at` are always sortable; `_status` only on a `drafts: true` collection. */
+function isSortableSystemField(collection: CollectionDefinition, key: string): boolean {
+  return SYSTEM_SORT_FIELDS.has(key) || (collection.drafts === true && key === '_status');
+}
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 500;
@@ -91,14 +109,41 @@ function coerceScalar(collection: CollectionDefinition, key: string, value: stri
 }
 
 function assertValidFilterField(collection: CollectionDefinition, key: string): void {
-  if (!SYSTEM_SORT_FIELDS.has(key) && !collection.fields[key]) {
+  if (!isSortableSystemField(collection, key) && !collection.fields[key]) {
     throw new InvalidQueryError(
       `Unknown filter field '${key}' for collection '${collection.slug}'`
     );
   }
 }
 
+/**
+ * Parses `?where=<json>` — a structured, nested `and`/`or` query (spec 050 §16). Only shape/size is
+ * checked here (valid JSON, a plain object, under the size cap); field/operator validity is checked
+ * once, downstream, by `operations.ts`'s `validateWhere` — the single place that already runs for
+ * both the Local API and HTTP, so it can't drift from this transport's own rules.
+ */
+function parseStructuredWhere(raw: string): DatabaseWhere {
+  if (raw.length > MAX_WHERE_PARAM_LENGTH) {
+    throw new InvalidQueryError(
+      `'where' query parameter exceeds the maximum length of ${MAX_WHERE_PARAM_LENGTH} characters`
+    );
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new InvalidQueryError("Invalid JSON in 'where' query parameter");
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new InvalidQueryError("'where' query parameter must be a JSON object");
+  }
+  return parsed as DatabaseWhere;
+}
+
 function parseWhere(collection: CollectionDefinition, url: URL): DatabaseWhere {
+  const structured = url.searchParams.get('where');
+  if (structured !== null) return parseStructuredWhere(structured);
+
   const where: DatabaseWhere = {};
 
   url.searchParams.forEach((value, rawKey) => {
@@ -140,14 +185,32 @@ function isOperatorObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** Parses a JSON-array `sort` param into `SortField[]` — shape only; fields validated downstream. */
+function parseStructuredSort(raw: string): SortField[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new InvalidQueryError("Invalid JSON in 'sort' query parameter");
+  }
+  if (!Array.isArray(parsed)) {
+    throw new InvalidQueryError("'sort' query parameter must be a JSON array of { field, order }");
+  }
+  return parsed as SortField[];
+}
+
 function parseSort(
   collection: CollectionDefinition,
   url: URL
-): { sort?: string; order?: 'asc' | 'desc' } {
+): { sort?: SortInput; order?: 'asc' | 'desc' } {
   const sortParam = url.searchParams.get('sort');
   if (!sortParam) return {};
 
-  if (!SYSTEM_SORT_FIELDS.has(sortParam) && !collection.fields[sortParam]) {
+  if (sortParam.trimStart().startsWith('[')) {
+    return { sort: parseStructuredSort(sortParam) };
+  }
+
+  if (!isSortableSystemField(collection, sortParam) && !collection.fields[sortParam]) {
     throw new InvalidQueryError(
       `Unknown sort field '${sortParam}' for collection '${collection.slug}'`
     );

@@ -83,4 +83,36 @@ describe('buildQueryString', () => {
   it('passes the draft status through', () => {
     expect(new URLSearchParams(buildQueryString({ status: 'all' })).get('status')).toBe('all');
   });
+
+  it('serializes a top-level and/or where as ?where=<json> (spec 050)', () => {
+    const where = {
+      and: [{ status: 'published' }, { or: [{ featured: true }, { views: { gte: 100 } }] }]
+    };
+    const params = new URLSearchParams(buildQueryString({ where }));
+
+    expect(params.get('featured')).toBeNull(); // not flattened into field params
+    expect(JSON.parse(params.get('where')!)).toEqual(where);
+  });
+
+  it('serializes a multi-field sort as JSON (spec 050)', () => {
+    const sort = [
+      { field: 'featured', order: 'desc' as const },
+      { field: 'views', order: 'asc' as const }
+    ];
+    const params = new URLSearchParams(buildQueryString({ sort }));
+
+    expect(JSON.parse(params.get('sort')!)).toEqual(sort);
+  });
+
+  it('keeps single-field sort as a plain string (backward compatibility)', () => {
+    const params = new URLSearchParams(buildQueryString({ sort: 'views', order: 'desc' }));
+    expect(params.get('sort')).toBe('views');
+    expect(params.get('order')).toBe('desc');
+  });
+
+  it('a flat where (no and/or) still serializes field-by-field, unchanged', () => {
+    const params = new URLSearchParams(buildQueryString({ where: { category: 'news' } }));
+    expect(params.get('category')).toBe('news');
+    expect(params.get('where')).toBeNull();
+  });
 });

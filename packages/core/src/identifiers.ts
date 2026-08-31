@@ -13,6 +13,13 @@ const IDENTIFIER_PATTERN = /^_?[a-z][a-zA-Z0-9_]*$/;
 const SYSTEM_FIELD_NAMES = new Set(['id', 'created_at', 'updated_at', '_status', '_storageKey']);
 
 /**
+ * `and`/`or` are reserved top-level keys in a `where` query (spec 050) — a flat filter object
+ * carrying one of them would be parsed as a boolean group instead of a field filter. Reserved here so
+ * a field can never legally collide with it, the same way system fields are reserved.
+ */
+const RESERVED_QUERY_KEYWORDS = new Set(['and', 'or']);
+
+/**
  * Prefix reserved for Forge's own internal system collections (e.g. `_forge_api_keys`, machine auth's
  * key store). Those are built directly as plain objects rather than through `defineCollection`/
  * `defineGlobal` — the one legitimate user of this prefix, and the only reason this check lives there
@@ -68,6 +75,11 @@ function validateFieldIdentifiers(
     if (SYSTEM_FIELD_NAMES.has(fieldName)) {
       errors.push(
         `Field name "${path}" in collection "${context.collectionSlug}" conflicts with a system field.`
+      );
+    }
+    if (RESERVED_QUERY_KEYWORDS.has(fieldName)) {
+      errors.push(
+        `Field name "${path}" in collection "${context.collectionSlug}" conflicts with the reserved query keyword "${fieldName}" ("and"/"or" are reserved for nested where queries).`
       );
     }
 
