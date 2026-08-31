@@ -1,5 +1,11 @@
 # @forge-cms/testing
 
+## 0.1.2
+
+### Patch Changes
+
+- @forge-cms/core@0.1.2
+
 ## 0.1.1
 
 ### Patch Changes
