@@ -1,5 +1,12 @@
 import type { DatabaseAdapter, DatabaseRecord } from '@forge-cms/db';
-import type { AuthAdapter, AuthSession, AuthUser } from './index.js';
+import { isUniqueConstraintError } from '@forge-cms/db';
+import type {
+  AuthActionResult,
+  AuthAdapter,
+  AuthSession,
+  AuthUser,
+  PublicSignupInput
+} from './index.js';
 import { ForgeAuthError } from './index.js';
 import { extractToken, issueToken, looksLikeSignedToken, validateSession } from './token-signer.js';
 import type { UserRole } from './roles.js';
@@ -10,8 +17,16 @@ export interface UsersCollectionAuthEnv {
   userDatabase?: DatabaseAdapter;
 }
 
+export interface PasswordPolicy {
+  /** Defaults to 8. */
+  minLength?: number;
+}
+
 export interface UsersCollectionAuthAdapterOptions {
   devMode?: boolean;
+  passwordPolicy?: PasswordPolicy;
+  /** Defaults to `'users'` — must match the slug passed to `defineUsersCollection()`/`withAuthFields()`. */
+  collection?: string;
 }
 
 export interface CreateUserInput {
@@ -23,6 +38,9 @@ export interface CreateUserInput {
 
 const DEFAULT_COLLECTION = 'users';
 const DEV_SECRET = 'forgecms-dev-only-signing-secret-do-not-use-in-real-deployments';
+const DEFAULT_MIN_PASSWORD_LENGTH = 8;
+/** Matches `@forge-cms/core`'s own `email` field validator (`validation.ts`'s `email_format` check). */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const SALT_BYTES = 16;
 const ITERATIONS = 100_000;
@@ -100,6 +118,20 @@ function sanitizeUser(record: DatabaseRecord): AuthUser {
   return rest as unknown as AuthUser;
 }
 
+/** Case/whitespace-insensitive email lookups and storage — `Foo@Bar.com` and `foo@bar.com` are one user. */
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function isValidEmail(email: string): boolean {
+  return EMAIL_PATTERN.test(email);
+}
+
+function meetsPasswordPolicy(password: string, policy: PasswordPolicy | undefined): boolean {
+  const minLength = policy?.minLength ?? DEFAULT_MIN_PASSWORD_LENGTH;
+  return password.length >= minLength;
+}
+
 /**
  * Auth adapter backed by a real `users` collection in the configured database.
  * Passwords are hashed with PBKDF2 (Web Crypto) and never stored or returned in plain text.
@@ -108,11 +140,14 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
   readonly name = 'users-collection';
   private secret?: string;
   private db?: DatabaseAdapter;
-  private collection = DEFAULT_COLLECTION;
+  private collection: string;
   private readonly devMode: boolean;
+  private readonly passwordPolicy?: PasswordPolicy;
 
   constructor(options: UsersCollectionAuthAdapterOptions = {}) {
     this.devMode = options.devMode ?? false;
+    if (options.passwordPolicy !== undefined) this.passwordPolicy = options.passwordPolicy;
+    this.collection = options.collection ?? DEFAULT_COLLECTION;
   }
 
   init(env?: UsersCollectionAuthEnv): this {
@@ -184,42 +219,104 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     return user;
   }
 
-  async login(email: string, password: string): Promise<{ token: string; user: AuthUser } | null> {
+  async login(email: string, password: string): Promise<AuthActionResult> {
     const db = this.getDb();
-    const records = await db.findMany({ collection: this.collection, where: { email } });
+    const records = await db.findMany({
+      collection: this.collection,
+      where: { email: normalizeEmail(email) }
+    });
     const record = records[0];
-    if (!record) return null;
+    if (!record) return { ok: false, reason: 'invalid-credentials' };
 
     const storedHash = record.passwordHash as string | undefined;
-    if (!storedHash) return null;
+    if (!storedHash) return { ok: false, reason: 'invalid-credentials' };
 
     const valid = await verifyPassword(password, storedHash);
-    if (!valid) return null;
+    if (!valid) return { ok: false, reason: 'invalid-credentials' };
 
     const user = sanitizeUser(record);
     const token = await issueToken(this.getSecret(), user);
-    return { token, user };
+    return { ok: true, token, user };
   }
 
-  async createUser(input: CreateUserInput): Promise<{ token: string; user: AuthUser } | null> {
-    const db = this.getDb();
-    const existing = await db.findMany({
-      collection: this.collection,
-      where: { email: input.email }
-    });
-    if (existing.length > 0) return null;
+  /** `true` once the users collection has at least one row — used by the first-admin bootstrap. */
+  private async hasAnyUser(db: DatabaseAdapter): Promise<boolean> {
+    const existing = await db.findMany({ collection: this.collection, limit: 1 });
+    return existing.length > 0;
+  }
 
+  /**
+   * Trusted, admin-facing user creation: the caller picks the role. The very first user created in a
+   * fresh install is always forced to `admin` regardless of the requested role, so a new install can
+   * never end up with a non-admin as its only user.
+   */
+  async createUser(input: CreateUserInput): Promise<AuthActionResult> {
+    const email = normalizeEmail(input.email);
+    if (!isValidEmail(email)) return { ok: false, reason: 'invalid-email' };
+    if (!meetsPasswordPolicy(input.password, this.passwordPolicy)) {
+      return { ok: false, reason: 'weak-password' };
+    }
+
+    const db = this.getDb();
+    const existing = await db.findMany({ collection: this.collection, where: { email } });
+    if (existing.length > 0) return { ok: false, reason: 'email-in-use' };
+
+    const role = (await this.hasAnyUser(db)) ? (input.role ?? 'viewer') : 'admin';
     const passwordHash = await hashPassword(input.password);
-    const record = await db.create(this.collection, {
-      email: input.email,
-      name: input.name ?? '',
-      role: input.role ?? 'viewer',
-      passwordHash
-    });
+
+    let record: DatabaseRecord;
+    try {
+      record = await db.create(this.collection, {
+        email,
+        name: input.name ?? '',
+        role,
+        passwordHash
+      });
+    } catch (err) {
+      if (isUniqueConstraintError(err)) return { ok: false, reason: 'email-in-use' };
+      throw err;
+    }
 
     const user = sanitizeUser(record);
     const token = await issueToken(this.getSecret(), user);
-    return { token, user };
+    return { ok: true, token, user };
+  }
+
+  /**
+   * Public, self-service signup. Unlike {@link createUser}, `input` has no `role` field at all — a
+   * client cannot smuggle a role through the server API. The first user ever created gets `admin`
+   * (same bootstrap rule as `createUser`); every other signup gets `viewer`.
+   */
+  async signup(input: PublicSignupInput): Promise<AuthActionResult> {
+    const email = normalizeEmail(input.email);
+    if (!isValidEmail(email)) return { ok: false, reason: 'invalid-email' };
+    if (!meetsPasswordPolicy(input.password, this.passwordPolicy)) {
+      return { ok: false, reason: 'weak-password' };
+    }
+
+    const db = this.getDb();
+    const existing = await db.findMany({ collection: this.collection, where: { email } });
+    if (existing.length > 0) return { ok: false, reason: 'email-in-use' };
+
+    const role = (await this.hasAnyUser(db)) ? 'viewer' : 'admin';
+    const passwordHash = await hashPassword(input.password);
+
+    let record: DatabaseRecord;
+    try {
+      record = await db.create(this.collection, {
+        email,
+        name: input.name ?? '',
+        role,
+        passwordHash
+      });
+    } catch (err) {
+      if (isUniqueConstraintError(err)) return { ok: false, reason: 'email-in-use' };
+      throw err;
+    }
+
+    const user = sanitizeUser(record);
+    const token = await issueToken(this.getSecret(), user);
+    return { ok: true, token, user };
   }
 
   async listUsers(): Promise<AuthUser[]> {
@@ -234,7 +331,7 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     if (!existing) return null;
 
     const updates: DatabaseRecord = {};
-    if (input.email !== undefined) updates.email = input.email;
+    if (input.email !== undefined) updates.email = normalizeEmail(input.email);
     if (input.name !== undefined) updates.name = input.name;
     if (input.role !== undefined) updates.role = input.role;
     if (input.password !== undefined) updates.passwordHash = await hashPassword(input.password);

@@ -69,6 +69,18 @@ export class AccessDeniedError extends ForgeError {
 }
 
 /**
+ * A mutating request authenticated only by the ambient Forge session cookie (no `Authorization`
+ * header) whose `Origin`/`Referer` doesn't match the request's own host — see `csrf.ts`'s
+ * `assertCsrfSafe`. A request authenticated via `Authorization: Bearer` is never subject to this
+ * check, so no machine/API-key client is affected.
+ */
+export class CsrfError extends ForgeError {
+  constructor(message = 'Cross-site request rejected') {
+    super(message, 403, 'FORBIDDEN');
+  }
+}
+
+/**
  * A `create`/`update` would violate a unique index — whether field-level `unique: true` or a
  * collection-level compound `indexes` entry. Every `DatabaseAdapter` (InMemory, libSQL, D1) surfaces
  * its own uniqueness conflict as `@forge-cms/db`'s `UniqueConstraintError`; `operations.ts` catches

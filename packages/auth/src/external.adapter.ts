@@ -1,5 +1,6 @@
 import type { AuthAdapter, AuthSession, AuthUser } from './index.js';
 import { ForgeAuthError } from './index.js';
+import { extractToken as extractSharedToken } from './token-signer.js';
 
 export interface ExternalAuthConfig {
   /** URL of the auth microservice used to validate tokens */
@@ -35,8 +36,10 @@ export class ExternalAuthAdapter implements AuthAdapter {
     return this;
   }
 
+  /** Shared with `UsersCollectionAuthAdapter`/`SignedTokenAuthAdapter` — case-insensitive `Bearer`,
+   *  trims, and falls back to the Forge session cookie (spec 053's cookie-fallback hardening). */
   extractToken(request: Request): string | null {
-    return request.headers.get('authorization')?.replace('Bearer ', '') ?? null;
+    return extractSharedToken(request);
   }
 
   async validateSession(token: string): Promise<AuthSession | null> {
@@ -48,8 +51,9 @@ export class ExternalAuthAdapter implements AuthAdapter {
 
     if (!token) return null;
 
+    let response: Response;
     try {
-      const response = await fetch(this.config.validateUrl, {
+      response = await fetch(this.config.validateUrl, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -57,21 +61,33 @@ export class ExternalAuthAdapter implements AuthAdapter {
         },
         body: JSON.stringify({ token })
       });
-
-      if (!response.ok) return null;
-
-      const data = (await response.json()) as {
-        user: AuthUser;
-        expiresAt?: string;
-      };
-
-      return {
-        user: data.user,
-        ...(data.expiresAt ? { expiresAt: new Date(data.expiresAt) } : {})
-      };
-    } catch {
-      return null;
+    } catch (err) {
+      // A network failure reaching the validation service is an infrastructure fault, not proof the
+      // token is invalid — surfacing it as `null` (→ a misleading 401) would hide a real outage behind
+      // "unauthenticated", exactly the pattern spec 049 fixed for `CompositeAuthAdapter`/`handlers.ts`.
+      throw new Error(
+        `ExternalAuthAdapter: failed to reach validation service: ${err instanceof Error ? err.message : String(err)}`
+      );
     }
+
+    // A `5xx` means the service itself is failing, not that it examined the token and rejected it —
+    // same "don't mask an outage as unauthenticated" rule as the network-failure case above.
+    if (response.status >= 500) {
+      throw new Error(`ExternalAuthAdapter: validation service returned ${response.status}`);
+    }
+
+    // A `4xx` is the service explicitly rejecting the token — a real, expected "invalid session".
+    if (!response.ok) return null;
+
+    const data = (await response.json()) as {
+      user: AuthUser;
+      expiresAt?: string;
+    };
+
+    return {
+      user: data.user,
+      ...(data.expiresAt ? { expiresAt: new Date(data.expiresAt) } : {})
+    };
   }
 
   async requireAuth(request: Request): Promise<AuthUser> {

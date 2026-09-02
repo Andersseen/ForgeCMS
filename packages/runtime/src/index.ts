@@ -22,6 +22,18 @@ export {
 // Serving stored files (spec 040)
 export { handleFile, type FileHandlerOptions } from './files.js';
 
+// Browser auth foundation: login/signup/logout/me handlers + CSRF (spec 053)
+export {
+  handleLogin,
+  handleSignup,
+  handleLogout,
+  handleMe,
+  authFailureResponse,
+  type AuthHandlerOptions,
+  type SignupHandlerOptions
+} from './auth-handlers.js';
+export { assertCsrfSafe } from './csrf.js';
+
 // Field defaults and auto-slugs (spec 040)
 export { applyFieldDefaults, applyAutoSlugs } from './defaults.js';
 
@@ -99,6 +111,7 @@ export {
   ValidationFailedError,
   UnauthorizedError,
   AccessDeniedError,
+  CsrfError,
   UniqueConstraintError,
   isForgeError,
   toApiErrorBody,

@@ -1,4 +1,4 @@
-import type { AuthAdapter, AuthSession, AuthUser } from './index.js';
+import type { AuthActionResult, AuthAdapter, AuthSession, AuthUser } from './index.js';
 import { ForgeAuthError } from './index.js';
 import { extractToken, issueToken, looksLikeSignedToken, validateSession } from './token-signer.js';
 
@@ -82,13 +82,13 @@ export class SignedTokenAuthAdapter implements AuthAdapter {
     return session.user;
   }
 
-  async login(email: string, password: string): Promise<{ token: string; user: AuthUser } | null> {
-    if (email !== DEMO_CREDENTIALS.email) return null;
+  async login(email: string, password: string): Promise<AuthActionResult> {
+    if (email !== DEMO_CREDENTIALS.email) return { ok: false, reason: 'invalid-credentials' };
     const hash = await sha256Hex(password);
-    if (hash !== DEMO_PASSWORD_HASH) return null;
+    if (hash !== DEMO_PASSWORD_HASH) return { ok: false, reason: 'invalid-credentials' };
 
     const user: AuthUser = { id: 'demo-user', email: DEMO_CREDENTIALS.email, roles: ['admin'] };
     const token = await this.issueToken(user);
-    return { token, user };
+    return { ok: true, token, user };
   }
 }

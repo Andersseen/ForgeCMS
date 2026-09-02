@@ -19,9 +19,9 @@ export default defineEventHandler(async (event) => {
 
   const auth = runtime.adapters.auth as UsersCollectionAuthAdapter;
   const result = await auth.login(body.email, body.password);
-  if (!result) {
+  if (!result.ok) {
     throw createError({ statusCode: 401, statusMessage: 'Invalid email or password' });
   }
 
-  return { data: result };
+  return { data: { token: result.token, user: result.user } };
 });

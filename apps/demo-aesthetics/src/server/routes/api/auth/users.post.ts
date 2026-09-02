@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody, createError } from 'h3';
 import type { CreateUserInput } from '@forge-cms/auth';
+import { authFailureResponse } from '@forge-cms/runtime';
 import { requireAdminAuth } from '../../../api/auth-request';
 
 /** POST /api/auth/users — admin only. */
@@ -24,8 +25,8 @@ export default defineEventHandler(async (event) => {
     role: body.role ?? 'viewer'
   });
 
-  if (!result) {
-    throw createError({ statusCode: 409, statusMessage: 'Email already in use' });
+  if (!result.ok) {
+    return authFailureResponse(result.reason);
   }
 
   return { data: result.user };

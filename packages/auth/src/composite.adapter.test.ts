@@ -74,8 +74,9 @@ describe('CompositeAuthAdapter', () => {
         password: 'password123',
         role: 'editor'
       });
+      if (!created.ok) throw new Error('expected success');
       const request = new Request('https://forge.test', {
-        headers: { authorization: `Bearer ${created?.token}` }
+        headers: { authorization: `Bearer ${created.token}` }
       });
       const user = await setup.composite.requireAuth(request);
       expect(user.email).toBe('human@example.com');
@@ -99,10 +100,11 @@ describe('CompositeAuthAdapter', () => {
         email: 'human2@example.com',
         password: 'password123'
       });
+      if (!created.ok) throw new Error('expected success');
       const { secret } = await setup.apiKeyAuth.createApiKey({ name: 'ci-bot-2' });
 
       const humanRequest = new Request('https://forge.test', {
-        headers: { authorization: `Bearer ${created?.token}` }
+        headers: { authorization: `Bearer ${created.token}` }
       });
       const apiKeyRequest = new Request('https://forge.test', {
         headers: { authorization: `Bearer ${secret}` }
@@ -259,7 +261,7 @@ const contractUser = await contractUserAuth.createUser({
   email: 'contract@example.com',
   password: 'contract-pass'
 });
-const contractToken = contractUser?.token ?? '';
+const contractToken = contractUser.ok ? contractUser.token : '';
 
 runAuthAdapterContractTests(
   () => new CompositeAuthAdapter([contractUserAuth, new ApiKeyAuthAdapter()]),

@@ -1,7 +1,5 @@
 import { defineEventHandler, getRouterParam, createError } from 'h3';
-import type { UsersCollectionAuthAdapter } from '@forge-cms/auth';
-import { getServerRuntime } from '../../../../api/runtime';
-import { createAuthRequest } from '../../../../api/auth-request';
+import { requireAdminAuth } from '../../../../api/auth-request';
 
 /**
  * DELETE /api/auth/users/:id
@@ -9,23 +7,12 @@ import { createAuthRequest } from '../../../../api/auth-request';
  * Deletes a user.
  */
 export default defineEventHandler(async (event) => {
-  const serverRuntime = await getServerRuntime(event.context.cloudflare?.env);
-  const auth = serverRuntime.adapters.auth as UsersCollectionAuthAdapter;
-
   const id = getRouterParam(event, 'id');
   if (!id) {
     throw createError({ statusCode: 400, statusMessage: 'Missing user id' });
   }
 
-  try {
-    await auth.requireRole(createAuthRequest(event), 'admin');
-  } catch (err) {
-    const statusCode = err instanceof Error && err.message === 'Forbidden' ? 403 : 401;
-    throw createError({
-      statusCode,
-      statusMessage: err instanceof Error ? err.message : 'Unauthorized'
-    });
-  }
+  const auth = await requireAdminAuth(event);
 
   await auth.deleteUser(id);
   return new Response(null, { status: 204 });

@@ -274,6 +274,10 @@ There is no email adapter, so the one side effect every booking form needs is a 
 The five CRUD routes, the four auth routes and the `createAuthRequest` body-consumption workaround
 were copied from `apps/www` almost verbatim. `@forge-cms/api` contains types and nothing else.
 **Fix:** roadmap 037 (`@forge-cms/analog`) — `defineForgeRoutes({ runtime })` should generate them.
+**Update (spec 053, 2026-09-02):** `apps/www` gained its own `requireAdminAuth()` (matching the one
+`apps/demo-aesthetics` already had) to add a CSRF check in one place instead of four — reduces
+duplication _within_ `apps/www`, but the two apps still maintain independent copies of the same
+pattern; this finding's actual fix (a generated/shared route layer) is unchanged.
 
 <a id="f13"></a>
 
@@ -291,7 +295,11 @@ to be rediscovered by every new app. **Fix:** export it from `@forge-cms/admin` 
 `ForgeAdminLayoutComponent` reads that exact localStorage key, but does not export it, so the host
 app hardcodes the same literal in its login page and API client
 ([`auth-token.ts`](../apps/demo-aesthetics/src/app/auth-token.ts)). **Fix:** export the constant; longer
-term, roadmap 028 (httpOnly cookie sessions) removes the question.
+term, roadmap 028 (httpOnly cookie sessions) removes the question. **Update (spec 053, 2026-09-02):**
+the server half of 028 (httpOnly `forge_session` cookie, CSRF protection) has shipped, but the client
+side of this finding is unchanged — `@forge-cms/angular`/`@forge-cms/admin` and this app's own
+`auth-token.ts` still read/write `localStorage` directly; a future Angular/admin auth spec switching
+the client to `credentials: 'include'` is what actually removes the question this finding raises.
 
 <a id="f2"></a>
 

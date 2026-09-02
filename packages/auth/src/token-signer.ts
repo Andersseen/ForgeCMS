@@ -1,4 +1,5 @@
 import type { AuthSession, AuthUser } from './index.js';
+import { parseCookieToken } from './cookie.js';
 
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -50,15 +51,28 @@ export function looksLikeSignedToken(token: string): boolean {
   return parts.length === 2 && parts.every((part) => part.length > 0);
 }
 
-export function extractToken(request: Request): string | null {
+/**
+ * A well-formed `Authorization: Bearer <token>` header, or `null` if absent/malformed (e.g.
+ * `Basic ...`, or `Bearer` with no token). Exported so `@forge-cms/runtime`'s CSRF check
+ * (`usesCookieCredential`) can test for exactly the same condition `extractToken` uses to decide
+ * whether it even looks at the cookie — an `Authorization` header that isn't a valid Bearer credential
+ * must not be treated as "not a cookie session" by one and "is a cookie session" by the other.
+ */
+export function extractBearerToken(request: Request): string | null {
   const authHeader = request.headers.get('authorization');
   if (!authHeader) return null;
-
   const match = /^Bearer\s+(.+)$/i.exec(authHeader);
-  if (!match?.[1]) return null;
+  const token = match?.[1]?.trim();
+  return token && token.length > 0 ? token : null;
+}
 
-  const token = match[1].trim();
-  return token.length > 0 ? token : null;
+/**
+ * `Authorization: Bearer` takes precedence (machine/programmatic clients); a browser session with no
+ * such header falls back to the Forge session cookie — this is what lets a page refresh authenticate
+ * from the cookie alone, with no client JS re-attaching a stored token.
+ */
+export function extractToken(request: Request): string | null {
+  return extractBearerToken(request) ?? parseCookieToken(request);
 }
 
 export async function issueToken(secret: string, user: AuthUser): Promise<string> {

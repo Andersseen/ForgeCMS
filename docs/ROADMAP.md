@@ -141,12 +141,24 @@ ForgeCMS competes with Directus, not with Payload.
 
 ## Phase 3 — Auth and DX as a product
 
-| #   | Item                                                                                                                                                               | Notes                                                                                             |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| 028 | **Real auth** — `auth: true` on any collection (not a hardcoded `users`), httpOnly cookie sessions, refresh, password reset, email verification, API keys, lockout | Today: a bearer token and nothing else. `AuthAdapter` does not even have `login` in its contract. |
-| 029 | **Email adapter** (`@forge-cms/email`) — contract + Resend / MailChannels for the Cloudflare target                                                                | Hard prerequisite for 028's password reset.                                                       |
-| 030 | **Config + plugin system** — `buildForgeConfig({ collections, globals, admin, plugins })`, plugins as `(config) => config`                                         | No plugin API means no ecosystem, ever.                                                           |
-| 031 | **CLI** (`@forge-cms/cli`) — `create-forge-cms`, `forge migrate` (versioned, with `down`), `forge generate:types`                                                  | Spec 014 is additive-only sync: no history, no rollback.                                          |
+| #   | Item                                                                                                                                                               | Notes                                                                                                                                                            |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 028 | **Real auth** — `auth: true` on any collection (not a hardcoded `users`), httpOnly cookie sessions, refresh, password reset, email verification, API keys, lockout | Machine auth (API keys) shipped spec 048. Browser-side (cookies, password reset, email verification, lockout) shipped/remaining per the 2026-09-02 update below. |
+| 029 | **Email adapter** (`@forge-cms/email`) — contract + Resend / MailChannels for the Cloudflare target                                                                | Hard prerequisite for 028's password reset.                                                                                                                      |
+| 030 | **Config + plugin system** — `buildForgeConfig({ collections, globals, admin, plugins })`, plugins as `(config) => config`                                         | No plugin API means no ecosystem, ever.                                                                                                                          |
+| 031 | **CLI** (`@forge-cms/cli`) — `create-forge-cms`, `forge migrate` (versioned, with `down`), `forge generate:types`                                                  | Spec 014 is additive-only sync: no history, no rollback.                                                                                                         |
+
+**Update (2026-09-02, spec 053):** the browser-auth half of item 028 is done, server-side —
+`UsersCollectionAuthAdapter`/`@forge-cms/runtime` gained HttpOnly cookie sessions (with `Authorization:
+Bearer` staying fully supported), CSRF protection for every cookie-authenticated mutating request,
+`handleLogin`/`handleSignup`/`handleLogout`/`handleMe`, a password policy, email normalization, a
+first-admin bootstrap, and `defineUsersCollection()`. Deliberately **not** done: `auth: true` on an
+arbitrary collection (still a specific adapter bound to one `users` collection), refresh tokens, lockout,
+password reset, and email verification (029 is still a hard prerequisite for the latter two) — session
+revocation more generally remains out of scope, since tokens are intentionally stateless. The natural
+next spec is the Angular/admin counterpart (login/signup UI, session state, route guards, a users
+workspace) building on this server contract — see
+[docs/specs/053-browser-auth-foundation.md](specs/053-browser-auth-foundation.md).
 
 ---
 

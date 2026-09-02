@@ -1,7 +1,7 @@
 import { defineEventHandler, readBody, createError } from 'h3';
-import type { UsersCollectionAuthAdapter, CreateUserInput } from '@forge-cms/auth';
-import { getServerRuntime } from '../../../api/runtime';
-import { createAuthRequest } from '../../../api/auth-request';
+import type { CreateUserInput } from '@forge-cms/auth';
+import { authFailureResponse } from '@forge-cms/runtime';
+import { requireAdminAuth } from '../../../api/auth-request';
 
 /**
  * POST /api/auth/users
@@ -9,9 +9,6 @@ import { createAuthRequest } from '../../../api/auth-request';
  * Creates a new user.
  */
 export default defineEventHandler(async (event) => {
-  const serverRuntime = await getServerRuntime(event.context.cloudflare?.env);
-  const auth = serverRuntime.adapters.auth as UsersCollectionAuthAdapter;
-
   let body: Partial<CreateUserInput>;
   try {
     body = await readBody(event);
@@ -19,15 +16,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Invalid JSON body' });
   }
 
-  try {
-    await auth.requireRole(createAuthRequest(event), 'admin');
-  } catch (err) {
-    const statusCode = err instanceof Error && err.message === 'Forbidden' ? 403 : 401;
-    throw createError({
-      statusCode,
-      statusMessage: err instanceof Error ? err.message : 'Unauthorized'
-    });
-  }
+  const auth = await requireAdminAuth(event);
 
   if (!body.email || !body.password) {
     throw createError({ statusCode: 400, statusMessage: 'Missing email or password' });
@@ -40,8 +29,8 @@ export default defineEventHandler(async (event) => {
     role: body.role ?? 'viewer'
   });
 
-  if (!result) {
-    throw createError({ statusCode: 409, statusMessage: 'Email already in use' });
+  if (!result.ok) {
+    return authFailureResponse(result.reason);
   }
 
   return { data: result.user };

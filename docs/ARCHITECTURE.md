@@ -75,12 +75,18 @@ value (`eq`) or an operator object (`{ gt: 10 }`, one or more of `eq`/`ne`/`gt`/
 ### AuthAdapter (`@forge-cms/auth`)
 
 `name`, `init(env)`, `extractToken(request)`, `validateSession(token)` → `AuthSession | null`,
-`requireAuth(request)` → `AuthUser` or throws `ForgeAuthError`. Two optional methods, both additive and
-backward compatible — an adapter omitting either behaves exactly as if neither existed:
-`syncSchema?()` (schema/table bootstrap, called by `ForgeCmsRuntime.syncSchema()`) and
+`requireAuth(request)` → `AuthUser` or throws `ForgeAuthError`. Four optional methods, all additive and
+backward compatible — an adapter omitting any of them behaves exactly as if it didn't exist:
+`syncSchema?()` (schema/table bootstrap, called by `ForgeCmsRuntime.syncSchema()`),
 `canHandleToken?(token)` (a cheap, synchronous "is this token even shaped like mine?" check;
 `CompositeAuthAdapter` consults it to skip a strategy that obviously isn't a token's owner before
-paying for a DB round-trip or signature verification).
+paying for a DB round-trip or signature verification), and, since spec 053, `login?(email, password)`
+and `signup?(input)` (both return `AuthActionResult` — `{ ok: true, token, user } | { ok: false, reason }`)
+— adapters that support password-based browser auth implement these; `packages/runtime`'s
+`handleLogin`/`handleSignup` feature-detect them rather than importing a concrete adapter.
+`UsersCollectionAuthAdapter` and `SignedTokenAuthAdapter`'s shared `extractToken` also falls back to a
+`forge_session` cookie (`@forge-cms/auth`'s `cookie.ts`) when no `Authorization` header is present —
+`ApiKeyAuthAdapter` keeps its own independent, Bearer-only `extractToken`, unaffected.
 
 `CompositeAuthAdapter` composes multiple `AuthAdapter`s behind one: `requireAuth()` tries each in
 order, falling through to the next only on an _expected_ rejection (`ForgeAuthError`) — any other
