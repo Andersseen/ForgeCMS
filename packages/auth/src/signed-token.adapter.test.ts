@@ -40,28 +40,30 @@ describe('SignedTokenAuthAdapter', () => {
   it('login() succeeds with the published demo credentials', async () => {
     const adapter = new SignedTokenAuthAdapter({ devMode: true }).init();
     const result = await adapter.login(DEMO_CREDENTIALS.email, DEMO_CREDENTIALS.password);
-    expect(result).not.toBeNull();
-    expect(result?.user.email).toBe(DEMO_CREDENTIALS.email);
-    expect(typeof result?.token).toBe('string');
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected success');
+    expect(result.user.email).toBe(DEMO_CREDENTIALS.email);
+    expect(typeof result.token).toBe('string');
   });
 
   it('login() rejects an incorrect password', async () => {
     const adapter = new SignedTokenAuthAdapter({ devMode: true }).init();
     const result = await adapter.login(DEMO_CREDENTIALS.email, 'wrong-password');
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: 'invalid-credentials' });
   });
 
   it('login() rejects an unknown email', async () => {
     const adapter = new SignedTokenAuthAdapter({ devMode: true }).init();
     const result = await adapter.login('nobody@example.com', DEMO_CREDENTIALS.password);
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: 'invalid-credentials' });
   });
 
   it('a token issued via login() authenticates a subsequent request', async () => {
     const adapter = new SignedTokenAuthAdapter({ devMode: true }).init();
     const login = await adapter.login(DEMO_CREDENTIALS.email, DEMO_CREDENTIALS.password);
+    if (!login.ok) throw new Error('expected success');
     const request = new Request('https://forge.test', {
-      headers: { authorization: `Bearer ${login?.token}` }
+      headers: { authorization: `Bearer ${login.token}` }
     });
     const user = await adapter.requireAuth(request);
     expect(user.email).toBe(DEMO_CREDENTIALS.email);

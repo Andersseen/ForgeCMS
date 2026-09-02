@@ -93,13 +93,13 @@ function listFiles(dir) {
   return output.sort();
 }
 
+// Deliberately excludes `devDependencies`: this feeds `assertRuntimeImportsDeclared`, which checks
+// what a real npm install of the *published* package resolves — devDependencies are never installed
+// for a consumer, so a package whose compiled runtime code imports another `@forge-cms/*` package
+// declared only as a devDependency would resolve locally (pnpm hoists devDeps into node_modules) but
+// break for every real external consumer with `ERR_MODULE_NOT_FOUND`.
 function dependencySections(pkg) {
-  return [
-    pkg.dependencies ?? {},
-    pkg.peerDependencies ?? {},
-    pkg.optionalDependencies ?? {},
-    pkg.devDependencies ?? {}
-  ];
+  return [pkg.dependencies ?? {}, pkg.peerDependencies ?? {}, pkg.optionalDependencies ?? {}];
 }
 
 function assertNoWorkspaceProtocols(pkg, label) {
@@ -214,10 +214,19 @@ import {
   InMemoryAuthAdapter,
   ApiKeyAuthAdapter,
   CompositeAuthAdapter,
+  UsersCollectionAuthAdapter,
+  defineUsersCollection,
   hasScope
 } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
-import { ForgeCmsRuntime, UniqueConstraintError } from '@forge-cms/runtime';
+import {
+  ForgeCmsRuntime,
+  UniqueConstraintError,
+  handleLogin,
+  handleSignup,
+  handleLogout,
+  handleMe
+} from '@forge-cms/runtime';
 
 const notes = defineCollection({
   slug: 'notes',
@@ -421,6 +430,84 @@ const membership = await queryRuntime.find({
 if (membership.docs.length !== 1 || membership.docs[0].title !== 'News') {
   throw new Error('Expected containsValue to filter by relation-array membership');
 }
+
+// Browser auth foundation (spec 053): defineUsersCollection + UsersCollectionAuthAdapter +
+// handleSignup/handleLogin/handleMe/handleLogout + CSRF protection, all through the packed public
+// surface only (no deep imports).
+const authDb = new InMemoryDatabaseAdapter();
+const usersAuth = new UsersCollectionAuthAdapter({ devMode: true }).init({ userDatabase: authDb });
+const authRuntime = new ForgeCmsRuntime({
+  collections: [defineUsersCollection()],
+  adapters: { database: authDb, auth: usersAuth, storage: new InMemoryStorageAdapter() }
+});
+authRuntime.init();
+await authRuntime.syncSchema();
+
+const signupResponse = await handleSignup(
+  {
+    request: new Request('https://forge.test/signup', {
+      method: 'POST',
+      body: JSON.stringify({ email: 'admin@example.com', password: 'password123', role: 'viewer' })
+    }),
+    env: {}
+  },
+  { runtime: authRuntime, enabled: true }
+);
+if (signupResponse.status !== 201) throw new Error('Expected signup to succeed with 201');
+const signupBody = await signupResponse.json();
+// First user ever, bootstrapped to admin regardless of the (ignored) role field in the body above.
+if (signupBody.data.user.role !== 'admin') throw new Error('Expected the first signup to become admin');
+const signupCookie = signupResponse.headers.get('set-cookie');
+if (!signupCookie || !signupCookie.includes('HttpOnly') || !signupCookie.includes('forge_session=')) {
+  throw new Error('Expected handleSignup to set an HttpOnly forge_session cookie');
+}
+
+const loginResponse = await handleLogin(
+  {
+    request: new Request('https://forge.test/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: 'admin@example.com', password: 'password123' })
+    }),
+    env: {}
+  },
+  { runtime: authRuntime }
+);
+if (loginResponse.status !== 200) throw new Error('Expected login to succeed with 200');
+const loginCookie = loginResponse.headers.get('set-cookie');
+const sessionToken = /forge_session=([^;]+)/.exec(loginCookie ?? '')?.[1];
+if (!sessionToken) throw new Error('Expected a session token from the login Set-Cookie header');
+
+const meResponse = await handleMe(
+  { request: new Request('https://forge.test/me', { headers: { cookie: \`forge_session=\${sessionToken}\` } }), env: {} },
+  { runtime: authRuntime }
+);
+if (meResponse.status !== 200) throw new Error('Expected handleMe to authenticate from the cookie alone');
+
+const crossSiteLogout = await handleLogout(
+  {
+    request: new Request('https://forge.test/logout', {
+      method: 'POST',
+      headers: { cookie: \`forge_session=\${sessionToken}\`, origin: 'https://evil.test' }
+    }),
+    env: {}
+  },
+  { runtime: authRuntime }
+);
+if (crossSiteLogout.status !== 403) {
+  throw new Error('Expected a cross-site cookie-authenticated logout to be rejected by CSRF protection');
+}
+
+const sameSiteLogout = await handleLogout(
+  {
+    request: new Request('https://forge.test/logout', {
+      method: 'POST',
+      headers: { cookie: \`forge_session=\${sessionToken}\`, origin: 'https://forge.test' }
+    }),
+    env: {}
+  },
+  { runtime: authRuntime }
+);
+if (sameSiteLogout.status !== 204) throw new Error('Expected a same-origin logout to succeed with 204');
 
 console.log('runtime consumer ok');
 `

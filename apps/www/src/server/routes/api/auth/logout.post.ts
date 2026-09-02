@@ -1,13 +1,13 @@
 import { defineEventHandler, toWebRequest } from 'h3';
 import type { ApiContext } from '@forge-cms/api';
-import { handleLogin } from '@forge-cms/runtime';
+import { handleLogout } from '@forge-cms/runtime';
 import { getServerRuntime } from '../../../api/runtime';
 
 /**
- * POST /api/auth/login
+ * POST /api/auth/logout
  *
- * Thin wrapper over `@forge-cms/runtime`'s `handleLogin` — validates `{ email, password }` against
- * the users collection, returns `{ data: { user, token } }`, and starts an HttpOnly session cookie.
+ * Thin wrapper over `@forge-cms/runtime`'s `handleLogout` — clears the session cookie. Client-state
+ * only: tokens are stateless, so this cannot revoke a Bearer token held elsewhere.
  */
 export default defineEventHandler(async (event) => {
   const runtime = await getServerRuntime(event.context.cloudflare?.env);
@@ -15,5 +15,5 @@ export default defineEventHandler(async (event) => {
     request: toWebRequest(event),
     env: event.context.cloudflare?.env
   };
-  return handleLogin(context, { runtime, cookie: { secure: !!event.context.cloudflare?.env } });
+  return handleLogout(context, { runtime, cookie: { secure: !!event.context.cloudflare?.env } });
 });

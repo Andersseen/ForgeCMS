@@ -1,20 +1,19 @@
-import { defineEventHandler, createError, toWebRequest } from 'h3';
+import { defineEventHandler, toWebRequest } from 'h3';
+import type { ApiContext } from '@forge-cms/api';
+import { handleMe } from '@forge-cms/runtime';
 import { getServerRuntime } from '../../../api/runtime';
 
 /**
  * GET /api/auth/me
  *
- * Returns the current authenticated user by validating the Bearer token
- * against the configured auth adapter.
+ * Thin wrapper over `@forge-cms/runtime`'s `handleMe` — resolves the current user from the session
+ * cookie or an `Authorization: Bearer` header.
  */
 export default defineEventHandler(async (event) => {
-  const serverRuntime = await getServerRuntime(event.context.cloudflare?.env);
-  const request = toWebRequest(event);
-
-  try {
-    const user = await serverRuntime.adapters.auth.requireAuth(request);
-    return { data: user };
-  } catch {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' });
-  }
+  const runtime = await getServerRuntime(event.context.cloudflare?.env);
+  const context: ApiContext = {
+    request: toWebRequest(event),
+    env: event.context.cloudflare?.env
+  };
+  return handleMe(context, { runtime });
 });

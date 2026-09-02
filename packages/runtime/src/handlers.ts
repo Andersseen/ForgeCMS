@@ -14,6 +14,7 @@ import {
   isForgeError,
   toApiErrorBody
 } from './errors.js';
+import { assertCsrfSafe } from './csrf.js';
 
 const WHERE_OPERATORS = new Set([
   'eq',
@@ -351,6 +352,14 @@ async function resolveRequest<TEnv>(
   const mustAuth = requireAuthFlag === true || routeRoles !== undefined;
 
   try {
+    // Applies to every mutating request reaching this collection, whether or not it ends up
+    // authenticated — a collection with its own function-based `access` (e.g.
+    // `defineUsersCollection()`) takes the `resolveOptionalUser` branch below, which must be
+    // CSRF-checked exactly like the `authorize()` branch: the ambient session cookie is just as
+    // forgeable there. A no-op for anonymous requests (no session cookie) and for `Authorization:
+    // Bearer` clients — see `csrf.ts`.
+    assertCsrfSafe(context.request);
+
     let user: AuthUser | null = null;
     if (mustAuth) {
       const result = await authorize(context, runtime, routeRoles);
@@ -362,9 +371,9 @@ async function resolveRequest<TEnv>(
 
     return { collection, collectionSlug, user };
   } catch (err) {
-    // `authorize`/`resolveOptionalUser` only throw an unexpected (non-auth-rejection) error here —
-    // this function is called before any handler's own try/catch, so it must convert that itself
-    // rather than let it escape as an unhandled rejection.
+    // `assertCsrfSafe`/`authorize`/`resolveOptionalUser` only throw an unexpected (non-auth-rejection)
+    // error here — this function is called before any handler's own try/catch, so it must convert
+    // that itself rather than let it escape as an unhandled rejection.
     return toErrorResponse(err, null);
   }
 }
@@ -632,6 +641,9 @@ async function resolveGlobalRequest<TEnv>(
   const mustAuth = requireAuthFlag === true || routeRoles !== undefined;
 
   try {
+    // See the matching comment in `resolveRequest` — must run regardless of `mustAuth`.
+    assertCsrfSafe(context.request);
+
     let user: AuthUser | null = null;
     if (mustAuth) {
       const result = await authorize(context, runtime, routeRoles);
@@ -801,6 +813,12 @@ export async function handlePreview<TEnv = unknown>(
   const collection = options.runtime.getCollection(collectionSlug);
   if (!collection) {
     return errorResponse('NOT_FOUND', `Collection '${collectionSlug}' not found`, 404);
+  }
+
+  try {
+    assertCsrfSafe(context.request);
+  } catch (err) {
+    return toErrorResponse(err, null);
   }
 
   let user: AuthUser | null = null;

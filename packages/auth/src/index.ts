@@ -15,7 +15,16 @@ export type {
 } from './api-key.adapter.js';
 export { CompositeAuthAdapter } from './composite.adapter.js';
 export { hasScope, hasAnyScope, hasAllScopes } from './scopes.js';
-export { AUTH_USER_FIELDS, withAuthFields } from './user-fields.js';
+export { AUTH_USER_FIELDS, withAuthFields, defineUsersCollection } from './user-fields.js';
+export type { DefineUsersCollectionOptions } from './user-fields.js';
+export {
+  SESSION_COOKIE_NAME,
+  parseCookieToken,
+  buildSessionCookie,
+  buildLogoutCookie
+} from './cookie.js';
+export type { SessionCookieOptions } from './cookie.js';
+export { extractBearerToken } from './token-signer.js';
 export type { UserRole } from './roles.js';
 export {
   USER_ROLES,
@@ -53,6 +62,23 @@ export interface AuthSession<TUser extends AuthUser = AuthUser> {
   expiresAt?: Date;
 }
 
+/** Why a login/signup attempt was rejected — lets the HTTP boundary give a precise, safe message. */
+export type AuthFailureReason =
+  | 'invalid-credentials'
+  | 'email-in-use'
+  | 'weak-password'
+  | 'invalid-email';
+
+export type AuthActionResult<TUser extends AuthUser = AuthUser> =
+  | { ok: true; token: string; user: TUser }
+  | { ok: false; reason: AuthFailureReason };
+
+export interface PublicSignupInput {
+  email: string;
+  password: string;
+  name?: string;
+}
+
 export interface AuthAdapter<TUser extends AuthUser = AuthUser> {
   readonly name: string;
   init(env?: unknown): this;
@@ -70,4 +96,12 @@ export interface AuthAdapter<TUser extends AuthUser = AuthUser> {
    * inside a `CompositeAuthAdapter`.
    */
   canHandleToken?(token: string): boolean;
+  /** Optional: adapters that support password login implement this (spec 053). */
+  login?(email: string, password: string): Promise<AuthActionResult<TUser>>;
+  /**
+   * Optional: adapters that support public self-service signup implement this (spec 053). The input
+   * type deliberately has no `role` field — a client cannot smuggle a role through the server API, not
+   * just through a UI that happens to hide the field.
+   */
+  signup?(input: PublicSignupInput): Promise<AuthActionResult<TUser>>;
 }
