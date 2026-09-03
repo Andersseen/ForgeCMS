@@ -1,17 +1,24 @@
 import type { Routes } from '@angular/router';
-import { ForgeAdminLayoutComponent, forgeAdminContentRoutes } from '@forge-cms/admin';
+import {
+  ForgeAdminLayoutComponent,
+  ForgeUsersWorkspaceComponent,
+  forgeAdminAuthRoutes,
+  forgeAdminContentRoutes
+} from '@forge-cms/admin';
+import { forgeAuthGuard } from '@forge-cms/angular';
 
 /**
- * The whole `/admin` section as one lazily-loaded chunk (matching the previous behaviour, where
- * everything under `/admin` was already pulled in together the moment `@forge-cms/admin` was
- * imported for the layout). `forgeAdminContentRoutes()` (spec 052) replaces this app's own
- * `collections`/`collections/:slug` pages — it wires the same URLs to the package's reusable
- * collections index, collection workspace, and document editor.
+ * `admin/login` (public signup is opt-in server-side only — see `signup.post.ts` — so it isn't
+ * mounted client-side here, per spec 054 §7) plus a guarded subtree for everything else. The layout
+ * (header + sidebar) only wraps the guarded content, matching `forgeAuthGuard()`'s own doc comment: an
+ * anonymous visitor never sees the shell flash before being redirected to sign in.
  */
 export const ADMIN_ROUTES: Routes = [
+  ...forgeAdminAuthRoutes({ signup: false }),
   {
     path: '',
     component: ForgeAdminLayoutComponent,
+    canActivate: [forgeAuthGuard()],
     children: [
       {
         path: '',
@@ -25,7 +32,8 @@ export const ADMIN_ROUTES: Routes = [
       },
       {
         path: 'users',
-        loadComponent: () => import('./pages/admin/users/users.page').then((m) => m.UsersPage)
+        component: ForgeUsersWorkspaceComponent,
+        canActivate: [forgeAuthGuard({ roles: ['admin'] })]
       },
       {
         path: 'api',

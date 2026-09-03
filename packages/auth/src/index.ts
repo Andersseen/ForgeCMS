@@ -46,6 +46,24 @@ export class ForgeAuthError extends Error {
   }
 }
 
+/** Why `UsersCollectionAuthAdapter.updateUser`/`deleteUser` rejected a change (spec 054). */
+export type UserMutationFailureReason = 'last-admin' | 'weak-password';
+
+/**
+ * Thrown by `UsersCollectionAuthAdapter.updateUser`/`deleteUser` instead of writing when the change
+ * would leave the installation with zero admins (`'last-admin'`) or set a password shorter than the
+ * configured policy (`'weak-password'`). A host route maps `reason` to a status (`409`/`400`).
+ */
+export class UserMutationError extends Error {
+  constructor(
+    message: string,
+    readonly reason: UserMutationFailureReason
+  ) {
+    super(message);
+    this.name = 'UserMutationError';
+  }
+}
+
 export interface AuthUser {
   id: string;
   email?: string;

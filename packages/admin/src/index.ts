@@ -45,3 +45,9 @@ export { PageHeaderComponent } from './page-header.component.js';
 export { LoadingStateComponent } from './loading-state.component.js';
 export { ErrorStateComponent } from './error-state.component.js';
 export { EmptyStateComponent } from './empty-state.component.js';
+
+// Auth experience (spec 054)
+export { ForgeSignInComponent } from './signin.component.js';
+export { ForgeSignUpComponent } from './signup.component.js';
+export { ForgeUsersWorkspaceComponent } from './users-workspace.component.js';
+export { forgeAdminAuthRoutes, type ForgeAdminAuthRoutesOptions } from './auth-routes.js';

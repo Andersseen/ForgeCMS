@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { runAuthAdapterContractTests } from '@forge-cms/testing/contracts';
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
+import { UserMutationError } from './index.js';
 import { defineUsersCollection } from './user-fields.js';
 import { UsersCollectionAuthAdapter } from './users-collection.adapter.js';
 
@@ -361,5 +362,116 @@ describe('UsersCollectionAuthAdapter', () => {
       headers: { authorization: `Bearer ${created.token}` }
     });
     await expect(adapter.requireAnyRole(request, ['admin', 'editor'])).rejects.toThrow('Forbidden');
+  });
+
+  describe('last-admin invariant (spec 054)', () => {
+    it('updateUser rejects a password under the policy with UserMutationError(weak-password)', async () => {
+      const created = await adapter.createUser({
+        email: 'weak@example.com',
+        password: 'secret123'
+      });
+      if (!created.ok) throw new Error('expected success');
+      const before = await db.findById('users', created.user.id);
+
+      await expect(adapter.updateUser(created.user.id, { password: 'short' })).rejects.toThrow(
+        UserMutationError
+      );
+      const after = await db.findById('users', created.user.id);
+      expect(after?.passwordHash).toBe(before?.passwordHash);
+    });
+
+    it('rejects the sole admin demoting themselves', async () => {
+      // `adapter` from beforeEach has exactly one user, the admin created by createAdapterWithUser().
+      const admin = await adapter.login('test@example.com', 'password123');
+      if (!admin.ok) throw new Error('expected success');
+
+      await expect(adapter.updateUser(admin.user.id, { role: 'viewer' })).rejects.toThrow(
+        UserMutationError
+      );
+      const stored = await db.findById('users', admin.user.id);
+      expect(stored?.role).toBe('admin');
+    });
+
+    it('rejects the sole admin being demoted by another admin', async () => {
+      const admin = await adapter.login('test@example.com', 'password123');
+      if (!admin.ok) throw new Error('expected success');
+      // A second admin is promoted, then demotes themselves back to editor first, leaving `admin`
+      // (the original account) as the sole remaining admin once more before the real assertion.
+      const second = await adapter.createUser({
+        email: 'second-admin@example.com',
+        password: 'secret123',
+        role: 'admin'
+      });
+      if (!second.ok) throw new Error('expected success');
+      await adapter.updateUser(second.user.id, { role: 'viewer' });
+
+      await expect(adapter.updateUser(admin.user.id, { role: 'viewer' })).rejects.toThrow(
+        UserMutationError
+      );
+    });
+
+    it('allows demoting an admin when a second admin exists', async () => {
+      const admin = await adapter.login('test@example.com', 'password123');
+      if (!admin.ok) throw new Error('expected success');
+      const second = await adapter.createUser({
+        email: 'second-admin2@example.com',
+        password: 'secret123',
+        role: 'admin'
+      });
+      if (!second.ok) throw new Error('expected success');
+
+      const updated = await adapter.updateUser(admin.user.id, { role: 'editor' });
+      expect(updated?.role).toBe('editor');
+    });
+
+    it('rejects the sole admin deleting themselves', async () => {
+      const admin = await adapter.login('test@example.com', 'password123');
+      if (!admin.ok) throw new Error('expected success');
+
+      await expect(adapter.deleteUser(admin.user.id)).rejects.toThrow(UserMutationError);
+      const stored = await db.findById('users', admin.user.id);
+      expect(stored).toBeTruthy();
+    });
+
+    it('rejects the sole admin being deleted by another admin', async () => {
+      const admin = await adapter.login('test@example.com', 'password123');
+      if (!admin.ok) throw new Error('expected success');
+      const second = await adapter.createUser({
+        email: 'second-admin3@example.com',
+        password: 'secret123',
+        role: 'admin'
+      });
+      if (!second.ok) throw new Error('expected success');
+      // Demote the second admin back down so `admin` is again the sole admin.
+      await adapter.updateUser(second.user.id, { role: 'viewer' });
+
+      await expect(adapter.deleteUser(admin.user.id)).rejects.toThrow(UserMutationError);
+    });
+
+    it('allows deleting an admin when a second admin exists', async () => {
+      const admin = await adapter.login('test@example.com', 'password123');
+      if (!admin.ok) throw new Error('expected success');
+      const second = await adapter.createUser({
+        email: 'second-admin4@example.com',
+        password: 'secret123',
+        role: 'admin'
+      });
+      if (!second.ok) throw new Error('expected success');
+
+      await expect(adapter.deleteUser(admin.user.id)).resolves.toBeUndefined();
+      expect(await db.findById('users', admin.user.id)).toBeNull();
+    });
+
+    it('never blocks deleting/demoting a non-admin, even when they are the only user of that role', async () => {
+      const viewer = await adapter.createUser({
+        email: 'lone-viewer@example.com',
+        password: 'secret123',
+        role: 'viewer'
+      });
+      if (!viewer.ok) throw new Error('expected success');
+
+      await expect(adapter.updateUser(viewer.user.id, { role: 'editor' })).resolves.not.toBeNull();
+      await expect(adapter.deleteUser(viewer.user.id)).resolves.toBeUndefined();
+    });
   });
 });

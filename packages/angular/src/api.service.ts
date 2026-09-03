@@ -1,10 +1,13 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
+import type { Signal } from '@angular/core';
 import { buildQueryString } from './query.js';
 import type { QueryOptions, QueryWhere } from './query.js';
 import {
+  ApiAuthActionError,
   ApiAuthError,
   ApiValidationError,
   FORGE_CMS_CONFIG,
+  type ApiErrorBody,
   type ApiFieldError,
   type ApiItemResponse,
   type ApiListResponse,
@@ -14,24 +17,29 @@ import {
   type PaginatedDocuments
 } from './types.js';
 
-async function toApiError(response: Response, fallbackMessage: string): Promise<Error> {
-  if (response.status === 401) {
-    return new ApiAuthError();
-  }
-  try {
-    const body = (await response.json()) as { error?: string; details?: ApiFieldError[] };
-    if (body.details) {
-      return new ApiValidationError(body.error ?? fallbackMessage, body.details);
-    }
-    return new Error(`${fallbackMessage}: ${response.status}`);
-  } catch {
-    return new Error(`${fallbackMessage}: ${response.status}`);
-  }
-}
-
 @Injectable({ providedIn: 'root' })
 export class CmsApiService {
   private readonly config = inject(FORGE_CMS_CONFIG, { optional: true });
+
+  /** Bumped once per observed `401` — a signal for any UI that wants to react to it generically. */
+  private readonly unauthorizedCount = signal(0);
+  readonly unauthorized: Signal<number> = this.unauthorizedCount.asReadonly();
+
+  /**
+   * Plain callback registry `ForgeAuthSession` uses to detect a session going stale mid-app (a 401 on
+   * some unrelated request) without polling `/api/auth/me` in a loop — see `auth-session.ts`. A plain
+   * callback rather than an `effect()` on {@link unauthorized}: `effect()` needs the full Angular
+   * change-detection scheduler wired up (a real bootstrapped app, or `TestBed` with a platform), which
+   * this package's lightweight `Injector.create`-based tests don't set up, and a synchronous callback is
+   * simpler to reason about here regardless.
+   */
+  private readonly unauthorizedListeners = new Set<() => void>();
+
+  /** Registers a listener called synchronously on every observed `401`. Returns an unsubscribe function. */
+  onUnauthorized(listener: () => void): () => void {
+    this.unauthorizedListeners.add(listener);
+    return () => this.unauthorizedListeners.delete(listener);
+  }
 
   private get baseUrl(): string {
     return this.config?.baseUrl ?? '/api/v1';
@@ -56,15 +64,82 @@ export class CmsApiService {
     return token ? { authorization: `Bearer ${token}` } : {};
   }
 
+  /**
+   * Turns a non-2xx response into an `Error`. Handles every shape this codebase's routes actually
+   * produce: the current Forge envelope (`{ error: { code, message, details? } }`, from
+   * `handlers.ts`/`auth-handlers.ts`/`authFailureResponse` — note `details` nests *inside* `error`,
+   * not at the top level), an older flat shape (`{ error: string, details: [...] }`, kept for backward
+   * compatibility), and h3's own `createError` shape (`{ statusMessage, message }`, used by the
+   * hand-rolled `apps/*` user-management routes for their own local validation). Without unwrapping
+   * the nested object form, a real per-field validation array or a real message like "Cannot remove
+   * the last remaining admin" previously surfaced as the useless string `"[object Object]"`.
+   */
+  private toApiError = async (response: Response, fallbackMessage: string): Promise<Error> => {
+    if (response.status === 401) {
+      this.unauthorizedCount.update((count) => count + 1);
+      for (const listener of this.unauthorizedListeners) listener();
+      return new ApiAuthError();
+    }
+    try {
+      const body = (await response.json()) as {
+        error?: string | { code?: string; message?: string; details?: unknown };
+        details?: ApiFieldError[];
+        statusMessage?: string;
+        message?: string;
+      };
+      const errorObject =
+        typeof body.error === 'object' && body.error !== null ? body.error : undefined;
+      const errorString = typeof body.error === 'string' ? body.error : undefined;
+      const details = (errorObject?.details as ApiFieldError[] | undefined) ?? body.details;
+
+      if (Array.isArray(details)) {
+        return new ApiValidationError(
+          errorObject?.message ?? errorString ?? fallbackMessage,
+          details
+        );
+      }
+      const text = errorObject?.message ?? errorString ?? body.statusMessage ?? body.message;
+      if (text) return new Error(text);
+      return new Error(`${fallbackMessage}: ${response.status}`);
+    } catch {
+      return new Error(`${fallbackMessage}: ${response.status}`);
+    }
+  };
+
+  private async toAuthActionError(
+    response: Response,
+    fallbackMessage: string
+  ): Promise<ApiAuthActionError> {
+    try {
+      const body = (await response.json()) as Partial<ApiErrorBody>;
+      if (body.error?.message) {
+        return new ApiAuthActionError(
+          body.error.code ?? 'UNKNOWN',
+          body.error.message,
+          response.status
+        );
+      }
+    } catch {
+      // fall through to the generic fallback below
+    }
+    return new ApiAuthActionError('UNKNOWN', fallbackMessage, response.status);
+  }
+
   async getCurrentUser(): Promise<AuthUser | null> {
-    const response = await fetch('/api/auth/me', { headers: this.getHeaders() });
+    const response = await fetch('/api/auth/me', {
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
     if (!response.ok) return null;
     const result = (await response.json()) as { data: AuthUser };
     return result.data;
   }
 
   async getCollections(): Promise<CollectionMeta[]> {
-    const response = await fetch(`${this.baseUrl}/collections`, { headers: this.authHeader() });
+    const response = await fetch(`${this.baseUrl}/collections`, {
+      headers: this.authHeader(),
+      credentials: 'include'
+    });
     if (!response.ok) throw new Error(`Failed to fetch collections: ${response.status}`);
     const result = (await response.json()) as { data: CollectionMeta[] };
     return result.data;
@@ -88,9 +163,10 @@ export class CmsApiService {
     options?: QueryOptions
   ): Promise<PaginatedDocuments<T>> {
     const response = await fetch(`${this.baseUrl}/${collection}${buildQueryString(options)}`, {
-      headers: this.authHeader()
+      headers: this.authHeader(),
+      credentials: 'include'
     });
-    if (!response.ok) throw await toApiError(response, `Failed to fetch ${collection}`);
+    if (!response.ok) throw await this.toApiError(response, `Failed to fetch ${collection}`);
     const result = (await response.json()) as ApiListResponse<T>;
     return { docs: result.data, meta: result.meta };
   }
@@ -120,9 +196,9 @@ export class CmsApiService {
   ): Promise<T> {
     const response = await fetch(
       `${this.baseUrl}/${collection}/${id}${buildQueryString(options)}`,
-      { headers: this.authHeader() }
+      { headers: this.authHeader(), credentials: 'include' }
     );
-    if (!response.ok) throw await toApiError(response, 'Failed to fetch document');
+    if (!response.ok) throw await this.toApiError(response, 'Failed to fetch document');
     const result = (await response.json()) as ApiItemResponse<T>;
     return result.data;
   }
@@ -144,9 +220,10 @@ export class CmsApiService {
     const response = await fetch(`${this.baseUrl}/${collection}`, {
       method: 'POST',
       headers: this.authHeader(),
+      credentials: 'include',
       body: form
     });
-    if (!response.ok) throw await toApiError(response, 'Failed to upload file');
+    if (!response.ok) throw await this.toApiError(response, 'Failed to upload file');
     const result = (await response.json()) as ApiItemResponse<T>;
     return result.data;
   }
@@ -159,9 +236,10 @@ export class CmsApiService {
     const response = await fetch(`${this.baseUrl}/${collection}${buildQueryString(options)}`, {
       method: 'POST',
       headers: this.getHeaders(),
+      credentials: 'include',
       body: JSON.stringify(data)
     });
-    if (!response.ok) throw await toApiError(response, 'Failed to create document');
+    if (!response.ok) throw await this.toApiError(response, 'Failed to create document');
     const result = (await response.json()) as ApiItemResponse<T>;
     return result.data;
   }
@@ -177,10 +255,11 @@ export class CmsApiService {
       {
         method: 'PUT',
         headers: this.getHeaders(),
+        credentials: 'include',
         body: JSON.stringify(data)
       }
     );
-    if (!response.ok) throw await toApiError(response, 'Failed to update document');
+    if (!response.ok) throw await this.toApiError(response, 'Failed to update document');
     const result = (await response.json()) as ApiItemResponse<T>;
     return result.data;
   }
@@ -214,9 +293,10 @@ export class CmsApiService {
     const response = await fetch(url, {
       method: 'POST',
       headers: this.getHeaders(),
+      credentials: 'include',
       body: JSON.stringify(data)
     });
-    if (!response.ok) throw await toApiError(response, 'Failed to preview document');
+    if (!response.ok) throw await this.toApiError(response, 'Failed to preview document');
     const result = (await response.json()) as ApiItemResponse<T>;
     return result.data;
   }
@@ -224,25 +304,61 @@ export class CmsApiService {
   async deleteDocument(collection: string, id: string): Promise<void> {
     const response = await fetch(`${this.baseUrl}/${collection}/${id}`, {
       method: 'DELETE',
-      headers: this.getHeaders()
+      headers: this.getHeaders(),
+      credentials: 'include'
     });
-    if (!response.ok) throw await toApiError(response, 'Failed to delete document');
+    if (!response.ok) throw await this.toApiError(response, 'Failed to delete document');
   }
 
+  /**
+   * `POST /api/auth/login`. Returns `{ token, user }` unchanged (Bearer-compatible), but a browser
+   * session should rely on the `Set-Cookie` header the server also sends (spec 053) — see
+   * `ForgeAuthSession`, which calls this and ignores `token`.
+   */
   async login(email: string, password: string): Promise<{ token: string; user: AuthUser }> {
     const response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ email, password })
     });
-    if (!response.ok) throw await toApiError(response, 'Login failed');
+    if (!response.ok) throw await this.toAuthActionError(response, 'Login failed');
     const result = (await response.json()) as { data: { token: string; user: AuthUser } };
     return result.data;
   }
 
+  /** `POST /api/auth/signup` — `404`s if the server hasn't enabled public signup. No `role` field. */
+  async signup(input: {
+    email: string;
+    password: string;
+    name?: string;
+  }): Promise<{ token: string; user: AuthUser }> {
+    const response = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(input)
+    });
+    if (!response.ok) throw await this.toAuthActionError(response, 'Signup failed');
+    const result = (await response.json()) as { data: { token: string; user: AuthUser } };
+    return result.data;
+  }
+
+  /** `POST /api/auth/logout` — clears the session cookie. `204` on success. */
+  async logout(): Promise<void> {
+    const response = await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include'
+    });
+    if (!response.ok) throw await this.toAuthActionError(response, 'Logout failed');
+  }
+
   async getUsers(): Promise<AuthUser[]> {
-    const response = await fetch('/api/auth/users', { headers: this.getHeaders() });
-    if (!response.ok) throw await toApiError(response, 'Failed to fetch users');
+    const response = await fetch('/api/auth/users', {
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    if (!response.ok) throw await this.toApiError(response, 'Failed to fetch users');
     const result = (await response.json()) as { data: AuthUser[] };
     return result.data;
   }
@@ -251,9 +367,10 @@ export class CmsApiService {
     const response = await fetch('/api/auth/users', {
       method: 'POST',
       headers: this.getHeaders(),
+      credentials: 'include',
       body: JSON.stringify(input)
     });
-    if (!response.ok) throw await toApiError(response, 'Failed to create user');
+    if (!response.ok) throw await this.toApiError(response, 'Failed to create user');
     const result = (await response.json()) as { data: AuthUser };
     return result.data;
   }
@@ -262,9 +379,10 @@ export class CmsApiService {
     const response = await fetch(`/api/auth/users/${id}`, {
       method: 'PUT',
       headers: this.getHeaders(),
+      credentials: 'include',
       body: JSON.stringify(input)
     });
-    if (!response.ok) throw await toApiError(response, 'Failed to update user');
+    if (!response.ok) throw await this.toApiError(response, 'Failed to update user');
     const result = (await response.json()) as { data: AuthUser };
     return result.data;
   }
@@ -272,9 +390,10 @@ export class CmsApiService {
   async deleteUser(id: string): Promise<void> {
     const response = await fetch(`/api/auth/users/${id}`, {
       method: 'DELETE',
-      headers: this.getHeaders()
+      headers: this.getHeaders(),
+      credentials: 'include'
     });
-    if (!response.ok) throw await toApiError(response, 'Failed to delete user');
+    if (!response.ok) throw await this.toApiError(response, 'Failed to delete user');
   }
 
   // --- Globals -----------------------------------------------------------------------------
@@ -284,10 +403,11 @@ export class CmsApiService {
    */
   async getGlobal<T = Record<string, unknown>>(global: string): Promise<T | null> {
     const response = await fetch(`${this.baseUrl}/globals/${global}`, {
-      headers: this.authHeader()
+      headers: this.authHeader(),
+      credentials: 'include'
     });
     if (response.status === 404) return null;
-    if (!response.ok) throw await toApiError(response, `Failed to fetch global '${global}'`);
+    if (!response.ok) throw await this.toApiError(response, `Failed to fetch global '${global}'`);
     const result = (await response.json()) as ApiItemResponse<T>;
     return result.data;
   }
@@ -302,9 +422,10 @@ export class CmsApiService {
     const response = await fetch(`${this.baseUrl}/globals/${global}`, {
       method: 'PUT',
       headers: this.getHeaders(),
+      credentials: 'include',
       body: JSON.stringify(data)
     });
-    if (!response.ok) throw await toApiError(response, `Failed to update global '${global}'`);
+    if (!response.ok) throw await this.toApiError(response, `Failed to update global '${global}'`);
     const result = (await response.json()) as ApiItemResponse<T>;
     return result.data;
   }

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Injector, runInInjectionContext } from '@angular/core';
 import { CmsApiService } from './api.service.js';
-import { ApiAuthError, ApiValidationError, FORGE_CMS_CONFIG } from './types.js';
+import { ApiAuthActionError, ApiAuthError, ApiValidationError, FORGE_CMS_CONFIG } from './types.js';
 
 interface FetchCall {
   url: string;
@@ -193,6 +193,130 @@ describe('CmsApiService — authentication', () => {
       );
 
     await expect(api.createDocument('services', {})).rejects.toBeInstanceOf(ApiValidationError);
+  });
+});
+
+describe('CmsApiService — credentials', () => {
+  it('sends credentials: include on reads and writes alike', async () => {
+    const api = createService();
+    respond = () => jsonResponse({ data: [] });
+
+    await api.getDocuments('services');
+    await api.getCollections();
+    await api.getCurrentUser();
+
+    for (const call of calls) {
+      expect(call.init?.credentials).toBe('include');
+    }
+  });
+});
+
+describe('CmsApiService — auth actions', () => {
+  it('signup posts email/password/name with no role field, credentials included', async () => {
+    const api = createService();
+    respond = () => jsonResponse({ data: { token: 'tok', user: { id: 'u1' } } }, 201);
+
+    await api.signup({ email: 'a@b.com', password: 'longenough', name: 'Ada' });
+
+    expect(calls[0]!.url).toBe('/api/auth/signup');
+    expect(calls[0]!.init?.credentials).toBe('include');
+    expect(JSON.parse(calls[0]!.init?.body as string)).toEqual({
+      email: 'a@b.com',
+      password: 'longenough',
+      name: 'Ada'
+    });
+  });
+
+  it('logout posts to /api/auth/logout with credentials included', async () => {
+    const api = createService();
+    respond = () => new Response(null, { status: 204 });
+
+    await api.logout();
+
+    expect(calls[0]!.url).toBe('/api/auth/logout');
+    expect(calls[0]!.init?.method).toBe('POST');
+    expect(calls[0]!.init?.credentials).toBe('include');
+  });
+
+  it('login/signup/logout throw ApiAuthActionError carrying the server message and code', async () => {
+    const api = createService();
+    respond = () =>
+      jsonResponse(
+        { error: { code: 'UNIQUE_CONSTRAINT', message: 'Email is already in use' } },
+        409
+      );
+
+    const err = await api.signup({ email: 'a@b.com', password: 'longenough' }).catch((e) => e);
+
+    expect(err).toBeInstanceOf(ApiAuthActionError);
+    expect(err.message).toBe('Email is already in use');
+    expect(err.code).toBe('UNIQUE_CONSTRAINT');
+    expect(err.status).toBe(409);
+  });
+
+  it('bumps the unauthorized signal once per observed 401 (for ForgeAuthSession)', async () => {
+    const api = createService();
+    respond = () => jsonResponse({ error: 'Unauthorized' }, 401);
+
+    expect(api.unauthorized()).toBe(0);
+    await expect(api.getDocuments('services')).rejects.toBeInstanceOf(ApiAuthError);
+    expect(api.unauthorized()).toBe(1);
+    await expect(api.getDocument('services', 'x')).rejects.toBeInstanceOf(ApiAuthError);
+    expect(api.unauthorized()).toBe(2);
+  });
+
+  it('does not bump unauthorized on a 403', async () => {
+    const api = createService();
+    respond = () => jsonResponse({ error: { code: 'FORBIDDEN', message: 'Forbidden' } }, 403);
+
+    await expect(api.getDocuments('services')).rejects.toThrow();
+    expect(api.unauthorized()).toBe(0);
+  });
+});
+
+describe('CmsApiService — error message fallback', () => {
+  it("surfaces an h3-style { statusMessage } body's text instead of a generic fallback", async () => {
+    const api = createService();
+    respond = () => jsonResponse({ statusMessage: 'Cannot remove the last remaining admin' }, 409);
+
+    await expect(api.updateUser('u1', { role: 'viewer' })).rejects.toThrow(
+      'Cannot remove the last remaining admin'
+    );
+  });
+
+  it("unwraps the real Forge envelope's nested error.message instead of stringifying the object", async () => {
+    const api = createService();
+    respond = () =>
+      jsonResponse(
+        { error: { code: 'UNIQUE_CONSTRAINT', message: 'Cannot remove the last remaining admin' } },
+        409
+      );
+
+    const err = await api.updateUser('u1', { role: 'viewer' }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe('Cannot remove the last remaining admin');
+    expect((err as Error).message).not.toContain('object Object');
+  });
+
+  it('unwraps a validation envelope whose details nest inside error, not at the top level', async () => {
+    const api = createService();
+    respond = () =>
+      jsonResponse(
+        {
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Document validation failed',
+            details: [{ field: 'title', message: 'Required', code: 'required' }]
+          }
+        },
+        400
+      );
+
+    const err = await api.createDocument('posts', {}).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ApiValidationError);
+    expect((err as ApiValidationError).details).toEqual([
+      { field: 'title', message: 'Required', code: 'required' }
+    ]);
   });
 });
 

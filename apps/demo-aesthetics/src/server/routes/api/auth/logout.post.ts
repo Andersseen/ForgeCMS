@@ -1,13 +1,13 @@
 import { defineEventHandler, toWebRequest } from 'h3';
 import type { ApiContext } from '@forge-cms/api';
-import { handleMe } from '@forge-cms/runtime';
+import { handleLogout } from '@forge-cms/runtime';
 import { getServerRuntime } from '../../../api/runtime';
 
 /**
- * GET /api/auth/me
+ * POST /api/auth/logout
  *
- * Thin wrapper over `@forge-cms/runtime`'s `handleMe` (spec 054 companion fix — this route previously
- * hand-rolled `requireAuth` directly).
+ * Thin wrapper over `@forge-cms/runtime`'s `handleLogout` — clears the session cookie. Didn't exist at
+ * all before spec 054.
  */
 export default defineEventHandler(async (event) => {
   const runtime = await getServerRuntime(event.context.cloudflare?.env);
@@ -15,5 +15,5 @@ export default defineEventHandler(async (event) => {
     request: toWebRequest(event),
     env: event.context.cloudflare?.env
   };
-  return handleMe(context, { runtime });
+  return handleLogout(context, { runtime, cookie: { secure: !!event.context.cloudflare?.env } });
 });

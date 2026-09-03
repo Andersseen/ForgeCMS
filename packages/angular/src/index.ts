@@ -1,17 +1,20 @@
 /**
  * `@forge-cms/angular` — the browser-side client.
  *
- * A barrel over four modules, so `resources.ts` can build on both the service and the types without
- * an import cycle (`import/no-cycle` is an error in this repo):
+ * A barrel over several modules, so `resources.ts`/`auth-session.ts`/`auth-guard.ts` can build on the
+ * service and the types without an import cycle (`import/no-cycle` is an error in this repo):
  *
- * - `types.ts`       response shapes, config token, typed errors, role helpers
- * - `query.ts`       `QueryOptions` → the query string the API parses
- * - `api.service.ts` `CmsApiService`, promise-based
- * - `resources.ts`   signal-based reads over the same service
+ * - `types.ts`        response shapes, config token, typed errors, role helpers
+ * - `query.ts`        `QueryOptions` → the query string the API parses
+ * - `api.service.ts`  `CmsApiService`, promise-based
+ * - `resources.ts`    signal-based reads over the same service
+ * - `auth-session.ts` `ForgeAuthSession` — signals-based browser session state (spec 054)
+ * - `auth-guard.ts`   `forgeAuthGuard` — functional Angular Router guard (spec 054)
  */
 export {
   FORGE_CMS_CONFIG,
   provideForgeCms,
+  ApiAuthActionError,
   ApiAuthError,
   ApiValidationError,
   USER_ROLES,
@@ -19,6 +22,7 @@ export {
   isAdmin,
   canWriteContent,
   canManageUsers,
+  type ApiErrorBody,
   type ApiFieldError,
   type ApiItemResponse,
   type ApiListResponse,
@@ -55,3 +59,6 @@ export {
   type DocumentRequest,
   type ForgeResource
 } from './resources.js';
+
+export { ForgeAuthSession, type ForgeAuthStatus } from './auth-session.js';
+export { forgeAuthGuard, type ForgeAuthGuardOptions } from './auth-guard.js';

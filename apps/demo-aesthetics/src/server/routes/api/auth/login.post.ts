@@ -1,27 +1,20 @@
-import { defineEventHandler, readBody, createError } from 'h3';
-import type { UsersCollectionAuthAdapter } from '@forge-cms/auth';
+import { defineEventHandler, toWebRequest } from 'h3';
+import type { ApiContext } from '@forge-cms/api';
+import { handleLogin } from '@forge-cms/runtime';
 import { getServerRuntime } from '../../../api/runtime';
 
-/** POST /api/auth/login — `{ email, password }` → `{ token, user }`. */
+/**
+ * POST /api/auth/login
+ *
+ * Thin wrapper over `@forge-cms/runtime`'s `handleLogin` (spec 054 companion fix — this route
+ * previously hand-rolled `auth.login()` directly and never set the `forge_session` cookie, which broke
+ * once the shared Angular client started relying on cookies instead of `localStorage`).
+ */
 export default defineEventHandler(async (event) => {
   const runtime = await getServerRuntime(event.context.cloudflare?.env);
-
-  let body: { email?: string; password?: string };
-  try {
-    body = await readBody(event);
-  } catch {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid JSON body' });
-  }
-
-  if (!body.email || !body.password) {
-    throw createError({ statusCode: 400, statusMessage: 'Missing email or password' });
-  }
-
-  const auth = runtime.adapters.auth as UsersCollectionAuthAdapter;
-  const result = await auth.login(body.email, body.password);
-  if (!result.ok) {
-    throw createError({ statusCode: 401, statusMessage: 'Invalid email or password' });
-  }
-
-  return { data: { token: result.token, user: result.user } };
+  const context: ApiContext = {
+    request: toWebRequest(event),
+    env: event.context.cloudflare?.env
+  };
+  return handleLogin(context, { runtime, cookie: { secure: !!event.context.cloudflare?.env } });
 });

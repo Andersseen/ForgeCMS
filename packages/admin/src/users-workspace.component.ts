@@ -1,5 +1,4 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import type { OnInit } from '@angular/core';
 import {
   VoltButton,
   VoltCard,
@@ -16,11 +15,16 @@ import {
 import { LmnPencilIcon, LmnPlusIcon, LmnTrashIcon, LmnUsersIcon } from 'lumen-icons';
 import {
   CmsApiService,
+  ForgeAuthSession,
   canManageUsers,
+  userRole,
   type AuthUser,
   type CreateUserInput
 } from '@forge-cms/angular';
-import { ErrorStateComponent, LoadingStateComponent, PageHeaderComponent } from '@forge-cms/admin';
+import { ErrorStateComponent } from './error-state.component.js';
+import { LoadingStateComponent } from './loading-state.component.js';
+import { PageHeaderComponent } from './page-header.component.js';
+import { ForgeConfirmDialogComponent } from './confirm-dialog.component.js';
 
 interface UserFormValue {
   name: string;
@@ -33,8 +37,18 @@ function emptyForm(): UserFormValue {
   return { name: '', email: '', password: '', role: 'viewer' };
 }
 
+/**
+ * Reusable users-management workspace for `@forge-cms/admin` consumers (spec 054), ported from
+ * `apps/www`'s app-local `UsersPage`. Already hits the dedicated `/api/auth/users*` primitives
+ * (`CmsApiService.getUsers/createUser/updateUser/deleteUser`), never the generic collection
+ * editor — `passwordHash` has no path to reach this component (audited in spec 054).
+ *
+ * Adds last-admin UX on top of the ported behavior: the server (`UsersCollectionAuthAdapter`,
+ * spec 054) is the real backstop, but disabling the sole admin's own delete/demote controls here
+ * avoids a round trip to discover an action was always going to fail.
+ */
 @Component({
-  selector: 'forge-cms-users',
+  selector: 'forge-users-workspace',
   standalone: true,
   imports: [
     VoltCard,
@@ -54,7 +68,8 @@ function emptyForm(): UserFormValue {
     LmnUsersIcon,
     PageHeaderComponent,
     ErrorStateComponent,
-    LoadingStateComponent
+    LoadingStateComponent,
+    ForgeConfirmDialogComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -79,17 +94,17 @@ function emptyForm(): UserFormValue {
           <div class="space-y-4">
             <div class="grid gap-4 md:grid-cols-2">
               <div class="space-y-1.5">
-                <volt-label htmlFor="user-name">Name</volt-label>
+                <volt-label htmlFor="forge-user-name">Name</volt-label>
                 <volt-input
-                  id="user-name"
+                  id="forge-user-name"
                   [value]="form().name"
                   (valueChange)="update('name', $event)"
                 />
               </div>
               <div class="space-y-1.5">
-                <volt-label htmlFor="user-email">Email</volt-label>
+                <volt-label htmlFor="forge-user-email">Email</volt-label>
                 <volt-input
-                  id="user-email"
+                  id="forge-user-email"
                   type="email"
                   [value]="form().email"
                   (valueChange)="update('email', $event)"
@@ -99,25 +114,33 @@ function emptyForm(): UserFormValue {
 
             <div class="grid gap-4 md:grid-cols-2">
               <div class="space-y-1.5">
-                <volt-label htmlFor="user-role">Role</volt-label>
+                <volt-label htmlFor="forge-user-role">Role</volt-label>
                 <select
-                  id="user-role"
+                  id="forge-user-role"
                   class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   [value]="form().role"
+                  [disabled]="isEditingSoleAdmin()"
+                  [attr.aria-describedby]="isEditingSoleAdmin() ? 'forge-user-role-hint' : null"
                   (change)="onRoleChange($event)"
                 >
                   <option value="admin">Admin</option>
                   <option value="editor">Editor</option>
                   <option value="viewer">Viewer</option>
                 </select>
+                @if (isEditingSoleAdmin()) {
+                  <p id="forge-user-role-hint" class="text-xs text-muted-foreground">
+                    This is the only admin — their role can't be changed until another admin exists.
+                  </p>
+                }
               </div>
               <div class="space-y-1.5">
-                <volt-label htmlFor="user-password">
+                <volt-label htmlFor="forge-user-password">
                   {{ editingUser() ? 'New password (leave blank to keep)' : 'Password' }}
                 </volt-label>
                 <volt-input
-                  id="user-password"
+                  id="forge-user-password"
                   type="password"
+                  autocomplete="new-password"
                   [value]="form().password"
                   (valueChange)="update('password', $event)"
                 />
@@ -125,7 +148,7 @@ function emptyForm(): UserFormValue {
             </div>
 
             @if (formError(); as message) {
-              <volt-error>{{ message }}</volt-error>
+              <volt-error role="alert">{{ message }}</volt-error>
             }
 
             <div class="flex items-center justify-end gap-2 pt-2">
@@ -152,7 +175,7 @@ function emptyForm(): UserFormValue {
         <forge-error-state title="Unable to load users" [message]="error()" (retry)="load()" />
       } @else {
         <volt-card class="overflow-hidden">
-          <volt-table>
+          <volt-table aria-label="Users">
             <volt-table-header>
               <volt-table-row>
                 <volt-table-head>Name</volt-table-head>
@@ -167,7 +190,12 @@ function emptyForm(): UserFormValue {
                   <volt-table-cell>
                     <div class="flex items-center gap-3">
                       <lmn-users [size]="16" class="text-muted-foreground" />
-                      <span class="font-medium">{{ user.name || 'Unknown' }}</span>
+                      <span class="font-medium">
+                        {{ user.name || 'Unknown' }}
+                        @if (isSelf(user)) {
+                          <span class="text-xs text-muted-foreground">(you)</span>
+                        }
+                      </span>
                     </div>
                   </volt-table-cell>
                   <volt-table-cell>{{ user.email }}</volt-table-cell>
@@ -187,14 +215,24 @@ function emptyForm(): UserFormValue {
                         (click)="startEdit(user)"
                       >
                         <lmn-pencil [size]="14" />
+                        <span class="sr-only">Edit {{ user.name || user.email }}</span>
                       </volt-button>
                       <volt-button
                         variant="ghost"
                         size="icon"
                         class="h-7 w-7"
-                        (click)="deleteUser(user)"
+                        [disabled]="isSoleAdmin(user)"
+                        [title]="isSoleAdmin(user) ? 'The only admin can\\'t be deleted' : ''"
+                        (click)="requestDelete(user)"
                       >
                         <lmn-trash [size]="14" />
+                        <span class="sr-only">
+                          {{
+                            isSoleAdmin(user)
+                              ? 'Cannot delete the only admin'
+                              : 'Delete ' + (user.name || user.email)
+                          }}
+                        </span>
                       </volt-button>
                     </div>
                   </volt-table-cell>
@@ -205,33 +243,55 @@ function emptyForm(): UserFormValue {
         </volt-card>
       }
     </div>
+
+    <forge-confirm-dialog
+      [open]="deleteTarget() !== null"
+      title="Delete this user?"
+      [message]="deleteMessage()"
+      (confirm)="confirmDelete()"
+      (cancel)="cancelDelete()"
+    />
   `
 })
-export class UsersPage implements OnInit {
-  private api = inject(CmsApiService);
+export class ForgeUsersWorkspaceComponent {
+  private readonly api = inject(CmsApiService);
+  private readonly session = inject(ForgeAuthSession);
 
   readonly users = signal<AuthUser[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
-  readonly currentUser = signal<AuthUser | null>(null);
-  readonly isAdmin = computed(() => canManageUsers(this.currentUser()));
+  readonly isAdmin = computed(() => canManageUsers(this.session.user()));
   readonly showForm = signal(false);
   readonly editingUser = signal<AuthUser | null>(null);
   readonly form = signal<UserFormValue>(emptyForm());
   readonly formError = signal<string | null>(null);
+  readonly deleteTarget = signal<AuthUser | null>(null);
 
-  ngOnInit(): void {
-    void this.loadUser();
+  private readonly adminCount = computed(
+    () => this.users().filter((user) => userRole(user) === 'admin').length
+  );
+
+  readonly isEditingSoleAdmin = computed(() => {
+    const editing = this.editingUser();
+    return editing !== null && this.isSoleAdmin(editing);
+  });
+
+  readonly deleteMessage = computed(() => {
+    const target = this.deleteTarget();
+    return target ? `Delete user ${target.email}? This cannot be undone.` : '';
+  });
+
+  constructor() {
     void this.load();
   }
 
-  private async loadUser(): Promise<void> {
-    try {
-      const user = await this.api.getCurrentUser();
-      this.currentUser.set(user);
-    } catch {
-      this.currentUser.set(null);
-    }
+  isSelf(user: AuthUser): boolean {
+    return user.id === this.session.user()?.id;
+  }
+
+  /** True when `user` is an admin and no other admin exists — the last-admin invariant's UI mirror. */
+  isSoleAdmin(user: AuthUser): boolean {
+    return userRole(user) === 'admin' && this.adminCount() === 1;
   }
 
   async load(): Promise<void> {
@@ -316,13 +376,23 @@ export class UsersPage implements OnInit {
     }
   }
 
-  async deleteUser(user: AuthUser): Promise<void> {
-    if (!window.confirm(`Delete user ${user.email}? This cannot be undone.`)) return;
+  requestDelete(user: AuthUser): void {
+    this.deleteTarget.set(user);
+  }
+
+  cancelDelete(): void {
+    this.deleteTarget.set(null);
+  }
+
+  async confirmDelete(): Promise<void> {
+    const user = this.deleteTarget();
+    if (!user) return;
+    this.deleteTarget.set(null);
     try {
       await this.api.deleteUser(user.id);
       await this.load();
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Failed to delete user');
+      this.error.set(err instanceof Error ? err.message : 'Failed to delete user');
     }
   }
 }

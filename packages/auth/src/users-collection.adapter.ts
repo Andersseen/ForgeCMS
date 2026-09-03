@@ -7,7 +7,7 @@ import type {
   AuthUser,
   PublicSignupInput
 } from './index.js';
-import { ForgeAuthError } from './index.js';
+import { ForgeAuthError, UserMutationError } from './index.js';
 import { extractToken, issueToken, looksLikeSignedToken, validateSession } from './token-signer.js';
 import type { UserRole } from './roles.js';
 import { hasAnyRole } from './roles.js';
@@ -325,10 +325,37 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     return records.map(sanitizeUser);
   }
 
+  /** How many `role: 'admin'` rows exist — the last-admin invariant below is keyed on this. */
+  private async countAdmins(db: DatabaseAdapter): Promise<number> {
+    const admins = await db.findMany({ collection: this.collection, where: { role: 'admin' } });
+    return admins.length;
+  }
+
+  /**
+   * Updates a user. Rejects (via {@link UserMutationError}) rather than writing when the change would:
+   * - set a password shorter than the configured policy, or
+   * - change the sole remaining admin's `role` away from `'admin'`.
+   *
+   * The second check, combined with {@link deleteUser}'s identical guard, is the whole last-admin
+   * invariant: an installation can never end up with zero usable administrators, however the change is
+   * attempted (self-demote, demoted by another admin, self-delete, deleted by another admin).
+   */
   async updateUser(id: string, input: Partial<CreateUserInput>): Promise<AuthUser | null> {
     const db = this.getDb();
     const existing = await db.findById(this.collection, id);
     if (!existing) return null;
+
+    if (input.password !== undefined && !meetsPasswordPolicy(input.password, this.passwordPolicy)) {
+      throw new UserMutationError('Password does not meet requirements', 'weak-password');
+    }
+    if (
+      input.role !== undefined &&
+      input.role !== 'admin' &&
+      existing.role === 'admin' &&
+      (await this.countAdmins(db)) <= 1
+    ) {
+      throw new UserMutationError('Cannot remove the last remaining admin', 'last-admin');
+    }
 
     const updates: DatabaseRecord = {};
     if (input.email !== undefined) updates.email = normalizeEmail(input.email);
@@ -340,8 +367,13 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     return sanitizeUser(updated);
   }
 
+  /** Rejects (via {@link UserMutationError}) deleting the sole remaining admin — see {@link updateUser}. */
   async deleteUser(id: string): Promise<void> {
     const db = this.getDb();
+    const existing = await db.findById(this.collection, id);
+    if (existing?.role === 'admin' && (await this.countAdmins(db)) <= 1) {
+      throw new UserMutationError('Cannot remove the last remaining admin', 'last-admin');
+    }
     await db.delete(this.collection, id);
   }
 }

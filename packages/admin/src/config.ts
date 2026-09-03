@@ -47,6 +47,12 @@ export interface ForgeAdminConfig {
     users?: boolean;
     settings?: boolean;
   };
+  /**
+   * Where the layout's "Log in" link and post-logout redirect go. Defaults to `/admin/login`, matching
+   * `forgeAdminAuthRoutes()`'s own convention (spec 054) — set this if a host mounts sign-in somewhere
+   * else instead (e.g. a top-level `/login` predating that helper).
+   */
+  signInPath?: string;
 }
 
 /** What the sidebar renders when a host app does not configure `nav`. */

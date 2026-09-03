@@ -136,3 +136,84 @@ Clears the cookie and returns `204` — idempotent, and CSRF-checked like any ot
 stateless (signed, not stored), so this is client-state-only: it cannot revoke a Bearer token a
 programmatic client still holds. A future spec may add real session revocation; this one doesn't
 pretend to.
+
+## Angular / admin auth experience
+
+Everything above is the server contract. `@forge-cms/angular` and `@forge-cms/admin` build a complete,
+reusable browser layer on top of it — session state, a route guard, sign-in/sign-up UI, and a users
+workspace — so a consumer never re-implements this flow. This is the short version; each piece links
+back to its own doc for detail.
+
+**1. Server** — as above: `defineUsersCollection()`, `UsersCollectionAuthAdapter`, the four handlers.
+
+**2. Angular provider** — no `authToken` needed for a browser session (see
+[Angular client](/docs/angular-client)):
+
+```ts
+// app.config.ts
+import { provideForgeCms } from '@forge-cms/angular';
+
+export const appConfig: ApplicationConfig = {
+  providers: [provideForgeCms({ baseUrl: '/api/v1' })]
+};
+```
+
+**3. Router** — a guarded subtree next to the sign-in/sign-up routes:
+
+```ts
+// admin.routes.ts
+import type { Routes } from '@angular/router';
+import {
+  ForgeAdminLayoutComponent,
+  ForgeUsersWorkspaceComponent,
+  forgeAdminAuthRoutes,
+  forgeAdminContentRoutes
+} from '@forge-cms/admin';
+import { forgeAuthGuard } from '@forge-cms/angular';
+
+export const ADMIN_ROUTES: Routes = [
+  ...forgeAdminAuthRoutes({ signup: false }), // GET /admin/login (+ /admin/signup if true)
+  {
+    path: '',
+    component: ForgeAdminLayoutComponent,
+    canActivate: [forgeAuthGuard()], // any authenticated user
+    children: [
+      ...forgeAdminContentRoutes(), // spec 052
+      {
+        path: 'users',
+        component: ForgeUsersWorkspaceComponent,
+        canActivate: [forgeAuthGuard({ roles: ['admin'] })] // admin only
+      }
+    ]
+  }
+];
+```
+
+That's the whole surface a consumer needs to write. `forgeAuthGuard()` awaits `ForgeAuthSession`'s
+one-time `/api/auth/me` bootstrap before deciding (so a page refresh never flashes an anonymous
+sidebar), redirects an anonymous visitor to `signInPath` (default `/admin/login`) with a `returnUrl`,
+and — with `roles` — redirects an authenticated-but-under-privileged visitor to `forbiddenPath`
+(default `/admin`). None of this replaces server enforcement; it only avoids a round trip to discover
+an action was always going to fail.
+
+**`ForgeAuthSession`** (`providedIn: 'root'`, injectable directly for a custom sign-in form or a
+user-menu component) exposes `user`, `status` (`'loading' | 'authenticated' | 'anonymous' | 'error'`),
+`authenticated`, `loading`, `error`, and `expired` as signals, plus `login()`/`signup()`/`logout()`
+(none of them throw — check `authenticated()`/`error()` after) and `refresh()`. A `401` on _any_ request
+while a session is authenticated flips it to `'anonymous'` with `expired: true` automatically — no
+polling, and a `403` never touches it.
+
+**Users management** — `ForgeUsersWorkspaceComponent` needs no server route beyond the ones already
+described (`GET/POST /api/auth/users`, `PUT/DELETE /api/auth/users/:id` — a host wires these the same
+way as `login.post.ts` above): list, create, edit, and delete, including a password reset
+(`updateUser(id, { password })`, already policy-checked). It also enforces the **last-admin invariant**
+client-side (disabling the sole admin's own delete/demote controls) as a UX mirror of the real
+server-side check in `UsersCollectionAuthAdapter` — an installation can never end up with zero admins,
+however the change is attempted.
+
+Host apps that predate `forgeAdminAuthRoutes()`'s `/admin/login` convention (an existing top-level
+`/login` route, say) can point the shared layout at it instead of migrating the route:
+
+```ts
+const config: ForgeAdminConfig = { signInPath: '/login' /* ... */ };
+```
