@@ -448,10 +448,10 @@ importers:
       '@forge-cms/core':
         specifier: workspace:*
         version: link:../core
-    devDependencies:
       '@forge-cms/db':
         specifier: workspace:*
         version: link:../db
+    devDependencies:
       '@forge-cms/testing':
         specifier: workspace:*
         version: link:../testing
