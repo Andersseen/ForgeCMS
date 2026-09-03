@@ -20,6 +20,8 @@ export interface ServerEnv {
    */
   BUCKET?: R2Bucket;
   AUTH_SECRET?: string;
+  /** Opt-in flag for `POST /api/auth/signup` — unset (disabled) by default, see spec 054 §7. */
+  FORGE_ENABLE_SIGNUP?: string;
 }
 
 let runtimePromise: Promise<ForgeCmsRuntime<ServerEnv>> | undefined;

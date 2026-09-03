@@ -580,8 +580,14 @@ function verifyAngularConsumer(tarballs) {
   writeFileSync(
     join(srcDir, 'index.ts'),
     `import { Component, inject } from '@angular/core';
-import type { Routes } from '@angular/router';
-import { CmsApiService, provideForgeCms, type QueryOptions } from '@forge-cms/angular';
+import type { CanActivateFn, Routes } from '@angular/router';
+import {
+  CmsApiService,
+  ForgeAuthSession,
+  forgeAuthGuard,
+  provideForgeCms,
+  type QueryOptions
+} from '@forge-cms/angular';
 import {
   ForgeAdminLayoutComponent,
   ForgeCollectionListComponent,
@@ -589,6 +595,10 @@ import {
   ForgeDocumentEditorComponent,
   ForgeCollectionsIndexComponent,
   ForgeConfirmDialogComponent,
+  ForgeSignInComponent,
+  ForgeSignUpComponent,
+  ForgeUsersWorkspaceComponent,
+  forgeAdminAuthRoutes,
   forgeAdminContentRoutes,
   type ForgeAdminConfig
 } from '@forge-cms/admin';
@@ -606,6 +616,24 @@ const generatedRoutes: Routes = forgeAdminContentRoutes();
 void generatedRoutes;
 void ForgeConfirmDialogComponent;
 
+// Angular/admin auth experience (spec 054): a real consumer's route composition, through the packed
+// public surface only — session, guard, sign-in/up, users workspace, and the auth route helper.
+const authRoutes: Routes = [
+  ...forgeAdminAuthRoutes({ signup: true }),
+  {
+    path: '',
+    canActivate: [forgeAuthGuard({ roles: ['admin'] })],
+    children: [
+      { path: 'users', component: ForgeUsersWorkspaceComponent },
+      { path: 'login', component: ForgeSignInComponent },
+      { path: 'signup', component: ForgeSignUpComponent }
+    ]
+  }
+];
+void authRoutes;
+const guard: CanActivateFn = forgeAuthGuard();
+void guard;
+
 const providers = provideForgeCms({ baseUrl: '/api' });
 
 // Query completeness (spec 050): nested and/or where + multi-field sort compile through the packed
@@ -622,7 +650,8 @@ void useFindOne;
 
 const adminConfig: ForgeAdminConfig = {
   title: 'External ForgeCMS',
-  nav: []
+  nav: [],
+  signInPath: '/login'
 };
 
 @Component({
@@ -634,6 +663,11 @@ const adminConfig: ForgeAdminConfig = {
 export class ExternalAdminComponent {
   protected readonly adminConfig = adminConfig;
   protected readonly api = inject(CmsApiService);
+  // Angular/admin auth experience (spec 054): the session service is a real injectable from the
+  // packed public entry, with the real signal API a consumer would read in a template.
+  protected readonly session = inject(ForgeAuthSession);
+  protected readonly authenticated = this.session.authenticated;
+  protected readonly currentUser = this.session.user;
 }
 `
   );

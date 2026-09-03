@@ -1,11 +1,13 @@
 import { defineEventHandler, getRouterParam, readBody, createError } from 'h3';
 import type { CreateUserInput } from '@forge-cms/auth';
+import { UserMutationError } from '@forge-cms/auth';
 import { requireAdminAuth } from '../../../../api/auth-request';
 
 /**
  * PUT /api/auth/users/:id
  *
- * Updates an existing user.
+ * Updates an existing user. Rejects (409/400) a change that would violate the last-admin invariant
+ * or the password policy — see `UsersCollectionAuthAdapter.updateUser` (spec 054).
  */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id');
@@ -22,7 +24,18 @@ export default defineEventHandler(async (event) => {
 
   const auth = await requireAdminAuth(event);
 
-  const updated = await auth.updateUser(id, body);
+  let updated;
+  try {
+    updated = await auth.updateUser(id, body);
+  } catch (err) {
+    if (err instanceof UserMutationError) {
+      throw createError({
+        statusCode: err.reason === 'last-admin' ? 409 : 400,
+        statusMessage: err.message
+      });
+    }
+    throw err;
+  }
   if (!updated) {
     throw createError({ statusCode: 404, statusMessage: 'User not found' });
   }

@@ -6,10 +6,6 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/landing.page').then((m) => m.LandingPage)
   },
   {
-    path: 'login',
-    loadComponent: () => import('./pages/login/login.page').then((m) => m.LoginPage)
-  },
-  {
     // The shell (header + sidebar) stays mounted across pages so the sidebar keeps its scroll.
     path: 'docs',
     loadComponent: () => import('./pages/docs/docs.page').then((m) => m.DocsPage),

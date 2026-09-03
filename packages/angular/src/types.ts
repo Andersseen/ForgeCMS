@@ -118,6 +118,28 @@ export class ApiAuthError extends Error {
   }
 }
 
+/** The `{ error: { code, message } }` envelope every Forge HTTP error response carries. */
+export interface ApiErrorBody {
+  error: { code: string; message: string; details?: unknown };
+}
+
+/**
+ * Thrown by `login`/`signup`/`logout` on a non-2xx response. Unlike the generic `Error` other write
+ * methods throw, `.message` is always the server's own curated text from spec 053's
+ * `authFailureResponse` table (e.g. `'Invalid email or password'`) — safe to show to a user directly,
+ * no client-side re-derivation needed.
+ */
+export class ApiAuthActionError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly status: number
+  ) {
+    super(message);
+    this.name = 'ApiAuthActionError';
+  }
+}
+
 export interface AuthUser {
   id: string;
   email?: string;

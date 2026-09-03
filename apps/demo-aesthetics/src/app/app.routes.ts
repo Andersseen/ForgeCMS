@@ -48,6 +48,10 @@ export const routes: Routes = [
     data: {
       config: {
         title: 'Lumea Aesthetics',
+        // This app predates `forgeAdminAuthRoutes()`'s `/admin/login` convention (spec 054) — its own
+        // top-level `/login` route stays as-is (see spec 054's non-goals), so the shared layout needs
+        // to be told where "Log in"/post-logout actually go instead of assuming the new default.
+        signInPath: '/login',
         nav: [
           {
             label: 'Clinic',

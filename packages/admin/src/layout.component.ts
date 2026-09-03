@@ -1,8 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map, startWith } from 'rxjs';
-import { CmsApiService, type AuthUser, canManageUsers, userRole } from '@forge-cms/angular';
+import { ForgeAuthSession, canManageUsers, userRole } from '@forge-cms/angular';
 import {
   VoltAvatar,
   VoltAvatarFallback,
@@ -39,8 +39,6 @@ interface BreadcrumbItem {
   label: string;
   routerLink?: string;
 }
-
-const AUTH_TOKEN_KEY = 'forge-auth-token';
 
 @Component({
   selector: 'forge-admin-layout',
@@ -222,10 +220,10 @@ const AUTH_TOKEN_KEY = 'forge-auth-token';
                 class="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive ring-2 ring-background"
               ></span>
             </volt-button>
-            @if (isLoggedIn()) {
+            @if (session.authenticated()) {
               <volt-button variant="ghost" size="sm" (click)="logout()">Log out</volt-button>
             } @else {
-              <a routerLink="/login">
+              <a [routerLink]="signInPath()">
                 <volt-button variant="ghost" size="sm">Log in</volt-button>
               </a>
             }
@@ -251,18 +249,21 @@ export class ForgeAdminLayoutComponent {
     () => this.config()?.nav ?? DEFAULT_ADMIN_NAV
   );
 
+  /** Where "Log in" and post-logout redirect go — see `ForgeAdminConfig.signInPath`. */
+  protected readonly signInPath = computed(() => this.config()?.signInPath ?? '/admin/login');
+
   /** Hides admin-only entries from editors and viewers. */
   protected visibleItems(group: ForgeAdminNavGroup): ForgeAdminNavItem[] {
-    const isAdmin = canManageUsers(this.currentUser());
+    const isAdmin = canManageUsers(this.session.user());
     return group.items.filter((item) => item.adminOnly !== true || isAdmin);
   }
 
   sidebarService = inject(VoltSidebarService);
   themeService = inject(ThemeService);
   private router = inject(Router);
-  private api = inject(CmsApiService);
+  protected readonly session = inject(ForgeAuthSession);
 
-  readonly currentUser = signal<AuthUser | null>(null);
+  readonly currentUser = this.session.user;
   readonly currentUserRole = computed(() => userRole(this.currentUser()));
   readonly userInitials = computed(() => {
     const name = this.currentUser()?.name ?? '';
@@ -290,26 +291,10 @@ export class ForgeAdminLayoutComponent {
 
   breadcrumbs = computed<BreadcrumbItem[]>(() => this.routeChanges());
 
-  constructor() {
-    void this.loadCurrentUser();
-  }
-
-  private async loadCurrentUser(): Promise<void> {
-    try {
-      const user = await this.api.getCurrentUser();
-      this.currentUser.set(user);
-    } catch {
-      // leave footer in default state if /api/auth/me fails
-    }
-  }
-
-  protected isLoggedIn(): boolean {
-    return localStorage.getItem(AUTH_TOKEN_KEY) !== null;
-  }
-
-  protected logout(): void {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    window.location.reload();
+  /** Clears the session (server cookie + local state) and returns to sign-in. */
+  protected async logout(): Promise<void> {
+    await this.session.logout();
+    await this.router.navigateByUrl(this.signInPath());
   }
 
   private buildBreadcrumbs(): BreadcrumbItem[] {

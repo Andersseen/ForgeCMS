@@ -5,11 +5,11 @@ const DEMO_EMAIL = 'demo@forgecms.dev';
 const DEMO_PASSWORD = 'forgecms-demo';
 
 async function login(page: Page) {
-  await page.goto('/login');
-  await page.locator('input#email').fill(DEMO_EMAIL);
-  await page.locator('input#password').fill(DEMO_PASSWORD);
-  await page.getByRole('button', { name: 'Log in' }).click();
-  await page.waitForURL('**/admin/collections');
+  await page.goto('/admin/login');
+  await page.locator('input#forge-signin-email').fill(DEMO_EMAIL);
+  await page.locator('input#forge-signin-password').fill(DEMO_PASSWORD);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.waitForURL('**/admin');
 }
 
 /**
@@ -95,13 +95,11 @@ test('unsaved changes in the document editor prompt before navigating away', asy
   await expect(page).toHaveURL(/\/admin\/collections\/posts\/new$/);
 });
 
-test('anonymous users cannot see write affordances or create documents', async ({ page }) => {
-  await page.goto('/admin/collections/posts');
-
-  // The workspace hides create/edit/delete/publish for a viewer who cannot write.
-  await expect(page.getByRole('button', { name: /New/i })).not.toBeVisible();
-
-  // The API also rejects anonymous write requests.
+test('the API still rejects an anonymous write even if the client were bypassed', async ({
+  page
+}) => {
+  // The route guard (see auth.spec.ts for its redirect behavior) is UX only — this proves the server
+  // remains the real backstop.
   const response = await page.request.post('/api/v1/posts', {
     data: { title: 'Should not be created', slug: `should-not-be-created-${Date.now()}` },
     headers: { 'content-type': 'application/json' }

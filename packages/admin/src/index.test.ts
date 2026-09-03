@@ -7,7 +7,11 @@ import {
   PageHeaderComponent,
   LoadingStateComponent,
   ErrorStateComponent,
-  EmptyStateComponent
+  EmptyStateComponent,
+  ForgeSignInComponent,
+  ForgeSignUpComponent,
+  ForgeUsersWorkspaceComponent,
+  forgeAdminAuthRoutes
 } from './index';
 
 describe('@forge-cms/admin', () => {
@@ -28,5 +32,12 @@ describe('@forge-cms/admin', () => {
     expect(LoadingStateComponent).toBeDefined();
     expect(ErrorStateComponent).toBeDefined();
     expect(EmptyStateComponent).toBeDefined();
+  });
+
+  it('exports the auth experience (spec 054)', () => {
+    expect(ForgeSignInComponent).toBeDefined();
+    expect(ForgeSignUpComponent).toBeDefined();
+    expect(ForgeUsersWorkspaceComponent).toBeDefined();
+    expect(forgeAdminAuthRoutes).toBeDefined();
   });
 });

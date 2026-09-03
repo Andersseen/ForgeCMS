@@ -15,17 +15,15 @@ dependencies), signal-based resources over it, and typed errors.
 import { provideForgeCms } from '@forge-cms/angular';
 
 export const appConfig: ApplicationConfig = {
-  providers: [
-    provideForgeCms({
-      baseUrl: '/api/v1',
-      // A function is re-read on every request, so a login mid-session takes effect immediately.
-      authToken: () => localStorage.getItem('forge-auth-token')
-    })
-  ]
+  providers: [provideForgeCms({ baseUrl: '/api/v1' })]
 };
 ```
 
-`authToken` also accepts a plain string. Omit it entirely for a read-only public site.
+Every request already sends `credentials: 'include'`, so a browser session works out of the box once
+you're using [the reusable auth UI](/docs/browser-auth) — no `authToken` needed for that path. `authToken`
+(a string, or a function re-read on every request) is for **machine/API-key clients** sending
+`Authorization: Bearer <token>` instead of a cookie — omit it entirely for a read-only public site or a
+browser app using cookie sessions.
 
 ## `CmsApiService`
 
@@ -46,12 +44,16 @@ const cms = inject(CmsApiService);
 | `deleteDocument(collection, id)`                          | `void`                                                         |
 | `uploadFile(collection, file, fields?)`                   | `T` — multipart create                                         |
 | `getCollections()`                                        | `CollectionMeta[]` — schema metadata                           |
-| `login(email, password)`                                  | `{ token, user }`                                              |
+| `login(email, password)` / `signup(input)` / `logout()`   | `{ token, user }` / `void` — see below                         |
 | `getCurrentUser()`                                        | `AuthUser \| null`                                             |
 | `getUsers()` / `createUser` / `updateUser` / `deleteUser` | user management (admin)                                        |
 
-The token is sent on **reads as well as writes**, which is what makes drafts and field-level read
-rules work for a signed-in editor.
+Bearer/`authToken` requests send the token on **reads as well as writes**, which is what makes drafts
+and field-level read rules work for a signed-in editor over that path.
+
+`login`/`signup`/`logout` are the low-level primitives — they exist so `ForgeAuthSession` (below) can
+be built on `CmsApiService` alone, with zero extra dependencies. A real app should use
+`ForgeAuthSession`, not these three directly; see [Browser auth](/docs/browser-auth).
 
 ## Query options
 
@@ -158,7 +160,10 @@ try {
   if (err instanceof ApiValidationError) {
     // err.details → [{ field: 'email', message: '…', code: 'type_email' }]
   } else if (err instanceof ApiAuthError) {
-    router.navigate(['/login']);
+    // A 401 on any request also flips a signed-in ForgeAuthSession to 'anonymous' automatically
+    // (see /docs/browser-auth) — forgeAuthGuard then redirects on the next navigation. This manual
+    // check/redirect is only for one-off calls made outside a guarded route.
+    router.navigate(['/admin/login']);
   }
 }
 ```

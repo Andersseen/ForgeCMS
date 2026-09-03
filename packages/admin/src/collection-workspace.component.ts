@@ -10,8 +10,13 @@ import {
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterOutlet } from '@angular/router';
 import { map } from 'rxjs';
-import { CmsApiService, canWriteContent, collectionResource } from '@forge-cms/angular';
-import type { AuthUser, CollectionMeta } from '@forge-cms/angular';
+import {
+  CmsApiService,
+  ForgeAuthSession,
+  canWriteContent,
+  collectionResource
+} from '@forge-cms/angular';
+import type { CollectionMeta } from '@forge-cms/angular';
 import { VoltInput } from '@voltui/components';
 import {
   ForgeCollectionListComponent,
@@ -196,9 +201,11 @@ export class ForgeCollectionWorkspaceComponent {
   protected readonly actionError = signal<string | null>(null);
   protected readonly describeAdminError = describeAdminError;
 
-  private readonly currentUser = signal<AuthUser | null>(null);
-  /** Hides create/edit/delete/publish affordances for a viewer who cannot write anyway. */
-  protected readonly readOnly = computed(() => !canWriteContent(this.currentUser()));
+  private readonly session = inject(ForgeAuthSession);
+  /** Hides create/edit/delete/publish affordances for a viewer who cannot write anyway. Reuses the
+   *  app-wide session instead of its own `getCurrentUser()` call — one `/me` bootstrap per app load,
+   *  not one per workspace instance (spec 054). */
+  protected readonly readOnly = computed(() => !canWriteContent(this.session.user()));
 
   protected readonly deleteMessage = computed(() => {
     const doc = this.deleteTarget();
@@ -216,7 +223,6 @@ export class ForgeCollectionWorkspaceComponent {
       if (slug === undefined) return;
       void this.loadMeta();
     });
-    void this.api.getCurrentUser().then((user) => this.currentUser.set(user));
   }
 
   protected async loadMeta(): Promise<void> {
