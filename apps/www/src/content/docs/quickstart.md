@@ -92,13 +92,13 @@ pnpm dev:demo    # a full marketing site built on the CMS (apps/demo-aesthetics)
 ```
 
 Open the printed URL and go to `/admin`. Reads are public; creating, editing and deleting require a
-login at `/login`:
+login:
 
-| App                    | Email                    | Password        | Role   |
-| ---------------------- | ------------------------ | --------------- | ------ |
-| `apps/www`             | `demo@forgecms.dev`      | `forgecms-demo` | admin  |
-| `apps/demo-aesthetics` | `demo@lumea.clinic`      | `lumea-demo`    | admin  |
-| `apps/demo-aesthetics` | `frontdesk@lumea.clinic` | `lumea-desk`    | editor |
+| App                               | Email                    | Password        | Role   |
+| --------------------------------- | ------------------------ | --------------- | ------ |
+| `apps/www` (`/admin/login`)       | `demo@forgecms.dev`      | `forgecms-demo` | admin  |
+| `apps/demo-aesthetics` (`/login`) | `demo@lumea.clinic`      | `lumea-demo`    | admin  |
+| `apps/demo-aesthetics` (`/login`) | `frontdesk@lumea.clinic` | `lumea-desk`    | editor |
 
 Local development uses in-memory adapters, so **data resets on every reload**. That is expected;
 the deployed apps persist to Cloudflare D1.

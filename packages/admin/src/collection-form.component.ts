@@ -20,13 +20,18 @@ import { normaliseReferences } from './references.js';
   template: `
     <div
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="forge-collection-form-title"
+      tabindex="-1"
+      (keydown.escape)="cancel.emit()"
       (click)="cancel.emit()"
     >
       <volt-card
         class="w-full max-w-lg p-6 space-y-4 max-h-[85vh] overflow-y-auto"
         (click)="$event.stopPropagation()"
       >
-        <h2 class="text-lg font-semibold">
+        <h2 id="forge-collection-form-title" class="text-lg font-semibold">
           {{ submitLabel() === 'Create' ? 'New document' : 'Edit document' }}
         </h2>
 

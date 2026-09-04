@@ -37,6 +37,16 @@ test.describe('auth guard and session', () => {
     await expect(page).not.toHaveURL(/\/admin\/login/);
   });
 
+  test('sign-in ignores an unsafe external returnUrl', async ({ page }) => {
+    await page.goto('/admin/login?returnUrl=https%3A%2F%2Fexample.com%2Fadmin');
+
+    await page.locator('input#forge-signin-email').fill(DEMO_EMAIL);
+    await page.locator('input#forge-signin-password').fill(DEMO_PASSWORD);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+
+    await expect(page).toHaveURL(/\/admin$/);
+  });
+
   test('logout clears the server session, not just local UI state', async ({ page }) => {
     await page.goto('/admin/login');
     await page.locator('input#forge-signin-email').fill(DEMO_EMAIL);

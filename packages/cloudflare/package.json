@@ -51,8 +51,8 @@
     "@forge-cms/storage": "workspace:*"
   },
   "devDependencies": {
-    "@cloudflare/vitest-plugin": "^1.1.2",
-    "@cloudflare/workers-types": "^5.20260831.1",
+    "@cloudflare/vitest-plugin": "1.1.2",
+    "@cloudflare/workers-types": "5.20260831.1",
     "@forge-cms/auth": "workspace:*",
     "@forge-cms/runtime": "workspace:*",
     "@forge-cms/testing": "workspace:*",

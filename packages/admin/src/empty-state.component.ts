@@ -18,6 +18,7 @@ import { VoltCard } from '@voltui/components';
         @if (message()) {
           <p class="text-xs text-muted-foreground max-w-sm mx-auto">{{ message() }}</p>
         }
+        <ng-content select="[actions]" />
       </div>
     </volt-card>
   `

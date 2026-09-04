@@ -20,11 +20,16 @@ import { VoltButton, VoltCard } from '@voltui/components';
         role="dialog"
         aria-modal="true"
         aria-labelledby="forge-confirm-dialog-title"
+        aria-describedby="forge-confirm-dialog-message"
+        tabindex="-1"
+        (keydown.escape)="cancel.emit()"
         (click)="cancel.emit()"
       >
         <volt-card class="w-full max-w-sm space-y-4 p-6" (click)="$event.stopPropagation()">
           <h2 id="forge-confirm-dialog-title" class="text-lg font-semibold">{{ title() }}</h2>
-          <p class="text-sm text-muted-foreground">{{ message() }}</p>
+          <p id="forge-confirm-dialog-message" class="text-sm text-muted-foreground">
+            {{ message() }}
+          </p>
 
           <div class="flex items-center justify-end gap-2 pt-2">
             <volt-button type="button" variant="outline" size="sm" (click)="cancel.emit()">

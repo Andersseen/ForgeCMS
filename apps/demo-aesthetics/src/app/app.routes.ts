@@ -68,8 +68,13 @@ export const routes: Routes = [
           {
             label: 'Content',
             items: [
-              { label: 'All collections', routerLink: '/admin/collections', icon: 'collections' },
-              { label: 'Media', routerLink: '/admin/media', icon: 'media' }
+              {
+                label: 'All collections',
+                routerLink: '/admin/collections',
+                icon: 'collections',
+                exact: true
+              },
+              { label: 'Media', routerLink: '/admin/media', icon: 'media', exact: true }
             ]
           },
           {
@@ -79,10 +84,16 @@ export const routes: Routes = [
                 label: 'Staff accounts',
                 routerLink: '/admin/users',
                 icon: 'users',
-                adminOnly: true
+                adminOnly: true,
+                exact: true
               },
-              { label: 'API', routerLink: '/admin/api', icon: 'api' },
-              { label: 'Clinic settings', routerLink: '/admin/settings', icon: 'settings' }
+              { label: 'API', routerLink: '/admin/api', icon: 'api', exact: true },
+              {
+                label: 'Clinic settings',
+                routerLink: '/admin/settings',
+                icon: 'settings',
+                exact: true
+              }
             ]
           }
         ]

@@ -1,5 +1,4 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { VoltBadge, VoltButton } from '@voltui/components';
 import {
   DEMO_ADMIN_URL,
@@ -24,7 +23,7 @@ type Audience = 'editor' | 'developer';
 @Component({
   selector: 'forge-cms-demo-dialog',
   standalone: true,
-  imports: [RouterLink, VoltButton, VoltBadge],
+  imports: [VoltButton, VoltBadge],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (dialog.isOpen()) {

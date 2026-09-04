@@ -24,13 +24,12 @@ export default defineConfig({
       '@angular/core',
       '@angular/platform-browser',
       '@angular/router',
-      'zone.js',
       'rxjs'
     ],
     exclude: ['@angular/compiler']
   },
   ssr: {
-    noExternal: ['@angular/**', 'zone.js', 'rxjs']
+    noExternal: ['@angular/**', 'rxjs']
   },
   test: {
     include: ['src/**/*.test.ts', 'vite-plugins/**/*.test.ts'],

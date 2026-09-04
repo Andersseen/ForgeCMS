@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { VoltBadge, VoltCard, VoltCardContent } from '@voltui/components';
+import { VoltBadge, VoltCard } from '@voltui/components';
 import { packages } from '../landing-data';
 
 @Component({
   selector: 'forge-cms-packages-section',
   standalone: true,
-  imports: [VoltBadge, VoltCard, VoltCardContent],
+  imports: [VoltBadge, VoltCard],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section id="packages" class="mx-auto w-full max-w-7xl px-6 py-20 md:px-8">
@@ -20,12 +20,12 @@ import { packages } from '../landing-data';
         </div>
 
         <div class="grid gap-3 sm:grid-cols-2">
-          @for (pkg of packages; track pkg) {
+          @for (pkg of packages; track pkg.name) {
             <volt-card>
-              <volt-card-content class="flex items-center justify-between p-5">
-                <span class="font-semibold">&#64;forge-cms/{{ pkg }}</span>
-                <volt-badge variant="secondary">0.0.0</volt-badge>
-              </volt-card-content>
+              <div class="flex items-center justify-between gap-4 p-5">
+                <span class="font-semibold">&#64;forge-cms/{{ pkg.name }}</span>
+                <volt-badge variant="secondary">{{ pkg.version }}</volt-badge>
+              </div>
             </volt-card>
           }
         </div>
