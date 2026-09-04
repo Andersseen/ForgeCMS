@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/demo-aesthetics",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "private": true,
   "description": "Real-world demo: an aesthetics clinic site whose entire content model runs on ForgeCMS.",
   "type": "module",

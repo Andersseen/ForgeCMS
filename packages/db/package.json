@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/db",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Database adapter contracts for ForgeCMS.",
   "author": "ForgeCMS contributors",
   "license": "MIT",
