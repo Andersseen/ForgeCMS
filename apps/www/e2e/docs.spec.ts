@@ -15,6 +15,7 @@ test('/docs redirects to the introduction and renders the sidebar', async ({ pag
 
   const sidebar = page.locator('aside');
   await expect(sidebar.getByRole('link', { name: 'Quickstart' })).toBeVisible();
+  await expect(sidebar.getByRole('link', { name: 'Small project guide' })).toBeVisible();
   await expect(sidebar.getByRole('link', { name: 'Local API' })).toBeVisible();
 });
 

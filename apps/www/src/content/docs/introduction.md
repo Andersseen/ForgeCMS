@@ -63,8 +63,8 @@ hop between your Analog route and your content.
 
 Be honest with yourself about this list before adopting it for something that matters:
 
-- **First public release.** `0.0.1` is installable and externally smoke-tested, but API stability is
-  not guaranteed before `1.0`.
+- **Pre-1.0 release line.** `0.4.x` is installable and smoke-tested through a small-project
+  consumer, but API stability is not guaranteed before `1.0`.
 - **Schema sync is additive.** It creates tables and adds columns, but it does not drop, rename,
   retype, or backfill data.
 - **Query gaps** — one sort field, no `OR`, no querying inside composite JSON values, and relation
@@ -86,7 +86,8 @@ packages talk to the outside world. Read [Core concepts](/docs/concepts) for the
 
 ## Where to go next
 
-- [Quickstart](/docs/quickstart) — running CMS in about ten minutes.
+- [Small project guide](/docs/small-project-guide) — users, cookie auth, posts, and a working admin.
+- [Quickstart](/docs/quickstart) — the bare Local API path in about ten minutes.
 - [Core concepts](/docs/concepts) — the mental model, in one page.
 - [Collections](/docs/collections) and [Fields](/docs/fields) — the modelling reference.
 - [Local API](/docs/local-api) — the way to use ForgeCMS from server code.

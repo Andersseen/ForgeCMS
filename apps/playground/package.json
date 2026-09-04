@@ -14,27 +14,27 @@
     "clean": "rm -rf dist .analog coverage"
   },
   "dependencies": {
-    "@angular/common": "^21.2.10",
-    "@angular/compiler": "^21.2.10",
-    "@angular/core": "^21.2.10",
-    "@angular/platform-browser": "^21.2.10",
+    "@angular/common": "21.2.10",
+    "@angular/compiler": "21.2.10",
+    "@angular/core": "21.2.10",
+    "@angular/platform-browser": "21.2.10",
     "@forge-cms/auth": "workspace:*",
     "@forge-cms/core": "workspace:*",
     "@forge-cms/db": "workspace:*",
     "@forge-cms/runtime": "workspace:*",
     "@forge-cms/storage": "workspace:*",
-    "rxjs": "^7.8.2",
-    "tslib": "^2.8.1",
-    "zone.js": "^0.15.1"
+    "rxjs": "7.8.2",
+    "tslib": "2.8.1",
+    "zone.js": "0.15.1"
   },
   "devDependencies": {
-    "@analogjs/vite-plugin-angular": "^2.4.8",
-    "@angular/build": "^21.2.10",
-    "@angular/compiler-cli": "^21.2.10",
-    "jsdom": "^27.3.0",
+    "@analogjs/vite-plugin-angular": "2.4.8",
+    "@angular/build": "21.2.10",
+    "@angular/compiler-cli": "21.2.10",
+    "jsdom": "27.3.0",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-tsconfig-paths": "^6.1.1",
+    "vite-tsconfig-paths": "6.1.1",
     "vitest": "catalog:"
   }
 }

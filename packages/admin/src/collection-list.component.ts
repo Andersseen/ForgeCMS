@@ -59,7 +59,7 @@ export interface StatusChangeRequest {
   template: `
     <forge-page-header [title]="collection().name" [subtitle]="collection().description">
       <div actions>
-        @if (!readOnly()) {
+        @if (!readOnly() && documents().length > 0) {
           <volt-button size="sm" (click)="create.emit()">
             <lmn-plus [size]="14" class="mr-1.5" />
             New
@@ -70,9 +70,22 @@ export interface StatusChangeRequest {
 
     @if (documents().length === 0) {
       <forge-empty-state
-        title="No documents yet"
-        message="Documents you create in this collection will show up here."
-      />
+        [title]="'No ' + collection().name.toLowerCase() + ' yet'"
+        [message]="
+          readOnly()
+            ? 'Documents in this collection will show up here once they are published.'
+            : 'Create the first document in this collection to start managing content.'
+        "
+      >
+        @if (!readOnly()) {
+          <div actions>
+            <volt-button size="sm" (click)="create.emit()">
+              <lmn-plus [size]="14" class="mr-1.5" />
+              New
+            </volt-button>
+          </div>
+        }
+      </forge-empty-state>
     } @else {
       <volt-table>
         <volt-table-header>

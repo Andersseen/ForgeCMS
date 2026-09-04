@@ -6,9 +6,7 @@ import { ForgeAuthSession, canManageUsers, userRole } from '@forge-cms/angular';
 import {
   VoltAvatar,
   VoltAvatarFallback,
-  VoltAvatarImage,
   VoltButton,
-  VoltInput,
   VoltSeparator,
   VoltSidebar,
   VoltSidebarContent,
@@ -20,7 +18,6 @@ import {
 } from '@voltui/components';
 import {
   LmnBars3Icon,
-  LmnBellIcon,
   LmnChartBarIcon,
   LmnChevronRightIcon,
   LmnCodeBracketIcon,
@@ -53,11 +50,9 @@ interface BreadcrumbItem {
     VoltSidebarHeader,
     VoltSidebarItem,
     VoltAvatar,
-    VoltAvatarImage,
     VoltAvatarFallback,
     VoltSeparator,
     VoltButton,
-    VoltInput,
     LmnSquares2x2Icon,
     LmnPhotoIcon,
     LmnUsersIcon,
@@ -66,7 +61,6 @@ interface BreadcrumbItem {
     LmnCogIcon,
     LmnBars3Icon,
     LmnChevronRightIcon,
-    LmnBellIcon,
     LmnSunIcon,
     LmnMoonIcon
   ],
@@ -75,7 +69,13 @@ interface BreadcrumbItem {
     <div class="min-h-screen flex bg-background">
       <!-- Mobile trigger -->
       <div class="fixed top-4 left-4 z-10 md:hidden">
-        <button volt-button variant="outline" size="icon" (click)="sidebarService.toggleMobile()">
+        <button
+          volt-button
+          variant="outline"
+          size="icon"
+          aria-label="Open navigation"
+          (click)="sidebarService.toggleMobile()"
+        >
           <lmn-bars-3 [size]="16" />
         </button>
       </div>
@@ -144,11 +144,6 @@ interface BreadcrumbItem {
         <volt-sidebar-footer>
           <div class="flex items-center gap-3">
             <volt-avatar>
-              <img
-                voltAvatarImage
-                [src]="'https://i.pravatar.cc/150?u=' + (currentUser()?.email ?? 'admin')"
-                [alt]="currentUser()?.name ?? 'User'"
-              />
               <volt-avatar-fallback>{{ userInitials() }}</volt-avatar-fallback>
             </volt-avatar>
             @if (!sidebarService.isCollapsed()) {
@@ -198,7 +193,6 @@ interface BreadcrumbItem {
             </div>
           </div>
           <div class="flex items-center gap-2 ml-auto">
-            <volt-input placeholder="Search..." class="w-56 h-8 text-xs" />
             <volt-button
               variant="ghost"
               size="icon"
@@ -213,12 +207,6 @@ interface BreadcrumbItem {
               } @else {
                 <lmn-moon [size]="16" />
               }
-            </volt-button>
-            <volt-button variant="ghost" size="icon" class="relative">
-              <lmn-bell [size]="16" />
-              <span
-                class="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive ring-2 ring-background"
-              ></span>
             </volt-button>
             @if (session.authenticated()) {
               <volt-button variant="ghost" size="sm" (click)="logout()">Log out</volt-button>

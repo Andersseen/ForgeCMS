@@ -3,6 +3,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ForgeAuthSession } from '@forge-cms/angular';
 import { VoltButton, VoltCard, VoltError, VoltInput, VoltLabel } from '@voltui/components';
 import { LmnEyeIcon, LmnEyeSlashIcon } from 'lumen-icons';
+import { safeAdminRedirect } from './safe-redirect.js';
 
 /**
  * Reusable sign-in page for `@forge-cms/admin` consumers, replacing the app-local login page every
@@ -118,7 +119,8 @@ export class ForgeSignInComponent {
     await this.session.login(this.email(), this.password());
     if (this.session.authenticated()) {
       const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
-      await this.router.navigateByUrl(returnUrl ?? this.redirectTo() ?? '/admin');
+      const fallback = safeAdminRedirect(this.redirectTo(), '/admin');
+      await this.router.navigateByUrl(safeAdminRedirect(returnUrl, fallback));
     }
   }
 }

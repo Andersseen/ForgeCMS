@@ -13,7 +13,15 @@ export const features = [
   }
 ] as const;
 
-export const packages = ['core', 'db', 'auth', 'storage', 'api', 'admin', 'testing'] as const;
+export const packages = [
+  { name: 'core', version: '0.4.0' },
+  { name: 'db', version: '0.4.0' },
+  { name: 'auth', version: '0.4.0' },
+  { name: 'storage', version: '0.4.0' },
+  { name: 'api', version: '0.4.0' },
+  { name: 'admin', version: '0.4.0' },
+  { name: 'testing', version: '0.4.0' }
+] as const;
 
 export const exampleCode = `import { defineCollection, defineField } from '@forge-cms/core';
 

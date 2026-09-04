@@ -4,10 +4,12 @@ test('renders the ForgeCMS landing page', async ({ page }) => {
   await page.goto('/');
 
   await expect(page).toHaveTitle(/ForgeCMS/);
-  await expect(page.getByRole('heading', { name: /Payload-like CMS path/i })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: /headless CMS built for Angular/i })
+  ).toBeVisible();
   await expect(page.getByRole('link', { name: /ForgeCMS/i }).first()).toBeVisible();
   await expect(page.getByRole('link', { name: 'GitHub' }).first()).toBeVisible();
-  await expect(page.getByText('@forge-cms/core', { exact: true })).toBeVisible();
+  await expect(page.getByText('collections / posts', { exact: true })).toBeVisible();
 });
 
 test('the header links to docs', async ({ page }) => {
@@ -27,16 +29,39 @@ test('the header links to docs', async ({ page }) => {
 test('CTA buttons are visible and enabled', async ({ page }) => {
   await page.goto('/');
 
-  const demoButton = page.getByRole('button', { name: 'See a real site on ForgeCMS' });
-  await expect(demoButton).toBeVisible();
-  await expect(demoButton).toBeEnabled();
-
-  await expect(page.getByRole('link', { name: 'Read the docs' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Get started' })).toHaveAttribute(
     'href',
-    /\/docs$/
+    /\/docs\/small-project-guide$/
   );
 
-  const exploreButton = page.getByRole('button', { name: 'Explore architecture' });
-  await expect(exploreButton).toBeVisible();
-  await expect(exploreButton).toBeEnabled();
+  await expect(page.getByRole('link', { name: 'View docs' })).toHaveCount(0);
+
+  const demoButton = page.getByRole('button', {
+    name: 'See the clinic demo powered by the real runtime'
+  });
+  await expect(demoButton).toBeVisible();
+  await expect(demoButton).toBeEnabled();
+});
+
+test('the homepage get-started path reaches the small-project guide', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByRole('link', { name: 'Get started' }).click();
+
+  await expect(page).toHaveURL(/\/docs\/small-project-guide$/);
+  await expect(page.getByRole('heading', { name: 'Small project guide', level: 1 })).toBeVisible();
+});
+
+test('package versions and footer are real homepage content', async ({ page }) => {
+  await page.goto('/');
+
+  const packages = page.locator('#packages');
+  await expect(packages.getByText('@forge-cms/core', { exact: true })).toBeVisible();
+  await expect(page.getByText('0.4.0').first()).toBeVisible();
+  await expect(page.getByText('0.0.0')).toHaveCount(0);
+
+  const footer = page.locator('footer');
+  await expect(footer.getByRole('link', { name: 'ForgeCMS' })).toBeVisible();
+  await expect(footer.getByRole('link', { name: 'Docs' })).toHaveAttribute('href', /\/docs$/);
+  await expect(footer.getByRole('link', { name: 'GitHub' })).toBeVisible();
 });

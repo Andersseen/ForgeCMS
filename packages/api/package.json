@@ -46,7 +46,7 @@
     "@forge-cms/core": "workspace:*"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250514.0",
+    "@cloudflare/workers-types": "4.20250514.0",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

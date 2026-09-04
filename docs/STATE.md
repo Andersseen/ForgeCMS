@@ -7,6 +7,29 @@
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
 
+## Professional UI & quality hardening (spec 056, in progress, 2026-09-04)
+
+Spec 056 is the first post-readiness polish/hardening branch for the existing `0.4.x` surface, not a
+new feature sprint. The first pass keeps the scope on `apps/www`, `apps/demo-aesthetics`, and the
+reusable admin experience:
+
+- `@forge-cms/admin` now sanitizes sign-in `returnUrl` values so external/protocol-relative/malformed
+  targets fall back inside `/admin` instead of being passed directly to `router.navigateByUrl`.
+- Reusable admin chrome no longer loads user avatars from `https://i.pravatar.cc`, and decorative
+  global search/notification controls were removed because ForgeCMS does not ship those capabilities
+  today.
+- Admin form/confirm overlays have stronger dialog semantics, and collection empty states can show a
+  role-aware create action.
+- The official homepage now prioritizes the beginner path (`/docs/small-project-guide`), docs, and
+  GitHub, and shows a product/admin-flavored preview before the code sample.
+- Docs copy was patched where it still implied older auth/login or public-baseline guidance.
+- `apps/demo-aesthetics` now has simple mobile public navigation and less implementation-demo footer
+  copy, plus a public-site E2E journey.
+
+Verified: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm format:check`,
+`pnpm --dir apps/www e2e`, `pnpm --dir apps/demo-aesthetics e2e`, and
+`pnpm --dir apps/tiny-project e2e`.
+
 ## Small-project readiness (spec 055, 2026-09-04)
 
 Content admin (spec 052), browser auth (spec 053), and Angular/admin auth (spec 054) were each

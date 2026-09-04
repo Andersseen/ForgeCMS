@@ -1,4 +1,4 @@
-import type { ApplicationConfig } from '@angular/core';
+import { provideZonelessChangeDetection, type ApplicationConfig } from '@angular/core';
 import { provideRouter, withComponentInputBinding, withInMemoryScrolling } from '@angular/router';
 import { provideContent, withMarkdownRenderer } from '@analogjs/content';
 import { provideVoltTheme } from '@voltui/components';
@@ -7,6 +7,7 @@ import { routes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
   providers: [
+    provideZonelessChangeDetection(),
     provideRouter(
       routes,
       withComponentInputBinding(),

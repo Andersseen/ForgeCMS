@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { applyVoltTheme } from '@voltui/components';
 import { SiteApiService } from '../../services/site-api.service';
 import { asyncState } from './async-state';
 
@@ -47,6 +48,28 @@ import { asyncState } from './async-state';
                 {{ site.phone }}
               </a>
             }
+            <details class="relative md:hidden">
+              <summary
+                class="flex h-9 cursor-pointer list-none items-center rounded-full border border-border px-4 text-sm font-medium marker:hidden"
+              >
+                Menu
+              </summary>
+              <nav
+                class="absolute right-0 top-11 z-30 flex min-w-44 flex-col rounded-xl border border-border bg-background p-2 shadow-lg"
+                aria-label="Mobile navigation"
+              >
+                @for (item of navigation; track item.path) {
+                  <a
+                    [routerLink]="item.path"
+                    routerLinkActive="bg-muted text-foreground"
+                    [routerLinkActiveOptions]="{ exact: item.path === '/' }"
+                    class="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    {{ item.label }}
+                  </a>
+                }
+              </nav>
+            </details>
             <a
               routerLink="/booking"
               class="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
@@ -111,12 +134,8 @@ import { asyncState } from './async-state';
           <div
             class="mx-auto flex max-w-6xl flex-col gap-2 px-5 py-5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between"
           >
-            <span>
-              A fictional clinic. Every word, price and image on this site is stored in ForgeCMS.
-            </span>
-            <a class="font-medium hover:text-foreground" routerLink="/admin"
-              >Open the CMS admin →</a
-            >
+            <span> Lumea Aesthetics is a fictional clinic showcase powered by ForgeCMS. </span>
+            <a class="font-medium hover:text-foreground" routerLink="/admin">Staff sign in</a>
           </div>
         </div>
       </footer>
@@ -125,6 +144,12 @@ import { asyncState } from './async-state';
 })
 export class SiteShell {
   private readonly api = inject(SiteApiService);
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      applyVoltTheme({ dark: false });
+    }
+  }
 
   protected readonly navigation = [
     { path: '/', label: 'Home' },
