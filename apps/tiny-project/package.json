@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/tiny-project",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "External-style readiness fixture (spec 055): a deliberately tiny users+posts app built only on published @forge-cms/* exports, proving Cloudflare (D1) and portable (libSQL) both work end to end.",
   "type": "module",
