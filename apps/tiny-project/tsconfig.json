@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["vitest/globals", "@cloudflare/workers-types"],
+    "moduleResolution": "Bundler"
+  },
+  "angularCompilerOptions": {
+    "strictInjectionParameters": true,
+    "strictInputAccessModifiers": true,
+    "strictTemplates": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "e2e/**/*.ts",
+    "test/**/*.ts",
+    "vite.config.ts",
+    "vitest.workers.config.ts",
+    "playwright.config.ts"
+  ]
+}

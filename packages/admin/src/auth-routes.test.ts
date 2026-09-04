@@ -24,7 +24,11 @@ describe('forgeAdminAuthRoutes', () => {
 
     const login = routes.find((route) => route.path === 'login');
     const signup = routes.find((route) => route.path === 'signup');
-    expect(login?.data).toEqual({ signUpPath: 'signup' });
     expect(signup?.component).toBe(ForgeSignUpComponent);
+    // `../signup`, not `signup`: `login` and `signup` are siblings in this same route array, but
+    // ForgeSignInComponent's `[routerLink]` resolves relative to its own activated route (`login`)
+    // — an unprefixed `signup` would append as *login's own child* (`/admin/login/signup`, not a
+    // registered route) instead of reaching the sibling. Real bug, found building spec 055's fixture.
+    expect(login?.data).toEqual({ signUpPath: '../signup' });
   });
 });

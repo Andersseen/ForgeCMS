@@ -21,6 +21,7 @@ drizzle.config.d.ts.map
 coverage/
 playwright-report/
 test-results/
+.playwright-mcp/
 
 # Logs
 *.log

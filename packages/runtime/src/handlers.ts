@@ -863,7 +863,10 @@ export async function handlePreview<TEnv = unknown>(
     // Populate relations if depth > 0
     if (depth > 0) {
       const { populateRecord } = await import('./populate.js');
-      previewData = await populateRecord(previewData, collection, options.runtime);
+      previewData = await populateRecord(previewData, collection, options.runtime, {
+        user,
+        overrideAccess: false
+      });
     }
 
     return jsonResponse({ data: previewData });

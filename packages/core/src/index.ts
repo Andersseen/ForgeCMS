@@ -533,11 +533,25 @@ export type CollectionBySlug<
   ? TCollection
   : never;
 
-/** Standard document metadata every stored record carries, alongside its declared fields. */
+/**
+ * Standard document metadata every stored record carries, alongside its declared fields.
+ *
+ * `_status` is always present in this type rather than conditional on a collection's `drafts: true`
+ * — `defineCollection`'s current signature widens a literal `drafts: true` argument to `boolean`
+ * (its parameter type declares `drafts?: boolean`, not a generic captured from the call site), so a
+ * conditional type keyed on `TCollection['drafts']` would never actually narrow and `_status` would
+ * be unreachable through the typed Local API on every `drafts: true` collection — a real gap found
+ * building spec 055's fixture (its `posts` collection needs `runtime.update({ data: { _status:
+ * 'published' } })` to type-check at all). Optional here is a deliberately small, generic fix: a
+ * consumer without `drafts: true` can still (harmlessly, at the type level — the runtime already
+ * validates/rejects unknown fields) mention `_status`, in exchange for every `drafts: true` consumer
+ * not needing an `as Record<string, unknown>` cast to publish/unpublish through the typed API.
+ */
 export interface DocumentMeta {
   id: string;
   created_at: string;
   updated_at: string;
+  _status?: 'draft' | 'published';
 }
 
 /** The full typed shape of a stored document: declared fields plus standard metadata. */
@@ -546,7 +560,7 @@ export type CollectionDocument<TCollection extends CollectionDefinition> =
 
 /** A typed create/update payload: any subset of the collection's declared fields. */
 export type CollectionInput<TCollection extends CollectionDefinition> = Partial<
-  CollectionData<TCollection>
+  CollectionData<TCollection> & Pick<DocumentMeta, '_status'>
 >;
 
 function createField<

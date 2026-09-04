@@ -449,7 +449,7 @@ async function seedTestimonials(runtime: ForgeCmsRuntime, ids: SeedIds): Promise
       rating: 5,
       service: 'microneedling',
       visitedAt: daysFromNow(-42),
-      status: 'published'
+      status: 'published' as const
     },
     {
       author: 'Carla R.',
@@ -458,7 +458,7 @@ async function seedTestimonials(runtime: ForgeCmsRuntime, ids: SeedIds): Promise
       rating: 5,
       service: 'hydraglow',
       visitedAt: daysFromNow(-20),
-      status: 'published'
+      status: 'published' as const
     },
     {
       author: 'Inés B.',
@@ -466,7 +466,7 @@ async function seedTestimonials(runtime: ForgeCmsRuntime, ids: SeedIds): Promise
       rating: 4,
       service: 'laser-hair',
       visitedAt: daysFromNow(-11),
-      status: 'published'
+      status: 'published' as const
     },
     {
       author: 'Anonymous',
@@ -474,7 +474,7 @@ async function seedTestimonials(runtime: ForgeCmsRuntime, ids: SeedIds): Promise
       rating: 3,
       service: 'peel',
       visitedAt: daysFromNow(-2),
-      status: 'draft'
+      status: 'draft' as const
     }
   ];
 

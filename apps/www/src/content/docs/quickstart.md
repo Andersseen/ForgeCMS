@@ -5,7 +5,8 @@ group: Getting started
 order: 2
 ---
 
-ForgeCMS `0.0.1` is an experimental first public release. Start from your own repository:
+ForgeCMS is an experimental, TypeScript-native CMS foundation — API stability is not guaranteed
+before `1.0`. Start from your own repository:
 
 ```sh
 pnpm add @forge-cms/core @forge-cms/runtime @forge-cms/db @forge-cms/auth @forge-cms/storage
@@ -211,6 +212,8 @@ thing.
 
 ## Next
 
+- [Small project guide](/docs/small-project-guide) — users, cookie auth, and a working admin, start
+  to finish.
 - [Core concepts](/docs/concepts) — what the runtime, adapters and Local API actually are.
 - [Fields](/docs/fields) — every field kind and its options.
 - [Deployment](/docs/deployment) — shipping it to Cloudflare with D1 and R2.

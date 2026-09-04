@@ -1,0 +1,15 @@
+{
+  // Test-only Wrangler config for the real-Workers-runtime D1 lifecycle proof
+  // (`pnpm test:cloudflare`, vitest.workers.config.ts). Never deployed, no account/credentials —
+  // @cloudflare/vitest-plugin provisions a local D1 binding via Miniflare. Mirrors
+  // packages/cloudflare/wrangler.test.jsonc's convention exactly.
+  "name": "forge-cms-tiny-project-test",
+  "main": "test/workers/fixtures/worker.ts",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "forge-cms-tiny-project-test",
+      "database_id": "00000000-0000-0000-0000-000000000002"
+    }
+  ]
+}

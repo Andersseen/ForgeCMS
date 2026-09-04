@@ -239,7 +239,7 @@ async function prepareForRead(
   let docs = records;
 
   if (args.depth === 1) {
-    docs = await populateRecords(docs, collection, ctx);
+    docs = await populateRecords(docs, collection, ctx, { user, overrideAccess });
   }
 
   if (args.overrideAccess === false) {

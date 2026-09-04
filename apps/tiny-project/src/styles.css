@@ -1,0 +1,47 @@
+/* Deliberately minimal — this fixture proves ForgeCMS integration, not visual design. */
+:root {
+  color-scheme: light dark;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 2rem;
+  max-width: 720px;
+  margin-inline: auto;
+}
+
+a {
+  color: inherit;
+}
+
+.tiny-nav {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.tiny-post-list {
+  list-style: none;
+  padding: 0;
+}
+
+.tiny-post-list li {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid light-dark(#ddd, #333);
+}
+
+form.tiny-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 360px;
+}
+
+.tiny-error {
+  color: #b91c1c;
+}
