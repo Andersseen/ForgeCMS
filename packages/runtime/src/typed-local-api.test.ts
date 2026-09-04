@@ -116,6 +116,27 @@ describe('typed Local API (compile-time only)', () => {
     expectTypeOf(page.docs).not.toBeAny();
   });
 
+  it('accepts and returns `_status` for typed create/update/find (spec 055 fix)', async () => {
+    // Real bug found building spec 055's external-consumer fixture: `defineCollection`'s current
+    // signature widens a literal `drafts: true` to `boolean`, so a conditional type keyed on it
+    // could never narrow — `_status` has to be a plain optional field on `DocumentMeta` instead (see
+    // its doc comment in @forge-cms/core). Proven here with runtime assertions, not just
+    // `expectTypeOf`, since the real failure mode was a compile error on ordinary usage.
+    const runtime = buildTypedRuntime();
+    const created = await runtime.create({
+      collection: 'posts',
+      data: { title: 'Draft me', slug: 'draft-me', _status: 'draft' }
+    });
+    expectTypeOf(created._status).toEqualTypeOf<'draft' | 'published' | undefined>();
+
+    const published = await runtime.update({
+      collection: 'posts',
+      id: created.id,
+      data: { _status: 'published' }
+    });
+    expectTypeOf(published._status).toEqualTypeOf<'draft' | 'published' | undefined>();
+  });
+
   it('rejects invalid usage at compile time (never executed)', () => {
     async function invalidUsage(runtime: ReturnType<typeof buildTypedRuntime>) {
       // @ts-expect-error - unknown collection is rejected

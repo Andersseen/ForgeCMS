@@ -29,7 +29,12 @@ export function forgeAdminAuthRoutes(options?: ForgeAdminAuthRoutesOptions): Rou
     {
       path: 'login',
       component: ForgeSignInComponent,
-      ...(signup && { data: { signUpPath: 'signup' } })
+      // `../signup`, not `signup`: `ForgeSignInComponent`'s [routerLink] resolves relative to its
+      // own activated route (`login`), so an unprefixed `signup` appended as *login's own child*
+      // (`/admin/login/signup`, not a registered route — a real bug found building spec 055's
+      // fixture, whose "Sign up" link 404'd via the wildcard redirect) instead of the sibling route
+      // `signup` actually is in the array below. `../` steps back up to the shared parent first.
+      ...(signup && { data: { signUpPath: '../signup' } })
     },
     ...(signup ? [{ path: 'signup', component: ForgeSignUpComponent }] : [])
   ];

@@ -33,7 +33,7 @@ consumer falls back to `fetch`.
 | [17](#f17) | The admin cannot see drafts — the client has no `status`            | the editor screen         | ✅ 041 + 042                              |
 | [9](#f9)   | `depth: 1` does not populate `upload` fields                        | every image on the site   | ✅ 040                                    |
 | [21](#f21) | Uploaded files are stored but never served                          | the media library         | ✅ 040                                    |
-| [8](#f8)   | The Local API returns `Record<string, unknown>` — inference stops   | every server route        | 038                                       |
+| [8](#f8)   | The Local API returns `Record<string, unknown>` — inference stops   | every server route        | ✅ 047 (package; this app not migrated)   |
 | [5](#f5)   | A route's `allowedRoles` pre-empts the collection's own access rule | the public booking form   | ⚠️ documented                             |
 | [19](#f19) | Hooks cannot tell a trusted server call from a public request       | the seed, silently        | ✅ 040                                    |
 | [4](#f4)   | No globals                                                          | site settings             | 023                                       |
@@ -44,8 +44,8 @@ consumer falls back to `fetch`.
 | [18](#f18) | No upload method in the client SDK                                  | the media library         | ✅ 041                                    |
 | [6](#f6)   | No email adapter, so a booking notifies nobody                      | the booking hook          | 029                                       |
 | [11](#f11) | No h3/Nitro helpers — auth routes are copy-paste                    | 6 route files             | 037                                       |
-| [13](#f13) | The Angular linker plugin must be copied into every app             | app setup                 | 037                                       |
-| [12](#f12) | The auth-token localStorage key is not exported                     | app setup                 | 028                                       |
+| [13](#f13) | The Angular linker plugin must be copied into every app             | app setup                 | ✅ 055                                    |
+| [12](#f12) | The auth-token localStorage key is not exported                     | app setup                 | ✅ 054 (client is cookie-only now)        |
 | [2](#f2)   | No SSR story for a content site                                     | the whole premise         | 036/037                                   |
 | [3](#f3)   | No money or timezone-aware date handling                            | prices, appointment times | new                                       |
 | [14](#f14) | `R2StorageAdapter` hardcodes the `BUCKET` binding name              | runtime wiring            | ✅ 040                                    |
@@ -121,15 +121,16 @@ broken link.
 
 ### 8. Type inference stops at the server boundary
 
-`CollectionData<typeof services>` infers a precise record type from the definition, but
-`find`/`findByID` return `DatabaseRecord` = `Record<string, unknown>`. Everything past that point is
-hand-written.
-
-- **Cost:** [`shared/site-content.ts`](../apps/demo-aesthetics/src/shared/site-content.ts) (150
-  lines of interfaces) and [`mappers.ts`](../apps/demo-aesthetics/src/server/api/mappers.ts) (210
-  lines of casting) — a fifth of the app's server code exists only to re-state what the collection
-  definitions already know.
-- **Fix:** roadmap 038. Generic `find<T extends CollectionDefinition>` would cover most of it.
+**Fixed at the package level, spec 047 (2026-08-27).** `ForgeCmsRuntime<TEnv, TCollections>` now
+preserves the registered collection schemas, so `find`/`findByID`/`findOne`/`create`/`update`/
+`delete`/`preview` infer typed collection slugs and typed returned documents (declared fields plus
+`id`/`created_at`/`updated_at`) instead of `Record<string, unknown>` — exactly the generic
+`find<T extends CollectionDefinition>` this finding asked for, proven through the packed public
+surface by `scripts/verify-release.mjs`. `apps/demo-aesthetics` itself was not migrated (out of
+scope for spec 047, and this app is frozen at "zero changes to packages/\*" per its own charter), so
+its own `shared/site-content.ts`/`mappers.ts` hand-written types remain as they were — this finding's
+_cost_ is unchanged in this app specifically, but the _capability_ that removes it for any new
+consumer now exists. See [docs/specs/047-typed-local-api.md](specs/047-typed-local-api.md).
 
 <a id="f5"></a>
 
@@ -283,23 +284,27 @@ pattern; this finding's actual fix (a generated/shared route layer) is unchanged
 
 ### 13. The Angular linker plugin must be copied per app
 
-`vite-plugins/angular-linker.ts` is mandatory for any Vite app consuming `@forge-cms/admin` (partial
-Ivy), and it ships in `apps/www` rather than in a package. Forgetting it produces a
-production-only `JIT compiler unavailable` crash — STATE.md's known issue #10, which is now waiting
-to be rediscovered by every new app. **Fix:** export it from `@forge-cms/admin` (or 037).
+~~`vite-plugins/angular-linker.ts` is mandatory for any Vite app consuming `@forge-cms/admin` (partial
+Ivy), and it ships in `apps/www` rather than in a package.~~ **Fixed, spec 055 (2026-09-03).**
+`@forge-cms/admin` now exports the plugin from a `./vite` subpath
+(`import { angularLinker } from '@forge-cms/admin/vite'`, `packages/admin/src/vite-linker.ts`);
+`@angular/compiler-cli`/`@babel/core`/`vite` are optional peer dependencies (only needed if a
+consumer actually imports this subpath). `apps/www` and `apps/demo-aesthetics` both dropped their
+local `vite-plugins/angular-linker.ts` copy in favor of the shared export, proving it in place, not
+just in isolation.
 
 <a id="f12"></a>
 
 ### 12. `'forge-auth-token'` is a magic string
 
-`ForgeAdminLayoutComponent` reads that exact localStorage key, but does not export it, so the host
-app hardcodes the same literal in its login page and API client
-([`auth-token.ts`](../apps/demo-aesthetics/src/app/auth-token.ts)). **Fix:** export the constant; longer
-term, roadmap 028 (httpOnly cookie sessions) removes the question. **Update (spec 053, 2026-09-02):**
-the server half of 028 (httpOnly `forge_session` cookie, CSRF protection) has shipped, but the client
-side of this finding is unchanged — `@forge-cms/angular`/`@forge-cms/admin` and this app's own
-`auth-token.ts` still read/write `localStorage` directly; a future Angular/admin auth spec switching
-the client to `credentials: 'include'` is what actually removes the question this finding raises.
+~~`ForgeAdminLayoutComponent` reads that exact localStorage key, but does not export it~~. **Fixed,
+spec 054 (2026-09-03).** `@forge-cms/angular`'s `CmsApiService` now sends `credentials: 'include'` on
+every request and the browser session lives in `ForgeAuthSession` (signals, no storage); `@forge-cms/admin`'s
+`ForgeAdminLayoutComponent` reads that service instead of `localStorage`. This app's own
+`auth-token.ts` (the file this finding originally pointed at) is gone — its `login.post.ts`/
+`me.get.ts` were brought onto `handleLogin`/`handleMe` in the same spec, so there is no longer a
+magic string to export: the question this finding raised (a bearer-token key shared between two
+files) does not apply to the cookie-based session at all.
 
 <a id="f2"></a>
 
@@ -398,13 +403,16 @@ Specs 040, 041 and 042 landed in this branch straight after the demo, closing 12
 | 040  | 1, 9, 14, 19, 21, 22 (+ case-insensitive `contains`) | Deleted `uploads.ts`, five slug hooks, a URL-rewrite hook, a file-serving route and a two-step seed workaround. |
 | 041  | 15, 17 (client half), 18                             | Deleted `admin-api.service.ts`; the admin talks to the package.                                                 |
 | 042  | 7 (editor half), 16 (partly), 17, 20                 | No UUIDs or `[object Object]` in the admin; publish from the list; the clinic's own sidebar.                    |
+| 047  | 8 (package level)                                    | Typed Local API exists for any new consumer; this app itself was not migrated (out of scope).                   |
+| 054  | 12                                                   | Client is cookie-only now (`credentials: 'include'`) — no `localStorage` auth-token question left to answer.    |
+| 055  | 13                                                   | `@forge-cms/admin/vite` exports the linker plugin; both `apps/www` and this app dropped their local copy.       |
 
 **Still open, in the order they should be taken:**
 
 1. **036's other half — SSR** (finding 2). The Local API makes ForgeCMS ideally placed for it and the
    demo still ships as an SPA.
-2. **038 typed documents** (findings 8, 16). The demo still hand-writes 350 lines of payload types
-   and casts every block at the render site.
+2. **038 typed `blocks` rows** (finding 16 only — finding 8 shipped at the package level via spec 047,
+   see the table above). Every `blocks` row is still `Record<string, unknown>` at the render site.
 3. **023 globals** (finding 4) is still open. **026 query completeness** (finding 10) shipped at the
    package level via spec 050 — `findOne`/`containsValue` now exist — but the demo's route file
    itself still uses its original workaround; migrating it is a follow-up, not done here.

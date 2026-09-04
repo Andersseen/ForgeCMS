@@ -43,6 +43,27 @@ describe('withAuthFields', () => {
     expect('passwordHash' in base.fields).toBe(false);
   });
 
+  // Real bug, found building spec 055's external-consumer fixture: `passwordHash` used to be
+  // spread first, so it was the merged collection's *first* field — and `@forge-cms/admin`'s
+  // relation picker searches whichever field comes first among text/slug/email kinds. A
+  // `relation({ collection: 'users' })` field ended up searching by password hash instead of
+  // email. `passwordHash` must land after every field the caller actually declared.
+  it('orders passwordHash after the caller-declared fields, not before them', () => {
+    const collection = withAuthFields(base);
+    expect(Object.keys(collection.fields)).toEqual(['email', 'name', 'passwordHash']);
+  });
+
+  it('still puts an explicitly declared passwordHash wherever the caller put it', () => {
+    const custom = defineField.text({ maxLength: 512 });
+    const collection = withAuthFields(
+      defineCollection({
+        slug: 'users',
+        fields: { passwordHash: custom, email: defineField.email({ required: true }) }
+      })
+    );
+    expect(Object.keys(collection.fields)).toEqual(['passwordHash', 'email']);
+  });
+
   // The actual bug this exists to fix: on a schemaless adapter an undeclared column is harmless,
   // but a real SQL adapter never creates it and every createUser/login fails at runtime with
   // "table users has no column named passwordHash".

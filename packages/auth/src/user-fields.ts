@@ -19,13 +19,26 @@ export const AUTH_USER_FIELDS = {
 /**
  * Returns the collection with the auth adapter's own fields merged in. Explicit fields win, so a
  * caller that already declares `passwordHash` keeps their definition.
+ *
+ * `collection.fields` is spread first, `AUTH_USER_FIELDS` second, so `passwordHash` lands *after*
+ * every field a caller actually declared (email, name, role, ...) instead of before all of them —
+ * object key order follows first insertion, and `passwordHash` failing to be a caller's first field
+ * is not just cosmetic: `@forge-cms/admin`'s `ForgeRelationPickerComponent` picks "the target
+ * collection's first text-ish field" as what it searches on, so a `relation({ collection: 'users' })`
+ * field silently searched by password hash instead of email until this fix (found building spec 055's
+ * external-consumer fixture, whose `post.author -> users` relation is exactly this shape).
  */
 export function withAuthFields<TSlug extends string, TFields extends FieldMap>(
   collection: CollectionDefinition<TSlug, TFields>
 ): CollectionDefinition<TSlug, TFields & typeof AUTH_USER_FIELDS> {
+  const hasOwnPasswordHash = 'passwordHash' in collection.fields;
+  const fields = {
+    ...collection.fields,
+    ...(!hasOwnPasswordHash && AUTH_USER_FIELDS)
+  } as TFields & typeof AUTH_USER_FIELDS;
   return {
     ...collection,
-    fields: { ...AUTH_USER_FIELDS, ...collection.fields } as TFields & typeof AUTH_USER_FIELDS
+    fields
   };
 }
 

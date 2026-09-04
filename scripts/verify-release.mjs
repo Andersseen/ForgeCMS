@@ -509,6 +509,88 @@ const sameSiteLogout = await handleLogout(
 );
 if (sameSiteLogout.status !== 204) throw new Error('Expected a same-origin logout to succeed with 204');
 
+// Small-project readiness (spec 055): a defineUsersCollection() + a relation to it, through the
+// packed public surface only — the exact "post.author -> users" shape a small real consumer uses.
+const smallProjectDb = new InMemoryDatabaseAdapter();
+const smallProjectAuth = new UsersCollectionAuthAdapter({ devMode: true }).init({
+  userDatabase: smallProjectDb
+});
+const smallProjectPosts = defineCollection({
+  slug: 'sp_posts',
+  fields: {
+    title: defineField.text({ required: true }),
+    author: defineField.relation({ collection: 'users' })
+  },
+  access: {
+    read: () => true,
+    create: ({ user }) => user?.role === 'admin' || user?.role === 'editor'
+  }
+});
+const smallProjectRuntime = new ForgeCmsRuntime({
+  collections: [defineUsersCollection(), smallProjectPosts],
+  adapters: { database: smallProjectDb, auth: smallProjectAuth, storage: new InMemoryStorageAdapter() }
+});
+smallProjectRuntime.init();
+await smallProjectRuntime.syncSchema();
+
+const spAdmin = await smallProjectAuth.createUser({ email: 'admin@sp.test', password: 'password123' });
+if (!spAdmin.ok) throw new Error('Expected the first small-project user to become admin');
+const spEditor = await smallProjectAuth.createUser({
+  email: 'editor@sp.test',
+  password: 'password123',
+  role: 'editor'
+});
+if (!spEditor.ok) throw new Error('Expected editor creation to succeed');
+const spViewer = await smallProjectAuth.createUser({
+  email: 'viewer@sp.test',
+  password: 'password123',
+  role: 'viewer'
+});
+if (!spViewer.ok) throw new Error('Expected viewer creation to succeed');
+
+// Role boundary through the packed public surface: editor may write, viewer may not.
+await smallProjectRuntime.create({
+  collection: 'sp_posts',
+  overrideAccess: false,
+  user: spEditor.user,
+  data: { title: 'By the editor', author: spAdmin.user.id }
+});
+let viewerDenied = false;
+try {
+  await smallProjectRuntime.create({
+    collection: 'sp_posts',
+    overrideAccess: false,
+    user: spViewer.user,
+    data: { title: 'Should be denied', author: spAdmin.user.id }
+  });
+} catch {
+  viewerDenied = true;
+}
+if (!viewerDenied) throw new Error('Expected a viewer to be denied write access to sp_posts');
+
+// depth: 1 population must never leak passwordHash (or any other access.read: [] field) from the
+// related document — a real bug found building spec 055's fixture, fixed in populateRecords.
+const spPopulated = await smallProjectRuntime.find({
+  collection: 'sp_posts',
+  overrideAccess: false,
+  user: null,
+  depth: 1
+});
+// Cast past the static field type (relation fields are typed as string | string[] — depth: 1
+// population is a runtime-only reshaping the typed API does not narrow at compile time).
+const spAuthor = spPopulated.docs[0]?.author as unknown as
+  | { email?: string; passwordHash?: string }
+  | undefined;
+if (!spAuthor || typeof spAuthor !== 'object') {
+  throw new Error('Expected the author relation to populate into an object');
+}
+if ('passwordHash' in spAuthor) {
+  throw new Error('passwordHash leaked through a populated relation');
+}
+if (spAuthor.email !== 'admin@sp.test') {
+  throw new Error('Expected the populated author to still carry its readable fields');
+}
+
 console.log('runtime consumer ok');
 `
   );

@@ -1,0 +1,15 @@
+name = "forge-cms-tiny-project"
+# Not deployed by CI — this app is a readiness fixture (spec 055), never `pnpm deploy:*`'d. This
+# file exists only so `wrangler pages dev` can serve a real local D1/R2-backed preview during manual
+# verification, matching the same convention every other app in this repo uses.
+compatibility_date = "2026-05-15"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "dist/analog/public"
+
+# `getServerRuntime` in src/server/api/runtime.ts checks `env.DB` and falls back to
+# `InMemoryDatabaseAdapter` when it is missing. Not created in any real Cloudflare account — local
+# `wrangler pages dev` provisions a local D1 automatically from this binding name.
+[[d1_databases]]
+binding = "DB"
+database_name = "forge-cms-tiny-project"
+database_id = "00000000-0000-0000-0000-000000000001"

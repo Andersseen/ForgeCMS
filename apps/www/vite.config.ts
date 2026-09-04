@@ -2,7 +2,7 @@ import analog from '@analogjs/platform';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
 import tsconfigPaths from 'vite-tsconfig-paths';
-import { angularLinker } from './vite-plugins/angular-linker';
+import { angularLinker } from '@forge-cms/admin/vite';
 import { escapeCodespans } from './vite-plugins/escape-codespans';
 
 export default defineConfig({

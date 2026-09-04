@@ -181,11 +181,11 @@ reset, email verification, and real session revocation — all deliberately defe
 
 ## Phase 5 — The Angular/Analog moat, finished
 
-| #   | Item                                                                                                                                      |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| 036 | **Signals-based client** — `resource()`-backed collection/document resources in `@forge-cms/angular`, SSR-safe fetch + hydration transfer |
-| 037 | **Analog integration package** — file-route helpers, typed server-route factories, `@forge-cms/analog`                                    |
-| 038 | **Generated types from collections** to the client without a codegen step (extend the existing `CollectionData<T>` inference)             |
+| #   | Item                                                                                                                                                                                                                                                                                     |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 036 | **Signals-based client** — `resource()`-backed collection/document resources in `@forge-cms/angular`, SSR-safe fetch + hydration transfer                                                                                                                                                |
+| 037 | **Analog integration package** — file-route helpers, typed server-route factories, `@forge-cms/analog`                                                                                                                                                                                   |
+| 038 | **Generated types from collections** to the client without a codegen step (extend the existing `CollectionData<T>` inference) — ✅ server half done via spec 047 (`ForgeCmsRuntime`'s typed Local API); wire-transport typing to the browser client (`@forge-cms/angular`) is still open |
 
 > Items 036–038 are listed last only because they depend on 019 having landed. In terms of _strategic
 > value they rank immediately after Phase 1_ — ahead of most of Phases 2–4. If time is short, prefer
@@ -213,7 +213,7 @@ reset, email verification, and real session revocation — all deliberately defe
 | Phase 2 — Content model             | 🟡 026 (query completeness) done 2026-08-30, spec 050 — globals/versions/localisation/relation integrity landed earlier as Phase 0.3.x; the rest of Phase 2 is otherwise unstarted                                                                                                 |
 | Phase 3 — Auth & DX                 | 🟡 028 (auth) done except `auth: true` on an arbitrary collection/refresh tokens/lockout/password reset/email verification/session revocation, specs 053 + 054 — see item notes above; 029/030/031 not started                                                                     |
 | Phase 4 — Admin UI                  | 🟡 032 (field widgets) partly done spec 042 · 033 (list view) mostly done spec 042 + 052 · users admin done spec 054 — see item notes above; remaining: configurable columns, saved filters, bulk actions, conditional fields, live preview, API-keys/settings/media-library admin |
-| Phase 5 — Angular moat              | ⬜ not started                                                                                                                                                                                                                                                                     |
+| Phase 5 — Angular moat              | 🟡 038 partly done (server-side typed Local API, spec 047); 036 (SSR-safe fetch)/037 (`@forge-cms/analog`)/client wire-transport typing still not started                                                                                                                          |
 | Phase 0.2 — Trust                   | ✅ done 2026-08-21 (hardening, validation, security, error contract, logging, upload lifecycle)                                                                                                                                                                                    |
 | Phase 0.3.1 — Globals               | ✅ done 2026-08-21 (singleton documents for site config)                                                                                                                                                                                                                           |
 | Phase 0.3.2 — Versions              | ✅ done 2026-08-21 (document history, restore, autosave support)                                                                                                                                                                                                                   |
