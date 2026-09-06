@@ -1,13 +1,35 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-04.**
+> **Last updated: 2026-09-06.**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
 
-## Professional UI & quality hardening (spec 056, in progress, 2026-09-04)
+## V1 delivery planning and repository assessment (2026-09-06)
+
+Documentation-only review at baseline commit `d518878`; public package manifests are `0.4.0`.
+[ROADMAP.md](ROADMAP.md) now sequences nine bounded minors (`0.5` through `0.13`) and a 1.0 RC/release
+gate. It links a source-based assessment, responsibility/assignment handbook, quality matrix and
+individual release briefs with 32 minor work packets plus three final release packets. The prior
+roadmap is preserved in [ROADMAP-LEGACY.md](ROADMAP-LEGACY.md). These are proposed scopes, not shipped
+features or implementation-approved specs.
+
+The review found uneven access enforcement in versions, preview and related-document population;
+stateless user-session role freshness limitations; potential provisioning/admin-removal races;
+incomplete relation/history consistency guarantees; and gaps between available suites and CI gates.
+See [the assessment](roadmap/v1/AUDIT.md) for code evidence, severity and the distinction between
+observed paths and concurrency scenarios still requiring reproduction. No product fix was made.
+
+Verified for this planning task: initial `pnpm build`, then `pnpm lint`, `pnpm typecheck`, `pnpm test`
+and `pnpm build` all passed. Turbo reused 13/14 lint, 23/24 typecheck, 23/24 test and 14/14 final build
+tasks. These are workspace gate results, not fresh backend/browser/coverage certification. No E2E,
+packed-install, real-backend integration or remote-deployment suite was newly run for this docs task.
+The new roadmap is the active sequencing reference; older “What's next”/debt narrative below needs
+the B01 reconciliation pass and should not be interpreted as new implementation instructions.
+
+## Professional UI & quality hardening (spec 056, done, 2026-09-04)
 
 Spec 056 is the first post-readiness polish/hardening branch for the existing `0.4.x` surface, not a
 new feature sprint. The first pass keeps the scope on `apps/www`, `apps/demo-aesthetics`, and the
