@@ -11,3 +11,8 @@
 | [QUICKSTART.md](QUICKSTART.md)     | How do I try this in 10 minutes?                                                                                                  | When the demo flow changes |
 
 Entry point for agents: [/CLAUDE.md](../CLAUDE.md) (also referenced by [/AGENTS.md](../AGENTS.md)).
+
+The active delivery plan is [ROADMAP.md](ROADMAP.md): bounded minors from the `0.4.0` baseline to
+1.0, with a [repository assessment](roadmap/v1/AUDIT.md), [execution handbook](roadmap/v1/EXECUTION.md),
+[quality contract](roadmap/v1/QUALITY.md) and individual release briefs. The previous roadmap is
+[archived](ROADMAP-LEGACY.md); historical specs remain the record of earlier implementation decisions.
