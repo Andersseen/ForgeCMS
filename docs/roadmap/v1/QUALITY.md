@@ -31,7 +31,7 @@ No changeset is needed for this roadmap's docs-only work; later `packages/*` wor
 | Command currently available | Required use in the proposed pipeline                                               |
 | --------------------------- | ----------------------------------------------------------------------------------- |
 | `pnpm test:cloudflare`      | Required for backend/runtime/auth/storage changes and every release candidate       |
-| `pnpm test:libsql`          | Same rule for portable content; not replaced by default `pnpm test`                 |
+| `pnpm test:libsql`          | Same rule for portable database behavior; not replaced by default `pnpm test`       |
 | `pnpm release:verify`       | Package/manifest/consumer changes and every release candidate                       |
 | `pnpm e2e:www`              | Existing admin/docs integration; required in CI                                     |
 | `pnpm e2e:tiny-project`     | Canonical consumer/admin/auth journey; required in CI                               |
@@ -41,7 +41,7 @@ B03 adds explicit jobs and a single aggregate required check. Release must depen
 checks, including the changeset check where relevant, not only a subset of successful jobs. Path
 filters must not allow package/runtime changes to bypass consumer/backend tests. Documentation-only
 changes may use a clearly defined reduced CI policy, but release candidates always use the full set.
-New coverage, production-browser and upgrade commands are deliverables of their packets: do not
+New coverage, S3 integration, production-browser and upgrade commands are deliverables of their packets: do not
 claim these commands already exist or instruct a model to run invented scripts.
 
 Keep fast PR checks separate from slower certification jobs with independent timeouts and artifacts.
@@ -93,12 +93,12 @@ results. Existing API input acceptance cannot be narrowed without migration note
 
 ## Deployment profiles
 
-| Profile                       | Required evidence                                                                      | Exclusions                                                          |
-| ----------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| InMemory                      | Fast contracts and default browser journeys                                            | No durability claim                                                 |
-| Portable libSQL               | Real DB lifecycle and persistence across restart; one built-consumer critical journey  | No first-party durable portable uploads in 1.0                      |
-| Local Cloudflare D1/R2        | workerd contracts/integration plus one built-consumer critical journey                 | Local evidence does not prove remote configuration                  |
-| Remote isolated D1/R2 staging | Correct bindings; persistence across deployment/restart; cookies; file lifecycle; logs | Only authorized staging, never destructive tests against production |
+| Profile                       | Required evidence                                                                                             | Exclusions                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| InMemory                      | Fast contracts and default browser journeys                                                                   | No durability claim                                                          |
+| Portable libSQL/S3            | Real DB + S3-compatible lifecycle, file persistence across restart, built-consumer journey and backup/restore | One tested standard runtime/service profile; no promise of every S3 provider |
+| Local Cloudflare D1/R2        | workerd contracts/integration plus one built-consumer critical journey                                        | Local evidence does not prove remote configuration                           |
+| Remote isolated D1/R2 staging | Correct bindings; persistence across deployment/restart; cookies; file lifecycle; logs                        | Only authorized staging, never destructive tests against production          |
 
 Do not multiply every browser test by every backend. Full core browser flows can run against one
 profile; run a minimal critical browser journey against each durable supported profile, with the
@@ -113,6 +113,29 @@ artifact, coverage, unresolved findings, upgrade/backup results, deployment prof
 Performance budgets use a fixed documented fixture and runtime; R02 sets initial budgets from
 measurement and freezes them before acceptance. Do not invent universal edge latency promises.
 
-Every critical journey passes three consecutive isolated candidate runs with no unexplained flaky
-failures. Critical/high security or integrity findings block release. Lower-severity accepted issues
+Critical journeys pass multiple clean isolated candidate runs with no unexplained flaky failures.
+Use an RC observation period with real maintained-consumer use; choose any fixed period during
+release preparation. Material auth/data/API fixes require renewed affected/downstream validation;
+calendar days or arbitrary run counts do not substitute for evidence. Critical/high security or integrity findings block release. Lower-severity accepted issues
 need impact, workaround, owner and follow-up; approval never substitutes for a missing core gate.
+
+## DX and portable storage acceptance
+
+Each milestone updates the runnable consumer guide for its changes. Verify install → define content
+and users → configure auth/infrastructure → bootstrap admin → mount runtime/auth/admin → manage
+content/files → typed Angular/Analog consumption → deploy → upgrade/restore, using only public
+packages. R04 reconciles these guides; it is not the first developer-experience gate.
+
+P01 adds `runStorageAdapterContractTests` and a real isolated S3-compatible service fixture. P02
+proves libSQL/S3 upload, access, metadata, restart and cleanup/failure semantics with the existing
+runtime pipeline. P03 extends M03 backup/restore to object bytes plus database references, and both
+profiles' production consumer journeys. R01/R03 require D1/R2 **and libSQL/S3**; InMemory is never
+portable durability evidence. S3-specific commands do not exist at this baseline and are introduced
+by those packets. Test one representative S3-compatible service and document actual provider/runtime
+coverage; supporting configuration for AWS S3, MinIO, B2 and Wasabi is not a promise to certify every
+provider. No presigned uploads, CDN or image processing is required.
+
+Use www for admin/docs verification, tiny-project for external-style setup and backend parity, and
+demo-aesthetics for Local API/public UX regression evidence. Certify existing controls and spec 056
+polish rather than redesigning these surfaces. SSR public-content evidence lands in 0.9 before S3;
+0.10 adds complete durable files to the same consumer story.

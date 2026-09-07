@@ -1,33 +1,33 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-06.**
+> **Last updated: 2026-09-07.**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
 
-## V1 delivery planning and repository assessment (2026-09-06)
+## V1 delivery planning and repository assessment (2026-09-07)
 
-Documentation-only review at baseline commit `d518878`; public package manifests are `0.4.0`.
-[ROADMAP.md](ROADMAP.md) now sequences nine bounded minors (`0.5` through `0.13`) and a 1.0 RC/release
-gate. It links a source-based assessment, responsibility/assignment handbook, quality matrix and
-individual release briefs with 32 minor work packets plus three final release packets. The prior
-roadmap is preserved in [ROADMAP-LEGACY.md](ROADMAP-LEGACY.md). These are proposed scopes, not shipped
-features or implementation-approved specs.
+Documentation-only product-priority revision at verified main `28ff76c`; latest public GitHub release
+is v0.4.0 (2026-09-03), and all ten public package manifests are `0.4.0`. Spec 056 is the latest
+completed spec; subsequent main changes are planning docs only. [ROADMAP.md](ROADMAP.md) now combines
+contract/access at 0.5 and auth/data integrity at 0.6, followed by upgrades (0.7), Angular client
+(0.8), SSR/Analog (0.9), portable S3 storage/profiles (0.10), existing-admin reliability (0.11) and
+certification/RC preparation (0.12), then RC → defect-only stabilization → 1.0. These are proposed
+outcomes, not implemented features or approved implementation specs. Packets remain bounded work
+units, not forced releases/PRs. [ROADMAP-LEGACY.md](ROADMAP-LEGACY.md) and historical specs are intact.
 
-The review found uneven access enforcement in versions, preview and related-document population;
-stateless user-session role freshness limitations; potential provisioning/admin-removal races;
-incomplete relation/history consistency guarantees; and gaps between available suites and CI gates.
-See [the assessment](roadmap/v1/AUDIT.md) for code evidence, severity and the distinction between
-observed paths and concurrency scenarios still requiring reproduction. No product fix was made.
+The [assessment](roadmap/v1/AUDIT.md) preserves access, session freshness/concurrency, relation/history,
+upgrade, Angular/SSR, peer and CI findings. No product fix was made. R2 remains the only durable
+storage adapter; S3 is now required before 1.0, not implemented. All three consumer apps still disable
+SSR. Existing spec 055 readiness and spec 056 polish are the baseline to certify, not rebuild.
 
-Verified for this planning task: initial `pnpm build`, then `pnpm lint`, `pnpm typecheck`, `pnpm test`
-and `pnpm build` all passed. Turbo reused 13/14 lint, 23/24 typecheck, 23/24 test and 14/14 final build
-tasks. These are workspace gate results, not fresh backend/browser/coverage certification. No E2E,
-packed-install, real-backend integration or remote-deployment suite was newly run for this docs task.
-The new roadmap is the active sequencing reference; older “What's next”/debt narrative below needs
-the B01 reconciliation pass and should not be interpreted as new implementation instructions.
+Verified for this docs revision: initial build, then `pnpm lint`, `pnpm typecheck`, `pnpm test` and
+`pnpm build` passed (Turbo reused all 14/24/24/14 tasks respectively). These are cached workspace gate
+results, not fresh backend/browser/coverage certification. No E2E, packed-install, real-backend or
+remote-deployment suite was newly run. The active roadmap controls sequencing; older debt/next-step
+narrative below remains historical pending B01 reconciliation and is not new implementation scope.
 
 ## Professional UI & quality hardening (spec 056, done, 2026-09-04)
 

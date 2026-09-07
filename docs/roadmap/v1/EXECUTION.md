@@ -1,7 +1,9 @@
 # V1 execution handbook
 
-The plan divides responsibilities; it does not ask all work to run concurrently. Small sequential
-PRs are the default. Follow [../../SDD.md](../../SDD.md), CLAUDE and CONVENTIONS.
+A packet is one bounded implementation responsibility, not a release or necessarily a public
+feature. A minor combines related packets into a coherent product/engineering outcome. One PR per
+coherent implementation is the default; keep related code, tests and docs together. Split only
+oversized or independently risky work. Avoid a giant branch for a minor and artificial tiny PRs. Follow [../../SDD.md](../../SDD.md), CLAUDE and CONVENTIONS.
 
 ## Ownership
 
@@ -19,8 +21,10 @@ observable behavior. High-risk auth and consistency designs need an explicit arc
 
 ## Packet preparation for smaller models
 
-Each release brief supplies IDs, owners, dependencies, boundaries and acceptance. Before coding,
-write one small spec using `docs/specs/TEMPLATE.md` that adds:
+Start with the assigned release brief, its findings and predecessor contracts; no separate
+governance phase is needed. For changes requiring a spec under SDD, prepare a focused spec using
+`docs/specs/TEMPLATE.md`. Bug fixes, tests and documentation do not acquire an extra spec requirement
+from being assigned a packet. Include the relevant details below:
 
 1. Packet/minor IDs and links to merged predecessor outcomes.
 2. One observable goal, with a before/after scenario.
@@ -29,7 +33,8 @@ write one small spec using `docs/specs/TEMPLATE.md` that adds:
    does not invent TypeScript signatures before design review. The implementer must not choose them.
 5. Behavior table for success, invalid input, missing record, denied access, dependency failure
    and concurrency when relevant. Separate Local API errors from HTTP status/envelope behavior.
-6. At most roughly ten implementation checklist items; split larger tasks into `ID-a` / `ID-b`.
+6. Aim for roughly ten meaningful implementation steps; split into `ID-a` / `ID-b` when the work
+   is actually oversized or independently risky, not merely because it touches many files.
 7. Test files, exact commands, required contract suites and expected regression outcomes.
 8. Changeset classification, compatibility impact, migration and recovery notes.
 9. Reviewer and completion evidence. Resolve open design questions before approval.
@@ -53,8 +58,8 @@ an explicit maintainer request to implement a particular spec constitutes approv
   server permission policy. Integration follows package contract verification.
 - Shared files (`operations.ts`, `handlers.ts`, adapter interfaces, entry points) have one active
   owner. Independent documentation/infrastructure may proceed after recording the same B01 baseline.
-- A packet may have child PRs without adding product scope. Each child has a bounded outcome;
-  the parent remains open until all acceptance criteria pass.
+- A coherent PR can complete related packets; a large packet can need multiple PRs. Record which
+  acceptance criteria each covers. Packet IDs remain useful tracking references, not forced PRs.
 - Capture behavior before refactoring. Do not combine a refactor, API redesign and new feature in
   one PR. No new abstraction or dependency without a concrete reason in the spec.
 - Changes under `packages/*` need a changeset. Keep the existing fixed version group; no manual
@@ -63,7 +68,8 @@ an explicit maintainer request to implement a particular spec constitutes approv
 
 ## Handling current work
 
-Spec 056 itself is marked done; STATE's stale in-progress heading was reconciled during this review.
+Spec 056 is marked done and merged; the previous planning pass reconciled its STATE heading.
+The 2026-09-07 baseline is main `28ff76c`, public GitHub release v0.4.0 and ten manifests at 0.4.0.
 Record its completed outcome and any remaining release bookkeeping in the 0.4.x baseline; do not
 reimplement its redirects, overlays or landing polish. Decorative work must not delay access fixes.
 
@@ -74,14 +80,16 @@ scheduled later. This rule does not authorize deployment or publication by an im
 
 ## Versioning and freeze
 
+Patches cover bugs, security fixes, UI polish, performance fixes, tests and documentation corrections.
+Minor versions communicate meaningful capability/guarantee changes, not code volume.
 Before 1.0, patches repair documented behavior; intentional API/default/configuration breaks use a
 documented minor with migration notes. Experimental status is not permission for silent breakage.
 From 1.0, compatible fixes are patches, additive compatible features minors, and incompatible public
 changes require a major release.
 
 0.5 freezes contract categories, not all final signatures. Finalize intentional changes during their
-assigned minors. Freeze the actual 1.0 surface at 0.12 exit. 0.13 and RC accept corrections and
-evidence only. A necessary breaking change reopens design, migration and downstream certification.
+assigned minors. Freeze the actual 1.0 surface at 0.11 exit. 0.12 combines final certification and RC preparation;
+RC accepts defects and evidence only. No extra minor is needed solely to record certification. A necessary breaking change reopens design, migration and downstream certification.
 
 ## Completion evidence
 
@@ -92,3 +100,19 @@ blocked checks distinctly. A claim that tests pass must identify which suites ac
 Each minor closes with its own exit gate plus [QUALITY.md](QUALITY.md), changelog and updated
 compatibility inventory. A missed gate delays that release; it cannot be replaced by future intent.
 Estimate scheduling only after measuring completed packets. No invented hour/date commitments.
+
+## Keep product use in each milestone
+
+0.5 combines B/A foundation and access work; 0.6 combines H/D auth and content safety. 0.7 upgrades
+precede 0.8 Angular and 0.9 SSR; 0.10 adds basic S3 and both complete durable profiles; 0.11 certifies
+the existing admin; 0.12 consolidates evidence and L01 preparation before RC → 1.0. Dependencies
+inside briefs describe actual required contracts, not a ban on useful earlier client/DX fixes.
+
+Update consumer instructions as each capability changes. Test installation/configuration, first-admin
+bootstrap, public route/admin mounting, typed consumption, deployment and upgrade without private
+Forge internals. Use tiny-project, www/docs and demo-aesthetics as validation surfaces; no redesign
+milestone is needed. Final certification assembles this evidence rather than starting DX work.
+
+For RC, agree an observation period appropriate to the candidate and maintained-consumer use.
+Require multiple clean certification runs and investigate flakiness; material auth/data/API fixes
+restart affected and downstream validation. No universal day/run count determines correctness.

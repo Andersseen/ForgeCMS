@@ -1,135 +1,177 @@
 # ROADMAP — A small, dependable ForgeCMS 1.0
 
-> Baseline: **2026-09-06**, commit `d518878`, public package manifests **0.4.0**.
-> Status: **proposed delivery plan; this document does not authorize implementation**.
-> Replaces the sequencing in [ROADMAP-LEGACY.md](ROADMAP-LEGACY.md), preserved as history.
-> [STATE.md](STATE.md) describes implementation; this document describes future release gates.
+> Baseline verified **2026-09-07**: current `main` **`28ff76c`**; latest public GitHub release
+> [v0.4.0](https://github.com/Andersseen/ForgeCMS/releases/tag/v0.4.0) (2026-09-03);
+> all ten public package manifests **0.4.0**. Latest completed spec: **056**.
+> Status: **proposed delivery plan; not implementation or publication authorization**.
+> [STATE.md](STATE.md) records implementation. [ROADMAP-LEGACY.md](ROADMAP-LEGACY.md) preserves history.
 
-## Product decision
+## Product direction
 
-ForgeCMS 1.0 should let another project install the libraries, define content, authenticate users,
-enforce access, edit and publish content, persist it, and upgrade safely. Its advantage is a typed
-server API and an Angular consumption path. It does not need feature parity with Payload.
+ForgeCMS is a TypeScript-first, code-first headless CMS for small and medium personal/client projects,
+with excellent Angular/Analog.js consumption, Cloudflare-first infrastructure, reusable Angular admin
+and a supported portable profile. The maintainer should be able to use it without rebuilding half a
+CMS. Angular, Analog, signals, typed content and safe SSR are the strategic differentiator. Feature
+parity with Payload, Strapi or Directus is not the goal.
 
-The existing implementation already contains more capabilities than a minimum useful CMS needs.
-**Stop expanding the feature catalogue until the existing public surface has credible guarantees.**
-Prioritize authorization consistency, data integrity, compatibility and consumer verification.
-More components, a plugin ecosystem and a CLI are not release prerequisites.
+The product hierarchy is:
 
-“Stable” means documented behavior, compatibility rules and repeatable evidence. It cannot mean
-zero possible defects. The acceptance gates below replace that impossible promise.
+1. Trustworthy CMS fundamentals.
+2. Angular/Analog developer experience.
+3. Cloudflare-native quality: D1, R2, Workers/Pages and Web Crypto.
+4. Credible open-source portability: libSQL, one S3-compatible adapter and a tested standard runtime.
+5. A professional reusable Angular admin.
+6. Ecosystem expansion later.
 
-## Reading and execution order
+**Cloudflare-first with a supported portable profile** means Cloudflare is preferred and best
+supported, not mandatory. D1 + libSQL and R2 + one S3-compatible adapter are enough before 1.0.
+This is neither a generic backend framework nor an enterprise CMS feature checklist.
 
-| Document                                      | Purpose                                                                   |
-| --------------------------------------------- | ------------------------------------------------------------------------- |
-| [Assessment](roadmap/v1/AUDIT.md)             | Strengths, observed defects, unverified risks and evidence                |
-| [Execution handbook](roadmap/v1/EXECUTION.md) | Responsibility boundaries, small-model packets, reviews and release rules |
-| [Quality contract](roadmap/v1/QUALITY.md)     | Unit, adapter, HTTP, browser, artifact and upgrade matrices               |
-| Release briefs below                          | Inputs, outputs, dependencies, tests, exclusions and exit gates           |
+> ForgeCMS 1.0 is a dependable, typed, code-first CMS for Angular/Analog applications. A developer
+> defines content and users in TypeScript, uses secure auth/access control and the reusable Angular
+> admin, runs primarily on Cloudflare D1/R2 or a credible portable libSQL/S3 stack, consumes typed
+> content with safe SSR/public hydration, evolves persisted schemas through a documented upgrade
+> path, and relies on the published package contracts.
 
-Documentation remains in English per CONVENTIONS.md. Packet IDs below are planning IDs, not spec
-numbers. Allocate the next free `docs/specs/NNN-*` when preparing a task; do not reuse historical
-spec IDs 019–056 for unrelated work. All briefs are proposed, with implementation not started.
+## Start from what already works
 
-## What 1.0 promises
+Spec 055 demonstrated a useful small project, including real local D1 and libSQL lifecycle tests,
+browser auth/admin journeys and packed-consumer verification. The foundation includes typed Local
+API, schema DSL, hooks, validation, row/field access, machine API keys, PBKDF2 users, HttpOnly sessions,
+signup/signin/logout/me, CSRF and last-admin checks. Relations, integrity rules, compound indexes,
+nested queries, findOne, multi-sort, drafts, versions, globals, localization, live preview and blocks
+are already exposed. Signals/session/guard and reusable content/users/auth admin also exist.
 
-| Surface            | Required guarantee                                                                             | Deliberate boundary                                                                    |
-| ------------------ | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Schema / Local API | Strict validation, documented inference, CRUD/count/findOne, defaults, hooks, access           | No new field kinds or generic workflow engine                                          |
-| HTTP               | Routes, queries, errors, metadata, limits and access are documented and tested                 | REST only; preserve `/api/v1`, partial `PUT`, canonical envelopes                      |
-| Database           | InMemory, libSQL and D1 agree on supported behavior; unsupported operations fail explicitly    | InMemory is for dev/tests; no new database engines or generic distributed transactions |
-| Auth               | Safe provisioning, current permissions, session invalidation, scoped API keys and CSRF         | No mandatory email service, OAuth marketplace or refresh-token subsystem               |
-| Content lifecycle  | Existing drafts, globals, versions, preview, localization and relations have tested boundaries | No new visual history/preview product; reject unsafe unsupported configurations        |
-| Storage            | R2 lifecycle and file access are reliable                                                      | Portable/libSQL content supported; durable portable uploads outside 1.0                |
-| Angular            | Configurable endpoints, structured errors, honest wire types and request-scoped SSR            | No server credentials/code in browser bundles; peer versions backed by tests           |
-| Admin              | Existing content/users workflows are usable, accessible and reusable                           | No dashboard rewrite, bulk actions, saved views or new WYSIWYG                         |
-| Maintenance        | Packed artifacts work; schema evolution, backup and recovery have a tested path                | No CLI required; no automatic rollback promise for arbitrary destructive migrations    |
+Spec 056 is **done**, with safe auth redirects, improved dialogs/empty states, removal of decorative
+admin chrome and external avatars, clearer beginner docs/homepage, and demo navigation/E2E polish.
+Commits since its implementation added planning documentation only. Do not schedule another redesign.
 
-Inventory **all** current exports. Before the 0.5 contract closes, classify each as retained and
-certified, deprecated with migration, removed before 1.0 with migration, or moved to a separate
-experimental entry point. Default to retaining useful APIs. An exported root API cannot silently
-be called experimental while the package promises stability. Experimental status never excuses
-unauthorized access or data loss.
+Remaining gaps are specific: durable storage is R2 only; no S3 adapter exists. All three apps still
+configure `ssr: false`. Angular auth paths/configuration and browser schema inference need work.
+Existing advanced content/auth paths need more consistent access and concurrency guarantees.
+See [AUDIT.md](roadmap/v1/AUDIT.md) for preserved evidence and unproven interleavings.
+
+## Read only what the task needs
+
+| Document                             | Purpose                                                              |
+| ------------------------------------ | -------------------------------------------------------------------- |
+| [AUDIT](roadmap/v1/AUDIT.md)         | Existing strengths, observed paths, risks and evidence limits        |
+| [EXECUTION](roadmap/v1/EXECUTION.md) | Prepare one bounded responsibility, review and merge coherently      |
+| [QUALITY](roadmap/v1/QUALITY.md)     | Relevant tests, durable profiles, compatibility and release evidence |
+| Release brief below                  | Goal, scope, packets, dependencies, acceptance and gate              |
+
+Read the assigned brief and its referenced findings/contracts, then prepare the necessary spec under
+[SDD.md](SDD.md). Packet IDs are planning references, not historical spec numbers. Allocate the next
+free spec number; do not reuse 019–056. This roadmap does not approve future implementation specs.
 
 ## Release sequence
 
-Minor means the middle number in `0.x.y`; **0.10 follows 0.9**. These are proposed versions, not
-claims of published releases. Keep the ten public packages in the existing Changesets fixed group.
-Family bumps do not imply every package gained functionality. The private root `0.0.0` is unrelated.
+Minor versions communicate a coherent capability or guarantee, not line count. Several packets and
+PRs may belong to a minor. **Packet ≠ release; packet ≠ necessarily a public feature.** One PR per
+coherent implementation is preferred; split only oversized or independently risky responsibilities.
+Do not build an entire minor on one giant branch or force a separate PR for each test/file change.
 
-| Release                                    | One release outcome                                                 | Packets                                    | Dependency              |
-| ------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------ | ----------------------- |
-| 0.4.x                                      | Record completed spec 056 and patch urgent regressions              | Release bookkeeping; no new feature bundle | Record current baseline |
-| [0.5](roadmap/v1/0.5-contract-baseline.md) | One accurate contract and visible test baseline                     | B01–B04                                    | 0.4.x baseline          |
-| [0.6](roadmap/v1/0.6-authorization.md)     | All content paths enforce the same access policy                    | A01–A04                                    | B01–B03                 |
-| [0.7](roadmap/v1/0.7-auth-lifecycle.md)    | Users/sessions/provisioning stay safe across requests and instances | H01–H04                                    | 0.6                     |
-| [0.8](roadmap/v1/0.8-data-integrity.md)    | Content mutations have defined failure/concurrency semantics        | D01–D04                                    | 0.7                     |
-| [0.9](roadmap/v1/0.9-schema-upgrades.md)   | Consumers can evolve and recover persisted data                     | M01–M03                                    | 0.8                     |
-| [0.10](roadmap/v1/0.10-angular-client.md)  | A configurable, typed and compatible browser SDK                    | C01–C03                                    | 0.9                     |
-| [0.11](roadmap/v1/0.11-ssr.md)             | Public-content SSR/hydration without crossing user boundaries       | S01–S03                                    | 0.10                    |
-| [0.12](roadmap/v1/0.12-admin.md)           | Existing editorial workflows work reliably in consumers             | U01–U03                                    | 0.11                    |
-| [0.13](roadmap/v1/0.13-certification.md)   | Candidate proven outside workspace shortcuts                        | R01–R04                                    | All earlier gates       |
-| [1.0 RC → 1.0](roadmap/v1/1.0-release.md)  | A documented compatibility commitment backed by evidence            | L01–L03                                    | 0.13 dossier            |
+| Release                                      | Product / engineering outcome                          | Packets                        | Release prerequisite                    |
+| -------------------------------------------- | ------------------------------------------------------ | ------------------------------ | --------------------------------------- |
+| 0.4.x                                        | Patch confirmed defects; spec 056 is already complete  | Current-line fixes/bookkeeping | Verified baseline                       |
+| [0.5](roadmap/v1/0.5-contract-baseline.md)   | Contract + access foundation                           | B01–B04, A01–A04               | 0.4.x baseline                          |
+| [0.6](roadmap/v1/0.6-auth-data-integrity.md) | Safe auth and data lifecycle under mutation/failure    | H01–H04, D01–D04               | 0.5 contracts/access                    |
+| [0.7](roadmap/v1/0.7-schema-upgrades.md)     | Schema upgrade, backup and recovery path               | M01–M03                        | 0.6 schema decisions                    |
+| [0.8](roadmap/v1/0.8-angular-client.md)      | First-class typed Angular client and DX                | C01–C03                        | Server contracts; 0.7 upgrade readiness |
+| [0.9](roadmap/v1/0.9-ssr.md)                 | Analog Local API + safe public SSR/hydration           | S01–S03                        | 0.8 transport/types                     |
+| [0.10](roadmap/v1/0.10-portable-storage.md)  | Complete D1/R2 and libSQL/S3 deployment profiles       | P01–P03                        | Storage/access/upgrades; 0.9 consumer   |
+| [0.11](roadmap/v1/0.11-admin.md)             | Existing admin is reliable, accessible and reusable    | U01–U03                        | SDK, SSR and durable profiles           |
+| [0.12](roadmap/v1/0.12-certification.md)     | Final artifact/profile certification + RC preparation  | R01–R04, L01 preparation       | Prior outcomes and U03 surface freeze   |
+| [1.0 RC → 1.0](roadmap/v1/1.0-release.md)    | Defect-only observation, then compatibility commitment | L01 candidate, L02–L03         | Accepted candidate evidence             |
 
-These nine minors deliberately separate permissions, session lifecycle, data integrity, upgrades,
-SDK and SSR. Do not combine them into one “production hardening” release. Each packet is a separate
-PR; split oversized packets into suffixed children before implementation. A minor is an acceptance
-milestone, not one large branch.
+This is eight meaningful pre-1.0 checkpoints instead of nine, while adding durable portable files.
+0.12 is a readiness checkpoint: do not publish an extra minor solely to say certification finished
+if no product/API change requires it. `0.10` follows `0.9`; numbers are proposed, not shipped claims.
+Keep the existing Changesets fixed family; a future S3 package's exact placement/group membership
+is a scoped design decision. The private root `0.0.0` is unrelated to public versions.
 
-Security fixes do not wait for the assigned minor. A confirmed unauthorized read/write gets an
-immediate regression patch or explicit safe restriction in the current supported 0.x line. The
-planned minor still completes the full design/audit. Never preserve an insecure accidental behavior
-as a compatibility guarantee.
+Release order is not a blanket dependency on unrelated packets. Client design and focused admin/DX
+fixes can proceed once their actual predecessor contracts are settled. Security patches bypass the
+minor schedule: confirmed unauthorized reads/writes, passwordHash/internal-field leakage, stale
+privilege, role escalation, corruption and broken upgrades get immediate regressions and fixes or
+explicit safe restrictions. No known critical/high safety defect is waived to advance the schedule.
+Bug/security/UI/performance/test/docs corrections are patches; intentional pre-1.0 contract changes
+need a meaningful minor and migration notes.
 
-## Priority and scope control
+## What 1.0 promises
 
-1. **Blockers:** unauthorized access, stale privileged sessions, data loss, broken artifacts,
-   undocumented incompatibilities and failing required tests.
-2. **Required value:** typed configurable client, public-content SSR, reliable existing admin,
-   install/upgrade guides and certified support profiles.
-3. **After 1.0:** portable durable storage, email/reset flows, CLI, config/plugins,
-   `@forge-cms/analog` as a new package, bulk actions, saved filters, visual history/preview,
-   richer editors, new providers and databases.
+| Surface            | Required guarantee                                                                                                                       | Boundary                                                                                                                              |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Schema / Local API | Strict validation, inference, CRUD/count/findOne, defaults, hooks and access                                                             | No new field kinds or workflow engine                                                                                                 |
+| HTTP               | Stable routes, query/error/metadata/limit behavior and canonical envelopes                                                               | REST; preserve `/api/v1`, partial `PUT`, `{ data, meta }` / `{ data }` / errors / `204`; inventory exact nested error and auth shapes |
+| Database           | D1/libSQL supported semantics agree; InMemory contracts for development/tests                                                            | No Postgres, MongoDB, database marketplace or generic distributed transactions                                                        |
+| Auth               | Safe admin bootstrap/user creation, opt-in signup, signin/session/logout, roles/password changes, current permissions, API keys and CSRF | No mandatory email/password-reset service, OAuth, MFA, passkeys or magic links                                                        |
+| Content lifecycle  | Certify existing drafts, globals, versions, preview, localization, relations and blocks                                                  | Explicit supported combinations; fix unsafe behavior rather than remove features                                                      |
+| Storage            | Durable R2 and one S3-compatible StorageAdapter; upload/access/cleanup lifecycle                                                         | Basic put/get/delete/list/public URL; no direct/presigned uploads, CDN abstraction or image pipeline                                  |
+| Angular / Analog   | Configurable content/auth transport, structured errors, schema-aware wire types, reliable signals and safe SSR/public hydration          | No browser credentials/server hooks or cross-request identity/cache leakage; no automatic Analog package                              |
+| Admin              | Existing content/users/auth workflows accessible and reusable under custom mount paths                                                   | No redesign, bulk actions, saved filters or new WYSIWYG                                                                               |
+| Maintenance        | Packed artifacts, tested peers, schema evolution and backup/recovery                                                                     | No CLI required or automatic rollback promise for arbitrary destructive migrations                                                    |
 
-The portable storage gap is real. The bounded promise is “libSQL for persisted content, R2 for
-durable uploads,” not “every feature on every backend.” If a committed consumer needs portable
-uploads, add a dedicated minor with storage contracts and lifecycle tests; never hide it in SDK work.
+Inventory every public export before the 0.5 contract closes. Retain useful APIs by default and
+record behavior, supported combinations and evidence gaps. A specific maintainer decision and
+migration path are required for actual removal/deprecation or movement to an experimental entry
+point. Calling an API experimental never excuses unauthorized access or data loss.
 
-Do not remove globals/versions/localization just to shrink the test matrix: they are already
-public. Enumerate combinations, repair safety and reject unsupported options. Actual removals
-require a maintainer decision and a migration. No new components are necessary just to label 1.0.
+## DX and evidence throughout delivery
 
-## Definition of 1.0 readiness
+The acceptance journey is: **install packages → define collections/users → configure auth → choose
+D1/R2 or libSQL/S3 → mount runtime/auth routes → bootstrap admin → mount Angular admin → sign in →
+manage users/content/files → consume typed Angular/Analog content → deploy → upgrade/recover**.
+A developer must complete it through public packages and documented host configuration without
+understanding private Forge internals. Certify existing steps now and extend the journey as SDK,
+SSR, upgrades and portable storage land; do not defer all guides and usability checks to R04.
 
-- Every retained export, route and option has an owner, contract, compatibility classification
-  and linked executable evidence.
-- All promised behavior has success, invalid-input and relevant denied/failure tests. Coverage
-  includes untested source; browser tests prove journeys rather than every internal branch.
-- All [quality gates](roadmap/v1/QUALITY.md) pass on the candidate commit. Release-required suites
-  cannot be omitted while publishing still proceeds.
-- No unresolved critical/high access, credential, corruption or data-loss findings. Lower-severity
-  accepted issues record effect, owner, workaround and follow-up; blockers cannot be waived.
-- A clean consumer installs packed candidates, builds for production, completes the product journey,
-  upgrades previous-version data and restores a backup without workspace imports.
-- D1/R2 and libSQL are proven in their stated profiles. Authorized remote staging evidence is
-  separate from local workerd evidence.
-- RC observation, support policy, recovery procedure, package metadata and docs are complete.
+- `apps/tiny-project`: external-style setup/auth/content/admin and D1/libSQL parity baseline; extend
+  or pair with a minimal packed consumer for files/production SSR.
+- `apps/www`: package/admin integration and beginner documentation verification.
+- `apps/demo-aesthetics`: real-world Local API consumption, public UX and regression dogfooding.
 
-No calendar deadline is inferred. Measure a completed packet per discipline before forecasting.
-Ship on evidence, not a date. If a gate grows, split its implementation; do not drop its guarantee.
+These are validation surfaces, not independent core features or redesign milestones. Use recorded
+consumer evidence honestly: local backend tests, dev-server browser tests, packed builds and remote
+deployment verification prove different things.
 
-## Mapping the old roadmap
+1.0 requires every retained contract linked to success, invalid-input and relevant denied/failure
+evidence; all applicable quality gates on candidate artifacts; no unresolved critical/high access,
+credential or data-integrity defects; and clean consumers proving both durable profiles, peers,
+SSR/admin, upgrade and restored backups. Lower-severity accepted issues record impact, workaround
+and follow-up. Local workerd results do not stand in for authorized isolated staging evidence.
 
-| Legacy theme                                                  | New treatment                                                     |
-| ------------------------------------------------------------- | ----------------------------------------------------------------- |
-| Local API, hooks, fields, globals, versions, locales, queries | Already implemented; certify in 0.5–0.9, do not recreate          |
-| Browser auth / users admin                                    | Already implemented; lifecycle in 0.7, interaction QA in 0.12     |
-| 036 signals / SSR                                             | Signals exist; SDK in 0.10, SSR in 0.11                           |
-| 038 document types                                            | Server half exists; browser wire typing in 0.10                   |
-| 031 migrations / CLI                                          | Essential upgrade safety in 0.9; optional CLI after 1.0           |
-| 029 email, 030 plugins, 037 Analog package                    | After 1.0 unless separately justified                             |
-| 032–035 richer admin                                          | Certify existing workflows in 0.12; new product surfaces deferred |
+Use an RC observation period with real use in maintained consumers and multiple clean certification
+runs. Investigate flakiness and rerun affected/downstream validation after material auth/data/API
+fixes. Evidence matters more than elapsed days; no universal seven-day or three-run rule. The
+maintainer may choose a candidate-specific observation period during preparation. No date is inferred.
 
-The legacy file is historical context, not a second active backlog. Update this index and the
-relevant brief for scope decisions; update STATE only with facts about implemented work.
+## Before → after and historical mapping
+
+| Previous v1 plan                     | Revised treatment                                                  |
+| ------------------------------------ | ------------------------------------------------------------------ |
+| 0.5 baseline + 0.6 authorization     | 0.5 contract/access foundation; retain B/A packets                 |
+| 0.7 auth + 0.8 data integrity        | 0.6 lifecycle hardening; retain H/D responsibilities               |
+| 0.9 upgrades                         | 0.7 upgrades, backup/recovery; no large CLI                        |
+| 0.10 Angular / 0.11 SSR              | 0.8 Angular / 0.9 SSR; central outcomes before final certification |
+| Portable files after 1.0             | 0.10 bounded S3 storage and complete deployment profiles           |
+| 0.12 admin                           | 0.11 certification of existing admin, not a rebuild                |
+| 0.13 certification + 1.0 preparation | 0.12 certification/RC preparation, then RC → defect fixes → 1.0    |
+
+Legacy Local API/hooks/fields/globals/versions/locales/query work is implemented, not a second
+backlog. Legacy 036 signals exist (reliability in C03; SSR in S01–S03), 038 server types exist
+(browser projections in C02), and 031's migration need remains M01–M03 without requiring a CLI.
+Legacy richer-admin ideas are deferred. Historical specs and ROADMAP-LEGACY stay intact; the earlier
+v1 structure is also available in Git history at `28ff76c`.
+
+## After 1.0
+
+Keep demand-driven ideas concise: email/password recovery, OAuth/social auth, plugins, CLI/scaffolding,
+additional DB adapters, direct/presigned uploads, advanced media, bulk actions, saved views, custom
+admin widgets, visual version history, scheduled publishing and richer workflows. A dedicated Analog
+package is a later decision only if repeated consumer integration justifies it. None blocks 1.0;
+organizations, teams, billing, enterprise identity, GraphQL and analytics are not pre-1.0 targets.
+
+Exact S3 package/API and tested provider matrix, session/atomicity design, migration signatures,
+peer/runtime ranges and candidate observation policy remain decisions for their scoped specs.
+They are not reasons to postpone the product commitments above or implement them in this docs task.
