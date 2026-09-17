@@ -62,3 +62,15 @@ export {
 
 export { ForgeAuthSession, type ForgeAuthStatus } from './auth-session.js';
 export { forgeAuthGuard, type ForgeAuthGuardOptions } from './auth-guard.js';
+
+// Forge Analytics (spec 057) — opt-in, experimental
+export { FORGE_ANALYTICS_CONFIG, type ForgeAnalyticsConfig } from './analytics-config.js';
+export { provideForgeAnalytics } from './analytics.js';
+export { ForgeAnalyticsTracker } from './analytics-tracker.service.js';
+export {
+  ForgeAnalyticsApiService,
+  type AnalyticsRange,
+  type AnalyticsTotals,
+  type AnalyticsTimelinePoint,
+  type AnalyticsSummaryResponse
+} from './analytics-api.service.js';

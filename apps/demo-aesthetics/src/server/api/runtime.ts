@@ -5,7 +5,8 @@ import {
   D1DatabaseAdapter,
   R2StorageAdapter,
   type D1Database,
-  type R2Bucket
+  type R2Bucket,
+  type AnalyticsEngineDataset
 } from '@forge-cms/cloudflare';
 import { ForgeCmsRuntime } from '@forge-cms/runtime';
 import { collections } from './collections';
@@ -22,6 +23,16 @@ export interface ServerEnv {
   AUTH_SECRET?: string;
   /** Opt-in flag for `POST /api/auth/signup` — unset (disabled) by default, see spec 054 §7. */
   FORGE_ENABLE_SIGNUP?: string;
+  /**
+   * Forge Analytics (spec 057, experimental). Read directly by `routes/api/analytics/*` — not
+   * wired into `ForgeCmsRuntime`'s `adapters`, since pageviews are not CMS documents.
+   */
+  ANALYTICS?: AnalyticsEngineDataset;
+  /** Stable per-deployment identifier written as the dataset's `index1`. Defaults to `'default'`. */
+  FORGE_ANALYTICS_SITE_ID?: string;
+  /** Server-only secrets for the Analytics Engine SQL API (query side only — writes need no secret). */
+  CLOUDFLARE_ACCOUNT_ID?: string;
+  CLOUDFLARE_ANALYTICS_TOKEN?: string;
 }
 
 let runtimePromise: Promise<ForgeCmsRuntime<ServerEnv>> | undefined;

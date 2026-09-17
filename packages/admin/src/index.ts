@@ -51,3 +51,7 @@ export { ForgeSignInComponent } from './signin.component.js';
 export { ForgeSignUpComponent } from './signup.component.js';
 export { ForgeUsersWorkspaceComponent } from './users-workspace.component.js';
 export { forgeAdminAuthRoutes, type ForgeAdminAuthRoutesOptions } from './auth-routes.js';
+
+// Forge Analytics (spec 057) — experimental, opt-in
+export { ForgeAnalyticsDashboardComponent } from './analytics-dashboard.component.js';
+export { forgeAdminAnalyticsRoutes } from './analytics-routes.js';

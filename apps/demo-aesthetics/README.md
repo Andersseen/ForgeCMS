@@ -114,6 +114,28 @@ The numbers are all in [`demo-limits.ts`](src/server/api/demo-limits.ts). None o
 is a spending limit. If the demo ever moves to a custom domain, a WAF rate-limiting rule (one is free
 per zone) filters abuse before it reaches the Worker and is worth adding on top.
 
+## Forge Analytics (experimental, spec 057)
+
+This app is the dogfood target for [Forge Analytics](../../docs/specs/057-cloudflare-analytics-foundation.md)
+— a privacy-minimizing, Cloudflare-first pageview analytics module. It is opt-in and does not affect
+`apps/www` or `apps/tiny-project`.
+
+- **Collection**: [`app.config.ts`](src/app/app.config.ts) adds `provideForgeAnalytics({ enabled:
+true })`; a first-party tracker beacons `POST /api/analytics/collect` on load and on every SPA
+  navigation (only the entry pageview includes `referrer` — it doesn't change across a session).
+- **Storage**: the `ANALYTICS` binding in [`wrangler.toml`](wrangler.toml) writes to a Cloudflare
+  Analytics Engine dataset. No binding → the collector silently no-ops (`NoopAnalyticsWriter`) instead
+  of failing the public site.
+- **Reading**: `/admin/analytics` (admin-only) reads `GET /api/analytics/summary`, which needs
+  `CLOUDFLARE_ACCOUNT_ID`/`CLOUDFLARE_ANALYTICS_TOKEN` — copy
+  [`.dev.vars.example`](.dev.vars.example) to `.dev.vars` to test it locally, or set them as Pages
+  secrets in production. Missing either one renders a "not configured" state, not an error.
+- No unique visitors, cookies, or persistent identifiers — see the spec for the exact fields collected
+  and deliberately not collected.
+
 ## Not included
 
-No e2e suite — Playwright stays in `apps/www` per CONVENTIONS.md.
+Browser automation for the analytics tracker/dashboard specifically — `e2e/` covers auth, the public
+site and the admin dashboard shell, but does not yet drive a real pageview through
+`/api/analytics/collect` end-to-end (see the spec's Test plan for why: that needs a real Analytics
+Engine dataset, not something CI can provision).

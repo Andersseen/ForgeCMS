@@ -16,6 +16,16 @@ import { MAX_BODY_BYTES, MAX_UPLOAD_BYTES, throttleWrite } from '../api/demo-lim
 /** Account management is off: nobody can add a login, and nobody can delete the demo admin. */
 const FROZEN_PATHS = ['/api/auth/users'];
 
+/**
+ * Forge Analytics (spec 057)'s collector is a `POST` but not a *mutation* in the sense this guard
+ * exists for — it never touches D1/R2, it goes to a separate, effectively-free Analytics Engine
+ * quota, and one visitor's page navigations legitimately fire several of these per minute. Sharing
+ * `throttleWrite`'s budget with real content writes starved actual signups/logins under load (caught
+ * by this app's own e2e suite once the tracker started running on every page). The body-size cap
+ * below still applies — this only exempts the write-count throttle.
+ */
+const UNTHROTTLED_WRITE_PATHS = ['/api/analytics/collect'];
+
 export default defineEventHandler((event) => {
   const path = event.path ?? '';
   if (!path.startsWith('/api/')) return;
@@ -43,6 +53,8 @@ export default defineEventHandler((event) => {
         : 'That payload is larger than the demo accepts.'
     });
   }
+
+  if (UNTHROTTLED_WRITE_PATHS.some((exempt) => path.startsWith(exempt))) return;
 
   // `cf-connecting-ip` is set by Cloudflare and cannot be spoofed by the client; the fallbacks only
   // matter for local development, where a single bucket is fine.

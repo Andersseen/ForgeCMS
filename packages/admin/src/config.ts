@@ -7,7 +7,8 @@ export type ForgeAdminNavIcon =
   | 'media'
   | 'users'
   | 'api'
-  | 'settings';
+  | 'settings'
+  | 'analytics';
 
 export interface ForgeAdminNavItem {
   label: string;

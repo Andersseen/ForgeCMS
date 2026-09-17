@@ -7,7 +7,11 @@ import {
   canManageUsers,
   canWriteContent,
   isAdmin,
-  userRole
+  userRole,
+  FORGE_ANALYTICS_CONFIG,
+  provideForgeAnalytics,
+  ForgeAnalyticsTracker,
+  ForgeAnalyticsApiService
 } from './index';
 import type { AuthUser } from './index';
 
@@ -18,6 +22,13 @@ describe('@forge-cms/angular', () => {
 
   it('exports FORGE_CMS_CONFIG token', () => {
     expect(FORGE_CMS_CONFIG).toBeDefined();
+  });
+
+  it('exports Forge Analytics (spec 057, experimental)', () => {
+    expect(FORGE_ANALYTICS_CONFIG).toBeDefined();
+    expect(provideForgeAnalytics).toBeDefined();
+    expect(ForgeAnalyticsTracker).toBeDefined();
+    expect(ForgeAnalyticsApiService).toBeDefined();
   });
 
   describe('role helpers', () => {

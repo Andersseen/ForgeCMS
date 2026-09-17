@@ -1,4 +1,5 @@
 import type { Routes } from '@angular/router';
+import { forgeAdminAnalyticsRoutes } from '@forge-cms/admin';
 
 export const routes: Routes = [
   {
@@ -74,7 +75,9 @@ export const routes: Routes = [
                 icon: 'collections',
                 exact: true
               },
-              { label: 'Media', routerLink: '/admin/media', icon: 'media', exact: true }
+              { label: 'Media', routerLink: '/admin/media', icon: 'media', exact: true },
+              // Forge Analytics (spec 057, experimental) — opt-in, not part of DEFAULT_ADMIN_NAV.
+              { label: 'Analytics', routerLink: '/admin/analytics', icon: 'analytics', exact: true }
             ]
           },
           {
@@ -119,6 +122,8 @@ export const routes: Routes = [
         path: 'media',
         loadComponent: () => import('./pages/admin/media.page').then((m) => m.AdminMediaPage)
       },
+      // Forge Analytics (spec 057, experimental) — reusable route from @forge-cms/admin.
+      ...forgeAdminAnalyticsRoutes(),
       {
         path: 'users',
         loadComponent: () => import('./pages/admin/users.page').then((m) => m.AdminUsersPage)

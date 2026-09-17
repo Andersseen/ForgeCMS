@@ -1,0 +1,13 @@
+# Forge Analytics (spec 057, experimental) — query side only.
+#
+# The write side needs nothing here: pageviews go straight to the `ANALYTICS` binding declared in
+# wrangler.toml. These two are only needed to make `GET /api/analytics/summary` return real data
+# locally via `wrangler pages dev --local-protocol https` or similar; without them the admin
+# dashboard renders its "not configured" state instead of erroring.
+#
+# CLOUDFLARE_ACCOUNT_ID: your Cloudflare account id (dashboard sidebar).
+# CLOUDFLARE_ANALYTICS_TOKEN: an API token scoped to Account > Account Analytics > Read.
+#
+# Copy this file to .dev.vars (git-ignored) and fill in real values. Never commit real secrets.
+CLOUDFLARE_ACCOUNT_ID=
+CLOUDFLARE_ANALYTICS_TOKEN=

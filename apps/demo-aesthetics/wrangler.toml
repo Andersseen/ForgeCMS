@@ -27,3 +27,11 @@ database_id = "2fe5edd2-384c-4aa9-9abd-9806d906c1cc"
 [[r2_buckets]]
 binding = "BUCKET"
 bucket_name = "forge-cms-demo-media"
+
+# Forge Analytics (spec 057, experimental/opt-in) — pageview event store. `AnalyticsEngineWriter`
+# reads `env.ANALYTICS`; when this binding is absent the collector route falls back to a silent
+# no-op writer instead of failing. No manual dataset-creation step: Analytics Engine creates the
+# dataset automatically on its first write.
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "forge_analytics_demo"

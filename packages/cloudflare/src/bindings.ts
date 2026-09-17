@@ -126,6 +126,21 @@ export interface KVListResult {
   cursor?: string;
 }
 
+/** A single Analytics Engine measurement, positional per `analytics-schema.ts`. */
+export interface AnalyticsEngineDataPoint {
+  /** Up to 1 string, high-cardinality filter key. */
+  indexes?: string[];
+  /** Up to 20 strings, 16KB each. */
+  blobs?: string[];
+  /** Up to 20 numbers. */
+  doubles?: number[];
+}
+
+/** Analytics Engine dataset binding. `writeDataPoint` is fire-and-forget (returns `void`, never throws). */
+export interface AnalyticsEngineDataset {
+  writeDataPoint(event: AnalyticsEngineDataPoint): void;
+}
+
 /** Typical Cloudflare Pages Functions environment */
 export interface CloudflareEnv {
   /** D1 database binding */
@@ -134,6 +149,8 @@ export interface CloudflareEnv {
   BUCKET?: R2Bucket;
   /** KV namespace binding */
   KV?: KVNamespace;
+  /** Analytics Engine dataset binding */
+  ANALYTICS?: AnalyticsEngineDataset;
   /** Any additional bindings (secrets, etc.) */
   [key: string]: unknown;
 }
