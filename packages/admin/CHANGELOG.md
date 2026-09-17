@@ -1,5 +1,27 @@
 # @forge-cms/admin
 
+## 0.5.0
+
+### Minor Changes
+
+- 23dac05: Add Forge Analytics (spec 057): an experimental, opt-in Cloudflare Analytics Engine integration.
+  `@forge-cms/cloudflare` gains `AnalyticsEngineWriter`/`NoopAnalyticsWriter` for writing pageviews and
+  `AnalyticsEngineQueryClient` for reading aggregated summaries via the Analytics Engine SQL API,
+  `@forge-cms/angular` gains a first-party pageview tracker (`provideForgeAnalytics`) and a query client
+  for the admin UI, `@forge-cms/admin` gains a reusable `ForgeAnalyticsDashboardComponent` and
+  `forgeAdminAnalyticsRoutes()`, and `@forge-cms/testing` gains `runAnalyticsWriterContractTests`.
+  Nothing is added to `DEFAULT_ADMIN_NAV` — every piece is opt-in and wired up only where an app chooses
+  to use it (see `apps/demo-aesthetics`).
+
+### Patch Changes
+
+- 5dd03da: Harden admin auth redirects, remove decorative shell controls and external avatar loading, and
+  improve dialog semantics and empty-state affordances.
+- 255febb: Fix mismatched Angular peer dependency pins that caused pnpm to install a second, duplicate copy of `@angular/common`/`@angular/platform-browser` inside any app depending on `@forge-cms/admin` (e.g. `apps/demo-aesthetics`). The duplicate copy's DOM adapter was never initialized by `bootstrapApplication`, so `PlatformLocation.getBaseHrefFromDOM()` threw `Cannot read properties of null (reading 'getBaseHref')` at runtime — reproduced in production on `/login` at `forge-cms-demo.pages.dev`. `@forge-cms/admin` and `@forge-cms/angular` now pin `@angular/*` peers to `21.2.10`, matching every consumer app, and `@forge-cms/admin` now declares `@angular/platform-browser` as an explicit peer so it dedupes against the host app's copy instead of resolving its own via a transitive `@angular/cdk` peer requirement.
+- Updated dependencies [255febb]
+- Updated dependencies [23dac05]
+  - @forge-cms/angular@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes
