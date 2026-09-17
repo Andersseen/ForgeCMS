@@ -7,6 +7,31 @@
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
 
+## Production fix: duplicate Angular bundled via mismatched peer deps (2026-09-17)
+
+`forge-cms-demo.pages.dev/login` (and any other route reachable through `@forge-cms/admin`) threw
+`TypeError: Cannot read properties of null (reading 'getBaseHref')` from `PlatformLocation` in
+production. Root cause: `packages/admin` and `packages/angular` pinned their `@angular/*`
+`peerDependencies` to the exact string `21.2.0`, while every consumer app (`apps/demo-aesthetics`,
+`apps/www`, `apps/tiny-project`) and admin/angular's own `devDependencies` were on `21.2.10`. pnpm
+could not satisfy that exact-version peer against the app's `21.2.10`, so it installed a second,
+isolated copy of `@angular/common` (and, via `@voltui/components` → `ng-primitives` → `@angular/cdk`'s
+unpinned `@angular/platform-browser` peer, a second copy of that too) specifically for
+`@forge-cms/admin`'s subtree. Both copies got bundled together by Vite/Rollup. `@angular/common`'s DOM
+adapter is module-scoped global state set once by `bootstrapApplication`; the duplicate copy's adapter
+was never set, so its `PlatformLocation.getBaseHrefFromDOM()` called `getDOM()` on the un-initialized
+copy and crashed on `null`.
+
+Fix: `packages/admin` and `packages/angular` now pin `@angular/*` peers to `21.2.10` (matching every
+consumer), and `packages/admin` gained an explicit `@angular/platform-browser` peer so it dedupes
+against the host app's copy instead of resolving its own via the transitive `@angular/cdk` requirement.
+Confirmed via `pnpm why @angular/common -r` (single `21.2.10` resolution across the whole workspace)
+and by grepping the rebuilt `apps/demo-aesthetics` bundle for `getBaseHrefFromDOM` (one definition, one
+call site, in one chunk — previously duplicated). This is the "peer" class of finding flagged but not
+fixed by the 2026-09-07 v1 audit below. **Not yet done:** redeploying `forge-cms-demo` (`pnpm
+deploy:demo`) to actually clear the bug in production — this fix is verified locally
+(`pnpm lint && pnpm typecheck && pnpm test && pnpm build` green) but not yet shipped.
+
 ## Forge Analytics — Cloudflare Analytics Engine foundation (spec 057, 2026-09-17)
 
 An experimental, **opt-in** analytics vertical slice, deliberately out of ROADMAP.md's pre-1.0
