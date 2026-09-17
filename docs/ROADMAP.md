@@ -171,6 +171,8 @@ additional DB adapters, direct/presigned uploads, advanced media, bulk actions, 
 admin widgets, visual version history, scheduled publishing and richer workflows. A dedicated Analog
 package is a later decision only if repeated consumer integration justifies it. None blocks 1.0;
 organizations, teams, billing, enterprise identity, GraphQL and analytics are not pre-1.0 targets.
+(Spec 057 added an experimental, opt-in Cloudflare Analytics Engine module outside this sequence at
+the maintainer's explicit request — it is not a 1.0 commitment and does not change this list.)
 
 Exact S3 package/API and tested provider matrix, session/atomicity design, migration signatures,
 peer/runtime ranges and candidate observation policy remain decisions for their scoped specs.

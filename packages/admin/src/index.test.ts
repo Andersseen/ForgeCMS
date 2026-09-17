@@ -11,7 +11,9 @@ import {
   ForgeSignInComponent,
   ForgeSignUpComponent,
   ForgeUsersWorkspaceComponent,
-  forgeAdminAuthRoutes
+  forgeAdminAuthRoutes,
+  ForgeAnalyticsDashboardComponent,
+  forgeAdminAnalyticsRoutes
 } from './index';
 
 describe('@forge-cms/admin', () => {
@@ -39,5 +41,10 @@ describe('@forge-cms/admin', () => {
     expect(ForgeSignUpComponent).toBeDefined();
     expect(ForgeUsersWorkspaceComponent).toBeDefined();
     expect(forgeAdminAuthRoutes).toBeDefined();
+  });
+
+  it('exports Forge Analytics (spec 057, experimental)', () => {
+    expect(ForgeAnalyticsDashboardComponent).toBeDefined();
+    expect(forgeAdminAnalyticsRoutes).toBeDefined();
   });
 });

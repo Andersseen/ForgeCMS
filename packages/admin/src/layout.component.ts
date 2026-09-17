@@ -130,6 +130,9 @@ interface BreadcrumbItem {
                       @case ('settings') {
                         <lmn-cog slot="icon" [size]="16" />
                       }
+                      @case ('analytics') {
+                        <lmn-chart-bar slot="icon" [size]="16" />
+                      }
                       @default {
                         <lmn-chart-bar slot="icon" [size]="16" />
                       }
