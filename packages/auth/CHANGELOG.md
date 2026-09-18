@@ -1,5 +1,12 @@
 # @forge-cms/auth
 
+## 0.5.0
+
+### Patch Changes
+
+- @forge-cms/db@0.5.0
+- @forge-cms/core@0.5.0
+
 ## 0.4.0
 
 ### Patch Changes

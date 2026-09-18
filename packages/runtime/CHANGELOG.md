@@ -1,5 +1,15 @@
 # @forge-cms/runtime
 
+## 0.5.0
+
+### Patch Changes
+
+- @forge-cms/auth@0.5.0
+- @forge-cms/db@0.5.0
+- @forge-cms/storage@0.5.0
+- @forge-cms/core@0.5.0
+- @forge-cms/api@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes
