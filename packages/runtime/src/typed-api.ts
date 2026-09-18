@@ -8,6 +8,7 @@ import type {
 } from '@forge-cms/core';
 import type { WhereCondition } from '@forge-cms/db';
 import type {
+  BaseOperationArgs,
   CountArgs,
   CreateArgs,
   DeleteArgs,
@@ -100,7 +101,7 @@ export type TypedDeleteArgs<
 export type TypedPreviewArgs<
   TCollections extends CollectionRegistry,
   TSlug extends CollectionSlug<TCollections>
-> = {
+> = Omit<BaseOperationArgs, 'collection' | 'depth' | 'locale'> & {
   collection: TSlug;
   data: CollectionInput<CollectionBySlug<TCollections, TSlug>>;
   id?: string;

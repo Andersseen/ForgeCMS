@@ -568,12 +568,25 @@ try {
 }
 if (!viewerDenied) throw new Error('Expected a viewer to be denied write access to sp_posts');
 
-// depth: 1 population must never leak passwordHash (or any other access.read: [] field) from the
-// related document — a real bug found building spec 055's fixture, fixed in populateRecords.
-const spPopulated = await smallProjectRuntime.find({
+// Population must never leak passwordHash (or any other access.read: [] field) from the related
+// document — a real bug found building spec 055's fixture, fixed in populateRecords. Nor may a
+// readable parent grant visibility into an otherwise-unreadable target (spec 058 §4):
+// defineUsersCollection()'s default access.read is \`user !== null\`, so an anonymous caller must not
+// see the populated author at all, while an authenticated one does.
+const spPopulatedAnonymous = await smallProjectRuntime.find({
   collection: 'sp_posts',
   overrideAccess: false,
   user: null,
+  depth: 1
+});
+if (spPopulatedAnonymous.docs[0]?.author !== null) {
+  throw new Error('Expected an anonymous caller to see a null author (users collection is not publicly readable)');
+}
+
+const spPopulated = await smallProjectRuntime.find({
+  collection: 'sp_posts',
+  overrideAccess: false,
+  user: spEditor.user,
   depth: 1
 });
 // Cast past the static field type (relation fields are typed as string | string[] — depth: 1
@@ -582,7 +595,7 @@ const spAuthor = spPopulated.docs[0]?.author as unknown as
   | { email?: string; passwordHash?: string }
   | undefined;
 if (!spAuthor || typeof spAuthor !== 'object') {
-  throw new Error('Expected the author relation to populate into an object');
+  throw new Error('Expected the author relation to populate into an object for an authenticated caller');
 }
 if ('passwordHash' in spAuthor) {
   throw new Error('passwordHash leaked through a populated relation');

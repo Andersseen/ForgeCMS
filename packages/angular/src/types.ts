@@ -181,6 +181,13 @@ export interface CreateUserInput {
 export interface ForgeCmsConfig {
   baseUrl: string;
   authToken?: string | (() => string | null);
+  /**
+   * Base path for `/login`, `/signup`, `/logout`, `/me`, and `/users*` (spec 058 §9). Defaults to
+   * `'/api/auth'`, matching every literal these methods used before this option existed — a consuming
+   * app mounted under a custom path (or one that moves auth routes elsewhere) can now configure this
+   * without replacing `CmsApiService`.
+   */
+  authBaseUrl?: string;
 }
 
 export const FORGE_CMS_CONFIG = new InjectionToken<ForgeCmsConfig>('FORGE_CMS_CONFIG');

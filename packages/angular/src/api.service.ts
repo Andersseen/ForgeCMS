@@ -45,6 +45,11 @@ export class CmsApiService {
     return this.config?.baseUrl ?? '/api/v1';
   }
 
+  /** See {@link ForgeCmsConfig.authBaseUrl}. Defaults to `/api/auth`, the literal every method below used before this existed. */
+  private get authBase(): string {
+    return this.config?.authBaseUrl ?? '/api/auth';
+  }
+
   private get authToken(): string | null {
     const token = this.config?.authToken;
     if (typeof token === 'function') return token();
@@ -126,7 +131,7 @@ export class CmsApiService {
   }
 
   async getCurrentUser(): Promise<AuthUser | null> {
-    const response = await fetch('/api/auth/me', {
+    const response = await fetch(`${this.authBase}/me`, {
       headers: this.getHeaders(),
       credentials: 'include'
     });
@@ -140,7 +145,7 @@ export class CmsApiService {
       headers: this.authHeader(),
       credentials: 'include'
     });
-    if (!response.ok) throw new Error(`Failed to fetch collections: ${response.status}`);
+    if (!response.ok) throw await this.toApiError(response, 'Failed to fetch collections');
     const result = (await response.json()) as { data: CollectionMeta[] };
     return result.data;
   }
@@ -311,12 +316,12 @@ export class CmsApiService {
   }
 
   /**
-   * `POST /api/auth/login`. Returns `{ token, user }` unchanged (Bearer-compatible), but a browser
-   * session should rely on the `Set-Cookie` header the server also sends (spec 053) — see
-   * `ForgeAuthSession`, which calls this and ignores `token`.
+   * `POST {authBaseUrl}/login` (default `/api/auth/login`). Returns `{ token, user }` unchanged
+   * (Bearer-compatible), but a browser session should rely on the `Set-Cookie` header the server also
+   * sends (spec 053) — see `ForgeAuthSession`, which calls this and ignores `token`.
    */
   async login(email: string, password: string): Promise<{ token: string; user: AuthUser }> {
-    const response = await fetch('/api/auth/login', {
+    const response = await fetch(`${this.authBase}/login`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       credentials: 'include',
@@ -327,13 +332,16 @@ export class CmsApiService {
     return result.data;
   }
 
-  /** `POST /api/auth/signup` — `404`s if the server hasn't enabled public signup. No `role` field. */
+  /**
+   * `POST {authBaseUrl}/signup` (default `/api/auth/signup`) — `404`s if the server hasn't enabled
+   * public signup. No `role` field.
+   */
   async signup(input: {
     email: string;
     password: string;
     name?: string;
   }): Promise<{ token: string; user: AuthUser }> {
-    const response = await fetch('/api/auth/signup', {
+    const response = await fetch(`${this.authBase}/signup`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       credentials: 'include',
@@ -344,9 +352,9 @@ export class CmsApiService {
     return result.data;
   }
 
-  /** `POST /api/auth/logout` — clears the session cookie. `204` on success. */
+  /** `POST {authBaseUrl}/logout` (default `/api/auth/logout`) — clears the session cookie. `204` on success. */
   async logout(): Promise<void> {
-    const response = await fetch('/api/auth/logout', {
+    const response = await fetch(`${this.authBase}/logout`, {
       method: 'POST',
       credentials: 'include'
     });
@@ -354,7 +362,7 @@ export class CmsApiService {
   }
 
   async getUsers(): Promise<AuthUser[]> {
-    const response = await fetch('/api/auth/users', {
+    const response = await fetch(`${this.authBase}/users`, {
       headers: this.getHeaders(),
       credentials: 'include'
     });
@@ -364,7 +372,7 @@ export class CmsApiService {
   }
 
   async createUser(input: CreateUserInput): Promise<AuthUser> {
-    const response = await fetch('/api/auth/users', {
+    const response = await fetch(`${this.authBase}/users`, {
       method: 'POST',
       headers: this.getHeaders(),
       credentials: 'include',
@@ -376,7 +384,7 @@ export class CmsApiService {
   }
 
   async updateUser(id: string, input: Partial<CreateUserInput>): Promise<AuthUser> {
-    const response = await fetch(`/api/auth/users/${id}`, {
+    const response = await fetch(`${this.authBase}/users/${id}`, {
       method: 'PUT',
       headers: this.getHeaders(),
       credentials: 'include',
@@ -388,7 +396,7 @@ export class CmsApiService {
   }
 
   async deleteUser(id: string): Promise<void> {
-    const response = await fetch(`/api/auth/users/${id}`, {
+    const response = await fetch(`${this.authBase}/users/${id}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
       credentials: 'include'

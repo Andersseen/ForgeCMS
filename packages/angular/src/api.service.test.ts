@@ -34,10 +34,16 @@ function listBody(docs: unknown[], meta: Record<string, unknown> = {}) {
   };
 }
 
-function createService(token: string | null = 'tok-123'): CmsApiService {
+function createService(
+  token: string | null = 'tok-123',
+  configOverrides: Partial<{ baseUrl: string; authBaseUrl: string }> = {}
+): CmsApiService {
   const injector = Injector.create({
     providers: [
-      { provide: FORGE_CMS_CONFIG, useValue: { baseUrl: '/api/v1', authToken: () => token } },
+      {
+        provide: FORGE_CMS_CONFIG,
+        useValue: { baseUrl: '/api/v1', authToken: () => token, ...configOverrides }
+      },
       { provide: CmsApiService, useClass: CmsApiService, deps: [] }
     ]
   });
@@ -271,6 +277,65 @@ describe('CmsApiService — auth actions', () => {
 
     await expect(api.getDocuments('services')).rejects.toThrow();
     expect(api.unauthorized()).toBe(0);
+  });
+});
+
+// Spec 058 §9: auth endpoints honor a configurable base path instead of a hardcoded `/api/auth`
+// literal, matching how `getDocuments`/etc. already honor `baseUrl`.
+describe('CmsApiService — authBaseUrl (spec 058)', () => {
+  it('defaults every auth endpoint to /api/auth when authBaseUrl is not set', async () => {
+    const api = createService();
+    respond = () => jsonResponse({ data: { token: 'tok', user: { id: 'u1' } } });
+
+    await api.login('a@b.com', 'password123');
+    expect(calls[0]!.url).toBe('/api/auth/login');
+  });
+
+  it('routes login/signup/logout/me/users through a configured authBaseUrl', async () => {
+    const api = createService('tok-123', { authBaseUrl: '/custom/auth' });
+    respond = () => jsonResponse({ data: { token: 'tok', user: { id: 'u1' } } });
+
+    await api.login('a@b.com', 'password123');
+    expect(calls[0]!.url).toBe('/custom/auth/login');
+
+    await api.signup({ email: 'a@b.com', password: 'password123' });
+    expect(calls[1]!.url).toBe('/custom/auth/signup');
+
+    respond = () => new Response(null, { status: 204 });
+    await api.logout();
+    expect(calls[2]!.url).toBe('/custom/auth/logout');
+
+    respond = () => jsonResponse({ data: { id: 'u1' } });
+    await api.getCurrentUser();
+    expect(calls[3]!.url).toBe('/custom/auth/me');
+
+    respond = () => jsonResponse({ data: [] });
+    await api.getUsers();
+    expect(calls[4]!.url).toBe('/custom/auth/users');
+
+    await api.createUser({ email: 'b@b.com', password: 'password123' });
+    expect(calls[5]!.url).toBe('/custom/auth/users');
+
+    respond = () => jsonResponse({ data: { id: 'u2' } });
+    await api.updateUser('u2', { name: 'New' });
+    expect(calls[6]!.url).toBe('/custom/auth/users/u2');
+
+    respond = () => new Response(null, { status: 204 });
+    await api.deleteUser('u2');
+    expect(calls[7]!.url).toBe('/custom/auth/users/u2');
+  });
+});
+
+// Spec 058 §9: getCollections previously degenerated into a plain `Error`, discarding the Forge
+// error code/message every other method already preserves via `toApiError`.
+describe('CmsApiService — getCollections error metadata (spec 058)', () => {
+  it('throws an error carrying the server-provided message instead of a generic one', async () => {
+    const api = createService();
+    respond = () =>
+      jsonResponse({ error: { code: 'FORBIDDEN', message: 'Collections are admin-only' } }, 403);
+
+    const err = await api.getCollections().catch((e) => e);
+    expect(err.message).toBe('Collections are admin-only');
   });
 });
 

@@ -78,6 +78,12 @@ export interface AuthUser {
 export interface AuthSession<TUser extends AuthUser = AuthUser> {
   user: TUser;
   expiresAt?: Date;
+  /**
+   * Opaque session-freshness marker, present only for tokens issued by an adapter that embeds one
+   * (currently `UsersCollectionAuthAdapter` — spec 058 §6). Adapters that don't set it never populate
+   * this field; it carries no meaning outside the adapter that issued the token.
+   */
+  sessionVersion?: number;
 }
 
 /** Why a login/signup attempt was rejected — lets the HTTP boundary give a precise, safe message. */

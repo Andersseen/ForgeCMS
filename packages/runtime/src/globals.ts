@@ -9,9 +9,11 @@ import {
   NotFoundError,
   ValidationFailedError
 } from './errors.js';
-import { resolveAccess } from './access.js';
+import { documentMatches, resolveAccess } from './access.js';
 import { applyFieldDefaults } from './defaults.js';
 import type { AccessDecision } from './access.js';
+import { statusConstraint } from './read-policy.js';
+import { populateRecord } from './populate.js';
 import {
   runAfterChangeHooks,
   runAfterOperationHooks,
@@ -83,30 +85,35 @@ async function prepareGlobalForRead(
   ctx: OperationContext,
   global: GlobalDefinition,
   record: DatabaseRecord | null,
-  args: { user?: CmsUser | null; overrideAccess?: boolean }
+  args: { user?: CmsUser | null; overrideAccess?: boolean; depth?: 0 | 1 }
 ): Promise<DatabaseRecord | null> {
   if (!record) return null;
 
   const user = args.user ?? null;
   const overrideAccess = args.overrideAccess !== false;
+  const collectionProxy = { ...global, upload: false };
 
   let doc = record;
 
-  if (args.overrideAccess === false) {
-    doc = await filterReadableFields(doc, { ...global, upload: false }, user);
+  if (args.depth === 1) {
+    doc = await populateRecord(doc, collectionProxy, ctx, {
+      user,
+      ...(args.overrideAccess !== undefined && { overrideAccess: args.overrideAccess })
+    });
   }
 
-  const withFieldHooks = await runFieldHooks({ ...global, upload: false }, 'afterRead', {
+  if (args.overrideAccess === false) {
+    doc = await filterReadableFields(doc, collectionProxy, user);
+  }
+
+  const withFieldHooks = await runFieldHooks(collectionProxy, 'afterRead', {
     data: doc,
     operation: 'read',
     user,
     overrideAccess
   });
 
-  return runAfterReadHooks(
-    { ...global, upload: false },
-    { user, overrideAccess, doc: withFieldHooks }
-  );
+  return runAfterReadHooks(collectionProxy, { user, overrideAccess, doc: withFieldHooks });
 }
 
 /**
@@ -128,6 +135,28 @@ export async function getGlobal(
   await checkGlobalAccess(global, 'read', args);
 
   const record = await ctx.adapters.database.findById(`_global_${global.slug}`, GLOBAL_ID);
+
+  // Draft visibility (spec 058 §8): a global was previously written but never gated its own
+  // `_status` on read, so an anonymous caller could read a global's unpublished draft content the
+  // exact same way an anonymous single-document read of a `drafts: true` collection cannot. Mirrors
+  // `findByID`'s "known id" reasoning — any authenticated caller sees a draft global, since there is
+  // no listing surface for globals to leak it through; anonymous is restricted to published. A hidden
+  // draft resolves to the same `null` as "never configured" rather than a distinct error, so neither
+  // shape confirms whether the global has ever been written.
+  const draftStatus = statusConstraint(
+    { ...global, upload: false },
+    undefined,
+    user,
+    overrideAccess,
+    'all'
+  );
+  if (record && draftStatus && !documentMatches(record, draftStatus)) {
+    await runAfterOperationHooks(
+      { ...global, upload: false },
+      { operation: 'read', user, overrideAccess, result: null }
+    );
+    return null;
+  }
 
   if (!record) {
     await runAfterOperationHooks(
