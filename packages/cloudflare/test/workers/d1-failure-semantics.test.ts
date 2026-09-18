@@ -55,3 +55,54 @@ describe('D1DatabaseAdapter — real local D1 binding: unregistered/unsynced col
     expect((thrown as { code?: string }).code).not.toBe('UNIQUE_CONSTRAINT');
   });
 });
+
+// Spec 059: a conditional write must never turn a failure into `{ applied: false }` — "the condition
+// was not met" and "the database could not answer" are different facts and callers act on the
+// difference (a last-admin refusal is a 409-shaped answer; a D1 outage is a 500).
+describe('D1DatabaseAdapter — real local D1 binding: conditional write failure semantics (spec 059)', () => {
+  const guard = { keepAtLeast: { where: { role: 'admin' }, others: 1 } };
+
+  it('rejects for an unregistered collection instead of reporting not-applied', async () => {
+    const adapter = new D1DatabaseAdapter().init(env);
+    await expect(
+      adapter.updateIf('cw_never_registered', 'x', { role: 'a' }, guard)
+    ).rejects.toThrow("Collection 'cw_never_registered' not registered. Call syncSchema first.");
+    await expect(adapter.deleteIf('cw_never_registered', 'x', guard)).rejects.toThrow(
+      "Collection 'cw_never_registered' not registered. Call syncSchema first."
+    );
+  });
+
+  it('rejects an unknown column before any statement runs, leaving the row untouched', async () => {
+    const people = defineCollection({
+      slug: 'cw_unknown_column',
+      fields: { role: defineField.text() }
+    });
+    const adapter = new D1DatabaseAdapter().init(env);
+    await adapter.syncSchema([people]);
+    await adapter.create('cw_unknown_column', { id: 'p1', role: 'admin' });
+
+    await expect(
+      adapter.updateIf('cw_unknown_column', 'p1', { role: 'x', nope: 1 }, {})
+    ).rejects.toThrow("Unknown column 'nope'");
+    await expect(
+      adapter.updateIf('cw_unknown_column', 'p1', { role: 'x' }, { targetMatches: { nope: 1 } })
+    ).rejects.toThrow("Unknown column 'nope'");
+    expect((await adapter.findById('cw_unknown_column', 'p1'))?.role).toBe('admin');
+  });
+
+  it('a table that disappears out-of-band fails as a real D1 error, not as applied: false', async () => {
+    const vanishing = defineCollection({
+      slug: 'cw_vanishing',
+      fields: { role: defineField.text() }
+    });
+    const adapter = new D1DatabaseAdapter().init(env);
+    await adapter.syncSchema([vanishing]);
+    await adapter.create('cw_vanishing', { id: 'v1', role: 'admin' });
+    await env.DB.exec('DROP TABLE "cw_vanishing"');
+
+    await expect(adapter.updateIf('cw_vanishing', 'v1', { role: 'x' }, guard)).rejects.toThrow(
+      /no such table/i
+    );
+    await expect(adapter.deleteIf('cw_vanishing', 'v1', guard)).rejects.toThrow(/no such table/i);
+  });
+});

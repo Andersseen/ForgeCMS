@@ -1,5 +1,12 @@
 import type { CollectionDefinition } from '@forge-cms/core';
-import type { DatabaseAdapter, DatabaseRecord, FindManyOptions } from './index.js';
+import type {
+  ConditionalDeleteResult,
+  ConditionalUpdateResult,
+  DatabaseAdapter,
+  DatabaseRecord,
+  FindManyOptions,
+  WriteCondition
+} from './index.js';
 import {
   getOrCreateDrizzleTable,
   generateCreateTableSql,
@@ -10,6 +17,7 @@ import {
   clearTableCache
 } from './schema-generator.js';
 import { toUniqueConstraintError } from './constraint-error.js';
+import { assertValidWriteCondition } from './write-condition.js';
 import { drizzle } from 'drizzle-orm/libsql';
 import { createClient, type Client } from '@libsql/client';
 import {
@@ -263,17 +271,8 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
     data: Partial<DatabaseRecord>
   ): Promise<DatabaseRecord> {
     const db = this.getDb();
-    const now = new Date().toISOString();
-    const collectionDef = this.getCollectionDef(collection);
     const table = this.getTable(collection);
-
-    const updates: DatabaseRecord = { updated_at: now };
-    for (const [key, value] of Object.entries(data)) {
-      if (key === 'id') continue;
-      assertValidColumn(key, collectionDef);
-      const field = collectionDef?.fields[key];
-      updates[key] = field ? toDbValue(value, field.kind) : value;
-    }
+    const updates = this.buildUpdateValues(collection, data);
 
     try {
       await db
@@ -296,6 +295,109 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
     const table = this.getTable(collection);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await db.delete(table).where(eq((table as any)['id'], id));
+  }
+
+  /** Column values for an `update`/`updateIf` write: validated, DB-encoded, `updated_at` stamped, `id` never writable. */
+  private buildUpdateValues(collection: string, data: Partial<DatabaseRecord>): DatabaseRecord {
+    const collectionDef = this.getCollectionDef(collection);
+    const updates: DatabaseRecord = { updated_at: new Date().toISOString() };
+    for (const [key, value] of Object.entries(data)) {
+      if (key === 'id') continue;
+      assertValidColumn(key, collectionDef);
+      const field = collectionDef?.fields[key];
+      updates[key] = field ? toDbValue(value, field.kind) : value;
+    }
+    return updates;
+  }
+
+  /**
+   * The whole of a conditional write's decision as ONE SQL predicate (spec 059) — the database
+   * evaluates it in the same statement that writes, so nothing can interleave between check and write:
+   *
+   *   id = ? AND (<targetMatches>) AND
+   *   (CASE WHEN (<P>) THEN 1 ELSE 0 END = 0            -- target not in the set: cannot shrink it
+   *    OR (SELECT COUNT(*) FROM t WHERE id <> ? AND (<P>)) >= ?)   -- enough OTHER members remain
+   *
+   * The `CASE` (rather than `NOT (<P>)`) keeps a NULL-valued predicate meaning "not a member": under
+   * SQL's three-valued logic `NOT NULL` is unknown and would wrongly refuse the write. Inside the
+   * subquery unqualified/table-qualified columns bind to the inner scan of the same table; outside
+   * it they bind to the row being written.
+   */
+  private buildWriteCondition(
+    collection: string,
+    id: string,
+    condition: WriteCondition,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    table: any
+  ): SQL {
+    const collectionDef = this.getCollectionDef(collection);
+    const parts: SQL[] = [eq(table['id'], id)];
+
+    const targetMatches = this.buildWhereCondition(table, collectionDef, condition.targetMatches);
+    if (targetMatches !== undefined) parts.push(targetMatches);
+
+    const floor = condition.keepAtLeast;
+    if (floor) {
+      // Built twice on purpose: each use needs its own copy of the bound parameters.
+      const isMember = this.buildWhereCondition(table, collectionDef, floor.where) ?? sql`1`;
+      const otherMember = this.buildWhereCondition(table, collectionDef, floor.where);
+      const otherMembers = otherMember
+        ? and(ne(table['id'], id), otherMember)!
+        : ne(table['id'], id);
+      parts.push(
+        sql`(CASE WHEN ${isMember} THEN 1 ELSE 0 END = 0 OR (SELECT COUNT(*) FROM ${table} WHERE ${otherMembers}) >= ${floor.others})`
+      );
+    }
+    return and(...parts)!;
+  }
+
+  /** One `UPDATE … WHERE <write condition> RETURNING *` statement; see {@link buildWriteCondition}. */
+  async updateIf(
+    collection: string,
+    id: string,
+    data: Partial<DatabaseRecord>,
+    condition: WriteCondition
+  ): Promise<ConditionalUpdateResult> {
+    assertValidWriteCondition(condition);
+    const db = this.getDb();
+    const table = this.getTable(collection);
+    const updates = this.buildUpdateValues(collection, data);
+    const where = this.buildWriteCondition(collection, id, condition, table);
+
+    let rows: unknown[];
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      rows = await db
+        .update(table)
+        .set(updates as any)
+        .where(where)
+        .returning();
+    } catch (err) {
+      throw toUniqueConstraintError(err, collection) ?? err;
+    }
+
+    const row = rows[0];
+    if (!row) return { applied: false };
+    return { applied: true, record: this.hydrateRecord(row as DatabaseRecord, collection) };
+  }
+
+  /** One `DELETE … WHERE <write condition> RETURNING id` statement; see {@link buildWriteCondition}. */
+  async deleteIf(
+    collection: string,
+    id: string,
+    condition: WriteCondition
+  ): Promise<ConditionalDeleteResult> {
+    assertValidWriteCondition(condition);
+    const db = this.getDb();
+    const table = this.getTable(collection);
+    const where = this.buildWriteCondition(collection, id, condition, table);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows = await db
+      .delete(table)
+      .where(where)
+      .returning({ id: (table as any)['id'] });
+    return { applied: rows.length > 0 };
   }
 
   async count(collection: string, where?: DatabaseWhere): Promise<number> {

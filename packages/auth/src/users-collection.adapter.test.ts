@@ -1,5 +1,8 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { runAuthAdapterContractTests } from '@forge-cms/testing/contracts';
+import {
+  runAuthAdapterContractTests,
+  runLastAdminConcurrencyContractTests
+} from '@forge-cms/testing/contracts';
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
 import { UserMutationError } from './index.js';
 import { defineUsersCollection } from './user-fields.js';
@@ -568,10 +571,11 @@ describe('Session freshness (spec 058 §6)', () => {
   });
 });
 
-// Spec 058 §7: two concurrency invariants — one closed atomically (§7a), one mitigated with a
-// documented, non-atomic best-effort compensation because the current `DatabaseAdapter` contract has
-// no conditional/compare-and-swap write to make it fully atomic (§7b).
-describe('Auth concurrency (spec 058 §7)', () => {
+// Spec 058 §7a closed the first-admin bootstrap race atomically with a unique-index claim. The
+// last-admin race (§7b) was only mitigated there; spec 059 closes it with a conditional write — its
+// deterministic two-writer proof lives in `runLastAdminConcurrencyContractTests` (run below for
+// InMemory, and for real libSQL/D1 in `db-parity`/`human-auth`).
+describe('Auth concurrency (spec 058 §7a)', () => {
   it('two concurrent first signups never both become admin (deterministic interleaving)', async () => {
     const db = new InMemoryDatabaseAdapter();
     const adapter = new UsersCollectionAuthAdapter({ devMode: true }).init({ userDatabase: db });
@@ -606,56 +610,87 @@ describe('Auth concurrency (spec 058 §7)', () => {
     expect(roles.filter((role) => role === 'admin')).toHaveLength(1);
     expect(roles.filter((role) => role === 'viewer')).toHaveLength(1);
   });
+});
 
-  it(
-    'two concurrent last-admin deletions never leave zero admins (bounded, non-atomic mitigation — ' +
-      'see updateUser/deleteUser doc comments for the residual gap this does not close)',
-    async () => {
-      const db = new InMemoryDatabaseAdapter();
-      const adapter = new UsersCollectionAuthAdapter({ devMode: true }).init({ userDatabase: db });
-      const a = await adapter.createUser({
-        email: 'race-admin-a@example.com',
-        password: 'secret123',
-        role: 'admin'
-      });
-      const b = await adapter.createUser({
-        email: 'race-admin-b@example.com',
-        password: 'secret123',
-        role: 'admin'
-      });
-      if (!a.ok || !b.ok) throw new Error('expected success');
+// Spec 059: the last-admin invariant is decided by the database inside one conditional write.
+// InMemory shares a single adapter instance between the parties (a separate `InMemoryDatabaseAdapter`
+// would be a separate store); the parties still have their own `UsersCollectionAuthAdapter`.
+runLastAdminConcurrencyContractTests(async ({ collection, parties, gate }) => {
+  const database = new InMemoryDatabaseAdapter();
+  await database.syncSchema([defineUsersCollection({ slug: collection })]);
 
-      // Force both operations' *pre-write* admin-count checks to overlap — the realistic race (two
-      // admins each removing the other at nearly the same time) — while every other `findMany` call
-      // (including each operation's own post-write recheck) passes straight through unmodified.
-      let preCheckCalls = 0;
-      let releaseBoth = () => {};
-      const bothSeen = new Promise<void>((resolve) => {
-        releaseBoth = resolve;
-      });
-      const originalFindMany = db.findMany.bind(db);
-      db.findMany = (async (opts: Parameters<typeof originalFindMany>[0]) => {
-        const isAdminCount =
-          opts.collection === 'users' &&
-          !!opts.where &&
-          JSON.stringify(opts.where) === JSON.stringify({ role: 'admin' });
-        if (isAdminCount) {
-          preCheckCalls++;
-          if (preCheckCalls <= 2) {
-            if (preCheckCalls === 2) releaseBoth();
-            await bothSeen;
-          }
-        }
-        return originalFindMany(opts);
-      }) as typeof db.findMany;
+  const contenderFor = async (slug: string) => {
+    await database.syncSchema([defineUsersCollection({ slug })]);
+    const gated = gate.wrap(database);
+    const users = new UsersCollectionAuthAdapter({ devMode: true, collection: slug }).init({
+      userDatabase: gated
+    });
+    return { users, database: gated };
+  };
 
-      await Promise.allSettled([adapter.deleteUser(a.user.id), adapter.deleteUser(b.user.id)]);
+  return {
+    contenders: await Promise.all(Array.from({ length: parties }, () => contenderFor(collection))),
+    contenderFor
+  };
+});
 
-      const remainingAdmins = await db.findMany({
-        collection: 'users',
-        where: { role: 'admin' }
-      });
-      expect(remainingAdmins.length).toBeGreaterThanOrEqual(1);
+describe('conditional-write capability (spec 059)', () => {
+  it('refuses, at init, a database that cannot make the last-admin invariant atomic', () => {
+    const legacy = { name: 'legacy-db' } as unknown as InMemoryDatabaseAdapter;
+
+    expect(() =>
+      new UsersCollectionAuthAdapter({ devMode: true }).init({ userDatabase: legacy })
+    ).toThrow(/updateIf\(\) and deleteIf\(\).*'legacy-db' does not/s);
+  });
+
+  it('a user deleted while a demotion is in flight reads as not-found, not as a last-admin refusal', async () => {
+    const { adapter, db } = await createAdapterWithUser();
+    const second = await adapter.createUser({
+      email: 'second@example.com',
+      password: 'secret123',
+      role: 'admin'
+    });
+    if (!second.ok) throw new Error('expected success');
+
+    await db.delete('users', second.user.id);
+    await expect(adapter.updateUser(second.user.id, { role: 'viewer' })).resolves.toBeNull();
+    await expect(adapter.deleteUser(second.user.id)).resolves.toBeUndefined();
+  });
+
+  it('updateUser and deleteUser reach the database only through the guarded conditional writes', async () => {
+    const { adapter, db } = await createAdapterWithUser();
+    const second = await adapter.createUser({
+      email: 'second@example.com',
+      password: 'secret123',
+      role: 'admin'
+    });
+    if (!second.ok) throw new Error('expected success');
+
+    const calls: string[] = [];
+    for (const method of [
+      'update',
+      'updateIf',
+      'delete',
+      'deleteIf',
+      'findMany',
+      'count'
+    ] as const) {
+      const original = (db[method] as (...args: unknown[]) => unknown).bind(db);
+      (db as unknown as Record<string, unknown>)[method] = (...args: unknown[]) => {
+        calls.push(method);
+        return original(...args);
+      };
     }
-  );
+
+    await adapter.updateUser(second.user.id, { role: 'editor' });
+    expect(calls).toEqual(['updateIf']);
+
+    calls.length = 0;
+    await adapter.updateUser(second.user.id, { name: 'Renamed' });
+    expect(calls).toEqual(['update']); // an update that cannot remove admin pays nothing extra
+
+    calls.length = 0;
+    await adapter.deleteUser(second.user.id);
+    expect(calls).toEqual(['deleteIf']); // no admin-count read, no post-write re-check
+  });
 });

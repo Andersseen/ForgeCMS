@@ -1,6 +1,6 @@
 import type { CollectionDefinition } from '@forge-cms/core';
 import { defineField } from '@forge-cms/core';
-import type { DatabaseAdapter, DatabaseRecord } from '@forge-cms/db';
+import type { DatabaseAdapter, DatabaseRecord, WriteCondition } from '@forge-cms/db';
 import { isUniqueConstraintError } from '@forge-cms/db';
 import type {
   AuthActionResult,
@@ -42,6 +42,14 @@ const DEFAULT_COLLECTION = 'users';
 const DEV_SECRET = 'forgecms-dev-only-signing-secret-do-not-use-in-real-deployments';
 const DEFAULT_MIN_PASSWORD_LENGTH = 8;
 const BOOTSTRAP_COLLECTION = '_forge_bootstrap';
+/**
+ * The last-admin invariant as a storage-level precondition (spec 059): a row currently in the admin set
+ * may only be removed from it (deleted, or given a non-admin role) while at least one OTHER admin
+ * remains — decided by the database inside the write itself, scoped to the write's own collection.
+ */
+const LAST_ADMIN_GUARD: WriteCondition = {
+  keepAtLeast: { where: { role: 'admin' }, others: 1 }
+};
 /** Matches `@forge-cms/core`'s own `email` field validator (`validation.ts`'s `email_format` check). */
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -194,6 +202,17 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     }
 
     if (env?.userDatabase !== undefined) {
+      // The last-admin invariant is decided by the database (spec 059). A custom adapter that predates
+      // `updateIf`/`deleteIf` cannot make it safe, so fail here — before any affected operation can run —
+      // rather than at the first demotion. (TypeScript implementers get this at compile time.)
+      const { updateIf, deleteIf } = env.userDatabase as Partial<DatabaseAdapter>;
+      if (typeof updateIf !== 'function' || typeof deleteIf !== 'function') {
+        throw new Error(
+          `UsersCollectionAuthAdapter requires a DatabaseAdapter that implements updateIf() and deleteIf() ` +
+            `(conditional writes, spec 059) to enforce the last-admin invariant atomically; ` +
+            `'${String(env.userDatabase.name ?? 'an unnamed adapter')}' does not.`
+        );
+      }
       this.db = env.userDatabase;
     }
     return this;
@@ -441,32 +460,25 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     return records.map(sanitizeUser);
   }
 
-  /** How many `role: 'admin'` rows exist — the last-admin invariant below is keyed on this. */
-  private async countAdmins(db: DatabaseAdapter): Promise<number> {
-    const admins = await db.findMany({ collection: this.collection, where: { role: 'admin' } });
-    return admins.length;
-  }
-
   /**
    * Updates a user. Rejects (via {@link UserMutationError}) rather than writing when the change would:
    * - set a password shorter than the configured policy, or
-   * - change the sole remaining admin's `role` away from `'admin'`.
+   * - remove the last remaining admin's admin role.
    *
-   * The second check, combined with {@link deleteUser}'s identical guard, is the whole last-admin
-   * invariant: an installation can never end up with zero usable administrators, however the change is
-   * attempted (self-demote, demoted by another admin, self-delete, deleted by another admin).
+   * The second check, together with {@link deleteUser}'s, is the whole last-admin invariant: a users
+   * collection can never end up with zero admins *through this adapter*, however the change is attempted
+   * (self-demote, demoted by another admin, self-delete, deleted by another admin) and however many of
+   * them run at once. Writes that bypass it — the generic content CRUD routes on the users collection
+   * (`/api/v1/users`) or direct adapter access — do not run the guard (spec 059, known limitations).
    *
-   * **Concurrency (spec 058 §7b, explicit limitation):** the pre-write `countAdmins()` check above is
-   * check-then-act, and the current `DatabaseAdapter` contract has no conditional/compare-and-swap
-   * write to make it atomic (no SQL-expression `WHERE`, no cross-adapter transaction). A **post-write
-   * re-verification with best-effort compensation** below closes the common case — two concurrent
-   * last-admin removals whose pre-checks both ran before either write landed — by reverting the role
-   * change and re-raising the same error if the count reads zero immediately afterward. This narrows,
-   * but does not eliminate, the race: if both operations' *post-write* rechecks also each run before
-   * the other's write becomes visible, both can still observe "still fine" and the invariant can still
-   * be violated. A genuine fix needs a conditional-write primitive across all three adapters (the
-   * H01 packet in `docs/roadmap/v1/0.6-auth-data-integrity.md`) — out of scope for this hardening pass;
-   * this is a bounded, honestly-documented mitigation, not a claim of atomicity.
+   * **Concurrency (spec 059):** any update that sets a non-admin role is one `updateIf()` carrying
+   * {@link LAST_ADMIN_GUARD}, so the database decides "is another admin still there?" in the same
+   * statement that writes — there is no read-then-write window, no post-write re-check and no
+   * compensation, and it holds across independent Workers/processes on D1 and libSQL. The guard is
+   * attached whenever the caller *intends* a non-admin role, whatever an earlier read showed, so a stale
+   * read cannot skip it. An update that cannot remove admin privilege is an ordinary `update()`.
+   *
+   * Returns `null` when the user does not exist (including one deleted while this call was in flight).
    */
   async updateUser(id: string, input: Partial<CreateUserInput>): Promise<AuthUser | null> {
     const db = this.getDb();
@@ -475,11 +487,6 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
 
     if (input.password !== undefined && !meetsPasswordPolicy(input.password, this.passwordPolicy)) {
       throw new UserMutationError('Password does not meet requirements', 'weak-password');
-    }
-    const demotesLastAdmin =
-      input.role !== undefined && input.role !== 'admin' && existing.role === 'admin';
-    if (demotesLastAdmin && (await this.countAdmins(db)) <= 1) {
-      throw new UserMutationError('Cannot remove the last remaining admin', 'last-admin');
     }
 
     const updates: DatabaseRecord = {};
@@ -493,45 +500,31 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
       updates._sessionVersion = sessionVersionOf(existing) + 1;
     }
 
-    const updated = await db.update(this.collection, id, updates);
-
-    if (demotesLastAdmin && (await this.countAdmins(db)) === 0) {
-      // Compensate: best-effort revert. See this method's doc comment for the residual race window.
-      await db.update(this.collection, id, { role: 'admin' }).catch(() => undefined);
-      throw new UserMutationError('Cannot remove the last remaining admin', 'last-admin');
+    if (input.role === undefined || input.role === 'admin') {
+      return sanitizeUser(await db.update(this.collection, id, updates));
     }
 
-    return sanitizeUser(updated);
+    const result = await db.updateIf(this.collection, id, updates, LAST_ADMIN_GUARD);
+    if (result.applied) return sanitizeUser(result.record);
+
+    // Not applied: either the user vanished meanwhile, or the guard refused. Only this re-read can tell
+    // them apart; the refusal itself was decided atomically by the database.
+    if (!(await db.findById(this.collection, id))) return null;
+    throw new UserMutationError('Cannot remove the last remaining admin', 'last-admin');
   }
 
   /**
-   * Rejects (via {@link UserMutationError}) deleting the sole remaining admin — see {@link updateUser}
-   * for the invariant and its documented, bounded (non-atomic) concurrency mitigation.
+   * Deletes a user; rejects (via {@link UserMutationError}) removing the last remaining admin. One
+   * `deleteIf()` carrying {@link LAST_ADMIN_GUARD} — see {@link updateUser} for the concurrency
+   * guarantee. Deleting a user who does not exist (or was deleted meanwhile) is a no-op; deleting a
+   * non-admin is never held back.
    */
   async deleteUser(id: string): Promise<void> {
     const db = this.getDb();
-    const existing = await db.findById(this.collection, id);
-    if (!existing) return;
+    const result = await db.deleteIf(this.collection, id, LAST_ADMIN_GUARD);
+    if (result.applied) return;
 
-    const deletesLastAdmin = existing.role === 'admin';
-    if (deletesLastAdmin && (await this.countAdmins(db)) <= 1) {
-      throw new UserMutationError('Cannot remove the last remaining admin', 'last-admin');
-    }
-
-    await db.delete(this.collection, id);
-
-    if (deletesLastAdmin && (await this.countAdmins(db)) === 0) {
-      // Compensate: best-effort restore. Re-creating with the same id/fields is not a perfect
-      // rollback (e.g. `created_at`/`updated_at` will not exactly match the original row), but it
-      // keeps the installation from ending up with zero admins in the common race case. If the
-      // compensating create itself fails (e.g. the id was reused in the meantime), the installation
-      // may be left with zero admins — an explicit, documented residual risk of the current
-      // non-transactional adapter contract (see `updateUser`'s doc comment).
-      try {
-        await db.create(this.collection, { ...existing });
-      } catch {
-        // Best-effort only — see comment above.
-      }
+    if (await db.findById(this.collection, id)) {
       throw new UserMutationError('Cannot remove the last remaining admin', 'last-admin');
     }
   }

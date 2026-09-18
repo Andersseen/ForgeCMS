@@ -13,8 +13,9 @@
 > [docs/specs/058-foundation-hardening-runtime-policy-consistency.md](specs/058-foundation-hardening-runtime-policy-consistency.md)
 > for the exact fixes and [STATE.md](STATE.md)'s matching dated entry. Still open from those packets:
 > B02–B04 (public-surface inventory beyond the new lightweight export-name diff, and a coverage target
-> beyond the new baseline gate), the full H01 conditional-write primitive (the last-admin race has a
-> documented, bounded mitigation, not a full fix), D01/D03 (no atomicity claim exists for cascades or
+> beyond the new baseline gate), ~~the full H01 conditional-write primitive~~ (done later the same day
+> by [spec 059](specs/059-conditional-writes-last-admin-invariant.md): `updateIf`/`deleteIf` close the
+> last-admin race on libSQL and D1; the generic users-collection CRUD path is still unguarded), D01/D03 (no atomicity claim exists for cascades or
 > version writes, by design, but the fault-injection/retention work in D01/D03 itself is not done), and
 > D04/F15/F16 (globals/localization certification beyond access, S3, and peer-range evidence beyond the
 > existing exact pins). This update does not change the release sequence or packet ownership below.

@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
+import { runLastAdminConcurrencyContractTests } from '@forge-cms/testing/contracts';
 import { InMemoryDatabaseAdapter, LibSqlDatabaseAdapter } from '@forge-cms/db';
 import type { DatabaseAdapter } from '@forge-cms/db';
 import { defineUsersCollection } from './user-fields.js';
@@ -100,5 +101,64 @@ describe.each(adapters)('UsersCollectionAuthAdapter on %s (adapter parity)', (_n
     });
     expect(created.ok).toBe(true);
     await expect(db.findMany({ collection: 'users' })).resolves.toHaveLength(2);
+  });
+});
+
+/**
+ * Spec 059's real-backend proof for libSQL: every party opens its **own client** (its own SQLite
+ * connection) on one on-disk database file, through its own `LibSqlDatabaseAdapter` and its own
+ * `UsersCollectionAuthAdapter`. `file::memory:` cannot do this — every connection to it is a separate,
+ * empty database — so a real file is the only way two independent runtimes can share one store here.
+ * The gate holds every party between "finished reading/deciding" and "write", so the decision has to
+ * come from the database statement itself.
+ *
+ * `node:fs`/`node:os` are loaded through a variable specifier with a local type on purpose: this
+ * package deliberately carries no `@types/node` (its source must stay edge-safe), and a test-only temp
+ * directory is not worth a dependency that would put Node globals in scope for the shipped code.
+ */
+interface NodeTempDir {
+  make(): string;
+  remove(directory: string): void;
+}
+async function loadNodeTempDir(): Promise<NodeTempDir> {
+  const fsSpecifier = 'node:fs';
+  const osSpecifier = 'node:os';
+  const fs = (await import(/* @vite-ignore */ fsSpecifier)) as {
+    mkdtempSync(prefix: string): string;
+    rmSync(path: string, options: { recursive: boolean; force: boolean }): void;
+  };
+  const os = (await import(/* @vite-ignore */ osSpecifier)) as { tmpdir(): string };
+  return {
+    make: () => fs.mkdtempSync(`${os.tmpdir()}/forge-last-admin-`),
+    remove: (directory) => fs.rmSync(directory, { recursive: true, force: true })
+  };
+}
+
+const tempDir = await loadNodeTempDir();
+
+describe('UsersCollectionAuthAdapter on LibSqlDatabaseAdapter — independent clients on one database file', () => {
+  const directory = tempDir.make();
+  afterAll(() => tempDir.remove(directory));
+  let fileCounter = 0;
+
+  runLastAdminConcurrencyContractTests(async ({ collection, parties, gate }) => {
+    const url = `file:${directory}/store-${++fileCounter}.db`;
+
+    const contenderFor = async (slug: string) => {
+      const database = new LibSqlDatabaseAdapter(url).init();
+      await database.syncSchema([defineUsersCollection({ slug })]);
+      const gated = gate.wrap(database);
+      const users = new UsersCollectionAuthAdapter({ devMode: true, collection: slug }).init({
+        userDatabase: gated
+      });
+      return { users, database: gated };
+    };
+
+    return {
+      contenders: await Promise.all(
+        Array.from({ length: parties }, () => contenderFor(collection))
+      ),
+      contenderFor
+    };
   });
 });
