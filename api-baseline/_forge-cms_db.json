@@ -1,4 +1,6 @@
 [
+  "ConditionalDeleteResult",
+  "ConditionalUpdateResult",
   "DatabaseAdapter",
   "DatabaseRecord",
   "DatabaseWhere",
@@ -16,6 +18,8 @@
   "WhereOperator",
   "WhereOrGroup",
   "WhereValue",
+  "WriteCondition",
+  "assertValidWriteCondition",
   "clearTableCache",
   "fieldKindToSqlType",
   "fromDbValue",

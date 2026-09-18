@@ -890,3 +890,165 @@ describe('ApiKeyAuthAdapter on D1DatabaseAdapter (adapter parity)', () => {
     await expect(sharedDb.findMany({ collection: 'posts' })).resolves.toHaveLength(2);
   });
 });
+
+/**
+ * Spec 059. The `MockD1Database` above is a regex-based SQL interpreter; it cannot evaluate the
+ * guard's cross-row `COUNT(*)` subquery, so it is NOT used to claim `updateIf`/`deleteIf` contract
+ * compliance — the real-D1 (workerd) suites in `test/workers/` carry that. What a unit test *can* pin
+ * down without a SQL engine is what the adapter sends: one statement, the predicate inside it, and
+ * bindings in the exact order the `?` placeholders appear (a misaligned binding would silently compare
+ * the wrong values on a real database).
+ */
+describe('D1DatabaseAdapter conditional writes — emitted SQL (spec 059)', () => {
+  interface Sent {
+    sql: string;
+    bindings: unknown[];
+  }
+
+  function capturingD1(reply: () => Promise<{ results: unknown[]; success: boolean }>): {
+    db: D1Database;
+    sent: Sent[];
+  } {
+    const sent: Sent[] = [];
+    const db: D1Database = {
+      prepare(sql: string) {
+        const entry: Sent = { sql, bindings: [] };
+        const statement: D1PreparedStatement = {
+          bind(...values: unknown[]) {
+            entry.bindings = values;
+            return statement;
+          },
+          first: () => Promise.resolve(null),
+          run: () => Promise.resolve({ results: [], success: true }),
+          all: <T>() => {
+            if (!sql.startsWith('PRAGMA')) sent.push(entry);
+            return (
+              sql.startsWith('PRAGMA') ? Promise.resolve({ results: [], success: true }) : reply()
+            ) as Promise<D1Result<T>>;
+          },
+          raw: () => Promise.resolve([])
+        };
+        return statement;
+      },
+      exec: () => Promise.resolve({ count: 0, duration: 0 }),
+      batch: () => Promise.resolve([])
+    };
+    return { db, sent };
+  }
+
+  const people = defineCollection({
+    slug: 'cw_people',
+    fields: { role: defineField.text(), team: defineField.text(), active: defineField.boolean() }
+  });
+
+  async function adapterOver(reply: () => Promise<{ results: unknown[]; success: boolean }>) {
+    const { db, sent } = capturingD1(reply);
+    const adapter = new D1DatabaseAdapter().init({ DB: db });
+    await adapter.syncSchema([people]);
+    return { adapter, sent };
+  }
+
+  it('updateIf sends ONE statement with the whole guard inside it, bindings in placeholder order', async () => {
+    const { adapter, sent } = await adapterOver(() =>
+      Promise.resolve({ results: [], success: true })
+    );
+
+    await adapter.updateIf(
+      'cw_people',
+      'u1',
+      { role: 'editor' },
+      {
+        targetMatches: { team: 'red' },
+        keepAtLeast: { where: { role: 'admin' }, others: 2 }
+      }
+    );
+
+    expect(sent).toHaveLength(1);
+    const [statement] = sent;
+    expect(statement!.sql).toBe(
+      'UPDATE "cw_people" SET "updated_at" = ?, "role" = ? WHERE "id" = ? AND ("team" = ?) AND ' +
+        '(CASE WHEN ("role" = ?) THEN 1 ELSE 0 END = 0 OR ' +
+        '(SELECT COUNT(*) FROM "cw_people" WHERE "id" != ? AND ("role" = ?)) >= ?) RETURNING *'
+    );
+    // SET values, id, targetMatches, member (CASE), id (subquery), member (subquery), others.
+    expect(statement!.bindings.slice(1)).toEqual([
+      'editor',
+      'u1',
+      'red',
+      'admin',
+      'u1',
+      'admin',
+      2
+    ]);
+    expect(typeof statement!.bindings[0]).toBe('string'); // updated_at
+  });
+
+  it('deleteIf sends ONE statement with the whole guard inside it', async () => {
+    const { adapter, sent } = await adapterOver(() =>
+      Promise.resolve({ results: [], success: true })
+    );
+
+    await adapter.deleteIf('cw_people', 'u1', {
+      keepAtLeast: { where: { role: 'admin' }, others: 1 }
+    });
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.sql).toBe(
+      'DELETE FROM "cw_people" WHERE "id" = ? AND ' +
+        '(CASE WHEN ("role" = ?) THEN 1 ELSE 0 END = 0 OR ' +
+        '(SELECT COUNT(*) FROM "cw_people" WHERE "id" != ? AND ("role" = ?)) >= ?) RETURNING "id"'
+    );
+    expect(sent[0]!.bindings).toEqual(['u1', 'admin', 'u1', 'admin', 1]);
+  });
+
+  it('an empty where means "every row" for the floor, and an empty condition adds nothing', async () => {
+    const { adapter, sent } = await adapterOver(() =>
+      Promise.resolve({ results: [], success: true })
+    );
+
+    await adapter.deleteIf('cw_people', 'u1', { keepAtLeast: { where: {}, others: 1 } });
+    await adapter.deleteIf('cw_people', 'u1', {});
+
+    expect(sent[0]!.sql).toContain(
+      'CASE WHEN 1 THEN 1 ELSE 0 END = 0 OR (SELECT COUNT(*) FROM "cw_people" WHERE "id" != ?) >= ?'
+    );
+    expect(sent[0]!.bindings).toEqual(['u1', 'u1', 1]);
+    expect(sent[1]!.sql).toBe('DELETE FROM "cw_people" WHERE "id" = ? RETURNING "id"');
+  });
+
+  it('maps RETURNING rows to applied/record (hydrated) and an empty result to applied: false', async () => {
+    const row = { id: 'u1', role: 'editor', team: null, active: 1 };
+    const applied = await adapterOver(() => Promise.resolve({ results: [row], success: true }));
+    expect(await applied.adapter.updateIf('cw_people', 'u1', { role: 'editor' }, {})).toEqual({
+      applied: true,
+      record: { id: 'u1', role: 'editor', team: null, active: true }
+    });
+    expect(await applied.adapter.deleteIf('cw_people', 'u1', {})).toEqual({ applied: true });
+
+    const refused = await adapterOver(() => Promise.resolve({ results: [], success: true }));
+    expect(await refused.adapter.updateIf('cw_people', 'u1', { role: 'x' }, {})).toEqual({
+      applied: false
+    });
+    expect(await refused.adapter.deleteIf('cw_people', 'u1', {})).toEqual({ applied: false });
+  });
+
+  it('a D1 failure propagates as a rejection, never as applied: false', async () => {
+    const { adapter } = await adapterOver(() => Promise.reject(new Error('D1_ERROR: overloaded')));
+
+    await expect(adapter.updateIf('cw_people', 'u1', { role: 'x' }, {})).rejects.toThrow(
+      'D1_ERROR: overloaded'
+    );
+    await expect(adapter.deleteIf('cw_people', 'u1', {})).rejects.toThrow('D1_ERROR: overloaded');
+  });
+
+  it('rejects an invalid `others` before sending any statement', async () => {
+    const { adapter, sent } = await adapterOver(() =>
+      Promise.resolve({ results: [], success: true })
+    );
+
+    await expect(
+      adapter.deleteIf('cw_people', 'u1', { keepAtLeast: { where: { role: 'admin' }, others: -1 } })
+    ).rejects.toThrow(RangeError);
+    expect(sent).toHaveLength(0);
+  });
+});

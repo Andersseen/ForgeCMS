@@ -1,11 +1,15 @@
 import type { CollectionDefinition } from '@forge-cms/core';
 import type {
+  ConditionalDeleteResult,
+  ConditionalUpdateResult,
   DatabaseAdapter,
   DatabaseRecord,
   DatabaseWhere,
-  FindManyOptions
+  FindManyOptions,
+  WriteCondition
 } from '@forge-cms/db';
 import {
+  assertValidWriteCondition,
   generateCreateTableSql,
   generateAddColumnSql,
   generateIndexSql,
@@ -293,16 +297,7 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     data: Partial<DatabaseRecord>
   ): Promise<DatabaseRecord> {
     const db = this.getDb();
-    const now = new Date().toISOString();
-    const collectionDef = this.getCollectionDef(collection);
-
-    const updates: DatabaseRecord = { updated_at: now };
-    for (const [key, value] of Object.entries(data)) {
-      if (key === 'id') continue;
-      assertValidColumn(key, collectionDef);
-      const field = collectionDef?.fields[key];
-      updates[key] = field ? toDbValue(value, field.kind) : value;
-    }
+    const updates = this.buildUpdateValues(collection, data);
 
     const keys = Object.keys(updates);
     const setClause = keys.map((k) => `"${k}" = ?`).join(', ');
@@ -326,6 +321,113 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     const db = this.getDb();
     this.getCollectionDef(collection);
     await db.prepare(`DELETE FROM "${collection}" WHERE id = ?`).bind(id).run();
+  }
+
+  /** Column values for an `update`/`updateIf` write: validated, DB-encoded, `updated_at` stamped, `id` never writable. */
+  private buildUpdateValues(collection: string, data: Partial<DatabaseRecord>): DatabaseRecord {
+    const collectionDef = this.getCollectionDef(collection);
+    const updates: DatabaseRecord = { updated_at: new Date().toISOString() };
+    for (const [key, value] of Object.entries(data)) {
+      if (key === 'id') continue;
+      assertValidColumn(key, collectionDef);
+      const field = collectionDef?.fields[key];
+      updates[key] = field ? toDbValue(value, field.kind) : value;
+    }
+    return updates;
+  }
+
+  /**
+   * The whole of a conditional write's decision as ONE SQL predicate (spec 059), evaluated by D1 in the
+   * same statement that writes — D1 runs a database's queries one at a time, so independent Worker
+   * isolates are serialized and nothing can interleave between check and write:
+   *
+   *   "id" = ? AND (<targetMatches>) AND
+   *   (CASE WHEN (<P>) THEN 1 ELSE 0 END = 0                        -- target not in the set: cannot shrink it
+   *    OR (SELECT COUNT(*) FROM "t" WHERE "id" != ? AND (<P>)) >= ?) -- enough OTHER members remain
+   *
+   * The `CASE` (rather than `NOT (<P>)`) keeps a NULL-valued predicate meaning "not a member" — under
+   * SQL's three-valued logic `NOT NULL` is unknown and would wrongly refuse the write. Unqualified
+   * columns inside the subquery bind to its own scan of the table; outside it, to the row being written.
+   * Bindings are listed in the exact order their `?` placeholders appear.
+   */
+  private buildWriteCondition(
+    collection: string,
+    id: string,
+    condition: WriteCondition
+  ): { sql: string; bindings: unknown[] } {
+    const collectionDef = this.getCollectionDef(collection);
+    const parts = ['"id" = ?'];
+    const bindings: unknown[] = [id];
+
+    const targetMatches = this.buildWhereExpression(collectionDef, condition.targetMatches);
+    if (targetMatches) {
+      parts.push(`(${targetMatches.sql})`);
+      bindings.push(...targetMatches.bindings);
+    }
+
+    const floor = condition.keepAtLeast;
+    if (floor) {
+      const member = this.buildWhereExpression(collectionDef, floor.where);
+      const memberBindings = member?.bindings ?? [];
+      parts.push(
+        `(CASE WHEN ${member ? `(${member.sql})` : '1'} THEN 1 ELSE 0 END = 0 OR ` +
+          `(SELECT COUNT(*) FROM "${collection}" WHERE "id" != ?${member ? ` AND (${member.sql})` : ''}) >= ?)`
+      );
+      bindings.push(...memberBindings, id, ...memberBindings, floor.others);
+    }
+    return { sql: parts.join(' AND '), bindings };
+  }
+
+  /**
+   * One `UPDATE … WHERE <write condition> RETURNING *` statement, run with `.all()` so `RETURNING`
+   * yields both the decision (a row came back) and the row as written. Deliberately not `batch()`: a
+   * single statement is the whole unit, and no Worker instance is trusted to be the only writer.
+   */
+  async updateIf(
+    collection: string,
+    id: string,
+    data: Partial<DatabaseRecord>,
+    condition: WriteCondition
+  ): Promise<ConditionalUpdateResult> {
+    assertValidWriteCondition(condition);
+    const db = this.getDb();
+    const updates = this.buildUpdateValues(collection, data);
+    const setClause = Object.keys(updates)
+      .map((k) => `"${k}" = ?`)
+      .join(', ');
+    const where = this.buildWriteCondition(collection, id, condition);
+    const sql = `UPDATE "${collection}" SET ${setClause} WHERE ${where.sql} RETURNING *`;
+
+    let results: DatabaseRecord[];
+    try {
+      ({ results } = await db
+        .prepare(sql)
+        .bind(...Object.values(updates), ...where.bindings)
+        .all<DatabaseRecord>());
+    } catch (err) {
+      throw toUniqueConstraintError(err, collection) ?? err;
+    }
+
+    const row = results[0];
+    if (!row) return { applied: false };
+    return { applied: true, record: this.hydrateRecord(row, collection) };
+  }
+
+  /** One `DELETE … WHERE <write condition> RETURNING "id"` statement; see {@link updateIf}. */
+  async deleteIf(
+    collection: string,
+    id: string,
+    condition: WriteCondition
+  ): Promise<ConditionalDeleteResult> {
+    assertValidWriteCondition(condition);
+    const db = this.getDb();
+    const where = this.buildWriteCondition(collection, id, condition);
+    const sql = `DELETE FROM "${collection}" WHERE ${where.sql} RETURNING "id"`;
+    const { results } = await db
+      .prepare(sql)
+      .bind(...where.bindings)
+      .all<{ id: string }>();
+    return { applied: results.length > 0 };
   }
 
   async count(collection: string, where?: DatabaseWhere): Promise<number> {

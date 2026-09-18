@@ -37,9 +37,33 @@ interface DatabaseAdapter<TRecord extends DatabaseRecord = DatabaseRecord> {
   create(collection: string, data: TRecord): Promise<TRecord>;
   update(collection: string, id: string, data: Partial<TRecord>): Promise<TRecord>;
   delete(collection: string, id: string): Promise<void>;
+  updateIf(
+    collection: string,
+    id: string,
+    data: Partial<TRecord>,
+    condition: WriteCondition
+  ): Promise<ConditionalUpdateResult<TRecord>>;
+  deleteIf(
+    collection: string,
+    id: string,
+    condition: WriteCondition
+  ): Promise<ConditionalDeleteResult>;
   syncSchema(collections: CollectionDefinition[]): Promise<void>;
 }
 ```
+
+`updateIf`/`deleteIf` are **conditional writes**: the condition and the write are one atomic step, decided
+by the database rather than by a read your code did earlier. A `WriteCondition` has two optional clauses —
+`targetMatches` (the row must currently match; per-row compare-and-set) and
+`keepAtLeast: { where, others }` (the row may leave the set matching `where` only while at least `others`
+_other_ rows of the collection stay in it — this is what keeps a users collection from losing its last
+admin). A missing row or an unmet condition returns `{ applied: false }`; it is not an error. A database
+failure rejects — it is never reported as "not applied". `LibSqlDatabaseAdapter` and `D1DatabaseAdapter`
+run each as one guarded SQL statement, so it holds across independent Workers or processes;
+`InMemoryDatabaseAdapter` is atomic within one adapter instance only. This is a single-row primitive, not a
+transaction. Writing your own adapter? Implement both methods and run
+`runDatabaseAdapterConditionalWriteContractTests` alongside the other suites; `UsersCollectionAuthAdapter`
+refuses to initialise over a database that lacks them.
 
 `FindManyOptions` is `{ collection, limit?, offset?, where?, sort?, order? }`. `count` must honour
 the same `where` as `findMany` — otherwise pagination advertises pages that do not exist. The SQL

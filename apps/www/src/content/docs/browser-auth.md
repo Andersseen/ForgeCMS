@@ -208,8 +208,13 @@ described (`GET/POST /api/auth/users`, `PUT/DELETE /api/auth/users/:id` — a ho
 way as `login.post.ts` above): list, create, edit, and delete, including a password reset
 (`updateUser(id, { password })`, already policy-checked). It also enforces the **last-admin invariant**
 client-side (disabling the sole admin's own delete/demote controls) as a UX mirror of the real
-server-side check in `UsersCollectionAuthAdapter` — an installation can never end up with zero admins,
-however the change is attempted.
+server-side check in `UsersCollectionAuthAdapter` — a users collection can never end up with zero admins
+through it, however the change is attempted, **including two admins removing each other at the same
+moment**: the check is a single conditional database write (`updateIf`/`deleteIf`), not a count followed
+by a write, so exactly one of two conflicting requests succeeds and the other gets the `last-admin`
+refusal. This holds across independent Workers on D1 and libSQL. It applies to the auth users routes
+(`/api/auth/users*`) only; if you also expose the users collection through the generic content routes
+(`/api/v1/users`), those do not run this guard.
 
 Host apps that predate `forgeAdminAuthRoutes()`'s `/admin/login` convention (an existing top-level
 `/login` route, say) can point the shared layout at it instead of migrating the route:

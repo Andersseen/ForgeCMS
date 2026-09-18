@@ -72,6 +72,16 @@ value (`eq`) or an operator object (`{ gt: 10 }`, one or more of `eq`/`ne`/`gt`/
 `contains`, spec 011); predicates across fields and across operators on the same field are AND-ed.
 `sort` names one field, `order` is `asc`/`desc`.
 
+Since spec 059 the contract also has **conditional writes**: `updateIf(collection, id, data, condition)`
+and `deleteIf(collection, id, condition)`. `condition` (`WriteCondition`) has two optional clauses —
+`targetMatches` (per-row compare-and-set) and `keepAtLeast: { where, others }` (the target may leave the
+set matching `where` only while at least `others` _other_ rows of the same collection stay in it). The
+database evaluates the condition atomically with the write (libSQL and D1: one guarded SQL statement;
+InMemory: one synchronous turn, so atomic within one instance only). A missing row or an unmet condition
+returns `{ applied: false }` — not an error; a failure rejects and is never reported as "not applied".
+It is a single-row primitive, **not a transaction**: nothing here makes a document write and a version
+write commit together (see spec 059 §7). It backs `UsersCollectionAuthAdapter`'s last-admin invariant.
+
 ### AuthAdapter (`@forge-cms/auth`)
 
 `name`, `init(env)`, `extractToken(request)`, `validateSession(token)` → `AuthSession | null`,
@@ -110,8 +120,11 @@ See `packages/storage/src/index.ts` — mirror of the others (init + file CRUD).
 
 ### Contract tests
 
-`@forge-cms/testing/contracts` exports `runDatabaseAdapterContractTests`,
-`runAuthAdapterContractTests`, `runStorageAdapterContractTests`. **Every adapter implementation must
+`@forge-cms/testing/contracts` exports `runDatabaseAdapterContractTests` (plus the additive
+`runDatabaseAdapterConstraintContractTests`, `runDatabaseAdapterQueryContractTests` and
+`runDatabaseAdapterConditionalWriteContractTests`), `runAuthAdapterContractTests`,
+`runStorageAdapterContractTests`, and — for the users-collection last-admin proof —
+`runLastAdminConcurrencyContractTests` with its `createWriteGate` barrier. **Every adapter implementation must
 run the matching suite in its test file.** This is what makes adapters swappable with confidence.
 
 ## Schema DSL (core concepts)

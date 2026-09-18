@@ -1,8 +1,17 @@
 [
+  "LastAdminContender",
+  "LastAdminDatabase",
+  "LastAdminHarness",
+  "LastAdminHarnessFactory",
+  "LastAdminUsers",
+  "WriteGate",
+  "createWriteGate",
   "runAnalyticsWriterContractTests",
   "runAuthAdapterContractTests",
+  "runDatabaseAdapterConditionalWriteContractTests",
   "runDatabaseAdapterConstraintContractTests",
   "runDatabaseAdapterContractTests",
   "runDatabaseAdapterQueryContractTests",
+  "runLastAdminConcurrencyContractTests",
   "runStorageAdapterContractTests"
 ]

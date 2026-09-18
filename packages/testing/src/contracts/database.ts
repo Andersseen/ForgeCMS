@@ -626,3 +626,456 @@ export function runDatabaseAdapterQueryContractTests(
     });
   });
 }
+
+// --- Conditional writes (spec 059) ---------------------------------------------------------------
+
+type ContractWhere = Record<string, unknown>;
+
+interface ContractWriteCondition {
+  targetMatches?: ContractWhere;
+  keepAtLeast?: { where: ContractWhere; others: number };
+}
+
+type ContractConditionalUpdateResult =
+  | { applied: true; record: Record<string, unknown> }
+  | { applied: false };
+
+interface ContractConditionalDatabaseAdapter extends ContractDatabaseAdapter {
+  updateIf(
+    collection: string,
+    id: string,
+    data: Record<string, unknown>,
+    condition: ContractWriteCondition
+  ): Promise<ContractConditionalUpdateResult>;
+  deleteIf(
+    collection: string,
+    id: string,
+    condition: ContractWriteCondition
+  ): Promise<{ applied: boolean }>;
+}
+
+const ADMINS_ONLY: ContractWriteCondition = {
+  keepAtLeast: { where: { role: 'admin' }, others: 1 }
+};
+
+/**
+ * Proves `updateIf`/`deleteIf` semantics (spec 059) are identical across every `DatabaseAdapter` —
+ * apart from the pre-existing `DatabaseWhere` `ne`-on-NULL divergence (JS `undefined !== x` is true, SQL
+ * `NULL != x` is unknown), which this suite deliberately does not exercise and which `targetMatches`
+ * inherits (use `eq`, or `in`, for compare-and-set) —
+ * applied vs. not-applied results, missing targets, both condition clauses, evaluation against the
+ * row's *current* state, conflicting writers, precedence over unique constraints, and no partial
+ * application. It uses two fixed collections, `roster` and `roster_other` — an adapter over a
+ * persistent store must be empty of both between tests (the InMemory/libSQL suites get that from a
+ * fresh adapter; `packages/cloudflare/test/workers` clears the two tables in a `beforeEach`).
+ *
+ * The concurrent cases assert only the *outcome* that atomicity guarantees (exactly one of two
+ * conflicting writers wins), which holds under any interleaving. Forcing a particular interleaving is
+ * `runLastAdminConcurrencyContractTests`' job.
+ */
+export function runDatabaseAdapterConditionalWriteContractTests(
+  createAdapter: () => ContractConditionalDatabaseAdapter
+) {
+  describe('DatabaseAdapter conditional write contract (spec 059)', () => {
+    let adapter: ContractConditionalDatabaseAdapter;
+
+    const roster = defineCollection({
+      slug: 'roster',
+      fields: {
+        email: defineField.text({ required: true, unique: true }),
+        role: defineField.text(),
+        team: defineField.text(),
+        version: defineField.number()
+      }
+    });
+    const rosterOther = defineCollection({
+      slug: 'roster_other',
+      fields: {
+        email: defineField.text({ required: true, unique: true }),
+        role: defineField.text()
+      }
+    });
+
+    async function seed(id: string, fields: Record<string, unknown> = {}): Promise<void> {
+      await adapter.create('roster', { id, email: `${id}@example.com`, ...fields });
+    }
+
+    async function roleOf(id: string): Promise<unknown> {
+      return (await adapter.findById('roster', id))?.role;
+    }
+
+    beforeEach(async () => {
+      adapter = createAdapter();
+      await adapter.syncSchema([roster, rosterOther]);
+    });
+
+    describe('updateIf', () => {
+      it('applies when targetMatches holds and returns the row as written', async () => {
+        await seed('u1', { role: 'editor', version: 1 });
+        const before = await adapter.findById('roster', 'u1');
+
+        const result = await adapter.updateIf(
+          'roster',
+          'u1',
+          { role: 'admin', version: 2 },
+          { targetMatches: { version: 1 } }
+        );
+
+        expect(result.applied).toBe(true);
+        if (!result.applied) return;
+        expect(result.record).toMatchObject({ id: 'u1', role: 'admin', version: 2 });
+        expect(result.record.created_at).toBe(before?.created_at);
+        expect(Date.parse(String(result.record.updated_at))).toBeGreaterThanOrEqual(
+          Date.parse(String(before?.updated_at))
+        );
+        // The stored row is exactly what the result reports.
+        expect(await adapter.findById('roster', 'u1')).toEqual(result.record);
+      });
+
+      it('does not apply, and changes nothing, when targetMatches fails', async () => {
+        await seed('u2', { role: 'editor', version: 1 });
+        const before = await adapter.findById('roster', 'u2');
+
+        const result = await adapter.updateIf(
+          'roster',
+          'u2',
+          { role: 'admin', version: 2 },
+          { targetMatches: { version: 99 } }
+        );
+
+        expect(result).toEqual({ applied: false });
+        expect(await adapter.findById('roster', 'u2')).toEqual(before);
+      });
+
+      it('treats a missing target as not applied (not an error) and never creates the row', async () => {
+        const result = await adapter.updateIf('roster', 'ghost', { role: 'admin' }, {});
+        expect(result).toEqual({ applied: false });
+        expect(await adapter.findById('roster', 'ghost')).toBeNull();
+      });
+
+      it('an empty condition holds whenever the row exists', async () => {
+        await seed('u3', { role: 'editor' });
+        const result = await adapter.updateIf('roster', 'u3', { role: 'viewer' }, {});
+        expect(result.applied).toBe(true);
+        expect(await roleOf('u3')).toBe('viewer');
+      });
+
+      it('never rewrites the id', async () => {
+        await seed('u4', { role: 'editor' });
+        const result = await adapter.updateIf('roster', 'u4', { id: 'hijacked', role: 'x' }, {});
+        expect(result.applied).toBe(true);
+        expect(await adapter.findById('roster', 'hijacked')).toBeNull();
+        expect(await roleOf('u4')).toBe('x');
+      });
+
+      it('evaluates targetMatches with the full query language (operators, and/or)', async () => {
+        await seed('u5', { role: 'editor', version: 5, team: 'red' });
+        const refused = await adapter.updateIf(
+          'roster',
+          'u5',
+          { role: 'z' },
+          { targetMatches: { and: [{ version: { gt: 5 } }, { team: 'red' }] } }
+        );
+        expect(refused.applied).toBe(false);
+        const applied = await adapter.updateIf(
+          'roster',
+          'u5',
+          { role: 'z' },
+          {
+            targetMatches: {
+              and: [{ version: { gte: 5 } }, { or: [{ team: 'blue' }, { team: 'red' }] }]
+            }
+          }
+        );
+        expect(applied.applied).toBe(true);
+      });
+    });
+
+    describe('deleteIf', () => {
+      it('deletes when the condition holds', async () => {
+        await seed('d1', { version: 1 });
+        const result = await adapter.deleteIf('roster', 'd1', { targetMatches: { version: 1 } });
+        expect(result).toEqual({ applied: true });
+        expect(await adapter.findById('roster', 'd1')).toBeNull();
+      });
+
+      it('keeps the row when the condition fails', async () => {
+        await seed('d2', { version: 1 });
+        const result = await adapter.deleteIf('roster', 'd2', { targetMatches: { version: 2 } });
+        expect(result).toEqual({ applied: false });
+        expect(await adapter.findById('roster', 'd2')).not.toBeNull();
+      });
+
+      it('treats a missing target as not applied (not an error)', async () => {
+        expect(await adapter.deleteIf('roster', 'ghost', {})).toEqual({ applied: false });
+      });
+
+      it('reports applied: false the second time (idempotent, accurate)', async () => {
+        await seed('d3');
+        expect(await adapter.deleteIf('roster', 'd3', {})).toEqual({ applied: true });
+        expect(await adapter.deleteIf('roster', 'd3', {})).toEqual({ applied: false });
+      });
+    });
+
+    describe('keepAtLeast (set floor)', () => {
+      it('lets a member leave while enough others remain, then refuses the last', async () => {
+        await seed('a', { role: 'admin' });
+        await seed('b', { role: 'admin' });
+
+        const first = await adapter.updateIf('roster', 'a', { role: 'editor' }, ADMINS_ONLY);
+        expect(first.applied).toBe(true);
+        expect(await roleOf('a')).toBe('editor');
+
+        const last = await adapter.updateIf('roster', 'b', { role: 'editor' }, ADMINS_ONLY);
+        expect(last).toEqual({ applied: false });
+        expect(await roleOf('b')).toBe('admin');
+        expect(await adapter.count('roster', { role: 'admin' })).toBe(1);
+      });
+
+      it('applies the same floor to deleteIf', async () => {
+        await seed('a', { role: 'admin' });
+        await seed('b', { role: 'admin' });
+
+        expect(await adapter.deleteIf('roster', 'a', ADMINS_ONLY)).toEqual({ applied: true });
+        expect(await adapter.deleteIf('roster', 'b', ADMINS_ONLY)).toEqual({ applied: false });
+        expect(await adapter.findById('roster', 'b')).not.toBeNull();
+      });
+
+      it('honours the exact boundary of `others`', async () => {
+        await seed('a', { role: 'admin' });
+        await seed('b', { role: 'admin' });
+        await seed('c', { role: 'admin' });
+        const needTwo: ContractWriteCondition = {
+          keepAtLeast: { where: { role: 'admin' }, others: 2 }
+        };
+
+        expect((await adapter.updateIf('roster', 'a', { role: 'editor' }, needTwo)).applied).toBe(
+          true
+        );
+        // Only b and c remain: b has exactly one other member, but two are required.
+        expect((await adapter.updateIf('roster', 'b', { role: 'editor' }, needTwo)).applied).toBe(
+          false
+        );
+        expect(await adapter.count('roster', { role: 'admin' })).toBe(2);
+      });
+
+      it('holds vacuously for a target that is not in the set, even when the set is empty', async () => {
+        await seed('e', { role: 'editor' });
+        await seed('n'); // role never set: NULL must mean "not a member", not "unknown"
+
+        expect(
+          (await adapter.updateIf('roster', 'e', { role: 'viewer' }, ADMINS_ONLY)).applied
+        ).toBe(true);
+        expect(await adapter.deleteIf('roster', 'n', ADMINS_ONLY)).toEqual({ applied: true });
+        expect(await adapter.deleteIf('roster', 'e', ADMINS_ONLY)).toEqual({ applied: true });
+      });
+
+      it('`others: 0` always holds', async () => {
+        await seed('a', { role: 'admin' });
+        const result = await adapter.deleteIf('roster', 'a', {
+          keepAtLeast: { where: { role: 'admin' }, others: 0 }
+        });
+        expect(result).toEqual({ applied: true });
+      });
+
+      it('counts only members matching the whole `where`, not the target itself', async () => {
+        await seed('a', { role: 'admin', team: 'red' });
+        await seed('b', { role: 'admin', team: 'blue' });
+        const redAdmins: ContractWriteCondition = {
+          keepAtLeast: { where: { and: [{ role: 'admin' }, { team: 'red' }] }, others: 1 }
+        };
+
+        // b is an admin but not a red admin; a is the only red admin, so nobody else backs it up.
+        expect((await adapter.updateIf('roster', 'a', { role: 'editor' }, redAdmins)).applied).toBe(
+          false
+        );
+        // b is not in the red-admin set at all, so the floor is vacuous for it.
+        expect((await adapter.updateIf('roster', 'b', { role: 'editor' }, redAdmins)).applied).toBe(
+          true
+        );
+      });
+
+      it('is scoped to the write’s own collection', async () => {
+        await seed('a', { role: 'admin' });
+        await adapter.create('roster_other', { id: 'o1', email: 'o1@example.com', role: 'admin' });
+        await adapter.create('roster_other', { id: 'o2', email: 'o2@example.com', role: 'admin' });
+
+        // Plenty of admins in the other collection must not satisfy this collection's floor.
+        expect(await adapter.deleteIf('roster', 'a', ADMINS_ONLY)).toEqual({ applied: false });
+        expect(await adapter.count('roster_other', { role: 'admin' })).toBe(2);
+      });
+
+      it('uses the row’s current state, not what the caller last saw', async () => {
+        await seed('a', { role: 'admin' });
+        await seed('b', { role: 'admin' });
+        // The caller of the next write "saw" two admins; a plain write removes one behind its back.
+        await adapter.update('roster', 'b', { role: 'editor' });
+
+        expect(await adapter.updateIf('roster', 'a', { role: 'editor' }, ADMINS_ONLY)).toEqual({
+          applied: false
+        });
+        expect(await roleOf('a')).toBe('admin');
+      });
+
+      it('requires every clause: a passing floor cannot rescue a failing targetMatches, and vice versa', async () => {
+        await seed('a', { role: 'admin', version: 1 });
+        await seed('b', { role: 'admin', version: 1 });
+
+        const floorOkTargetBad = { ...ADMINS_ONLY, targetMatches: { version: 2 } };
+        expect(
+          (await adapter.updateIf('roster', 'a', { role: 'x' }, floorOkTargetBad)).applied
+        ).toBe(false);
+
+        await adapter.updateIf('roster', 'b', { role: 'editor' }, {});
+        const targetOkFloorBad = { ...ADMINS_ONLY, targetMatches: { version: 1 } };
+        expect(
+          (await adapter.updateIf('roster', 'a', { role: 'x' }, targetOkFloorBad)).applied
+        ).toBe(false);
+        expect(await roleOf('a')).toBe('admin');
+      });
+    });
+
+    describe('conflicting writers', () => {
+      it('a stale compare-and-set loses: the second of two writers holding the same expectation is refused', async () => {
+        await seed('v', { version: 1 });
+        const bump = { targetMatches: { version: 1 } };
+
+        const first = await adapter.updateIf('roster', 'v', { version: 2 }, bump);
+        const second = await adapter.updateIf('roster', 'v', { version: 2 }, bump);
+
+        expect(first.applied).toBe(true);
+        expect(second.applied).toBe(false);
+      });
+
+      it('exactly one of two concurrent compare-and-set writers wins', async () => {
+        await seed('v', { version: 1 });
+        const bump = { targetMatches: { version: 1 } };
+
+        const results = await Promise.all([
+          adapter.updateIf('roster', 'v', { role: 'p1', version: 2 }, bump),
+          adapter.updateIf('roster', 'v', { role: 'p2', version: 2 }, bump)
+        ]);
+
+        expect(results.filter((r) => r.applied)).toHaveLength(1);
+        const stored = await adapter.findById('roster', 'v');
+        expect(stored?.version).toBe(2);
+        // The surviving value is the winner's, whole — no field-by-field mixture.
+        expect(['p1', 'p2']).toContain(stored?.role);
+      });
+
+      it('two concurrent demotions of the last two admins never both apply', async () => {
+        await seed('a', { role: 'admin' });
+        await seed('b', { role: 'admin' });
+
+        const results = await Promise.all([
+          adapter.updateIf('roster', 'a', { role: 'editor' }, ADMINS_ONLY),
+          adapter.updateIf('roster', 'b', { role: 'editor' }, ADMINS_ONLY)
+        ]);
+
+        expect(results.filter((r) => r.applied)).toHaveLength(1);
+        expect(await adapter.count('roster', { role: 'admin' })).toBe(1);
+      });
+
+      it('a concurrent delete and demotion of the last two admins never both apply', async () => {
+        await seed('a', { role: 'admin' });
+        await seed('b', { role: 'admin' });
+
+        const [deleted, demoted] = await Promise.all([
+          adapter.deleteIf('roster', 'a', ADMINS_ONLY),
+          adapter.updateIf('roster', 'b', { role: 'editor' }, ADMINS_ONLY)
+        ]);
+
+        expect([deleted.applied, demoted.applied].filter(Boolean)).toHaveLength(1);
+        expect(await adapter.count('roster', { role: 'admin' })).toBe(1);
+      });
+
+      it('three admins racing to leave: exactly two succeed, one stays', async () => {
+        for (const id of ['a', 'b', 'c']) await seed(id, { role: 'admin' });
+
+        const results = await Promise.all(
+          ['a', 'b', 'c'].map((id) =>
+            adapter.updateIf('roster', id, { role: 'editor' }, ADMINS_ONLY)
+          )
+        );
+
+        expect(results.filter((r) => r.applied)).toHaveLength(2);
+        expect(await adapter.count('roster', { role: 'admin' })).toBe(1);
+      });
+
+      it('does not over-block writers that do not conflict', async () => {
+        await seed('a', { role: 'admin' });
+        await seed('b', { role: 'admin' });
+        await seed('e', { role: 'editor' });
+
+        const [demoted, deleted] = await Promise.all([
+          adapter.updateIf('roster', 'a', { role: 'editor' }, ADMINS_ONLY),
+          adapter.deleteIf('roster', 'e', ADMINS_ONLY)
+        ]);
+
+        expect(demoted.applied).toBe(true);
+        expect(deleted.applied).toBe(true);
+      });
+    });
+
+    describe('unique constraints and partial application', () => {
+      it('a failed condition wins over a would-be unique conflict (reports not applied)', async () => {
+        await seed('x1', { role: 'editor' });
+        await seed('x2', { role: 'editor' });
+
+        const result = await adapter.updateIf(
+          'roster',
+          'x2',
+          { email: 'x1@example.com' },
+          { targetMatches: { role: 'nobody' } }
+        );
+        expect(result).toEqual({ applied: false });
+      });
+
+      it('throws the unique-constraint error when the condition holds but the write would conflict', async () => {
+        await seed('x1', { role: 'editor' });
+        await seed('x2', { role: 'editor' });
+
+        await expectUniqueConflict(
+          adapter.updateIf(
+            'roster',
+            'x2',
+            { email: 'x1@example.com' },
+            { targetMatches: { role: 'editor' } }
+          )
+        );
+      });
+
+      it('applies none of the changes when one of them violates a unique index', async () => {
+        await seed('x1', { role: 'editor' });
+        await seed('x2', { role: 'editor', team: 'red' });
+        const before = await adapter.findById('roster', 'x2');
+
+        await expectUniqueConflict(
+          adapter.updateIf(
+            'roster',
+            'x2',
+            { team: 'blue', role: 'admin', email: 'x1@example.com' },
+            {}
+          )
+        );
+
+        expect(await adapter.findById('roster', 'x2')).toEqual(before);
+      });
+    });
+
+    describe('invalid conditions', () => {
+      // `undefined` (a JS caller omitting `others`) is the value that once slipped past InMemory only.
+      for (const others of [-1, 1.5, Number.NaN, undefined as unknown as number]) {
+        it(`rejects keepAtLeast.others = ${others} before writing anything`, async () => {
+          await seed('a', { role: 'admin' });
+          await seed('b', { role: 'admin' });
+          const bad: ContractWriteCondition = { keepAtLeast: { where: { role: 'admin' }, others } };
+
+          await expect(adapter.updateIf('roster', 'a', { role: 'editor' }, bad)).rejects.toThrow();
+          await expect(adapter.deleteIf('roster', 'a', bad)).rejects.toThrow();
+          expect(await adapter.count('roster', { role: 'admin' })).toBe(2);
+        });
+      }
+    });
+  });
+}

@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { defineCollection, defineField } from '@forge-cms/core';
 import {
+  runDatabaseAdapterConditionalWriteContractTests,
   runDatabaseAdapterConstraintContractTests,
   runDatabaseAdapterQueryContractTests
 } from '@forge-cms/testing/contracts';
@@ -13,11 +14,12 @@ import { D1DatabaseAdapter } from '../../src/d1.adapter.js';
 // per *test file*, not per `it()` — the same real D1 binding, and the same `widgets`/`articles` rows
 // with fixed ids, would otherwise still be there on the second test's `beforeEach`. This `beforeEach`
 // runs *before* the contract suites' own inner `beforeEach` (outer-describe hooks run first), so it
-// resets exactly the two fixed table names those suites use — the smallest fix that keeps
-// `packages/testing/src/contracts/database.ts` itself untouched (spec 051 §18).
+// resets exactly the fixed table names those suites use — the smallest fix that keeps
+// `packages/testing/src/contracts/database.ts` itself untouched (spec 051 §18). The conditional-write
+// suite (spec 059) adds `roster`/`roster_other`.
 describe('D1DatabaseAdapter — real local D1 binding: shared contract suites', () => {
   beforeEach(async () => {
-    for (const table of ['widgets', 'articles']) {
+    for (const table of ['widgets', 'articles', 'roster', 'roster_other']) {
       try {
         await env.DB.exec(`DELETE FROM "${table}"`);
       } catch {
@@ -33,6 +35,15 @@ describe('D1DatabaseAdapter — real local D1 binding: shared contract suites', 
   });
 
   runDatabaseAdapterQueryContractTests(() => {
+    const adapter = new D1DatabaseAdapter();
+    adapter.init(env);
+    return adapter;
+  });
+
+  // The real-D1 evidence for spec 059: `updateIf`/`deleteIf` run as one guarded SQL statement inside
+  // workerd's actual D1 (SQLite) — not the hand-rolled SQL interpreter the unit-test mock uses, which
+  // cannot evaluate the cross-row `COUNT(*)` subquery.
+  runDatabaseAdapterConditionalWriteContractTests(() => {
     const adapter = new D1DatabaseAdapter();
     adapter.init(env);
     return adapter;
