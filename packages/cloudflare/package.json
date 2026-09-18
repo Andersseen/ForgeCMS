@@ -57,6 +57,7 @@
     "@forge-cms/runtime": "workspace:*",
     "@forge-cms/testing": "workspace:*",
     "typescript": "catalog:",
+    "vite": "catalog:",
     "vitest": "catalog:"
   }
 }
