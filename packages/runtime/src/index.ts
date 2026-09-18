@@ -14,7 +14,6 @@ export {
   handleRestoreVersion,
   handlePreview,
   type HandlerOptions,
-  type PreviewOptions,
   DEFAULT_LIMIT,
   MAX_LIMIT
 } from './handlers.js';
@@ -46,6 +45,8 @@ export {
   create,
   update,
   deleteDocument,
+  restoreVersion,
+  preview,
   type PaginatedDocs,
   type BaseOperationArgs,
   type FindArgs,
@@ -54,7 +55,8 @@ export {
   type CountArgs,
   type CreateArgs,
   type UpdateArgs,
-  type DeleteArgs
+  type DeleteArgs,
+  type PreviewArgs
 } from './operations.js';
 
 // Globals — singleton documents (site-wide config: nav, footer, SEO defaults).
@@ -66,11 +68,11 @@ export {
   type UpdateGlobalArgs
 } from './globals.js';
 
-// Versions — document history, diff, restore.
+// Versions — document history, diff, restore. `restoreVersion` itself is exported from
+// `operations.js` (spec 058 §2 — it routes through the module's own `update()`).
 export {
   listVersions,
   getVersion,
-  restoreVersion,
   createVersion,
   versionsEnabled,
   autosaveEnabled,

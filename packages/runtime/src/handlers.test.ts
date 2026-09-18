@@ -10,7 +10,14 @@ import {
 } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import { ForgeCmsRuntime } from './runtime.js';
-import { handleList, handleRead, handleCreate, handleUpdate, handleDelete } from './handlers.js';
+import {
+  handleList,
+  handleRead,
+  handleCreate,
+  handleUpdate,
+  handleDelete,
+  handlePreview
+} from './handlers.js';
 
 function createTestContext(
   method: string,
@@ -1464,5 +1471,106 @@ describe('HTTP auth boundary: 401 vs 403 vs 500', () => {
     const bodyText = JSON.stringify(await response.json());
     expect(bodyText).not.toContain(secretMarker);
     expect(bodyText).toContain('INTERNAL_ERROR');
+  });
+});
+
+// Spec 058 §3: handlePreview delegates to runtime.preview() instead of duplicating access logic.
+describe('handlePreview HTTP boundary (spec 058)', () => {
+  function createNotesRuntime() {
+    const notes = defineCollection({
+      slug: 'notes',
+      fields: {
+        title: defineField.text({ required: true }),
+        ownerId: defineField.text({ required: true }),
+        secret: defineField.text({ access: { read: [] } })
+      },
+      access: {
+        create: () => false,
+        update: ({ user, doc }) => !!user && doc?.['ownerId'] === user.id
+      }
+    });
+
+    const auth = new InMemoryAuthAdapter();
+    auth.registerSession('owner-token', { user: { id: 'owner-1', email: 'owner@example.com' } });
+    auth.registerSession('stranger-token', {
+      user: { id: 'stranger-1', email: 'stranger@example.com' }
+    });
+
+    return new ForgeCmsRuntime({
+      collections: [notes],
+      adapters: {
+        database: new InMemoryDatabaseAdapter(),
+        auth,
+        storage: new InMemoryStorageAdapter()
+      }
+    });
+  }
+
+  it('new-document preview is denied when the collection has no create access (403)', async () => {
+    const runtime = createNotesRuntime();
+    runtime.init();
+
+    const context = createTestContext(
+      'POST',
+      'https://forge.test/api/notes/preview',
+      { title: 'Draft', ownerId: 'owner-1' },
+      'owner-token'
+    );
+    context.params = { collection: 'notes' };
+
+    const response = await handlePreview(context, { runtime });
+    expect(response.status).toBe(403);
+  });
+
+  it("existing-document preview is denied for a caller without update access (can't preview another user's document)", async () => {
+    const runtime = createNotesRuntime();
+    runtime.init();
+    const doc = await runtime.adapters.database.create('notes', {
+      title: 'Owner note',
+      ownerId: 'owner-1'
+    });
+
+    const context = createTestContext(
+      'POST',
+      `https://forge.test/api/notes/${doc.id}/preview`,
+      { title: 'Hijacked' },
+      'stranger-token'
+    );
+    context.params = { collection: 'notes', id: doc.id as string };
+
+    const response = await handlePreview(context, { runtime });
+    expect(response.status).toBe(403);
+
+    // Nothing persisted, whatever the outcome.
+    const stored = await runtime.adapters.database.findById('notes', doc.id as string);
+    expect(stored?.title).toBe('Owner note');
+  });
+
+  it('existing-document preview succeeds for the owner and never leaks a field-hidden value', async () => {
+    const runtime = createNotesRuntime();
+    runtime.init();
+    const doc = await runtime.adapters.database.create('notes', {
+      title: 'Owner note',
+      ownerId: 'owner-1',
+      secret: 'do-not-leak'
+    });
+
+    const context = createTestContext(
+      'POST',
+      `https://forge.test/api/notes/${doc.id}/preview`,
+      { title: 'Edited' },
+      'owner-token'
+    );
+    context.params = { collection: 'notes', id: doc.id as string };
+
+    const response = await handlePreview(context, { runtime });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { data: Record<string, unknown> };
+    expect(body.data.title).toBe('Edited');
+    expect(body.data).not.toHaveProperty('secret');
+
+    // Still nothing persisted.
+    const stored = await runtime.adapters.database.findById('notes', doc.id as string);
+    expect(stored?.title).toBe('Owner note');
   });
 });

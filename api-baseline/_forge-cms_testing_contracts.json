@@ -1,0 +1,8 @@
+[
+  "runAnalyticsWriterContractTests",
+  "runAuthAdapterContractTests",
+  "runDatabaseAdapterConstraintContractTests",
+  "runDatabaseAdapterContractTests",
+  "runDatabaseAdapterQueryContractTests",
+  "runStorageAdapterContractTests"
+]

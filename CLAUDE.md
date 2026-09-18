@@ -50,7 +50,7 @@ packages/
   runtime/      ForgeCmsRuntime orchestrator + framework-agnostic HTTP CRUD handlers
   cloudflare/   D1 + R2 adapters (KV planned, not implemented)
   angular/      Angular client SDK (CmsApiService, provideForgeCms)
-  admin/        Angular admin components (skeleton, NOT yet used by apps/www)
+  admin/        Angular admin components — real, used by apps/www's /admin (content, auth, users)
   testing/      Adapter contract test suites (import from @forge-cms/testing/contracts)
 ```
 
@@ -75,4 +75,4 @@ packages/
 - HTTP API routes live in `apps/www/src/server/routes/api/` (Analog/Nitro h3 file routes) and delegate to the `handleX` handlers — keep routes thin.
 - The server runtime instance + demo collections + seed data: `apps/www/src/server/api/runtime.ts` (in-memory adapters locally, D1 when `env.DB` exists; local data resets on every reload — that's expected).
 - The `/admin` UI in `apps/www` consumes `@forge-cms/admin`'s real components; `dashboard`/`media`/`users`/`api`/`settings` pages remain app-local.
-- Roadmap and sequencing: [docs/ROADMAP.md](docs/ROADMAP.md). Phase 1 (Local API, function-based access, full hooks, composite fields) is done; Phases 2–5 are not started.
+- Roadmap and sequencing: [docs/ROADMAP.md](docs/ROADMAP.md) (current) and [docs/STATE.md](docs/STATE.md) (what's actually implemented). The Local API, function-based access, full hook pipeline, composite fields, drafts, versions, globals, live preview, localization, and relation integrity are all done — see STATE.md for the complete list and dates. Remaining pre-1.0 work is tracked as 0.5–0.12 in ROADMAP.md, not as numbered "phases".

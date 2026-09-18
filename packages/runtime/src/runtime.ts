@@ -225,7 +225,7 @@ export class ForgeCmsRuntime<
   }
 
   restoreVersion(args: RestoreVersionArgs): Promise<DatabaseRecord> {
-    return versionOps.restoreVersion(this, args);
+    return operations.restoreVersion(this, args);
   }
 
   createVersion(args: CreateVersionArgs): Promise<Version> {
@@ -235,47 +235,18 @@ export class ForgeCmsRuntime<
   // --- Preview ----------------------------------------------------------------------------
 
   /**
-   * Generates a preview of a document by merging stored data with unsaved changes.
-   * If id is provided, merges changes with existing document. Otherwise, previews new document.
+   * A non-persistent simulation of a permitted create/update (spec 058 §3) — merges stored data with
+   * unsaved changes for an existing document, or previews a new one. Delegates to `operations.preview`,
+   * which enforces the same access/field-projection policy `find`/`create`/`update` do; see that
+   * function's docs for the exact semantics. `overrideAccess` defaults to `true` like every other Local
+   * API method (a direct call is trusted server code).
    */
-  async preview<TSlug extends CollectionSlug<TCollections>>(
+  preview<TSlug extends CollectionSlug<TCollections>>(
     args: TypedPreviewArgs<TCollections, TSlug>
   ): Promise<CollectionDocument<CollectionBySlug<TCollections, TSlug>>> {
-    const collection = this.getCollection(args.collection);
-    if (!collection) {
-      throw new (await import('./errors.js')).NotFoundError(
-        `Collection '${args.collection}' not found`
-      );
-    }
-
-    let previewData: Record<string, unknown>;
-    let existing: DatabaseRecord | null = null;
-
-    if (args.id) {
-      existing = await this.adapters.database.findById(args.collection, args.id);
-      if (!existing) {
-        throw new (await import('./errors.js')).NotFoundError(`Document '${args.id}' not found`);
-      }
-      previewData = { ...existing, ...args.data };
-    } else {
-      previewData = args.data;
-    }
-
-    // Apply field defaults and auto-slugs
-    const { applyFieldDefaults, applyAutoSlugs } = await import('./defaults.js');
-    previewData = applyAutoSlugs(
-      collection,
-      applyFieldDefaults(collection, previewData),
-      existing ?? undefined
-    );
-
-    // Populate relations if depth > 0
-    if (args.depth && args.depth > 0) {
-      const { populateRecord } = await import('./populate.js');
-      previewData = await populateRecord(previewData, collection, this);
-    }
-
-    return previewData as CollectionDocument<CollectionBySlug<TCollections, TSlug>>;
+    return operations.preview(this, args as operations.PreviewArgs) as Promise<
+      CollectionDocument<CollectionBySlug<TCollections, TSlug>>
+    >;
   }
 }
 

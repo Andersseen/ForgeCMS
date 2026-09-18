@@ -5,11 +5,6 @@ import { UserMutationError } from './index.js';
 import { defineUsersCollection } from './user-fields.js';
 import { UsersCollectionAuthAdapter } from './users-collection.adapter.js';
 
-function createAdapter() {
-  const db = new InMemoryDatabaseAdapter();
-  return new UsersCollectionAuthAdapter({ devMode: true }).init({ userDatabase: db });
-}
-
 async function createAdapterWithUser(password = 'password123') {
   const db = new InMemoryDatabaseAdapter();
   const adapter = new UsersCollectionAuthAdapter({ devMode: true }).init({ userDatabase: db });
@@ -22,7 +17,15 @@ async function createAdapterWithUser(password = 'password123') {
   return { adapter, db };
 }
 
-const contractAdapter = createAdapter();
+// Spec 058 §6: `validateSession` now re-reads the user row from the database (session freshness), so
+// the contract-test factory must hand every adapter instance the *same* backing database the token's
+// user was actually created in — a fresh, empty database per instance (the previous shape here) would
+// make every session look like "the user was deleted", which is exactly the bug this closes, not a
+// contract-test artifact to route around.
+const contractDb = new InMemoryDatabaseAdapter();
+const contractAdapter = new UsersCollectionAuthAdapter({ devMode: true }).init({
+  userDatabase: contractDb
+});
 const contractUser = await contractAdapter.createUser({
   email: 'contract@example.com',
   password: 'contract-pass',
@@ -31,7 +34,7 @@ const contractUser = await contractAdapter.createUser({
 const contractToken = contractUser.ok ? contractUser.token : '';
 
 runAuthAdapterContractTests(
-  () => createAdapter(),
+  () => new UsersCollectionAuthAdapter({ devMode: true }).init({ userDatabase: contractDb }),
   () =>
     new Request('https://forge.test', {
       headers: { authorization: `Bearer ${contractToken}` }
@@ -474,4 +477,185 @@ describe('UsersCollectionAuthAdapter', () => {
       await expect(adapter.deleteUser(viewer.user.id)).resolves.toBeUndefined();
     });
   });
+});
+
+// Spec 058 §6: a signed token embeds role/email/name at login time; `validateSession` must not keep
+// trusting that stale snapshot for its whole 24h TTL once the underlying row changes.
+describe('Session freshness (spec 058 §6)', () => {
+  it('reflects a role change on the very next validateSession call, without re-login', async () => {
+    const { adapter } = await createAdapterWithUser();
+    const admin = await adapter.login('test@example.com', 'password123');
+    if (!admin.ok) throw new Error('expected success');
+
+    // A second admin so demoting the first does not hit the last-admin guard.
+    const second = await adapter.createUser({
+      email: 'second@example.com',
+      password: 'secret123',
+      role: 'admin'
+    });
+    if (!second.ok) throw new Error('expected success');
+    await adapter.updateUser(admin.user.id, { role: 'viewer' });
+
+    const session = await adapter.validateSession(admin.token);
+    expect(session?.user.role).toBe('viewer');
+  });
+
+  it('invalidates the session of a user who has since been deleted', async () => {
+    const { adapter } = await createAdapterWithUser();
+    const second = await adapter.createUser({
+      email: 'second@example.com',
+      password: 'secret123',
+      role: 'admin'
+    });
+    if (!second.ok) throw new Error('expected success');
+    const victim = await adapter.login('test@example.com', 'password123');
+    if (!victim.ok) throw new Error('expected success');
+
+    await adapter.deleteUser(victim.user.id);
+
+    expect(await adapter.validateSession(victim.token)).toBeNull();
+  });
+
+  it('invalidates every session issued before a password change', async () => {
+    const { adapter } = await createAdapterWithUser();
+    const before = await adapter.login('test@example.com', 'password123');
+    if (!before.ok) throw new Error('expected success');
+
+    await adapter.updateUser(before.user.id, { password: 'brand-new-password-1' });
+
+    expect(await adapter.validateSession(before.token)).toBeNull();
+
+    const after = await adapter.login('test@example.com', 'brand-new-password-1');
+    expect(after.ok).toBe(true);
+    if (after.ok) {
+      expect(await adapter.validateSession(after.token)).toBeTruthy();
+    }
+  });
+
+  it("does not invalidate a different user's session when one user changes their password", async () => {
+    const { adapter } = await createAdapterWithUser();
+    const admin = await adapter.login('test@example.com', 'password123');
+    if (!admin.ok) throw new Error('expected success');
+    const second = await adapter.createUser({
+      email: 'second@example.com',
+      password: 'secret123',
+      role: 'viewer'
+    });
+    if (!second.ok) throw new Error('expected success');
+    const secondSession = await adapter.login('second@example.com', 'secret123');
+    if (!secondSession.ok) throw new Error('expected success');
+
+    await adapter.updateUser(admin.user.id, { password: 'new-admin-password-1' });
+
+    expect(await adapter.validateSession(secondSession.token)).toBeTruthy();
+  });
+
+  it('propagates a database failure during session validation instead of returning null', async () => {
+    const db = new InMemoryDatabaseAdapter();
+    const adapter = new UsersCollectionAuthAdapter({ devMode: true }).init({ userDatabase: db });
+    const created = await adapter.createUser({
+      email: 'x@example.com',
+      password: 'secret123',
+      role: 'admin'
+    });
+    if (!created.ok) throw new Error('expected success');
+
+    db.findById = (async () => {
+      throw new Error('simulated db outage');
+    }) as typeof db.findById;
+
+    await expect(adapter.validateSession(created.token)).rejects.toThrow('simulated db outage');
+  });
+});
+
+// Spec 058 §7: two concurrency invariants — one closed atomically (§7a), one mitigated with a
+// documented, non-atomic best-effort compensation because the current `DatabaseAdapter` contract has
+// no conditional/compare-and-swap write to make it fully atomic (§7b).
+describe('Auth concurrency (spec 058 §7)', () => {
+  it('two concurrent first signups never both become admin (deterministic interleaving)', async () => {
+    const db = new InMemoryDatabaseAdapter();
+    const adapter = new UsersCollectionAuthAdapter({ devMode: true }).init({ userDatabase: db });
+    await adapter.syncSchema();
+
+    let hasAnyUserCalls = 0;
+    let releaseFirst = () => {};
+    const firstWaiting = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const originalFindMany = db.findMany.bind(db);
+    db.findMany = (async (opts: Parameters<typeof originalFindMany>[0]) => {
+      if (opts.collection === 'users' && opts.limit === 1 && !opts.where) {
+        hasAnyUserCalls++;
+        if (hasAnyUserCalls === 1) {
+          await firstWaiting;
+        } else if (hasAnyUserCalls === 2) {
+          releaseFirst();
+        }
+      }
+      return originalFindMany(opts);
+    }) as typeof db.findMany;
+
+    const [a, b] = await Promise.all([
+      adapter.signup({ email: 'racer-a@example.com', password: 'secret123' }),
+      adapter.signup({ email: 'racer-b@example.com', password: 'secret123' })
+    ]);
+
+    expect(a.ok).toBe(true);
+    expect(b.ok).toBe(true);
+    const roles = [a, b].map((r) => (r.ok ? r.user.role : undefined));
+    expect(roles.filter((role) => role === 'admin')).toHaveLength(1);
+    expect(roles.filter((role) => role === 'viewer')).toHaveLength(1);
+  });
+
+  it(
+    'two concurrent last-admin deletions never leave zero admins (bounded, non-atomic mitigation — ' +
+      'see updateUser/deleteUser doc comments for the residual gap this does not close)',
+    async () => {
+      const db = new InMemoryDatabaseAdapter();
+      const adapter = new UsersCollectionAuthAdapter({ devMode: true }).init({ userDatabase: db });
+      const a = await adapter.createUser({
+        email: 'race-admin-a@example.com',
+        password: 'secret123',
+        role: 'admin'
+      });
+      const b = await adapter.createUser({
+        email: 'race-admin-b@example.com',
+        password: 'secret123',
+        role: 'admin'
+      });
+      if (!a.ok || !b.ok) throw new Error('expected success');
+
+      // Force both operations' *pre-write* admin-count checks to overlap — the realistic race (two
+      // admins each removing the other at nearly the same time) — while every other `findMany` call
+      // (including each operation's own post-write recheck) passes straight through unmodified.
+      let preCheckCalls = 0;
+      let releaseBoth = () => {};
+      const bothSeen = new Promise<void>((resolve) => {
+        releaseBoth = resolve;
+      });
+      const originalFindMany = db.findMany.bind(db);
+      db.findMany = (async (opts: Parameters<typeof originalFindMany>[0]) => {
+        const isAdminCount =
+          opts.collection === 'users' &&
+          !!opts.where &&
+          JSON.stringify(opts.where) === JSON.stringify({ role: 'admin' });
+        if (isAdminCount) {
+          preCheckCalls++;
+          if (preCheckCalls <= 2) {
+            if (preCheckCalls === 2) releaseBoth();
+            await bothSeen;
+          }
+        }
+        return originalFindMany(opts);
+      }) as typeof db.findMany;
+
+      await Promise.allSettled([adapter.deleteUser(a.user.id), adapter.deleteUser(b.user.id)]);
+
+      const remainingAdmins = await db.findMany({
+        collection: 'users',
+        where: { role: 'admin' }
+      });
+      expect(remainingAdmins.length).toBeGreaterThanOrEqual(1);
+    }
+  );
 });

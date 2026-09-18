@@ -11,10 +11,10 @@ import {
   UniqueConstraintError,
   ValidationFailedError
 } from './errors.js';
-import { documentMatches, mergeWhere, resolveAccess } from './access.js';
+import { documentMatches, mergeWhere } from './access.js';
 import { validateSort, validateWhere } from './query-validation.js';
 import { applyAutoSlugs, applyFieldDefaults } from './defaults.js';
-import type { AccessDecision } from './access.js';
+import { checkAccess, statusConstraint } from './read-policy.js';
 import {
   runAfterChangeHooks,
   runAfterDeleteHooks,
@@ -29,7 +29,8 @@ import {
 } from './hooks.js';
 import { assertWritableFields, filterReadableFields, FieldAccessError } from './field-access.js';
 import { populateRecord, populateRecords } from './populate.js';
-import { createVersion, versionsEnabled } from './versions.js';
+import { createVersion, getVersion, versionsEnabled } from './versions.js';
+import type { RestoreVersionArgs } from './versions.js';
 import {
   isLocalizedCollection,
   storeLocalizedDocument,
@@ -40,6 +41,7 @@ import {
   handleCascadeDelete,
   handleSetNullOnDelete
 } from './relation-integrity.js';
+import type { RelationMutator } from './relation-integrity.js';
 
 /** A page of documents plus everything a paginator needs. */
 export interface PaginatedDocs<TDoc = DatabaseRecord> {
@@ -108,6 +110,12 @@ export interface CreateArgs extends BaseOperationArgs {
 export interface UpdateArgs extends BaseOperationArgs {
   id: string;
   data: Record<string, unknown>;
+  /**
+   * Overrides the default (unlabeled) version snapshot's label when this update creates one — used by
+   * {@link restoreVersion} so a restore creates exactly one version, labeled, instead of restoring
+   * through a second bespoke write path (spec 058 §2).
+   */
+  versionLabel?: string;
 }
 
 export interface DeleteArgs extends BaseOperationArgs {
@@ -137,71 +145,6 @@ async function runWrite<T>(collection: string, op: () => Promise<T>): Promise<T>
     if (isDbUniqueConstraintError(err)) throw new UniqueConstraintError(collection, err.fields);
     throw err;
   }
-}
-
-/**
- * Resolves the collection's access rule for an operation.
- *
- * A rule that is not configured yields `undefined`, which every caller treats as "allowed" — the
- * Local API has no route-level fallback to defer to, and the HTTP layer applies its own
- * `allowedRoles` gate *before* calling in.
- */
-async function checkAccess(
-  collection: CollectionDefinition,
-  operation: 'read' | 'create' | 'update' | 'delete',
-  args: {
-    user?: CmsUser | null;
-    overrideAccess?: boolean;
-    id?: string;
-    data?: Record<string, unknown>;
-    doc?: Record<string, unknown>;
-  }
-): Promise<AccessDecision> {
-  if (args.overrideAccess !== false) return { allowed: true };
-
-  const decision = await resolveAccess(collection.access?.[operation], {
-    user: args.user ?? null,
-    operation,
-    collection,
-    ...(args.id !== undefined && { id: args.id }),
-    ...(args.data !== undefined && { data: args.data }),
-    ...(args.doc !== undefined && { doc: args.doc })
-  });
-
-  if (decision === undefined) return { allowed: true };
-  if (!decision.allowed) throw new AccessDeniedError();
-  return decision;
-}
-
-/**
- * The `_status` constraint for a read. Anonymous callers only ever see published documents,
- * whatever they ask for.
- *
- * `defaultStatus` differs by operation, preserving spec 017's behaviour: a **list** stays
- * published-only unless the caller opts in (`?status=draft|all`), because a listing is the surface
- * that leaks unfinished content; a **single read by id** shows drafts to any authenticated caller,
- * since they had to know the id already.
- */
-function statusConstraint(
-  collection: CollectionDefinition,
-  status: DraftStatus | 'all' | undefined,
-  user: CmsUser | null,
-  overrideAccess: boolean,
-  defaultStatus: DraftStatus | 'all'
-): DatabaseWhere | undefined {
-  if (collection.drafts !== true) return undefined;
-
-  // Trusted server-side calls see everything unless they ask for a specific status.
-  if (overrideAccess) {
-    if (status === undefined || status === 'all') return undefined;
-    return { _status: status };
-  }
-
-  if (!user) return { _status: 'published' };
-
-  const effective = status ?? defaultStatus;
-  if (effective === 'all') return undefined;
-  return { _status: effective };
 }
 
 /**
@@ -633,7 +576,8 @@ export async function update(ctx: OperationContext, args: UpdateArgs): Promise<D
       collection: args.collection,
       documentId: args.id,
       data,
-      user
+      user,
+      ...(args.versionLabel !== undefined && { label: args.versionLabel })
     });
   }
 
@@ -652,6 +596,46 @@ export async function update(ctx: OperationContext, args: UpdateArgs): Promise<D
 
   await runAfterOperationHooks(collection, { operation: 'update', user, overrideAccess, result });
   return result;
+}
+
+/**
+ * Restores a document to a specific historical version — spec 058 §2. Unlike the pre-058
+ * implementation (which wrote through `ctx.adapters.database.update()` directly, bypassing access,
+ * validation, and hooks), this fetches the raw version snapshot and then calls this module's own
+ * `update()`, so a restore gets exactly the same update-access/row-policy/field-write/validation/hook
+ * pipeline a normal update gets, and creates exactly one labeled version (via `versionLabel`) instead
+ * of a second, bespoke version write.
+ *
+ * The version snapshot itself is always fetched unfiltered (`overrideAccess: true` on the internal
+ * `getVersion` call) — restore's authorization gate is `update()`'s own update-access check on the
+ * *current* document, exactly like calling `update()` directly would behave; there is no separate
+ * "can this caller read this document's history" gate for restore (see spec 058 §2 for the reasoning).
+ * A forbidden or invalid restore throws before `update()` ever reaches the adapter write, so both the
+ * current document and its history are left unchanged.
+ */
+export async function restoreVersion(
+  ctx: OperationContext,
+  args: RestoreVersionArgs
+): Promise<DatabaseRecord> {
+  const collection = getCollectionOrThrow(ctx, args.collection);
+  if (!versionsEnabled(collection)) {
+    throw new Error(`Collection '${args.collection}' does not have versions enabled`);
+  }
+
+  const version = await getVersion(ctx, {
+    collection: args.collection,
+    versionId: args.versionId,
+    overrideAccess: true
+  });
+
+  return update(ctx, {
+    collection: args.collection,
+    id: version.documentId,
+    data: version.data,
+    ...(args.user !== undefined && { user: args.user }),
+    ...(args.overrideAccess !== undefined && { overrideAccess: args.overrideAccess }),
+    versionLabel: `Restored from version ${version.versionNumber}`
+  });
 }
 
 const MEDIA_URL_PREFIX = '/api/media/';
@@ -677,6 +661,27 @@ export async function deleteDocument(
   ctx: OperationContext,
   args: DeleteArgs
 ): Promise<DatabaseRecord> {
+  return deleteDocumentInternal(ctx, args, new Set<string>());
+}
+
+/**
+ * The real implementation behind {@link deleteDocument}, plus every cascade-triggered dependent
+ * delete (spec 058 §5) — cascade's `RelationMutator.deleteDocument` calls straight back into this
+ * function with the same `visited` set, so a multi-level cascade chain runs the full pipeline (access,
+ * hooks, relation integrity) at every level. Cycle/diamond protection lives entirely on the *caller*
+ * side (`handleCascadeDelete`/`handleSetNullOnDelete` check `visited` before ever invoking the
+ * mutator — see that module) — this function marks its own key visited (below) precisely so those
+ * caller-side checks can see it, but does not re-check its own key at entry: by the time this function
+ * is reached through the mutator, the caller has already decided this key needs processing exactly
+ * once, and re-checking here would treat "the caller just claimed this key" as "already done" and skip
+ * the actual deletion — see this spec's implementation notes for the regression this caused.
+ */
+async function deleteDocumentInternal(
+  ctx: OperationContext,
+  args: DeleteArgs,
+  visited: Set<string>
+): Promise<DatabaseRecord> {
+  const key = `${args.collection}:${args.id}`;
   const collection = getCollectionOrThrow(ctx, args.collection);
   const user = args.user ?? null;
   const overrideAccess = args.overrideAccess !== false;
@@ -700,12 +705,25 @@ export async function deleteDocument(
     'beforeDelete hook'
   );
 
-  // Check relation integrity constraints
+  visited.add(key);
+
+  // Check relation integrity constraints (restrict, and required-field-on-set-null) before any
+  // mutation happens.
   await checkDeleteRestrictions(ctx, collection, args.id);
 
-  // Handle cascade and set-null before deleting
-  await handleCascadeDelete(ctx, collection, args.id);
-  await handleSetNullOnDelete(ctx, collection, args.id);
+  // Handle cascade and set-null before deleting — routed through this module's own
+  // `deleteDocument`/`update` via a `RelationMutator`, so dependent mutations get the full pipeline
+  // (access, field-write checks, validation, hooks, version snapshots) instead of a raw adapter write.
+  // Both run with `overrideAccess: true`: a cascade/set-null is a consequence of an already-authorized
+  // delete, the same way a database's own `ON DELETE CASCADE` doesn't re-run application ACL per
+  // cascaded row — a deliberate, documented choice, not an oversight (spec 058 §5).
+  const mutator: RelationMutator = {
+    deleteDocument: (a) => deleteDocumentInternal(ctx, { ...a, overrideAccess: true }, visited),
+    update: (a) => update(ctx, { ...a, overrideAccess: true })
+  };
+  const integrityOptions = { mutator, visited, ...(user !== null && { user }) };
+  await handleCascadeDelete(ctx, collection, args.id, integrityOptions);
+  await handleSetNullOnDelete(ctx, collection, args.id, integrityOptions);
 
   // The database delete must succeed — and only then does the underlying storage object get
   // removed. Deleting the object first (or on a rejected/failed database delete) would orphan the
@@ -737,6 +755,118 @@ export async function deleteDocument(
     result: existing
   });
   return existing;
+}
+
+export interface PreviewArgs extends BaseOperationArgs {
+  data: Record<string, unknown>;
+  id?: string;
+}
+
+/**
+ * A non-persistent simulation of a permitted create/update — spec 058 §3. Before this fix, preview
+ * read the raw adapter row and merged caller-supplied `data` with **no** access enforcement at all
+ * (no collection/row/field-write check, no draft-visibility check, no field-read projection): any
+ * caller who could reach the endpoint could preview (and see every hidden field of) any document,
+ * and could smuggle a forbidden field into the merged output because it was never persisted.
+ *
+ * Existing-document preview now requires the same **update** access an actual `update()` call would
+ * (row-level policy included) plus the same draft-visibility a normal single-document read applies —
+ * stricter than raw `update()` (which has no draft gate), because preview hands the full merged
+ * document back to the caller to render, unlike a blind write. New-document preview requires **create**
+ * access. Both require field-write access on every field in `data` when untrusted
+ * (`overrideAccess: false`), and project the returned document through the same field-read rules a
+ * normal read would (hidden fields never appear in the output). Depth-1 population forwards the
+ * caller's `user`/`overrideAccess`, so a populated target obeys the §4 population-visibility fix
+ * instead of always resolving as a trusted call.
+ *
+ * Zero adapter writes, zero version creation, zero committed-mutation hooks — unchanged from before
+ * this fix; this function never called `create()`/`update()`/`createVersion()`.  Full
+ * `validateCollection()` is deliberately not run: preview must be able to render an intentionally
+ * incomplete draft, not just a document that would actually pass validation.
+ */
+export async function preview(ctx: OperationContext, args: PreviewArgs): Promise<DatabaseRecord> {
+  const collection = getCollectionOrThrow(ctx, args.collection);
+  const user = args.user ?? null;
+
+  let existing: DatabaseRecord | null = null;
+  let previewData: Record<string, unknown>;
+
+  if (args.id) {
+    existing = await ctx.adapters.database.findById(args.collection, args.id);
+    if (!existing) throw notFound(args.collection, args.id);
+
+    const decision = await checkAccess(collection, 'update', {
+      user,
+      ...(args.overrideAccess !== undefined && { overrideAccess: args.overrideAccess }),
+      id: args.id,
+      data: args.data,
+      doc: existing
+    });
+    if (decision.where && !documentMatches(existing, decision.where)) {
+      throw notFound(args.collection, args.id);
+    }
+
+    // Draft visibility: a normal single-document read hides an inaccessible draft from an anonymous
+    // caller behind a 404 (never confirming the document exists) — preview must not be a back door
+    // around that, since it returns the full document body for the caller to render.
+    const draftStatus = statusConstraint(
+      collection,
+      undefined,
+      user,
+      args.overrideAccess !== false,
+      'all'
+    );
+    if (draftStatus && !documentMatches(existing, draftStatus)) {
+      throw notFound(args.collection, args.id);
+    }
+
+    if (args.overrideAccess === false) {
+      try {
+        await assertWritableFields(args.data, collection, user, 'update');
+      } catch (err) {
+        if (err instanceof FieldAccessError) throw new AccessDeniedError(err.message);
+        throw err;
+      }
+    }
+
+    previewData = { ...existing, ...args.data };
+  } else {
+    await checkAccess(collection, 'create', {
+      user,
+      ...(args.overrideAccess !== undefined && { overrideAccess: args.overrideAccess }),
+      data: args.data
+    });
+
+    if (args.overrideAccess === false) {
+      try {
+        await assertWritableFields(args.data, collection, user, 'create');
+      } catch (err) {
+        if (err instanceof FieldAccessError) throw new AccessDeniedError(err.message);
+        throw err;
+      }
+    }
+
+    previewData = args.data;
+  }
+
+  previewData = applyAutoSlugs(
+    collection,
+    applyFieldDefaults(collection, previewData),
+    existing ?? undefined
+  );
+
+  if (args.depth && args.depth > 0) {
+    previewData = await populateRecord(previewData, collection, ctx, {
+      user,
+      ...(args.overrideAccess !== undefined && { overrideAccess: args.overrideAccess })
+    });
+  }
+
+  if (args.overrideAccess === false) {
+    previewData = await filterReadableFields(previewData, collection, user);
+  }
+
+  return previewData;
 }
 
 export { populateRecord, populateRecords };

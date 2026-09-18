@@ -4,9 +4,12 @@ import type {
   RelationFieldOptions,
   UploadFieldOptions
 } from '@forge-cms/core';
-import type { DatabaseRecord } from '@forge-cms/db';
+import type { DatabaseRecord, DatabaseWhere } from '@forge-cms/db';
 import type { OperationContext } from './context.js';
 import { filterReadableFields } from './field-access.js';
+import { mergeWhere } from './access.js';
+import { checkAccess, statusConstraint } from './read-policy.js';
+import { AccessDeniedError } from './errors.js';
 
 interface RelationFieldEntry {
   name: string;
@@ -18,13 +21,19 @@ export interface PopulateOptions {
   user?: CmsUser | null;
   /**
    * Defaults to `true` (trusted Local API call, matching every other operation's default) — the
-   * populated document is embedded as-is. `false` runs it through `filterReadableFields` against
-   * *its own* collection's field-level `access.read` rules first, the same way the top-level
-   * document already is. Without this, `depth: 1` on a `relation`/`upload` field embedded the
-   * related document's raw row untouched — on a `defineUsersCollection()`/`withAuthFields()` target
-   * this leaked `passwordHash` (`access.read: []`, meant to be unreadable by anyone) into any
-   * anonymous or field-filtered response with a relation to `users`, e.g. `post.author -> users`
-   * (found building spec 055's external-consumer fixture, whose content model is exactly that shape).
+   * populated document is embedded as-is. `false` enforces the target collection's own read policy
+   * — collection-level access, row-level predicates, and draft visibility (spec 058 §4) — before the
+   * document is even fetched, then projects it through `filterReadableFields` against its field-level
+   * `access.read` rules, the same way the top-level document already is. Without the field-level half
+   * of this, `depth: 1` on a `relation`/`upload` field embedded the related document's raw row
+   * untouched — on a `defineUsersCollection()`/`withAuthFields()` target this leaked `passwordHash`
+   * (`access.read: []`, meant to be unreadable by anyone) into any anonymous or field-filtered
+   * response with a relation to `users`, e.g. `post.author -> users` (found building spec 055's
+   * external-consumer fixture). Field-level projection alone was not enough, though: a readable
+   * parent document does not make an unrelated *target* document readable — a public `post` could be
+   * readable while its related `author` (or a draft target) stayed private, and depth-1 population
+   * would still embed it in full. §4 closes that: a caller cannot see more of a populated target
+   * through population than they could by reading that target directly.
    */
   overrideAccess?: boolean;
 }
@@ -77,14 +86,38 @@ export async function populateRecords(
     }
     if (ids.size === 0) continue;
 
-    let related = await ctx.adapters.database.findMany({
-      collection: targetSlug,
-      where: { id: { in: Array.from(ids) } }
-    });
+    let related: DatabaseRecord[] = [];
     if (filterRelated) {
-      related = await Promise.all(
-        related.map((doc) => filterReadableFields(doc, targetCollection, user))
-      );
+      // A readable parent must not automatically grant visibility into the target collection: apply
+      // its own collection/row/draft read policy to the query itself, so an inaccessible or hidden
+      // target is never fetched in the first place (spec 058 §4) — not merely field-projected after
+      // the fact. A collection-level denial (`AccessDeniedError`) means every target of this field is
+      // hidden; `related` stays `[]` and every id in it resolves the same way a dangling/missing id
+      // already does (single → null, many → omitted) — inaccessible and missing are indistinguishable.
+      try {
+        const decision = await checkAccess(targetCollection, 'read', {
+          user,
+          overrideAccess: false
+        });
+        const idFilter: DatabaseWhere = { id: { in: Array.from(ids) } };
+        const where =
+          mergeWhere(
+            mergeWhere(idFilter, decision.where),
+            statusConstraint(targetCollection, undefined, user, false, 'all')
+          ) ?? idFilter;
+
+        related = await ctx.adapters.database.findMany({ collection: targetSlug, where });
+        related = await Promise.all(
+          related.map((doc) => filterReadableFields(doc, targetCollection, user))
+        );
+      } catch (err) {
+        if (!(err instanceof AccessDeniedError)) throw err;
+      }
+    } else {
+      related = await ctx.adapters.database.findMany({
+        collection: targetSlug,
+        where: { id: { in: Array.from(ids) } }
+      });
     }
     const byId = new Map(related.map((r) => [r.id as string, r]));
 

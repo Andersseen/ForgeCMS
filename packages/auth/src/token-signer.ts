@@ -10,6 +10,15 @@ interface TokenPayload {
   role?: string;
   roles?: string[];
   exp: number;
+  /**
+   * Opaque session-freshness marker (spec 058 §6) — `UsersCollectionAuthAdapter` embeds its user
+   * row's `_sessionVersion` here at issue time and compares it against the row's *current* value on
+   * every `validateSession()` call, so a password change (which bumps the row's version) invalidates
+   * every token issued before it. Every other token-signer-based adapter (`SignedTokenAuthAdapter`)
+   * never sets this, so it is simply absent from their tokens and ignored — this field only has
+   * meaning to the adapter that chooses to read it.
+   */
+  sv?: number;
 }
 
 export function base64UrlEncode(bytes: Uint8Array): string {
@@ -75,13 +84,18 @@ export function extractToken(request: Request): string | null {
   return extractBearerToken(request) ?? parseCookieToken(request);
 }
 
-export async function issueToken(secret: string, user: AuthUser): Promise<string> {
+export async function issueToken(
+  secret: string,
+  user: AuthUser,
+  sessionVersion?: number
+): Promise<string> {
   const payload: TokenPayload = {
     sub: user.id,
     ...(user.email !== undefined && { email: user.email }),
     ...(user.name !== undefined && { name: user.name }),
     ...(user.role !== undefined && { role: user.role }),
     ...(user.roles !== undefined && { roles: user.roles }),
+    ...(sessionVersion !== undefined && { sv: sessionVersion }),
     exp: Date.now() + TOKEN_TTL_MS
   };
   const payloadPart = base64UrlEncode(new TextEncoder().encode(JSON.stringify(payload)));
@@ -126,5 +140,9 @@ export async function validateSession(secret: string, token: string): Promise<Au
     ...(payload.role !== undefined && { role: payload.role }),
     ...(payload.roles !== undefined && { roles: payload.roles })
   };
-  return { user, expiresAt: new Date(payload.exp) };
+  return {
+    user,
+    expiresAt: new Date(payload.exp),
+    ...(payload.sv !== undefined && { sessionVersion: payload.sv })
+  };
 }

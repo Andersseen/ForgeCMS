@@ -79,6 +79,10 @@ describe('portable libSQL profile — full small-project server lifecycle', () =
     expect(updated['title']).toBe('Portable Post (updated)');
     expect(updated['_status']).toBe('published');
 
+    // Spec 058 §4: population enforces the *target* collection's own read policy. This app's `users`
+    // collection (`defineUsersCollection()`) defaults `access.read` to `user !== null` — anonymous
+    // cannot read a user row directly, so `depth: 1` on `posts.author -> users` must not expose one
+    // either, even though the post itself is public.
     const anonymousAfterPublish = await runtime.find({
       collection: 'posts',
       overrideAccess: false,
@@ -86,7 +90,17 @@ describe('portable libSQL profile — full small-project server lifecycle', () =
       depth: 1
     });
     expect(anonymousAfterPublish.docs).toHaveLength(1);
-    const author = anonymousAfterPublish.docs[0]?.['author'] as Record<string, unknown> | undefined;
+    expect(anonymousAfterPublish.docs[0]?.['author']).toBeNull();
+
+    const authenticatedAfterPublish = await runtime.find({
+      collection: 'posts',
+      overrideAccess: false,
+      user: admin.user,
+      depth: 1
+    });
+    const author = authenticatedAfterPublish.docs[0]?.['author'] as
+      | Record<string, unknown>
+      | undefined;
     expect(author?.['email']).toBe('owner@tiny.test');
 
     await runtime.delete({

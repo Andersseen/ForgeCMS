@@ -74,6 +74,11 @@ describe('real local D1 — full small-project server lifecycle', () => {
       data: { _status: 'published' }
     });
 
+    // Spec 058 §4: population enforces the *target* collection's own read policy, not just the
+    // parent's. `defineUsersCollection()`'s default `access.read` is `user !== null` — an anonymous
+    // caller cannot read a `users` row directly, so `depth: 1` on `posts.author -> users` must not
+    // expose it either, even though the post itself is public. This is real local-D1 evidence for
+    // that fix, not just an in-memory unit test: a readable parent must not leak an unreadable target.
     const anonymousAfterPublish = await runtime.find({
       collection: 'posts',
       overrideAccess: false,
@@ -81,7 +86,16 @@ describe('real local D1 — full small-project server lifecycle', () => {
       depth: 1
     });
     expect(anonymousAfterPublish.docs).toHaveLength(1);
-    const author = anonymousAfterPublish.docs[0]?.['author'] as Record<string, unknown> | undefined;
+    expect(anonymousAfterPublish.docs[0]?.['author']).toBeNull();
+
+    // The same relation populates normally for a caller who *can* read the `users` collection.
+    const editorAfterPublish = await runtime.find({
+      collection: 'posts',
+      overrideAccess: false,
+      user: editor.user,
+      depth: 1
+    });
+    const author = editorAfterPublish.docs[0]?.['author'] as Record<string, unknown> | undefined;
     expect(author?.['email']).toBe('owner@d1.test');
 
     // Real D1 unique index on `slug`, not just an in-process pre-check.

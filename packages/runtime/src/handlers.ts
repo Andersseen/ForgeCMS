@@ -792,84 +792,43 @@ export async function handleRestoreVersion<TEnv = unknown>(
 
 // --- preview --------------------------------------------------------------------------------
 
-export interface PreviewOptions {
-  /** Allow previewing drafts without authentication (for preview tokens). */
-  allowDraftPreview?: boolean;
-}
-
 /**
- * Generates a preview of a document by merging stored data with unsaved changes.
- * Useful for live preview in the admin UI before saving.
+ * A non-persistent simulation of a permitted create/update (spec 058 §3) — delegates entirely to
+ * `runtime.preview()`, which enforces the same access/field-projection policy `create`/`update`
+ * already get. Previously this duplicated preview end-to-end: it read the raw adapter row and merged
+ * caller-supplied data with **no** access enforcement of any kind (any authenticated caller, of any
+ * role, could preview — and see every hidden field of — any document in any collection) — a second,
+ * diverging implementation of the exact bug `runtime.preview()` itself had. The caller is resolved
+ * through the same `resolveRequest()` every other collection route uses, so CSRF, `allowedRoles`, and
+ * a collection's own `access.create`/`access.update` rule all apply exactly as they would for a real
+ * write. The previous `allowDraftPreview` escape hatch (never wired into any shipped route) is
+ * removed — it existed to let an unauthenticated caller bypass auth entirely for a "preview token"
+ * feature this codebase does not have; anonymous preview is still possible the same way anonymous
+ * create/update is possible: only if the collection's own access rule allows it.
  */
 export async function handlePreview<TEnv = unknown>(
   context: ApiContext<TEnv>,
-  options: HandlerOptions<TEnv> & PreviewOptions
+  options: HandlerOptions<TEnv>
 ): Promise<Response> {
-  const collectionSlug = context.params?.['collection'];
-  if (!collectionSlug) {
-    return errorResponse('INVALID_INPUT', 'Missing collection parameter', 400);
-  }
-
-  const collection = options.runtime.getCollection(collectionSlug);
-  if (!collection) {
-    return errorResponse('NOT_FOUND', `Collection '${collectionSlug}' not found`, 404);
-  }
-
-  try {
-    assertCsrfSafe(context.request);
-  } catch (err) {
-    return toErrorResponse(err, null);
-  }
-
-  let user: AuthUser | null = null;
-  try {
-    user = await options.runtime.adapters.auth.requireAuth(context.request);
-  } catch (err) {
-    if (!(err instanceof ForgeAuthError)) return toErrorResponse(err, null);
-    // Preview might be allowed without auth for draft preview
-    if (!options.allowDraftPreview) {
-      return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
-    }
-  }
+  const documentId = context.params?.['id'];
+  const resolved = await resolveRequest(context, options, documentId ? 'update' : 'create', false);
+  if (resolved instanceof Response) return resolved;
+  const { collectionSlug, user } = resolved;
 
   try {
     const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
-    const documentId = context.params?.['id'];
     const depth = parseDepth(new URL(context.request.url));
 
-    let previewData: Record<string, unknown>;
-    let existing: Record<string, unknown> | null = null;
+    const doc = await options.runtime.preview({
+      collection: collectionSlug,
+      data: body,
+      ...(documentId !== undefined && { id: documentId }),
+      depth,
+      user,
+      overrideAccess: false
+    });
 
-    if (documentId) {
-      // Preview existing document with changes
-      existing = await options.runtime.adapters.database.findById(collectionSlug, documentId);
-      if (!existing) {
-        return errorResponse('NOT_FOUND', `Document '${documentId}' not found`, 404);
-      }
-      previewData = { ...existing, ...body };
-    } else {
-      // Preview new document
-      previewData = body;
-    }
-
-    // Apply field defaults and auto-slugs
-    const { applyFieldDefaults, applyAutoSlugs } = await import('./defaults.js');
-    previewData = applyAutoSlugs(
-      collection,
-      applyFieldDefaults(collection, previewData),
-      existing ?? undefined
-    );
-
-    // Populate relations if depth > 0
-    if (depth > 0) {
-      const { populateRecord } = await import('./populate.js');
-      previewData = await populateRecord(previewData, collection, options.runtime, {
-        user,
-        overrideAccess: false
-      });
-    }
-
-    return jsonResponse({ data: previewData });
+    return jsonResponse({ data: doc });
   } catch (err) {
     return toErrorResponse(err, user);
   }

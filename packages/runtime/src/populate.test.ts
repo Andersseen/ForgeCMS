@@ -203,4 +203,184 @@ describe('populateRecords', () => {
       expect(populatedAuthor.secret).toBe('visible-to-trusted-server-code');
     });
   });
+
+  // Spec 058 §4: a readable parent must not automatically grant visibility into the target
+  // collection. Field-level projection (above) is necessary but not sufficient.
+  describe('target collection read/row/draft visibility (spec 058)', () => {
+    function createRuntimeWithPrivateTarget() {
+      const authors = defineCollection({
+        slug: 'authors',
+        drafts: true,
+        access: {
+          // Row-level: only the author (matched by `ownerId`) may read their own row.
+          read: ({ user }) => (user ? { ownerId: user.id } : false)
+        },
+        fields: {
+          name: defineField.text({ required: true }),
+          ownerId: defineField.text()
+        }
+      });
+      const media = defineCollection({
+        slug: 'media',
+        upload: true,
+        access: { read: () => false },
+        fields: {
+          filename: defineField.text(),
+          url: defineField.text()
+        }
+      });
+      const posts = defineCollection({
+        slug: 'posts',
+        fields: {
+          title: defineField.text({ required: true }),
+          author: defineField.relation({ collection: 'authors' }),
+          cover: defineField.upload({ collection: 'media' })
+        }
+      });
+
+      const runtime = new ForgeCmsRuntime({
+        collections: [authors, media, posts],
+        adapters: {
+          database: new InMemoryDatabaseAdapter(),
+          auth: new InMemoryAuthAdapter(),
+          storage: new InMemoryStorageAdapter()
+        }
+      });
+      runtime.init();
+      return { runtime, posts };
+    }
+
+    it('hides a row-restricted relation target from an anonymous caller (null, not an error)', async () => {
+      const { runtime, posts } = createRuntimeWithPrivateTarget();
+      const author = await runtime.adapters.database.create('authors', {
+        name: 'Ada',
+        ownerId: 'owner-1'
+      });
+      const post = await runtime.adapters.database.create('posts', {
+        title: 'Hi',
+        author: author.id
+      });
+
+      const [populated] = await populateRecords([post], posts, runtime, {
+        user: null,
+        overrideAccess: false
+      });
+      expect(populated?.author).toBeNull();
+    });
+
+    it('reveals a row-restricted relation target to the authenticated owner', async () => {
+      const { runtime, posts } = createRuntimeWithPrivateTarget();
+      const author = await runtime.adapters.database.create('authors', {
+        name: 'Ada',
+        ownerId: 'owner-1'
+      });
+      const post = await runtime.adapters.database.create('posts', {
+        title: 'Hi',
+        author: author.id
+      });
+
+      const [populated] = await populateRecords([post], posts, runtime, {
+        user: { id: 'owner-1', email: 'a@example.com' },
+        overrideAccess: false
+      });
+      expect((populated?.author as Record<string, unknown>)?.name).toBe('Ada');
+    });
+
+    it('does not reveal a row-restricted target to a *different* authenticated user', async () => {
+      const { runtime, posts } = createRuntimeWithPrivateTarget();
+      const author = await runtime.adapters.database.create('authors', {
+        name: 'Ada',
+        ownerId: 'owner-1'
+      });
+      const post = await runtime.adapters.database.create('posts', {
+        title: 'Hi',
+        author: author.id
+      });
+
+      const [populated] = await populateRecords([post], posts, runtime, {
+        user: { id: 'someone-else', email: 'b@example.com' },
+        overrideAccess: false
+      });
+      expect(populated?.author).toBeNull();
+    });
+
+    it('hides a draft target from an anonymous caller and reveals it to an authenticated one', async () => {
+      const { runtime, posts } = createRuntimeWithPrivateTarget();
+      const author = await runtime.adapters.database.create('authors', {
+        name: 'Ada',
+        ownerId: 'owner-1',
+        _status: 'draft'
+      });
+      const post = await runtime.adapters.database.create('posts', {
+        title: 'Hi',
+        author: author.id
+      });
+
+      const anon = await populateRecords([post], posts, runtime, {
+        user: null,
+        overrideAccess: false
+      });
+      expect(anon[0]?.author).toBeNull();
+
+      const owner = await populateRecords([post], posts, runtime, {
+        user: { id: 'owner-1', email: 'a@example.com' },
+        overrideAccess: false
+      });
+      expect((owner[0]?.author as Record<string, unknown>)?.name).toBe('Ada');
+    });
+
+    it('hides an unreadable upload relation target the same way as a relation target', async () => {
+      const { runtime, posts } = createRuntimeWithPrivateTarget();
+      const file = await runtime.adapters.database.create('media', {
+        filename: 'photo.jpg',
+        url: '/api/media/media/photo.jpg'
+      });
+      const post = await runtime.adapters.database.create('posts', { title: 'Hi', cover: file.id });
+
+      const [populated] = await populateRecords([post], posts, runtime, {
+        user: { id: 'owner-1', email: 'a@example.com' },
+        overrideAccess: false
+      });
+      expect(populated?.cover).toBeNull();
+    });
+
+    it('trusted (overrideAccess: true) calls still see private/draft targets, unaffected', async () => {
+      const { runtime, posts } = createRuntimeWithPrivateTarget();
+      const author = await runtime.adapters.database.create('authors', {
+        name: 'Ada',
+        ownerId: 'owner-1',
+        _status: 'draft'
+      });
+      const post = await runtime.adapters.database.create('posts', {
+        title: 'Hi',
+        author: author.id
+      });
+
+      const [populated] = await populateRecords([post], posts, runtime);
+      expect((populated?.author as Record<string, unknown>)?.name).toBe('Ada');
+    });
+
+    it('does not reveal whether a target is missing versus inaccessible (identical null shape)', async () => {
+      const { runtime, posts } = createRuntimeWithPrivateTarget();
+      const author = await runtime.adapters.database.create('authors', {
+        name: 'Ada',
+        ownerId: 'owner-1'
+      });
+      const dangling = await runtime.adapters.database.create('posts', {
+        title: 'Dangling',
+        author: 'does-not-exist'
+      });
+      const inaccessible = await runtime.adapters.database.create('posts', {
+        title: 'Inaccessible',
+        author: author.id
+      });
+
+      const results = await populateRecords([dangling, inaccessible], posts, runtime, {
+        user: null,
+        overrideAccess: false
+      });
+      expect(results[0]?.author).toBeNull();
+      expect(results[1]?.author).toBeNull();
+    });
+  });
 });

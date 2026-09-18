@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { defineField, defineGlobal } from '@forge-cms/core';
+import { defineCollection, defineField, defineGlobal } from '@forge-cms/core';
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
 import { InMemoryAuthAdapter } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
@@ -192,5 +192,95 @@ describe('Globals', () => {
       const response = await handleGlobalRead(context, { runtime });
       expect(response.status).toBe(404);
     });
+  });
+});
+
+// Spec 058 §8: globals must not accept `depth` and silently ignore it, and a draft global must not be
+// readable by an anonymous caller — both previously true (F11).
+describe('Global draft visibility and depth (spec 058)', () => {
+  let runtime: ForgeCmsRuntime;
+
+  beforeEach(async () => {
+    runtime = createTestRuntime();
+    runtime.init();
+    await runtime.syncSchema();
+  });
+
+  it('hides a draft global from an anonymous/untrusted caller (resolves like "never configured")', async () => {
+    await runtime.updateGlobalDocument({
+      global: 'draft_global',
+      data: { title: 'Unfinished', _status: 'draft' }
+    });
+
+    const anon = await runtime.getGlobalDocument({
+      global: 'draft_global',
+      overrideAccess: false
+    });
+    expect(anon).toBeNull();
+
+    const authed = await runtime.getGlobalDocument({
+      global: 'draft_global',
+      user: { id: 'u1', email: 'u@example.com' },
+      overrideAccess: false
+    });
+    expect(authed?.title).toBe('Unfinished');
+
+    // Trusted Local API calls are unaffected.
+    const trusted = await runtime.getGlobalDocument({ global: 'draft_global' });
+    expect(trusted?.title).toBe('Unfinished');
+  });
+
+  it('reveals a published global to an anonymous caller as before', async () => {
+    await runtime.updateGlobalDocument({
+      global: 'draft_global',
+      data: { title: 'Live', _status: 'published' }
+    });
+
+    const anon = await runtime.getGlobalDocument({
+      global: 'draft_global',
+      overrideAccess: false
+    });
+    expect(anon?.title).toBe('Live');
+  });
+
+  it('populates a relation field when depth: 1 is requested instead of ignoring it', async () => {
+    // Build a dedicated runtime whose global actually has a relation field to prove population.
+    const people = defineCollection({
+      slug: 'people',
+      fields: { name: defineField.text({ required: true }) }
+    });
+    const siteSettings = defineGlobal({
+      slug: 'settings_with_relation',
+      fields: {
+        title: defineField.text({ required: true }),
+        owner: defineField.relation({ collection: 'people' })
+      }
+    });
+    const relRuntime = new ForgeCmsRuntime({
+      collections: [people],
+      globals: [siteSettings],
+      adapters: {
+        database: new InMemoryDatabaseAdapter(),
+        auth: new InMemoryAuthAdapter(),
+        storage: new InMemoryStorageAdapter()
+      }
+    });
+    relRuntime.init();
+    await relRuntime.syncSchema();
+
+    const owner = await relRuntime.create({ collection: 'people', data: { name: 'Ada' } });
+    await relRuntime.updateGlobalDocument({
+      global: 'settings_with_relation',
+      data: { title: 'Site', owner: owner.id }
+    });
+
+    const withoutDepth = await relRuntime.getGlobalDocument({ global: 'settings_with_relation' });
+    expect(withoutDepth?.owner).toBe(owner.id);
+
+    const withDepth = await relRuntime.getGlobalDocument({
+      global: 'settings_with_relation',
+      depth: 1
+    });
+    expect((withDepth?.owner as Record<string, unknown>)?.name).toBe('Ada');
   });
 });

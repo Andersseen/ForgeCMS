@@ -1,11 +1,72 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-17.**
+> **Last updated: 2026-09-18.**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Foundation hardening / runtime policy consistency (spec 058, 2026-09-18)
+
+A maintainer-directed hardening pass, not a feature sprint — re-verified `docs/roadmap/v1/AUDIT.md`'s
+F04–F11 findings against current source (all confirmed still true) and fixed the confirmed ones by
+consolidating alternate content paths onto the existing Local API pipeline. See
+[docs/specs/058-foundation-hardening-runtime-policy-consistency.md](specs/058-foundation-hardening-runtime-policy-consistency.md)
+for full design/rationale. Summary:
+
+- **`@forge-cms/runtime`**: extracted shared `checkAccess`/`statusConstraint` into a new
+  `read-policy.ts` (no behavior change) so alternate paths reuse the same policy `find`/`findByID`
+  use, instead of reimplementing it. `listVersions`/`getVersion` now gate on the owning document's
+  current read access/row policy/draft visibility and project field-level hidden values out of
+  returned snapshots (previously: no enforcement at all). `restoreVersion` moved into `operations.ts`
+  and now routes through the module's own `update()` (access, field-write checks, validation, hooks,
+  one labeled version) instead of writing through the adapter directly. `preview()` (Local API and
+  HTTP) now enforces create/update access, field-write access, and field-read projection, and forwards
+  caller identity into population; `handlePreview` now delegates to `preview()` instead of duplicating
+  the same (previously unenforced) logic, and its unused `allowDraftPreview` option is gone.
+  `populate.ts` now enforces the _target_ collection's own read/row/draft policy before embedding it,
+  not just field-level projection — a public parent no longer leaks a private/draft target.
+  `relation-integrity.ts` no longer skips same-collection (self) relations, uses a real `containsValue`
+  query instead of a full-table scan for many-relation lookups, routes cascade/set-null through the
+  real delete/update pipeline (with cycle protection via a shared visited set) instead of raw adapter
+  writes, and rejects `set-null` on a `required` field before any mutation. `globals.ts` now enforces
+  draft visibility on read and wires `depth: 1` to real population instead of silently ignoring it.
+- **`@forge-cms/auth`** (`UsersCollectionAuthAdapter`): sessions are now re-validated against the
+  current user row on every request (role/name changes take effect immediately, a deleted user's
+  session is invalidated, a password change invalidates every session issued before it, via a new
+  `_sessionVersion` field). The first-admin bootstrap race is closed atomically using a unique-index
+  claim in a new `_forge_bootstrap` collection, scoped per users-collection. The last-admin removal
+  race is narrowed with a post-write re-verify-and-compensate — **explicitly not a full fix**: the
+  current `DatabaseAdapter` contract has no conditional/compare-and-swap write, so a narrow residual
+  race remains (documented on `updateUser`/`deleteUser`, spec 058 §7b) pending a future H01-style
+  contract primitive.
+- **`@forge-cms/angular`**: `ForgeCmsConfig.authBaseUrl` (default `/api/auth`, matching every existing
+  literal) lets a host mounted under a custom path configure the auth transport the way `baseUrl`
+  already configures content; `getCollections()` now preserves the server's Forge error code/message
+  instead of throwing a generic `Error`.
+- **CI**: `pnpm test:libsql`, `pnpm e2e:tiny-project`, and `pnpm e2e:demo` are now part of the required
+  `checks` job (previously real suites that existed but were not release-gating).
+- **Coverage/contract baseline**: `@vitest/coverage-v8` added (the root config referenced a coverage
+  reporter with no provider installed, so it silently measured nothing); `vitest.config.ts` now sets
+  real thresholds scoped to `packages/*/src` (measured baseline 2026-09-18: ~66.8% statements / 70.3%
+  branches / 59.4% functions / 67.3% lines — `packages/admin`'s UI components are the largest known
+  gap, pre-existing per AUDIT.md finding F17, not fixed here). A new `scripts/check-public-api.mjs`
+  (`pnpm check:api` / `check:api:update`) snapshots every published package's exported symbol names
+  against `api-baseline/*.json`, now wired into CI, so an accidental removed/renamed export is visible
+  before publishing.
+- **Real bugs found by these fixes, not just theorized**: `apps/tiny-project`'s real-D1 and
+  real-libSQL lifecycle tests, and `scripts/verify-release.mjs`'s packed-consumer check, all asserted
+  that an **anonymous** caller could see a populated `post.author -> users` relation's email —
+  `defineUsersCollection()`'s own default `access.read` (`user !== null`) says an anonymous caller
+  cannot read a `users` row at all, so this was the exact population bypass this spec fixes, caught
+  immediately by real backend evidence once the fix landed. All three were corrected to assert
+  anonymous sees `null` and an authenticated caller still sees the populated author.
+- **Verified**: `pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build`,
+  `pnpm test:cloudflare`, `pnpm test:libsql`, `pnpm release:verify`, `pnpm check:api` all green.
+  **Not verified in this environment**: `pnpm e2e:www`/`e2e:tiny-project`/`e2e:demo` — no Playwright
+  browser binaries available in this sandbox (no network to install them); the CI wiring is in place
+  but unexecuted here. No real remote Cloudflare deployment was touched.
 
 ## Production fix: duplicate Angular bundled via mismatched peer deps (2026-09-17)
 
