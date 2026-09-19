@@ -38,6 +38,15 @@ export {
 } from './where.js';
 export { assertValidWriteCondition } from './write-condition.js';
 export {
+  ATOMIC_WRITE_MAX_OPERATIONS,
+  ATOMIC_WRITE_REQUIRE_APPLIED_SQL,
+  AtomicWriteConditionError,
+  isAtomicWriteConditionError,
+  assertValidAtomicWrite,
+  toAtomicWriteError,
+  atomicWriteMustApply
+} from './atomic-write.js';
+export {
   UniqueConstraintError,
   isUniqueConstraintError,
   parseSqliteUniqueConstraintMessage,
@@ -91,6 +100,41 @@ export interface ConditionalDeleteResult {
   applied: boolean;
 }
 
+/**
+ * One write of an {@link DatabaseAdapter.atomicWrite} batch (spec 060). Each mirrors the adapter method
+ * of the same name, so "a batch of X is calling X in order, atomically" is the whole explanation. Pure
+ * data: there is no way to run code between operations.
+ */
+export type AtomicWriteOperation<TRecord extends DatabaseRecord = DatabaseRecord> =
+  | { type: 'create'; collection: string; data: TRecord }
+  | { type: 'update'; collection: string; id: string; data: Partial<TRecord> }
+  | { type: 'delete'; collection: string; id: string }
+  | {
+      type: 'updateIf';
+      collection: string;
+      id: string;
+      data: Partial<TRecord>;
+      condition: WriteCondition;
+      /** Fail (and roll back) the whole batch when this write does not apply. Default `false`: `applied: false` is a valid result. */
+      requireApplied?: boolean;
+    }
+  | {
+      type: 'deleteIf';
+      collection: string;
+      id: string;
+      condition: WriteCondition;
+      /** Fail (and roll back) the whole batch when this write does not apply. Default `false`: `applied: false` is a valid result. */
+      requireApplied?: boolean;
+    };
+
+/** Result of one operation, in the same position and with the same `type` as the input operation. */
+export type AtomicWriteResult<TRecord extends DatabaseRecord = DatabaseRecord> =
+  | { type: 'create'; record: TRecord }
+  | { type: 'update'; record: TRecord }
+  | { type: 'delete' }
+  | ({ type: 'updateIf' } & ConditionalUpdateResult<TRecord>)
+  | ({ type: 'deleteIf' } & ConditionalDeleteResult);
+
 export interface DatabaseAdapter<TRecord extends DatabaseRecord = DatabaseRecord> {
   readonly name: string;
   init(env?: unknown): this;
@@ -137,5 +181,30 @@ export interface DatabaseAdapter<TRecord extends DatabaseRecord = DatabaseRecord
     id: string,
     condition: WriteCondition
   ): Promise<ConditionalDeleteResult>;
+  /**
+   * Atomic write batch (spec 060): runs `operations` in order and **either commits all of them or none**.
+   * Declarative and database-only — not a callback transaction, and never spans object storage.
+   *
+   * - Success → one result per operation, same order/length as the input (empty batch → `[]`, no I/O).
+   *   Later operations observe the effects of earlier ones. Records are hydrated as the single calls do.
+   * - `update` of a missing row, or a `requireApplied` conditional that does not apply → rejects with
+   *   `AtomicWriteConditionError`. Without `requireApplied`, `updateIf`/`deleteIf` report `applied: false`
+   *   (spec 059) and the rest of the batch still commits. `delete` of a missing row is a no-op.
+   * - Unique-index violation, including between two operations of the batch → `UniqueConstraintError`
+   *   (`collection` names the table that conflicted). Nothing persisted.
+   * - Invalid input (more than `ATOMIC_WRITE_MAX_OPERATIONS`, malformed operation, bad `others`, and on
+   *   SQL adapters an unregistered collection or unknown column) rejects before anything is written.
+   * - Any other failure rejects; SQL backends roll back. Never reported as a result.
+   *
+   * Retry: the errors above mean "known rolled back". A network failure after the request left the
+   * process is outcome-unknown — do not blindly retry; supply your own unique keys (on SQL adapters, ids too) so a retry is
+   * recognisable. No exactly-once promise.
+   *
+   * Atomicity: libSQL (`client.batch(…, 'write')`), D1 (`batch()`), InMemory (staged copy published in
+   * one synchronous turn — one adapter instance/process only). Not atomic across calls.
+   */
+  atomicWrite(
+    operations: readonly AtomicWriteOperation<TRecord>[]
+  ): Promise<AtomicWriteResult<TRecord>[]>;
   syncSchema(collections: CollectionDefinition[]): Promise<void>;
 }

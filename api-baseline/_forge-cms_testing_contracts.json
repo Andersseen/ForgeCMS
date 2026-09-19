@@ -1,4 +1,9 @@
 [
+  "AtomicWriteContractOptions",
+  "FirstAdminContender",
+  "FirstAdminDatabase",
+  "FirstAdminHarnessFactory",
+  "FirstAdminUsers",
   "LastAdminContender",
   "LastAdminDatabase",
   "LastAdminHarness",
@@ -8,10 +13,12 @@
   "createWriteGate",
   "runAnalyticsWriterContractTests",
   "runAuthAdapterContractTests",
+  "runDatabaseAdapterAtomicWriteContractTests",
   "runDatabaseAdapterConditionalWriteContractTests",
   "runDatabaseAdapterConstraintContractTests",
   "runDatabaseAdapterContractTests",
   "runDatabaseAdapterQueryContractTests",
+  "runFirstAdminBootstrapContractTests",
   "runLastAdminConcurrencyContractTests",
   "runStorageAdapterContractTests"
 ]

@@ -5,6 +5,7 @@ import {
   runDatabaseAdapterQueryContractTests
 } from '@forge-cms/testing/contracts';
 import { ApiKeyAuthAdapter } from '@forge-cms/auth';
+import { AtomicWriteConditionError, UniqueConstraintError } from '@forge-cms/db';
 import { D1DatabaseAdapter } from './d1.adapter.js';
 import type { D1Database, D1PreparedStatement, D1Result } from './bindings.js';
 
@@ -1050,5 +1051,188 @@ describe('D1DatabaseAdapter conditional writes — emitted SQL (spec 059)', () =
       adapter.deleteIf('cw_people', 'u1', { keepAtLeast: { where: { role: 'admin' }, others: -1 } })
     ).rejects.toThrow(RangeError);
     expect(sent).toHaveLength(0);
+  });
+});
+
+/**
+ * Spec 060. As with the conditional writes above, the unit-test mock cannot run the guard SQL, so the
+ * contract evidence for `atomicWrite` is the real-D1 (workerd) suite in `test/workers/d1-atomic-write.test.ts`.
+ * What a unit test can pin down without a SQL engine is what the adapter *sends* — one `batch()`, the
+ * statements in operation order with a guard only after must-apply operations, bindings in placeholder
+ * order — and how a failed batch's error is classified.
+ */
+describe('D1DatabaseAdapter atomicWrite — emitted batch (spec 060)', () => {
+  interface Sent {
+    sql: string;
+    bindings: unknown[];
+  }
+
+  function capturingBatchD1(outcome: () => Promise<{ results: unknown[]; success: boolean }[]>) {
+    const batches: Sent[][] = [];
+    const perStatement: string[] = [];
+    const entries = new WeakMap<D1PreparedStatement, Sent>();
+    const db: D1Database = {
+      prepare(sql: string) {
+        const entry: Sent = { sql, bindings: [] };
+        const statement: D1PreparedStatement = {
+          bind(...values: unknown[]) {
+            entry.bindings = values;
+            return statement;
+          },
+          first: () => {
+            perStatement.push(sql);
+            return Promise.resolve(null);
+          },
+          run: () => {
+            perStatement.push(sql);
+            return Promise.resolve({ results: [], success: true });
+          },
+          all: <T>() => {
+            if (!sql.startsWith('PRAGMA')) perStatement.push(sql);
+            return Promise.resolve({ results: [], success: true }) as Promise<D1Result<T>>;
+          },
+          raw: () => Promise.resolve([])
+        };
+        entries.set(statement, entry);
+        return statement;
+      },
+      exec: () => Promise.resolve({ count: 0, duration: 0 }),
+      batch: <T>(statements: D1PreparedStatement[]) => {
+        batches.push(statements.map((s) => entries.get(s)!));
+        return outcome() as Promise<D1Result<T>[]>;
+      }
+    };
+    return { db, batches, perStatement };
+  }
+
+  const slots = defineCollection({
+    slug: 'ab_slots',
+    fields: { key: defineField.text({ unique: true }), active: defineField.boolean() }
+  });
+
+  async function adapterOver(outcome: () => Promise<{ results: unknown[]; success: boolean }[]>) {
+    const captured = capturingBatchD1(outcome);
+    const adapter = new D1DatabaseAdapter().init({ DB: captured.db });
+    await adapter.syncSchema([slots]);
+    captured.perStatement.length = 0;
+    return { adapter, ...captured };
+  }
+
+  it('sends ONE batch: statements in operation order, a guard only after must-apply operations', async () => {
+    const { adapter, batches, perStatement } = await adapterOver(() =>
+      Promise.resolve([
+        { results: [{ id: 's1', key: 'k', active: 1 }], success: true },
+        { results: [{ id: 's1', key: 'k', active: 0 }], success: true },
+        { results: [{ 'abs(...)': 0 }], success: true },
+        { results: [], success: true },
+        { results: [], success: true },
+        { results: [{ id: 's1' }], success: true },
+        { results: [{ 'abs(...)': 0 }], success: true }
+      ])
+    );
+
+    const results = await adapter.atomicWrite([
+      { type: 'create', collection: 'ab_slots', data: { id: 's1', key: 'k', active: true } },
+      { type: 'update', collection: 'ab_slots', id: 's1', data: { active: false } },
+      { type: 'delete', collection: 'ab_slots', id: 'nobody' },
+      { type: 'updateIf', collection: 'ab_slots', id: 's1', data: { key: 'z' }, condition: {} },
+      {
+        type: 'deleteIf',
+        collection: 'ab_slots',
+        id: 's1',
+        condition: { targetMatches: { key: 'k' } },
+        requireApplied: true
+      }
+    ]);
+
+    expect(perStatement).toEqual([]); // nothing executed on its own
+    expect(batches).toHaveLength(1);
+    const [batch] = batches;
+    expect(batch!.map((s) => s.sql.split(' ').slice(0, 3).join(' '))).toEqual([
+      'INSERT INTO "ab_slots"',
+      'UPDATE "ab_slots" SET',
+      'SELECT abs(CASE WHEN', // guard after the plain update
+      'DELETE FROM "ab_slots"',
+      'UPDATE "ab_slots" SET', // updateIf, not required: no guard
+      'DELETE FROM "ab_slots"',
+      'SELECT abs(CASE WHEN' // guard after requireApplied deleteIf
+    ]);
+    expect(batch![0]!.sql).toMatch(/\) RETURNING \*$/);
+    expect(batch![5]!.sql).toBe(
+      'DELETE FROM "ab_slots" WHERE "id" = ? AND ("key" = ?) RETURNING "id"'
+    );
+    expect(batch![5]!.bindings).toEqual(['s1', 'k']);
+    expect(batch![1]!.bindings.slice(1)).toEqual([0, 's1']); // SET active (boolean → 0), WHERE id
+
+    // Results are read from the statement's own position, skipping the guards.
+    expect(results.map((r) => r.type)).toEqual([
+      'create',
+      'update',
+      'delete',
+      'updateIf',
+      'deleteIf'
+    ]);
+    expect(results[0]).toMatchObject({ record: { id: 's1', active: true } });
+    expect(results[1]).toMatchObject({ record: { active: false } });
+    expect(results[3]).toEqual({ type: 'updateIf', applied: false });
+    expect(results[4]).toEqual({ type: 'deleteIf', applied: true });
+  });
+
+  it('never touches D1 for an empty or invalid batch', async () => {
+    const { adapter, batches, perStatement } = await adapterOver(() => Promise.resolve([]));
+
+    expect(await adapter.atomicWrite([])).toEqual([]);
+    await expect(
+      adapter.atomicWrite([{ type: 'create', collection: 'ab_slots', data: { nope: 1 } }])
+    ).rejects.toThrow("Unknown column 'nope'");
+    await expect(
+      adapter.atomicWrite(
+        Array.from({ length: 26 }, () => ({ type: 'delete', collection: 'ab_slots', id: 'x' }))
+      )
+    ).rejects.toBeInstanceOf(RangeError);
+
+    expect(batches).toEqual([]);
+    expect(perStatement).toEqual([]);
+  });
+
+  it('fails loudly, rather than reporting applied: false, when D1 returns too few results or a failed one', async () => {
+    const op = { type: 'deleteIf', collection: 'ab_slots', id: 's1', condition: {} } as const;
+
+    const short = await adapterOver(() => Promise.resolve([]));
+    await expect(short.adapter.atomicWrite([op])).rejects.toThrow(
+      /returned 0 results for 1 statements/
+    );
+
+    const failed = await adapterOver(() => Promise.resolve([{ results: [], success: false }]));
+    await expect(failed.adapter.atomicWrite([op])).rejects.toThrow(/reported a failed statement/);
+  });
+
+  describe('classifies a failed batch', () => {
+    const failing = (message: string) => () => Promise.reject(new Error(message));
+    const write = (adapter: D1DatabaseAdapter) =>
+      adapter.atomicWrite([
+        { type: 'create', collection: 'ab_slots', data: { id: 'x', key: 'k' } },
+        { type: 'update', collection: 'ab_slots', id: 'x', data: { key: 'k2' } }
+      ]);
+
+    it('a unique violation becomes UniqueConstraintError naming the table SQLite reports', async () => {
+      const { adapter } = await adapterOver(
+        failing('D1_ERROR: UNIQUE constraint failed: ab_slots.key: SQLITE_CONSTRAINT')
+      );
+      const error = await write(adapter).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(UniqueConstraintError);
+      expect(error).toMatchObject({ collection: 'ab_slots', fields: ['key'] });
+    });
+
+    it('the must-apply guard failing becomes AtomicWriteConditionError', async () => {
+      const { adapter } = await adapterOver(failing('D1_ERROR: integer overflow: SQLITE_ERROR'));
+      await expect(write(adapter)).rejects.toBeInstanceOf(AtomicWriteConditionError);
+    });
+
+    it('anything else is rethrown untouched, never reported as a result', async () => {
+      const original = new Error('D1_ERROR: no such table: ab_slots: SQLITE_ERROR');
+      const { adapter } = await adapterOver(() => Promise.reject(original));
+      await expect(write(adapter)).rejects.toBe(original);
+    });
   });
 });

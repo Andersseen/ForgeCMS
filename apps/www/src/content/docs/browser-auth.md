@@ -108,6 +108,32 @@ The very first user ever created — via `signup()` **or** the trusted `createUs
 `admin`, regardless of any requested role. A fresh install can never end up with a non-admin as its
 only user. Every signup after that gets `viewer`.
 
+The first administrator is provisioned as **one atomic database write**: the bootstrap claim (a unique row
+in the internal `_forge_bootstrap` collection, keyed by the users collection) and the admin user commit
+together or not at all. Of several concurrent first signups exactly one becomes admin; a first signup that
+fails (a database error, or the same email submitted twice at once) leaves neither user nor claim behind,
+so the next valid first signup can still become the administrator. This needs a database whose
+`atomicWrite` is real — `UsersCollectionAuthAdapter` refuses to initialise otherwise.
+
+### Recovering a burned claim (databases written before spec 060)
+
+Before spec 060 the claim was written first and the user second, so a failure between them left the claim
+consumed with **no administrator** — every later signup became `viewer`. Such a database (claim present,
+zero admins) is deliberately **not** auto-repaired: public signup stays `viewer`, because "claim present,
+no admin" is also what an intentionally emptied admin set looks like, and repairing it automatically would
+hand the next anonymous signup an administrator account. Recover from trusted server code — a seed script
+or a one-off route you delete afterwards — with either:
+
+```ts
+// no users at all yet, or any state: creates an admin without touching the claim
+await auth.createUser({ email: 'you@example.com', password: 'a-real-password', role: 'admin' });
+
+// a viewer already signed up and should be the admin
+await auth.updateUser(existingUserId, { role: 'admin' });
+```
+
+Neither is reachable over HTTP without an existing admin. Once any admin exists, ordinary rules apply.
+
 ## Error reasons
 
 `login`/`signup`/`createUser` return a result, not a thrown exception, for every expected failure:

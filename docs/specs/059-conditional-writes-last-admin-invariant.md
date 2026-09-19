@@ -229,6 +229,7 @@ A second primitive — a declarative, data-only **atomic write batch** (an order
 `create`/`update`/`delete` operations, each optionally carrying a `WriteCondition`, executed as one
 unit) — would map to D1 `batch()` and libSQL `client.batch(…, 'write')`, both documented transactional,
 and would reuse `WriteCondition` unchanged. That is the recommended next step, not part of this one.
+_(Delivered by [spec 060](060-atomic-write-batch-first-admin-provisioning.md).)_
 
 ### Known limitations (stated, not hidden)
 
@@ -265,6 +266,8 @@ and would reuse `WriteCondition` unchanged. That is the recommended next step, n
   out. Reproduced against built `dist` with a one-shot failing `create`. It is a failure-recovery
   gap, not a two-writer race, and needs an atomic "create user as admin unless an admin exists" or a
   claim+create batch — i.e. the next primitive above. Recorded for that step.
+  **Superseded by [spec 060](060-atomic-write-batch-first-admin-provisioning.md): fixed — claim and
+  user are one atomic write.**
 
 ## Implementation plan
 

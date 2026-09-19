@@ -1,5 +1,7 @@
 import type { CollectionDefinition } from '@forge-cms/core';
 import type {
+  AtomicWriteOperation,
+  AtomicWriteResult,
   ConditionalDeleteResult,
   ConditionalUpdateResult,
   DatabaseAdapter,
@@ -9,7 +11,11 @@ import type {
   WriteCondition
 } from '@forge-cms/db';
 import {
+  ATOMIC_WRITE_REQUIRE_APPLIED_SQL,
+  assertValidAtomicWrite,
   assertValidWriteCondition,
+  atomicWriteMustApply,
+  toAtomicWriteError,
   generateCreateTableSql,
   generateAddColumnSql,
   generateIndexSql,
@@ -19,7 +25,7 @@ import {
   toUniqueConstraintError,
   normalizeSort
 } from '@forge-cms/db';
-import type { D1Database } from './bindings.js';
+import type { D1Database, D1PreparedStatement } from './bindings.js';
 
 export interface D1Env {
   DB: D1Database;
@@ -257,8 +263,8 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     return results.map((r) => this.hydrateRecord(r, options.collection));
   }
 
-  async create(collection: string, data: DatabaseRecord): Promise<DatabaseRecord> {
-    const db = this.getDb();
+  /** The row a `create`/atomic `create` inserts: id generated if absent, timestamps stamped, values DB-encoded. */
+  private buildCreateRecord(collection: string, data: DatabaseRecord): DatabaseRecord {
     const now = new Date().toISOString();
     const collectionDef = this.getCollectionDef(collection);
 
@@ -274,16 +280,32 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
       const field = collectionDef?.fields[key];
       record[key] = field ? toDbValue(value, field.kind) : value;
     }
+    return record;
+  }
 
+  private buildInsert(
+    collection: string,
+    record: DatabaseRecord,
+    returning: boolean
+  ): { sql: string; bindings: unknown[] } {
     const keys = Object.keys(record);
     const placeholders = keys.map(() => '?').join(', ');
     const columns = keys.map((k) => `"${k}"`).join(', ');
-    const sql = `INSERT INTO "${collection}" (${columns}) VALUES (${placeholders})`;
+    return {
+      sql: `INSERT INTO "${collection}" (${columns}) VALUES (${placeholders})${returning ? ' RETURNING *' : ''}`,
+      bindings: Object.values(record)
+    };
+  }
+
+  async create(collection: string, data: DatabaseRecord): Promise<DatabaseRecord> {
+    const db = this.getDb();
+    const record = this.buildCreateRecord(collection, data);
+    const { sql, bindings } = this.buildInsert(collection, record, false);
 
     try {
       await db
         .prepare(sql)
-        .bind(...Object.values(record))
+        .bind(...bindings)
         .run();
     } catch (err) {
       throw toUniqueConstraintError(err, collection) ?? err;
@@ -428,6 +450,132 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
       .bind(...where.bindings)
       .all<{ id: string }>();
     return { applied: results.length > 0 };
+  }
+
+  /**
+   * One `db.batch(statements)` — D1's transactional batch ("batched statements are SQL transactions ...
+   * each statement will execute and commit, sequentially, non-concurrently"; a failing statement "aborts
+   * or rolls back the entire sequence"; results are in statement order) — not a loop of `run()`s, and
+   * not an interactive transaction, which D1 does not have (spec 060).
+   *
+   * Every statement is built and bound *before* anything is sent, so schema-dependent validation
+   * (unregistered collection, unknown column) rejects with nothing written. Operations that must apply are
+   * followed by {@link ATOMIC_WRITE_REQUIRE_APPLIED_SQL}, which aborts and rolls back the batch when the
+   * statement before it changed no row. D1's batch error carries no statement index, so
+   * {@link toAtomicWriteError} classifies by message alone. Encoding, `id` immutability, timestamps and
+   * condition semantics are the single-call code (`buildCreateRecord`, `buildUpdateValues`,
+   * `buildWriteCondition`).
+   */
+  async atomicWrite(operations: readonly AtomicWriteOperation[]): Promise<AtomicWriteResult[]> {
+    assertValidAtomicWrite(operations);
+    if (operations.length === 0) return [];
+
+    const db = this.getDb();
+    const statements: D1PreparedStatement[] = [];
+    const toResult: ((rows: DatabaseRecord[]) => AtomicWriteResult)[] = [];
+    const resultIndex: number[] = [];
+
+    const push = (sql: string, bindings: unknown[]) => {
+      statements.push(db.prepare(sql).bind(...bindings));
+    };
+
+    for (const operation of operations) {
+      const { collection } = operation;
+      this.getCollectionDef(collection);
+      resultIndex.push(statements.length);
+
+      switch (operation.type) {
+        case 'create': {
+          const insert = this.buildInsert(
+            collection,
+            this.buildCreateRecord(collection, operation.data),
+            true
+          );
+          push(insert.sql, insert.bindings);
+          toResult.push(([row]) => {
+            if (!row) throw new Error(`Batch insert into '${collection}' returned no row`);
+            return { type: 'create', record: this.hydrateRecord(row, collection) };
+          });
+          break;
+        }
+        case 'update': {
+          const updates = this.buildUpdateValues(collection, operation.data);
+          const where = this.buildWriteCondition(collection, operation.id, {});
+          const setClause = Object.keys(updates)
+            .map((k) => `"${k}" = ?`)
+            .join(', ');
+          push(`UPDATE "${collection}" SET ${setClause} WHERE ${where.sql} RETURNING *`, [
+            ...Object.values(updates),
+            ...where.bindings
+          ]);
+          toResult.push(([row]) => {
+            if (!row) throw new Error(`Batch update of '${collection}' returned no row`);
+            return { type: 'update', record: this.hydrateRecord(row, collection) };
+          });
+          break;
+        }
+        case 'delete': {
+          const where = this.buildWriteCondition(collection, operation.id, {});
+          push(`DELETE FROM "${collection}" WHERE ${where.sql}`, where.bindings);
+          toResult.push(() => ({ type: 'delete' }));
+          break;
+        }
+        case 'updateIf': {
+          const updates = this.buildUpdateValues(collection, operation.data);
+          const where = this.buildWriteCondition(collection, operation.id, operation.condition);
+          const setClause = Object.keys(updates)
+            .map((k) => `"${k}" = ?`)
+            .join(', ');
+          push(`UPDATE "${collection}" SET ${setClause} WHERE ${where.sql} RETURNING *`, [
+            ...Object.values(updates),
+            ...where.bindings
+          ]);
+          toResult.push(([row]) =>
+            row
+              ? { type: 'updateIf', applied: true, record: this.hydrateRecord(row, collection) }
+              : { type: 'updateIf', applied: false }
+          );
+          break;
+        }
+        case 'deleteIf': {
+          const where = this.buildWriteCondition(collection, operation.id, operation.condition);
+          push(`DELETE FROM "${collection}" WHERE ${where.sql} RETURNING "id"`, where.bindings);
+          toResult.push((rows) => ({ type: 'deleteIf', applied: rows.length > 0 }));
+          break;
+        }
+      }
+
+      if (atomicWriteMustApply(operation))
+        statements.push(db.prepare(ATOMIC_WRITE_REQUIRE_APPLIED_SQL));
+    }
+
+    let batchResults: Awaited<ReturnType<D1Database['batch']>>;
+    try {
+      batchResults = await db.batch<DatabaseRecord>(statements);
+    } catch (err) {
+      throw toAtomicWriteError(err);
+    }
+
+    // The batch is committed by now. A binding that hands back fewer results than statements (or reports
+    // `success: false`) would otherwise read as "no rows" — a definite `applied: false` for a write that
+    // did apply — so it fails loudly instead.
+    if (
+      batchResults.length !== statements.length ||
+      batchResults.some((r) => r.success === false)
+    ) {
+      throw new Error(
+        `atomicWrite: D1 returned ${batchResults.length} results for ${statements.length} statements ` +
+          '(or reported a failed statement); the batch may already have been committed but its results ' +
+          'cannot be read reliably'
+      );
+    }
+
+    return toResult.map((build, i) => {
+      const at = resultIndex[i];
+      const result = at === undefined ? undefined : batchResults[at];
+      if (!result) throw new Error(`atomicWrite: no result for operation ${i}`);
+      return build((result.results ?? []) as DatabaseRecord[]);
+    });
   }
 
   async count(collection: string, where?: DatabaseWhere): Promise<number> {

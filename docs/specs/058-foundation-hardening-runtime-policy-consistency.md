@@ -243,6 +243,7 @@ ever succeed, permanently. `hasAnyUser()` remains a fast-path guard (skip attemp
 already exist, avoiding a redundant write on every ordinary signup after bootstrap) — the actual
 correctness comes from the atomic claim, not the guard. This closes the "accidentally open public race"
 finding without any `DatabaseAdapter` contract change.
+_(Bootstrap atomicity — claim and first user as one write — was completed by [spec 060](060-atomic-write-batch-first-admin-provisioning.md); this section records what shipped in 058.)_
 
 **7b. Last-admin removal race (cannot be made atomic without a contract change — explicit limitation).**
 `updateUser`/`deleteUser`'s `countAdmins(db) <= 1` pre-check is check-then-act with no way to make it a

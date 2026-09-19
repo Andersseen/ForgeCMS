@@ -19,6 +19,11 @@
 > version writes, by design, but the fault-injection/retention work in D01/D03 itself is not done), and
 > D04/F15/F16 (globals/localization certification beyond access, S3, and peer-range evidence beyond the
 > existing exact pins). This update does not change the release sequence or packet ownership below.
+>
+> **2026-09-19 update:** [spec 060](specs/060-atomic-write-batch-first-admin-provisioning.md) adds the
+> atomic write batch (`DatabaseAdapter.atomicWrite`) that spec 059 named as the next primitive, and uses
+> it to make first-admin provisioning all-or-nothing. D02/D03 have the storage capability they needed but
+> are **not** migrated; the generic users-collection CRUD bypass (rest of H02) is still open.
 
 ## Product direction
 

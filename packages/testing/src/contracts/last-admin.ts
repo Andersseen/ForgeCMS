@@ -3,7 +3,14 @@ import { describe, expect, it } from 'vitest';
 // Deterministic last-admin concurrency proof (spec 059). Duck-typed on purpose — like every other
 // contract in this package it must not import `@forge-cms/db`/`@forge-cms/auth`.
 
-const GATED_METHODS = new Set(['update', 'updateIf', 'delete', 'deleteIf']);
+const GATED_METHODS = new Set([
+  'create',
+  'update',
+  'updateIf',
+  'delete',
+  'deleteIf',
+  'atomicWrite'
+]);
 
 /**
  * A barrier for database writes. Once armed for N parties, every mutating call made through a wrapped
@@ -15,7 +22,7 @@ const GATED_METHODS = new Set(['update', 'updateIf', 'delete', 'deleteIf']);
  * so a second write from the same operation (e.g. a compensating one) does not deadlock.
  */
 export interface WriteGate {
-  /** Wraps `database` so its mutating calls (`update`, `updateIf`, `delete`, `deleteIf`) pass through the gate. Reads are never held. */
+  /** Wraps `database` so its mutating calls (`create`, `update`, `updateIf`, `delete`, `deleteIf`, `atomicWrite`) pass through the gate. Reads are never held. */
   wrap<T extends object>(database: T): T;
   /** Start holding writes until `parties` of them have arrived. Before this, wrapped databases pass straight through. */
   arm(parties: number): void;

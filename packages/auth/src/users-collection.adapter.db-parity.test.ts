@@ -1,5 +1,8 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import { runLastAdminConcurrencyContractTests } from '@forge-cms/testing/contracts';
+import {
+  runFirstAdminBootstrapContractTests,
+  runLastAdminConcurrencyContractTests
+} from '@forge-cms/testing/contracts';
 import { InMemoryDatabaseAdapter, LibSqlDatabaseAdapter } from '@forge-cms/db';
 import type { DatabaseAdapter } from '@forge-cms/db';
 import { defineUsersCollection } from './user-fields.js';
@@ -160,5 +163,34 @@ describe('UsersCollectionAuthAdapter on LibSqlDatabaseAdapter — independent cl
       ),
       contenderFor
     };
+  });
+});
+
+/**
+ * Spec 060's real-backend proof for libSQL: every party is its own `LibSqlDatabaseAdapter` (its own
+ * client, its own SQLite connection) on one on-disk file — see the note above on why `file::memory:`
+ * cannot do this. The first-admin batch is a real `client.batch(…, 'write')` transaction, and the barrier
+ * holds every party at its first write, so which caller becomes admin is decided by the database.
+ */
+describe('first-admin provisioning on LibSqlDatabaseAdapter — independent clients on one database file', () => {
+  const directory = tempDir.make();
+  afterAll(() => tempDir.remove(directory));
+  let fileCounter = 0;
+
+  runFirstAdminBootstrapContractTests(async ({ collection, parties, wrap }) => {
+    const url = `file:${directory}/bootstrap-${++fileCounter}.db`;
+
+    const contender = async () => {
+      const database = new LibSqlDatabaseAdapter(url).init();
+      await database.syncSchema([defineUsersCollection({ slug: collection })]);
+      return {
+        users: new UsersCollectionAuthAdapter({ devMode: true, collection }).init({
+          userDatabase: wrap(database)
+        }),
+        database
+      };
+    };
+
+    return { contenders: await Promise.all(Array.from({ length: parties }, contender)) };
   });
 });

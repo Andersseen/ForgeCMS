@@ -1,11 +1,14 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { defineCollection, defineField } from '@forge-cms/core';
 import {
   runDatabaseAdapterConstraintContractTests,
   runDatabaseAdapterQueryContractTests,
-  runDatabaseAdapterConditionalWriteContractTests
+  runDatabaseAdapterConditionalWriteContractTests,
+  runDatabaseAdapterAtomicWriteContractTests
 } from '@forge-cms/testing/contracts';
+import type { Client } from '@libsql/client';
 import { LibSqlDatabaseAdapter } from './libsql.adapter.js';
+import { UniqueConstraintError } from './constraint-error.js';
 
 runDatabaseAdapterConstraintContractTests(() => {
   const adapter = new LibSqlDatabaseAdapter('file::memory:');
@@ -20,6 +23,12 @@ runDatabaseAdapterQueryContractTests(() => {
 });
 
 runDatabaseAdapterConditionalWriteContractTests(() => {
+  const adapter = new LibSqlDatabaseAdapter('file::memory:');
+  adapter.init();
+  return adapter;
+});
+
+runDatabaseAdapterAtomicWriteContractTests(() => {
   const adapter = new LibSqlDatabaseAdapter('file::memory:');
   adapter.init();
   return adapter;
@@ -262,5 +271,127 @@ describe('LibSqlDatabaseAdapter conditional writes (spec 059)', () => {
       );
       expect(`${error.message} ${String(error.cause)}`).toMatch(/no such table/i);
     }
+  });
+});
+
+describe('LibSqlDatabaseAdapter atomicWrite (spec 060)', () => {
+  let adapter: LibSqlDatabaseAdapter;
+
+  const posts = defineCollection({
+    slug: 'posts',
+    fields: { title: defineField.text({ required: true }) }
+  });
+
+  beforeEach(async () => {
+    adapter = new LibSqlDatabaseAdapter('file::memory:');
+    adapter.init();
+    await adapter.syncSchema([posts]);
+  });
+
+  // Spec 060: the batch must be libSQL's real transactional batch, not a loop of independent statements.
+  describe('atomicWrite uses the native transactional batch', () => {
+    type BatchSpy = ReturnType<typeof vi.spyOn>;
+    let executeSpy: BatchSpy;
+    let batchSpy: BatchSpy;
+
+    beforeEach(() => {
+      const client = (adapter as unknown as { client: Client }).client;
+      executeSpy = vi.spyOn(client, 'execute');
+      batchSpy = vi.spyOn(client, 'batch');
+    });
+
+    it('issues exactly one client.batch(statements, "write") and no per-statement execute', async () => {
+      await adapter.atomicWrite([
+        { type: 'create', collection: 'posts', data: { id: 'p1', title: 'One' } },
+        { type: 'update', collection: 'posts', id: 'p1', data: { title: 'Two' } },
+        { type: 'delete', collection: 'posts', id: 'nothing' }
+      ]);
+
+      expect(executeSpy).not.toHaveBeenCalled();
+      expect(batchSpy).toHaveBeenCalledTimes(1);
+      const [statements, mode] = batchSpy.mock.calls[0] as [{ sql: string }[], string];
+      expect(mode).toBe('write');
+      // create, update (+ its must-apply guard), delete
+      expect(statements).toHaveLength(4);
+      expect(statements[0]?.sql).toMatch(/^insert into "posts"/i);
+      expect(statements[1]?.sql).toMatch(/^update "posts"/i);
+      expect(statements[2]?.sql).toMatch(/^select abs\(/i);
+      expect(statements[3]?.sql).toMatch(/^delete from "posts"/i);
+    });
+
+    it('adds a guard only after operations that must apply', async () => {
+      await adapter.atomicWrite([
+        { type: 'create', collection: 'posts', data: { id: 'p1', title: 'One' } },
+        { type: 'updateIf', collection: 'posts', id: 'p1', data: { title: 'x' }, condition: {} },
+        { type: 'deleteIf', collection: 'posts', id: 'p1', condition: {}, requireApplied: true }
+      ]);
+
+      const [statements] = batchSpy.mock.calls[0] as [{ sql: string }[]];
+      expect(statements.map((s) => s.sql.split(' ')[0]?.toLowerCase())).toEqual([
+        'insert',
+        'update',
+        'delete',
+        'select'
+      ]);
+    });
+
+    it('binds every value as a parameter — no operation input is interpolated into SQL', async () => {
+      const hostile = "x'); DROP TABLE posts; --";
+      await adapter.atomicWrite([
+        { type: 'create', collection: 'posts', data: { id: hostile, title: hostile } }
+      ]);
+
+      const [statements] = batchSpy.mock.calls[0] as [{ sql: string; args: unknown[] }[]];
+      expect(statements[0]?.sql).not.toContain('DROP TABLE');
+      expect(statements[0]?.args).toContain(hostile);
+      expect(await adapter.count('posts')).toBe(1);
+    });
+
+    it('validates before sending: a bad operation never reaches the client', async () => {
+      await expect(
+        adapter.atomicWrite([
+          { type: 'create', collection: 'posts', data: { title: 'fine' } },
+          { type: 'create', collection: 'posts', data: { nonexistent: 1 } }
+        ])
+      ).rejects.toThrow("Unknown column 'nonexistent'");
+      await expect(
+        adapter.atomicWrite([{ type: 'create', collection: 'never_registered', data: {} }])
+      ).rejects.toThrow("Collection 'never_registered' not registered");
+
+      expect(batchSpy).not.toHaveBeenCalled();
+      expect(executeSpy).not.toHaveBeenCalled();
+    });
+
+    it('fails loudly, rather than reporting applied: false, when the driver returns too few result sets', async () => {
+      await adapter.create('posts', { id: 'p1', title: 'One' });
+      batchSpy.mockResolvedValueOnce([]);
+
+      await expect(
+        adapter.atomicWrite([{ type: 'deleteIf', collection: 'posts', id: 'p1', condition: {} }])
+      ).rejects.toThrow(/returned 0 result sets for 1 statements/);
+    });
+
+    it('does not touch the client for an empty batch', async () => {
+      expect(await adapter.atomicWrite([])).toEqual([]);
+      expect(batchSpy).not.toHaveBeenCalled();
+    });
+
+    it('maps a unique violation to UniqueConstraintError naming the conflicting table', async () => {
+      await adapter.syncSchema([
+        defineCollection({ slug: 'slots', fields: { key: defineField.text({ unique: true }) } })
+      ]);
+      await adapter.create('slots', { key: 'k' });
+
+      const error = await adapter
+        .atomicWrite([
+          { type: 'create', collection: 'posts', data: { title: 'fine' } },
+          { type: 'create', collection: 'slots', data: { key: 'k' } }
+        ])
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(UniqueConstraintError);
+      expect((error as UniqueConstraintError).collection).toBe('slots');
+      expect(await adapter.count('posts')).toBe(0);
+    });
   });
 });

@@ -1,5 +1,7 @@
 import type { CollectionDefinition } from '@forge-cms/core';
 import type {
+  AtomicWriteOperation,
+  AtomicWriteResult,
   ConditionalDeleteResult,
   ConditionalUpdateResult,
   DatabaseAdapter,
@@ -18,8 +20,15 @@ import {
 } from './schema-generator.js';
 import { toUniqueConstraintError } from './constraint-error.js';
 import { assertValidWriteCondition } from './write-condition.js';
+import {
+  ATOMIC_WRITE_REQUIRE_APPLIED_SQL,
+  assertValidAtomicWrite,
+  atomicWriteMustApply,
+  toAtomicWriteError
+} from './atomic-write.js';
 import { drizzle } from 'drizzle-orm/libsql';
-import { createClient, type Client } from '@libsql/client';
+import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
+import { createClient, type Client, type InStatement, type InValue } from '@libsql/client';
 import {
   eq,
   ne,
@@ -39,6 +48,13 @@ import {
 } from 'drizzle-orm';
 import { toOperatorValues, normalizeSort } from './where.js';
 import type { DatabaseWhere } from './where.js';
+
+/**
+ * Drizzle types `values()`/`set()` per table schema; the tables here are built dynamically from
+ * collection definitions, so the value maps are necessarily loose (as in every other write in this file).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DrizzleValues = any;
 
 const SYSTEM_COLUMNS = new Set(['id', 'created_at', 'updated_at', '_status', '_storageKey']);
 
@@ -73,6 +89,11 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
   private getDb(): ReturnType<typeof drizzle> {
     if (!this.db) throw new Error('LibSqlDatabaseAdapter not initialized. Call init() first.');
     return this.db;
+  }
+
+  private getClient(): Client {
+    if (!this.client) throw new Error('LibSqlDatabaseAdapter not initialized. Call init() first.');
+    return this.client;
   }
 
   private getCollectionDef(collection: string): CollectionDefinition | undefined {
@@ -237,11 +258,10 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
     return result.map((r) => this.hydrateRecord(r, options.collection));
   }
 
-  async create(collection: string, data: DatabaseRecord): Promise<DatabaseRecord> {
-    const db = this.getDb();
+  /** The row a `create`/atomic `create` inserts: id generated if absent, timestamps stamped, values DB-encoded. */
+  private buildCreateRecord(collection: string, data: DatabaseRecord): DatabaseRecord {
     const now = new Date().toISOString();
     const collectionDef = this.getCollectionDef(collection);
-    const table = this.getTable(collection);
 
     const record: DatabaseRecord = {
       id: (data.id as string) || crypto.randomUUID(),
@@ -255,6 +275,13 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
       const field = collectionDef?.fields[key];
       record[key] = field ? toDbValue(value, field.kind) : value;
     }
+    return record;
+  }
+
+  async create(collection: string, data: DatabaseRecord): Promise<DatabaseRecord> {
+    const db = this.getDb();
+    const table = this.getTable(collection);
+    const record = this.buildCreateRecord(collection, data);
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -398,6 +425,147 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
       .where(where)
       .returning({ id: (table as any)['id'] });
     return { applied: rows.length > 0 };
+  }
+
+  /**
+   * One `client.batch(statements, 'write')` — libSQL's real transactional batch (`BEGIN IMMEDIATE` … all
+   * statements in order … `COMMIT`, `ROLLBACK` on any failure) — not a loop of `execute()`s. Deliberately
+   * not drizzle's `db.batch()`, which in drizzle-orm 0.45.2 passes no mode and so runs `BEGIN DEFERRED`;
+   * statements are built with drizzle's `.toSQL()` and handed to the client directly (spec 060).
+   *
+   * Every statement is built *before* anything is sent, so schema-dependent validation (unregistered
+   * collection, unknown column) rejects with nothing written. Operations that must apply are followed by
+   * {@link ATOMIC_WRITE_REQUIRE_APPLIED_SQL}, which aborts and rolls back the batch when the statement
+   * before it changed no row. Encoding, `id` immutability, timestamps and condition semantics are the
+   * single-call code itself (`buildCreateRecord`, `buildUpdateValues`, `buildWriteCondition`).
+   */
+  async atomicWrite(operations: readonly AtomicWriteOperation[]): Promise<AtomicWriteResult[]> {
+    assertValidAtomicWrite(operations);
+    if (operations.length === 0) return [];
+
+    const db = this.getDb();
+    const client = this.getClient();
+    const statements: InStatement[] = [];
+    const toResult: ((rows: DatabaseRecord[]) => AtomicWriteResult)[] = [];
+    const resultIndex: number[] = [];
+
+    const push = (query: { sql: string; params: unknown[] }) => {
+      statements.push({ sql: query.sql, args: query.params as InValue[] });
+    };
+
+    for (const operation of operations) {
+      const table = this.getTable(operation.collection);
+      const { collection } = operation;
+      resultIndex.push(statements.length);
+
+      switch (operation.type) {
+        case 'create': {
+          const record = this.buildCreateRecord(collection, operation.data);
+          push(
+            db
+              .insert(table)
+              .values(record as DrizzleValues)
+              .returning()
+              .toSQL()
+          );
+          toResult.push(([row]) => {
+            if (!row) throw new Error(`Batch insert into '${collection}' returned no row`);
+            return { type: 'create', record: this.hydrateRecord(row, collection) };
+          });
+          break;
+        }
+        case 'update': {
+          const updates = this.buildUpdateValues(collection, operation.data);
+          const where = this.buildWriteCondition(collection, operation.id, {}, table);
+          push(
+            db
+              .update(table)
+              .set(updates as DrizzleValues)
+              .where(where)
+              .returning()
+              .toSQL()
+          );
+          toResult.push(([row]) => {
+            if (!row) throw new Error(`Batch update of '${collection}' returned no row`);
+            return { type: 'update', record: this.hydrateRecord(row, collection) };
+          });
+          break;
+        }
+        case 'delete': {
+          const where = this.buildWriteCondition(collection, operation.id, {}, table);
+          push(db.delete(table).where(where).toSQL());
+          toResult.push(() => ({ type: 'delete' }));
+          break;
+        }
+        case 'updateIf': {
+          const updates = this.buildUpdateValues(collection, operation.data);
+          const where = this.buildWriteCondition(
+            collection,
+            operation.id,
+            operation.condition,
+            table
+          );
+          push(
+            db
+              .update(table)
+              .set(updates as DrizzleValues)
+              .where(where)
+              .returning()
+              .toSQL()
+          );
+          toResult.push(([row]) =>
+            row
+              ? { type: 'updateIf', applied: true, record: this.hydrateRecord(row, collection) }
+              : { type: 'updateIf', applied: false }
+          );
+          break;
+        }
+        case 'deleteIf': {
+          const where = this.buildWriteCondition(
+            collection,
+            operation.id,
+            operation.condition,
+            table
+          );
+          push(
+            db
+              .delete(table)
+              .where(where)
+              .returning({ id: (table as unknown as { id: SQLiteColumn }).id })
+              .toSQL()
+          );
+          toResult.push((rows) => ({ type: 'deleteIf', applied: rows.length > 0 }));
+          break;
+        }
+      }
+
+      if (atomicWriteMustApply(operation))
+        statements.push({ sql: ATOMIC_WRITE_REQUIRE_APPLIED_SQL });
+    }
+
+    let resultSets: Awaited<ReturnType<Client['batch']>>;
+    try {
+      resultSets = await client.batch(statements, 'write');
+    } catch (err) {
+      throw toAtomicWriteError(err);
+    }
+
+    // The batch is committed by now. A driver that hands back fewer result sets than statements would
+    // otherwise read as "no rows" — i.e. a definite `applied: false` for a write that did apply — so a
+    // missing result set fails loudly instead.
+    if (resultSets.length !== statements.length) {
+      throw new Error(
+        `atomicWrite: libSQL returned ${resultSets.length} result sets for ${statements.length} statements; ` +
+          'the batch may already have been committed but its results cannot be read reliably'
+      );
+    }
+
+    return toResult.map((build, i) => {
+      const at = resultIndex[i];
+      const resultSet = at === undefined ? undefined : resultSets[at];
+      if (!resultSet) throw new Error(`atomicWrite: no result for operation ${i}`);
+      return build(resultSet.rows.map((row) => ({ ...row }) as DatabaseRecord));
+    });
   }
 
   async count(collection: string, where?: DatabaseWhere): Promise<number> {
