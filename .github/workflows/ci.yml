@@ -88,8 +88,12 @@ jobs:
       - name: Verify packed package installation
         run: pnpm release:verify
 
+      # One install is enough: www, tiny-project and demo-aesthetics pin the same @playwright/test
+      # version, so they share the browser cache. Filtering all three ran three `--with-deps`
+      # installs in parallel and they raced for the apt lock (E: Could not get lock
+      # /var/lib/apt/lists/lock). If the pins ever diverge, add a second, sequential step.
       - name: Install Playwright (chromium)
-        run: pnpm --filter @forge-cms/www --filter @forge-cms/tiny-project --filter @forge-cms/demo-aesthetics exec playwright install --with-deps chromium
+        run: pnpm --filter @forge-cms/www exec playwright install --with-deps chromium
 
       - name: E2E tests — apps/www
         run: pnpm e2e:www

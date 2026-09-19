@@ -111,11 +111,13 @@ test('content admin: create a post with a relation, verify draft is hidden, publ
   await rowAgain.getByRole('button', { name: 'Publish' }).click();
   await expect(rowAgain.getByText('Published', { exact: true })).toBeVisible();
 
-  // Now visible on the public site, with the relation populated.
+  // Now visible on the public site. The public route reads as an anonymous user, and population
+  // enforces the target collection's own read policy (spec 058 §4): `users` is authenticated-only,
+  // so the author's email must NOT leak onto a public page even though the post itself is public.
   await page.goto('/');
   await page.getByRole('link', { name: title }).click();
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
-  await expect(page.getByText(/By admin@tiny\.e2e\.test/)).toBeVisible();
+  await expect(page.getByText(/admin@tiny\.e2e\.test/)).toHaveCount(0);
 
   // Edit.
   await page.goto('/admin/collections/posts');

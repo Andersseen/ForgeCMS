@@ -1,11 +1,31 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-18.**
+> **Last updated: 2026-09-19.**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## CI back to green — Playwright install race + stale tiny-project E2E (2026-09-19)
+
+`main` CI had been red since spec 058 added `e2e:tiny-project` and `e2e:demo` to the required job. Two
+independent causes, the second hidden behind the first (the E2E steps never ran in CI):
+
+- **`Install Playwright (chromium)` step**: `pnpm --filter www --filter tiny-project --filter
+demo-aesthetics exec playwright install --with-deps chromium` ran three `--with-deps` installs in
+  parallel and they raced for the apt lock (`E: Could not get lock /var/lib/apt/lists/lock`). All three
+  apps pin the same `@playwright/test` (1.60.0), so it now installs once, via `@forge-cms/www`. If the
+  pins ever diverge, add a second **sequential** install step — do not re-parallelise. (The two earlier
+  red runs, `Typecheck`, were the Vite peer-resolution dedupe already fixed by `94009e7`.)
+- **`apps/tiny-project/e2e/golden-path.spec.ts`** ("content admin: create a post with a relation…")
+  asserted that an anonymous visitor sees `By admin@tiny.e2e.test` on the public post page — exactly the
+  `users` read-policy bypass spec 058 §4 closed (finding (c) under spec 059 below). The app is correct;
+  the test now asserts the author's email is **absent** from the public page (a leak regression guard).
+- **Verified locally**: `e2e:www` 19/19, `e2e:tiny-project` 9/9, `e2e:demo` 9/9, prettier + ESLint on the
+  touched files. **Not verified**: the fix on a real GitHub Actions run (changes not yet pushed when this
+  was written), and the full `lint && typecheck && test && build` gate was not re-run (build was a Turbo
+  cache hit). No `packages/*` change, so no changeset.
 
 ## Conditional writes — last-admin race closed at the storage layer (spec 059, 2026-09-18)
 
@@ -67,7 +87,8 @@ RETURNING *` / `DELETE … RETURNING id`), so the decision is the database's and
   (verified by stashing this work and re-running): it expects the public post page to show
   `By admin@tiny.e2e.test` to an anonymous visitor, which spec 058's population fix correctly stopped
   doing. Spec 058 added `e2e:tiny-project` to the required CI job without being able to run it, so `main`
-  CI is likely red on this; it needs a small fixture fix (assert the author is hidden, then sign in).
+  CI was red on this. **Fixed 2026-09-19** (see the CI section above): the test now asserts the author's
+  email is hidden from the anonymous public page.
 - **Verified**: `pnpm lint`, `typecheck`, `test` (24/24 tasks; the auth/db/cloudflare/testing
   ones executed fresh — 210 auth / 195 db / 104 cloudflare unit tests), `build`, `test:cloudflare` (115 real-workerd + tiny-project D1), `test:libsql`,
   `check:api` (baseline updated intentionally: +4 names in `@forge-cms/db`, +9 in
