@@ -1,5 +1,22 @@
 # @forge-cms/www
 
+## 0.0.11
+
+### Patch Changes
+
+- Updated dependencies [31bae06]
+- Updated dependencies [664ad5b]
+- Updated dependencies [d718fbd]
+  - @forge-cms/db@0.6.0
+  - @forge-cms/cloudflare@0.6.0
+  - @forge-cms/auth@0.6.0
+  - @forge-cms/runtime@0.6.0
+  - @forge-cms/angular@0.6.0
+  - @forge-cms/storage@0.6.0
+  - @forge-cms/admin@0.6.0
+  - @forge-cms/core@0.6.0
+  - @forge-cms/api@0.6.0
+
 ## 0.0.10
 
 ### Patch Changes
