@@ -209,7 +209,12 @@ function verifyRuntimeConsumer(tarballs) {
   writeFileSync(
     join(srcDir, 'index.ts'),
     `import { defineCollection, defineField } from '@forge-cms/core';
-import { InMemoryDatabaseAdapter } from '@forge-cms/db';
+import {
+  InMemoryDatabaseAdapter,
+  AtomicWriteConditionError,
+  ATOMIC_WRITE_MAX_OPERATIONS
+} from '@forge-cms/db';
+import type { AtomicWriteOperation } from '@forge-cms/db';
 import {
   InMemoryAuthAdapter,
   ApiKeyAuthAdapter,
@@ -461,6 +466,50 @@ const signupCookie = signupResponse.headers.get('set-cookie');
 if (!signupCookie || !signupCookie.includes('HttpOnly') || !signupCookie.includes('forge_session=')) {
   throw new Error('Expected handleSignup to set an HttpOnly forge_session cookie');
 }
+
+// Spec 060: the first admin was provisioned as ONE atomic write — the bootstrap claim exists together
+// with the admin, through the packed public surface.
+if ((await authDb.count('_forge_bootstrap')) !== 1 || (await authDb.count('users', { role: 'admin' })) !== 1) {
+  throw new Error('Expected exactly one bootstrap claim and one admin after the first signup');
+}
+
+// Atomic write batch (spec 060), packed public surface: all-or-nothing with typed errors.
+const batchDb = new InMemoryDatabaseAdapter();
+await batchDb.syncSchema([
+  defineCollection({ slug: 'slots', fields: { key: defineField.text({ unique: true }) } })
+]);
+const batchOk = await batchDb.atomicWrite([
+  { type: 'create', collection: 'slots', data: { id: 's1', key: 'a' } },
+  { type: 'updateIf', collection: 'slots', id: 's1', data: { key: 'b' }, condition: { targetMatches: { key: 'a' } }, requireApplied: true }
+] satisfies AtomicWriteOperation[]);
+if (batchOk.map((r) => r.type).join() !== 'create,updateIf' || (await batchDb.findById('slots', 's1'))?.key !== 'b') {
+  throw new Error('Expected the atomic write batch to commit in order and return ordered results');
+}
+let uniqueCode: unknown;
+try {
+  await batchDb.atomicWrite([
+    { type: 'create', collection: 'slots', data: { id: 's2', key: 'c' } },
+    { type: 'create', collection: 'slots', data: { id: 's3', key: 'b' } }
+  ]);
+} catch (error) {
+  uniqueCode = (error as { code?: unknown }).code;
+}
+if (uniqueCode !== 'UNIQUE_CONSTRAINT' || (await batchDb.findById('slots', 's2')) !== null) {
+  throw new Error('Expected a conflicting batch to reject with UniqueConstraintError and roll back');
+}
+let conditionError: unknown;
+try {
+  await batchDb.atomicWrite([
+    { type: 'create', collection: 'slots', data: { id: 's4', key: 'd' } },
+    { type: 'deleteIf', collection: 'slots', id: 's1', condition: { targetMatches: { key: 'nope' } }, requireApplied: true }
+  ]);
+} catch (error) {
+  conditionError = error;
+}
+if (!(conditionError instanceof AtomicWriteConditionError) || (await batchDb.findById('slots', 's4')) !== null) {
+  throw new Error('Expected requireApplied to fail the batch with AtomicWriteConditionError and roll back');
+}
+if (ATOMIC_WRITE_MAX_OPERATIONS !== 25) throw new Error('Expected the documented batch cap of 25');
 
 const loginResponse = await handleLogin(
   {

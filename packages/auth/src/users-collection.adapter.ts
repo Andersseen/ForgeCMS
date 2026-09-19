@@ -38,6 +38,13 @@ export interface CreateUserInput {
   role?: 'admin' | 'editor' | 'viewer';
 }
 
+/** What every new user row starts from; the role is decided by the provisioning path. */
+interface NewAccount {
+  email: string;
+  name: string;
+  passwordHash: string;
+}
+
 const DEFAULT_COLLECTION = 'users';
 const DEV_SECRET = 'forgecms-dev-only-signing-secret-do-not-use-in-real-deployments';
 const DEFAULT_MIN_PASSWORD_LENGTH = 8;
@@ -202,14 +209,20 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     }
 
     if (env?.userDatabase !== undefined) {
-      // The last-admin invariant is decided by the database (spec 059). A custom adapter that predates
-      // `updateIf`/`deleteIf` cannot make it safe, so fail here — before any affected operation can run —
-      // rather than at the first demotion. (TypeScript implementers get this at compile time.)
-      const { updateIf, deleteIf } = env.userDatabase as Partial<DatabaseAdapter>;
-      if (typeof updateIf !== 'function' || typeof deleteIf !== 'function') {
+      // The last-admin invariant (spec 059) and first-admin provisioning (spec 060) are decided by the
+      // database. A custom adapter that predates `updateIf`/`deleteIf`/`atomicWrite` cannot make them
+      // safe, so fail here — before any affected operation can run — rather than at the first demotion
+      // or the first signup. (TypeScript implementers get this at compile time.)
+      const { updateIf, deleteIf, atomicWrite } = env.userDatabase as Partial<DatabaseAdapter>;
+      if (
+        typeof updateIf !== 'function' ||
+        typeof deleteIf !== 'function' ||
+        typeof atomicWrite !== 'function'
+      ) {
         throw new Error(
-          `UsersCollectionAuthAdapter requires a DatabaseAdapter that implements updateIf() and deleteIf() ` +
-            `(conditional writes, spec 059) to enforce the last-admin invariant atomically; ` +
+          `UsersCollectionAuthAdapter requires a DatabaseAdapter that implements updateIf(), deleteIf() ` +
+            `and atomicWrite() (conditional and atomic writes, specs 059/060) to enforce the last-admin ` +
+            `invariant and first-admin provisioning atomically; ` +
             `'${String(env.userDatabase.name ?? 'an unnamed adapter')}' does not.`
         );
       }
@@ -246,7 +259,7 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
   }
 
   /**
-   * Registers `_forge_bootstrap` on first use so {@link claimFirstAdminBootstrap} works even for a
+   * Registers `_forge_bootstrap` on first use so {@link createFirstAdmin} works even for a
    * `UsersCollectionAuthAdapter` used standalone (not through `ForgeCmsRuntime.syncSchema()`, which
    * would otherwise be the only caller of {@link syncSchema}) — some real adapters (libSQL, D1) throw
    * outright on a write to a never-synced collection, rather than merely skipping unique-index
@@ -263,27 +276,69 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
   }
 
   /**
-   * Atomically claims the "first admin" bootstrap slot using the database's own unique-index
-   * enforcement as a compare-and-swap primitive: of any number of concurrent callers, `create()`
-   * with the same `slot` value can only ever succeed once — every adapter (InMemory/libSQL/D1)
-   * already enforces field-level `unique: true` (proven by spec 046's constraint contract suite), so
-   * every other racing caller observes `UniqueConstraintError` and safely loses the race, permanently
-   * (the marker row is never deleted). This closes "two concurrent first signups both become admin"
-   * without a new `DatabaseAdapter` contract method (spec 058 §7a).
+   * Provisions the first administrator as ONE atomic write (spec 060): the `_forge_bootstrap` claim and
+   * the admin user commit together or not at all. Of any number of concurrent first callers the database
+   * lets exactly one batch commit — the claim's unique index rejects every other — and a failure of the
+   * user insert (a duplicate email, a database error) rolls the claim back with it, so a failed first
+   * creation can never consume the bootstrap opportunity (spec 058 §7a committed the claim first and
+   * created the user second, leaving a claim with no administrator behind it).
    *
-   * The slot is keyed by `this.collection`, not a single fixed value: `_forge_bootstrap` is one
-   * table shared by every `UsersCollectionAuthAdapter` instance pointed at the same database, and
-   * more than one can legitimately coexist there (the `collection` constructor option exists
-   * precisely so a consumer can target a renamed/second `users`-like collection) — each one's "first
-   * admin" is a property of *its own* users table, not of the database as a whole.
+   * The claim is keyed by `this.collection`, not a single fixed value: `_forge_bootstrap` is one table
+   * shared by every `UsersCollectionAuthAdapter` instance pointed at the same database, and more than one
+   * can legitimately coexist there (the `collection` constructor option exists precisely so a consumer
+   * can target a renamed/second `users`-like collection) — each one's "first admin" is a property of
+   * *its own* users table, not of the database as a whole.
+   *
+   * `'lost-claim'` means another caller provisioned the first admin (nothing of this batch persisted);
+   * `'email-in-use'` means the user insert conflicted (the claim was rolled back too). Any other failure
+   * propagates: nothing persisted, so the next attempt can still become the administrator.
    */
-  private async claimFirstAdminBootstrap(db: DatabaseAdapter): Promise<boolean> {
+  private async createFirstAdmin(
+    db: DatabaseAdapter,
+    account: NewAccount
+  ): Promise<DatabaseRecord | 'lost-claim' | 'email-in-use'> {
     await this.ensureBootstrapSchema(db);
     try {
-      await db.create(BOOTSTRAP_COLLECTION, { slot: this.collection });
-      return true;
+      const [, created] = await db.atomicWrite([
+        { type: 'create', collection: BOOTSTRAP_COLLECTION, data: { slot: this.collection } },
+        { type: 'create', collection: this.collection, data: { ...account, role: 'admin' } }
+      ]);
+      if (created?.type !== 'create') {
+        throw new Error(
+          'atomicWrite returned an unexpected result for the first-admin batch — the batch itself may ' +
+            'already have committed (claim and admin user persisted); check the users collection before retrying'
+        );
+      }
+      return created.record;
     } catch (err) {
-      if (isUniqueConstraintError(err)) return false;
+      if (isUniqueConstraintError(err)) {
+        if (err.collection === BOOTSTRAP_COLLECTION) return 'lost-claim';
+        if (err.collection === this.collection) return 'email-in-use';
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Inserts a new user. The very first user of a fresh install is provisioned as the administrator by
+   * {@link createFirstAdmin}; everyone else (including a caller that just lost the first-admin claim, or
+   * any user of a database whose claim was already consumed) is created with `fallbackRole`. Returns
+   * `'email-in-use'` for a unique-index conflict.
+   */
+  private async insertUser(
+    db: DatabaseAdapter,
+    account: NewAccount,
+    fallbackRole: 'admin' | 'editor' | 'viewer'
+  ): Promise<DatabaseRecord | 'email-in-use'> {
+    if (!(await this.hasAnyUser(db))) {
+      const first = await this.createFirstAdmin(db, account);
+      if (first !== 'lost-claim') return first;
+    }
+
+    try {
+      return await db.create(this.collection, { ...account, role: fallbackRole });
+    } catch (err) {
+      if (isUniqueConstraintError(err)) return 'email-in-use';
       throw err;
     }
   }
@@ -369,7 +424,13 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
   /**
    * Trusted, admin-facing user creation: the caller picks the role. The very first user created in a
    * fresh install is always forced to `admin` regardless of the requested role, so a new install can
-   * never end up with a non-admin as its only user.
+   * never end up with a non-admin as its only user (provisioned atomically with its bootstrap claim,
+   * spec 060).
+   *
+   * This is also the documented recovery for a database whose bootstrap claim was burned before spec 060
+   * (claim present, no admin): a caller that does not win the claim gets the *requested* role, so
+   * `createUser({ …, role: 'admin' })` provisions an administrator without touching the claim. It is
+   * trusted-server code only — see {@link updateUser} for promoting an existing user.
    */
   async createUser(input: CreateUserInput): Promise<AuthActionResult> {
     const email = normalizeEmail(input.email);
@@ -382,29 +443,13 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     const existing = await db.findMany({ collection: this.collection, where: { email } });
     if (existing.length > 0) return { ok: false, reason: 'email-in-use' };
 
-    // Bootstrap race fix (spec 058 §7a): `hasAnyUser()` alone is check-then-act — two concurrent
-    // `createUser`/`signup` calls could both observe "no users yet" and both be granted `admin`. The
-    // atomic claim is the actual tie-breaker; `hasAnyUser()` remains a fast-path guard that skips the
-    // extra write once bootstrap is long over.
-    const role = (await this.hasAnyUser(db))
-      ? (input.role ?? 'viewer')
-      : (await this.claimFirstAdminBootstrap(db))
-        ? 'admin'
-        : (input.role ?? 'viewer');
     const passwordHash = await hashPassword(input.password);
-
-    let record: DatabaseRecord;
-    try {
-      record = await db.create(this.collection, {
-        email,
-        name: input.name ?? '',
-        role,
-        passwordHash
-      });
-    } catch (err) {
-      if (isUniqueConstraintError(err)) return { ok: false, reason: 'email-in-use' };
-      throw err;
-    }
+    const record = await this.insertUser(
+      db,
+      { email, name: input.name ?? '', passwordHash },
+      input.role ?? 'viewer'
+    );
+    if (record === 'email-in-use') return { ok: false, reason: 'email-in-use' };
 
     const user = sanitizeUser(record);
     const token = await issueToken(this.getSecret(), user, sessionVersionOf(record));
@@ -427,27 +472,15 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     const existing = await db.findMany({ collection: this.collection, where: { email } });
     if (existing.length > 0) return { ok: false, reason: 'email-in-use' };
 
-    // See the matching comment in `createUser` — same atomic-claim fix for the same race, reachable
-    // here through a *public* endpoint, which is exactly what makes this one security-sensitive.
-    const role = (await this.hasAnyUser(db))
-      ? 'viewer'
-      : (await this.claimFirstAdminBootstrap(db))
-        ? 'admin'
-        : 'viewer';
+    // Same path as `createUser`, reachable here through a *public* endpoint — which is what makes the
+    // first-admin provisioning security-sensitive. Nobody but the very first user can become admin.
     const passwordHash = await hashPassword(input.password);
-
-    let record: DatabaseRecord;
-    try {
-      record = await db.create(this.collection, {
-        email,
-        name: input.name ?? '',
-        role,
-        passwordHash
-      });
-    } catch (err) {
-      if (isUniqueConstraintError(err)) return { ok: false, reason: 'email-in-use' };
-      throw err;
-    }
+    const record = await this.insertUser(
+      db,
+      { email, name: input.name ?? '', passwordHash },
+      'viewer'
+    );
+    if (record === 'email-in-use') return { ok: false, reason: 'email-in-use' };
 
     const user = sanitizeUser(record);
     const token = await issueToken(this.getSecret(), user, sessionVersionOf(record));
@@ -479,6 +512,10 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
    * read cannot skip it. An update that cannot remove admin privilege is an ordinary `update()`.
    *
    * Returns `null` when the user does not exist (including one deleted while this call was in flight).
+   *
+   * Promoting an existing user (`{ role: 'admin' }`) is a plain update that never consults or touches the
+   * bootstrap claim — together with {@link createUser}, the trusted-server recovery for a database whose
+   * claim was burned before spec 060 (claim present, no admin).
    */
   async updateUser(id: string, input: Partial<CreateUserInput>): Promise<AuthUser | null> {
     const db = this.getDb();

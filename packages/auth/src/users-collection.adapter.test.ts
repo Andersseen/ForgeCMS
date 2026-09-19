@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import {
   runAuthAdapterContractTests,
+  runFirstAdminBootstrapContractTests,
   runLastAdminConcurrencyContractTests
 } from '@forge-cms/testing/contracts';
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
@@ -634,13 +635,43 @@ runLastAdminConcurrencyContractTests(async ({ collection, parties, gate }) => {
   };
 });
 
+// Spec 060: first-admin provisioning is one atomic write. InMemory shares a single adapter instance
+// between the parties (a second `InMemoryDatabaseAdapter` would be a second store); each still has its
+// own `UsersCollectionAuthAdapter`. The real-backend runs are in `db-parity` (independent libSQL clients)
+// and `@forge-cms/cloudflare`'s `first-admin-bootstrap` (real D1).
+runFirstAdminBootstrapContractTests(async ({ collection, parties, wrap }) => {
+  const database = new InMemoryDatabaseAdapter();
+  await database.syncSchema([defineUsersCollection({ slug: collection })]);
+
+  return {
+    contenders: Array.from({ length: parties }, () => ({
+      users: new UsersCollectionAuthAdapter({ devMode: true, collection }).init({
+        userDatabase: wrap(database)
+      }),
+      database
+    }))
+  };
+});
+
 describe('conditional-write capability (spec 059)', () => {
   it('refuses, at init, a database that cannot make the last-admin invariant atomic', () => {
     const legacy = { name: 'legacy-db' } as unknown as InMemoryDatabaseAdapter;
 
     expect(() =>
       new UsersCollectionAuthAdapter({ devMode: true }).init({ userDatabase: legacy })
-    ).toThrow(/updateIf\(\) and deleteIf\(\).*'legacy-db' does not/s);
+    ).toThrow(/updateIf\(\), deleteIf\(\) and atomicWrite\(\).*'legacy-db' does not/s);
+  });
+
+  it('refuses, at init, a database that has conditional writes but no atomicWrite (spec 060)', () => {
+    const half = {
+      name: 'half-db',
+      updateIf: () => Promise.resolve({ applied: false }),
+      deleteIf: () => Promise.resolve({ applied: false })
+    } as unknown as InMemoryDatabaseAdapter;
+
+    expect(() =>
+      new UsersCollectionAuthAdapter({ devMode: true }).init({ userDatabase: half })
+    ).toThrow(/atomicWrite\(\).*'half-db' does not/s);
   });
 
   it('a user deleted while a demotion is in flight reads as not-found, not as a last-admin refusal', async () => {
@@ -692,5 +723,87 @@ describe('conditional-write capability (spec 059)', () => {
     calls.length = 0;
     await adapter.deleteUser(second.user.id);
     expect(calls).toEqual(['deleteIf']); // no admin-count read, no post-write re-check
+  });
+});
+
+describe('first-admin provisioning call shape (spec 060)', () => {
+  async function freshInstall() {
+    const db = new InMemoryDatabaseAdapter();
+    const adapter = new UsersCollectionAuthAdapter({ devMode: true }).init({ userDatabase: db });
+    await adapter.syncSchema();
+    const calls: { method: string; args: unknown[] }[] = [];
+    for (const method of ['create', 'atomicWrite', 'update', 'updateIf'] as const) {
+      const original = (db[method] as (...args: unknown[]) => unknown).bind(db);
+      (db as unknown as Record<string, unknown>)[method] = (...args: unknown[]) => {
+        calls.push({ method, args });
+        return original(...args);
+      };
+    }
+    return { adapter, db, calls };
+  }
+
+  it('the first user is provisioned by ONE atomicWrite — claim and admin together, no standalone claim write', async () => {
+    const { adapter, calls } = await freshInstall();
+
+    const result = await adapter.signup({ email: 'first@example.com', password: 'password123' });
+    if (!result.ok) throw new Error('expected success');
+    expect(result.user.role).toBe('admin');
+
+    expect(calls.map((c) => c.method)).toEqual(['atomicWrite']);
+    const operations = calls[0]!.args[0] as { type: string; collection: string; data: object }[];
+    expect(operations.map((o) => `${o.type}:${o.collection}`)).toEqual([
+      'create:_forge_bootstrap',
+      'create:users'
+    ]);
+    expect(operations[0]?.data).toEqual({ slot: 'users' });
+    expect(operations[1]?.data).toMatchObject({ role: 'admin', email: 'first@example.com' });
+  });
+
+  it('every later user is an ordinary create — bootstrap adds no write once a user exists', async () => {
+    const { adapter, calls } = await freshInstall();
+    await adapter.signup({ email: 'first@example.com', password: 'password123' });
+    calls.length = 0;
+
+    await adapter.signup({ email: 'second@example.com', password: 'password123' });
+    await adapter.createUser({ email: 'third@example.com', password: 'password123' });
+
+    expect(calls.map((c) => c.method)).toEqual(['create', 'create']);
+    expect(calls.every((c) => c.args[0] === 'users')).toBe(true);
+  });
+
+  it('a caller that loses the claim falls back to an ordinary create of its requested role', async () => {
+    const { adapter, db, calls } = await freshInstall();
+    await db.create('_forge_bootstrap', { slot: 'users' }); // claim already taken (burned)
+    calls.length = 0;
+
+    const signup = await adapter.signup({ email: 'a@example.com', password: 'password123' });
+    const trusted = await adapter.createUser({
+      email: 'b@example.com',
+      password: 'password123',
+      role: 'editor'
+    });
+
+    expect(signup.ok && signup.user.role).toBe('viewer');
+    expect(trusted.ok && trusted.user.role).toBe('editor');
+    // The first caller attempted the atomic batch (rolled back by the claim conflict), then created
+    // normally; once that user exists, the second caller skips the bootstrap path entirely.
+    expect(calls.map((c) => c.method)).toEqual(['atomicWrite', 'create', 'create']);
+    expect(await db.count('_forge_bootstrap')).toBe(1);
+  });
+
+  it('the claim is scoped to its users collection: a second users collection gets its own first admin', async () => {
+    const db = new InMemoryDatabaseAdapter();
+    await db.syncSchema([defineUsersCollection(), defineUsersCollection({ slug: 'staff' })]);
+    const users = new UsersCollectionAuthAdapter({ devMode: true }).init({ userDatabase: db });
+    const staff = new UsersCollectionAuthAdapter({ devMode: true, collection: 'staff' }).init({
+      userDatabase: db
+    });
+
+    const a = await users.signup({ email: 'a@example.com', password: 'password123' });
+    const b = await staff.signup({ email: 'b@example.com', password: 'password123' });
+
+    expect(a.ok && a.user.role).toBe('admin');
+    expect(b.ok && b.user.role).toBe('admin');
+    expect(await db.count('_forge_bootstrap')).toBe(2);
   });
 });

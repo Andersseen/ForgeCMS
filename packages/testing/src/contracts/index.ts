@@ -4,6 +4,10 @@ export {
   runDatabaseAdapterQueryContractTests,
   runDatabaseAdapterConditionalWriteContractTests
 } from './database.js';
+export {
+  runDatabaseAdapterAtomicWriteContractTests,
+  type AtomicWriteContractOptions
+} from './atomic-write.js';
 export { runAuthAdapterContractTests } from './auth.js';
 export { runStorageAdapterContractTests } from './storage.js';
 export { runAnalyticsWriterContractTests } from './analytics.js';
@@ -17,3 +21,10 @@ export {
   type LastAdminHarnessFactory,
   type LastAdminUsers
 } from './last-admin.js';
+export {
+  runFirstAdminBootstrapContractTests,
+  type FirstAdminContender,
+  type FirstAdminDatabase,
+  type FirstAdminHarnessFactory,
+  type FirstAdminUsers
+} from './bootstrap.js';

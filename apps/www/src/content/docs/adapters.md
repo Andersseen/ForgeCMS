@@ -48,6 +48,9 @@ interface DatabaseAdapter<TRecord extends DatabaseRecord = DatabaseRecord> {
     id: string,
     condition: WriteCondition
   ): Promise<ConditionalDeleteResult>;
+  atomicWrite(
+    operations: readonly AtomicWriteOperation<TRecord>[]
+  ): Promise<AtomicWriteResult<TRecord>[]>;
   syncSchema(collections: CollectionDefinition[]): Promise<void>;
 }
 ```
@@ -64,6 +67,42 @@ run each as one guarded SQL statement, so it holds across independent Workers or
 transaction. Writing your own adapter? Implement both methods and run
 `runDatabaseAdapterConditionalWriteContractTests` alongside the other suites; `UsersCollectionAuthAdapter`
 refuses to initialise over a database that lacks them.
+
+`atomicWrite` is an **atomic write batch**: an ordered list of `create`/`update`/`delete`/`updateIf`/
+`deleteIf` operations (the same names and semantics as the methods above) that **all commit or none do**.
+It is declarative data — there is no callback, so no hook, HTTP call or other async work can run between
+statements — and it is database-only: a database and an object store (D1 + R2, libSQL + S3) can never
+commit together, so an upload lifecycle needs compensation, not a batch.
+
+```ts
+const [claim, user] = await database.atomicWrite([
+  { type: 'create', collection: '_forge_bootstrap', data: { slot: 'users' } },
+  { type: 'create', collection: 'users', data: { email, role: 'admin', passwordHash } }
+]);
+```
+
+- Operations run in order; later ones see what earlier ones wrote. Results come back in the same order
+  and length, discriminated by `type` (`create`/`update` → `{ record }`; `updateIf` → `{ applied, record? }`;
+  `deleteIf` → `{ applied }`; `delete` → `{}`). An empty batch returns `[]`.
+- Failure rolls everything back and rejects: a unique-index violation → `UniqueConstraintError` (its
+  `collection` says which table conflicted); a plain `update` of a missing row, or an `updateIf`/`deleteIf`
+  with `requireApplied: true` that does not apply → `AtomicWriteConditionError`. Without `requireApplied`
+  a conditional operation may report `applied: false` and the rest of the batch still commits — use
+  `requireApplied` whenever a later operation depends on it (e.g. a document compare-and-set followed by
+  its snapshot insert). `delete` of a missing row is a no-op.
+- Invalid input — more than `ATOMIC_WRITE_MAX_OPERATIONS` (25) operations, a malformed operation, and on
+  the SQL adapters an unknown column or unregistered collection — rejects **before anything is written**.
+- Retry: `UniqueConstraintError` and `AtomicWriteConditionError` mean "known rolled back". A network
+  failure after the request left the process is outcome-unknown; supply your own unique keys (on the SQL adapters, ids too) so a retry
+  is recognisable, and do not assume exactly-once.
+- `LibSqlDatabaseAdapter` runs one `client.batch(statements, 'write')`; `D1DatabaseAdapter` runs one D1
+  `batch()`; `InMemoryDatabaseAdapter` stages a copy of the touched collections and publishes it in one
+  synchronous turn (atomic within one adapter instance only). Writing your own adapter? It must be
+  genuinely atomic — a loop of independent writes is not an implementation. If you are SQLite-based, reuse
+  the exported `assertValidAtomicWrite`, `toAtomicWriteError`, `atomicWriteMustApply` (which operations
+  must be followed by the guard statement) and `ATOMIC_WRITE_REQUIRE_APPLIED_SQL`, and run
+  `runDatabaseAdapterAtomicWriteContractTests`. `UsersCollectionAuthAdapter` refuses to initialise over a
+  database that lacks `atomicWrite`, because first-admin provisioning depends on it.
 
 `FindManyOptions` is `{ collection, limit?, offset?, where?, sort?, order? }`. `count` must honour
 the same `where` as `findMany` — otherwise pagination advertises pages that do not exist. The SQL

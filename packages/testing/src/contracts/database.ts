@@ -791,6 +791,20 @@ export function runDatabaseAdapterConditionalWriteContractTests(
       });
     });
 
+    describe('update()', () => {
+      // InMemory used to merge `data` wholesale and could re-key a row (spec 059 adjacent finding (b));
+      // the SQL adapters always ignored `id`. Spec 060's batch `update` shares that code, so it is pinned
+      // here for the plain call on every adapter.
+      it('never rewrites the id', async () => {
+        await seed('k1', { role: 'editor' });
+        const updated = await adapter.update('roster', 'k1', { id: 'hijacked', role: 'viewer' });
+
+        expect(updated.id).toBe('k1');
+        expect(await adapter.findById('roster', 'hijacked')).toBeNull();
+        expect(await roleOf('k1')).toBe('viewer');
+      });
+    });
+
     describe('deleteIf', () => {
       it('deletes when the condition holds', async () => {
         await seed('d1', { version: 1 });

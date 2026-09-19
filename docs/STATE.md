@@ -1,11 +1,92 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-19.**
+> **Last updated: 2026-09-19 (spec 060).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Atomic write batches + first-admin provisioning (spec 060, 2026-09-19)
+
+The multi-statement primitive spec 059 named as the next step, plus its first consumer. One bounded step:
+`DatabaseAdapter` gained one **required** method, `atomicWrite`, and first-admin provisioning was moved
+onto it. See [docs/specs/060-atomic-write-batch-first-admin-provisioning.md](specs/060-atomic-write-batch-first-admin-provisioning.md)
+for the design, the verified backend semantics and the sufficiency evaluation.
+
+- **Primitive (`@forge-cms/db`)**: `atomicWrite(operations)` — an ordered, declarative, database-only list
+  of `create`/`update`/`delete`/`updateIf`/`deleteIf` operations (one per existing method) that **all commit
+  or none do**. Later operations see earlier ones; results return in input order (`{ type, … }`). It reuses
+  spec 059's `WriteCondition` unchanged; a conditional operation may report `applied: false` (rest still
+  commits) unless `requireApplied: true`, which — like a plain `update` of a missing row — fails and rolls
+  back the whole batch with `AtomicWriteConditionError`. A unique violation rejects with
+  `UniqueConstraintError` naming the conflicting table. Invalid input (over `ATOMIC_WRITE_MAX_OPERATIONS` =
+  25, malformed operation, on SQL adapters an unknown column/collection) rejects before anything is written.
+  **Not** a callback transaction, not raw SQL, and never spans object storage (D1 + R2 cannot commit together).
+- **Adapters**: libSQL runs one `client.batch(statements, 'write')` (built with drizzle `.toSQL()`,
+  because drizzle 0.45.2's own `db.batch()` uses `deferred`); D1 runs one `batch()`; InMemory stages a copy
+  of the touched collections and publishes it in one synchronous turn (atomic within one adapter instance
+  only). "Must apply" is decided **inside the database**: a guard statement (`SELECT abs(CASE WHEN changes()
+= 0 THEN -9223372036854775808 …)`) raises when the previous statement changed no row, aborting and
+  rolling back the batch — spiked on real libSQL and real local D1 first, because D1 has no interactive
+  transaction. D1's batch error carries no statement index, so the public error has no operation index.
+- **The bug and the fix (`@forge-cms/auth`)**: `UsersCollectionAuthAdapter` used to commit the
+  `_forge_bootstrap` claim and _then_ create the first user; if the second write failed the claim stayed
+  forever with no admin behind it (every later signup a `viewer`). Reproduced on `main` before designing
+  (claim count 1, users 0). Now `[create claim, create admin]` is one `atomicWrite`: a lost claim rolls back
+  and the caller falls back to an ordinary non-admin `create`; a duplicate email rolls the claim back too
+  (`email-in-use`); any other failure leaves nothing behind, so the next valid first user still becomes the
+  administrator. Found while proving it: the old flow could also be burned with **no infrastructure failure**
+  — a plain double-submit of the same first signup fails the claim-holder on the unique email (real libSQL
+  and D1; not InMemory). `init()` now also requires `atomicWrite`. Claim row shape unchanged.
+- **Already-burned claims (databases from before 060)**: not auto-repaired, on purpose — "claim present, no
+  admin" is indistinguishable from an intentionally emptied admin set, and repair would need a
+  cross-collection guard `WriteCondition` does not have; public signup stays `viewer`. Recovery is trusted
+  server code that never touches the claim: `auth.createUser({ …, role: 'admin' })` (works with zero users)
+  or `auth.updateUser(id, { role: 'admin' })`. Documented in `browser-auth.md`; tested on all three backends.
+- **Breaking for custom `DatabaseAdapter` implementations** (0.x `minor`; see the changeset). Nothing else in
+  this repo implements the interface. Also: `InMemoryDatabaseAdapter.update()` no longer rewrites a row's
+  `id` (spec 059 adjacent finding (b)); `createWriteGate` now also holds `create` and `atomicWrite`.
+- **Evidence**: new shared `runDatabaseAdapterAtomicWriteContractTests` (43 cases: commit/order, every
+  rollback shape, unique conflicts inside and across operations, missing targets, `requireApplied`, a
+  `keepAtLeast` guard inside a batch, invalid input leaving no partial write, hydration parity, cap, racing
+  batches) on InMemory, real libSQL and real local D1; new `runFirstAdminBootstrapContractTests` (12 cases:
+  barrier-held concurrent first signups on independent adapters incl. same-email, the failed-first-creation
+  regression for `signup`/`createUser` × unique/non-unique failure, burned-claim compatibility) on InMemory,
+  real on-disk libSQL with independent clients, and real D1 in workerd. Adapter-specific: libSQL asserts one
+  `client.batch(…, 'write')` and no `execute`; D1 asserts one `batch()` and no per-statement execution
+  (real-D1 instrumentation) plus emitted SQL/binding order and error classification. **Mutation-checked**:
+  dropping the guard fails 11 tests on libSQL / 13 on D1; partial publish fails 14 on InMemory; restoring the
+  old two-step bootstrap fails 13 tests on InMemory+libSQL and 6 on D1. `verify-release.mjs`'s packed
+  consumer now also exercises `atomicWrite` and the first-signup claim from the tarballs.
+- **Sufficiency (spec §8, nothing migrated)**: **D03** (document update + version insert) **fits one batch**
+  — `[updateIf(doc, CAS, requireApplied), create(version)]`; version numbering still needs a unique index +
+  retry. **D02** (cascade/set-null) **partly**: the dependent writes can be one batch decided by traversal/
+  policy/hooks outside the transaction, but it lacks a cross-collection "no referencing rows" guard
+  (`WriteCondition` is same-collection), and the 25-operation cap needs a chunk-or-reject rule. DB + object
+  storage: not expressible — needs compensation with durable recovery.
+- **Known limitations (stated, not hidden)**: (1) the generic content CRUD path on the users collection
+  (`/api/v1/users`, `runtime.update/delete`) **still bypasses** the last-admin/lifecycle invariants — rest of
+  H02, untouched. (2) D02, D03 and the DB + object-storage lifecycle are **not** migrated/solved. (3) Remote
+  Turso and production D1 are not exercised; real-D1 evidence is same-isolate on local D1. (4) The guard relies
+  on SQLite `changes()` and the `abs()` overflow error, verified on libSQL 0.17.3 and local D1. (5)
+  `InMemoryDatabaseAdapter` accepts a duplicate primary key on `create` (libSQL/D1 reject it) —
+  pre-existing, found here, not fixed; it is why "supply your own ids so a retry is recognisable" is stated
+  for SQL adapters only.
+- **Verified 2026-09-19 (all uncached: `turbo --force`, 0 cached)**: `pnpm build` (14/14); one combined
+  `turbo run lint typecheck test` run of 52 tasks, all successful (unit tests: 297 db / 241 auth / 110
+  cloudflare / 318 runtime); `test:cloudflare` (175 real-workerd tests in 12 files + tiny-project D1
+  lifecycle); `test:libsql` (3); `check:api` (baseline intentionally +9 names in `@forge-cms/db`, +7 in
+  `@forge-cms/testing/contracts`, no removals); `format:check`; `release:verify`; and the consumer E2Es
+  `e2e:www` 19/19, `e2e:tiny-project` 9/9, `e2e:demo` 9/9. `pnpm lint` still reports 4 pre-existing
+  warnings in `libsql.adapter.ts` (spec 059's misplaced `eslint-disable` comments; identical on `HEAD`).
+  Reviewed by the `forge-rules-reviewer` and `spec-reviewer` agents (auth-sensitive work): no rule or
+  acceptance-criterion violations; their findings were addressed — SQL adapters now fail loudly if the
+  driver returns fewer results than statements (instead of reading a missing result as `applied: false`),
+  the batch helper is exported as `atomicWriteMustApply` and documented, `update()` id-immutability is a
+  contract case on all three adapters, and the error classifier has unit tests. Not run: any remote
+  Cloudflare/Turso deployment. Nothing published; no version bumped; changes are uncommitted on
+  `feature/spec-060-atomic-write-batch`.
 
 ## CI back to green — Playwright install race + stale tiny-project E2E (2026-09-19)
 
@@ -78,10 +159,11 @@ RETURNING *` / `DELETE … RETURNING id`), so the decision is the database's and
   suffices for H02 last-admin, migration bookkeeping and per-document optimistic concurrency, but not for
   D02 (cascade: N writes + a cross-collection "no referencing rows" guard) or D03 (document + version
   must commit together), which need a multi-statement atomic batch (D1 `batch()` / libSQL batch).
+  **That batch now exists — spec 060 (entry above); D02/D03 are still not migrated to it.**
 - **Adjacent findings, reproduced but deliberately not fixed here**: (a) a failed first-user `create()`
   permanently burns the spec-058 `_forge_bootstrap` claim — no later caller can win it, every later
   signup becomes `viewer`, and the collection is left with zero admins and no in-band way out (needs an
-  atomic "create as admin unless one exists", i.e. the next primitive). (b) `InMemoryDatabaseAdapter.update()` merges `data` wholesale, so it can rewrite a row's `id` (the SQL
+  atomic "create as admin unless one exists", i.e. the next primitive). **Fixed by spec 060 (entry above).** (b) _(fixed by spec 060)_ `InMemoryDatabaseAdapter.update()` merges `data` wholesale, so it can rewrite a row's `id` (the SQL
   adapters and `updateIf` ignore it) — pre-existing. (c) `apps/tiny-project`'s
   `e2e/golden-path.spec.ts` "content admin: create a post with a relation…" **fails on clean `main`**
   (verified by stashing this work and re-running): it expects the public post page to show
@@ -1038,6 +1120,15 @@ passwordHash`~~ — **fixed 2026-07-22, spec 018.** `@forge-cms/auth` now export
       content** instead, the pattern `ForgeCollectionListComponent` (spec 052) already used.
 
 ## What's next
+
+**Next bounded step (recommended after spec 060, 2026-09-19): close the generic users-collection CRUD
+bypass (rest of roadmap H02).** The storage-level invariants now hold — last-admin (059) and first-admin
+provisioning (060) are decided by the database — but `PUT/DELETE /api/v1/users/:id` and
+`runtime.update/delete` on the users collection still run through the content pipeline, which knows nothing
+about them, so an ordinary content write can delete or demote the last admin. It is small, security-relevant,
+and roadmap D01 lists the H02 storage decisions as a dependency, so it comes before D03 (document + version
+in one `atomicWrite`, which spec 060 §8 shows now fits one batch) and D02 (cascade, which still needs a
+cross-collection guard and a cap rule). Nothing of that is started.
 
 Work is planned in [ROADMAP.md](ROADMAP.md), which sequences the remaining gaps by cost-of-delay.
 Each numbered item there gets its own spec in `docs/specs/` when picked up, per [SDD.md](SDD.md).
