@@ -1,11 +1,35 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-23 (spec 061).**
+> **Last updated: 2026-09-23 (admin layout fix).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Admin shell: fixed sidebar/header, scrollable content only (2026-09-23)
+
+`ForgeAdminLayoutComponent` (`@forge-cms/admin`) used `min-h-screen` on its outer shell, so a page with
+enough content to overflow the viewport (found on `apps/demo-aesthetics`'s Clinic settings, which lists
+every weekday's opening hours as its own field group) scrolled the **whole admin shell** — sidebar and
+top header bar included — instead of just the page content. Fixed: the shell is now `h-dvh overflow-
+hidden` (pinned to the viewport, not just a minimum), the header keeps its own bounded region, and only
+the `<router-outlet>` content area scrolls (`flex-1 min-h-0 overflow-y-auto` — `min-h-0` is what lets a
+flex child actually shrink below its content's natural height instead of forcing the ancestor to grow).
+CSS-only; no template structure or public API changed. Verified visually with a real dev server
+(Playwright MCP, before/after screenshots) and by re-running `e2e:www`/`e2e:demo`/`e2e:tiny-project`
+(all three mount this shared shell) — all green. Changeset: `admin-layout-fixed-sidebar-scroll.md`
+(`@forge-cms/admin`, patch).
+
+Same session, app-local (no changeset — `apps/*` don't need one): `apps/demo-aesthetics`'s admin
+Overview dashboard gained a "Site traffic" card next to the booking inbox, reusing
+`ForgeAnalyticsApiService` (spec 057) to show last-7-days pageviews with a link to the full `/admin/
+analytics` page. Shows "Not set up yet" until the deployment has `CLOUDFLARE_ACCOUNT_ID`/
+`CLOUDFLARE_ANALYTICS_TOKEN` secrets (an Analytics-Engine-write binding already exists in
+`wrangler.toml`; only the read side's API credentials are missing) — those need to be created from the
+Cloudflare dashboard (My Profile → API Tokens) and handed over to be set via `wrangler pages secret
+put`; not done here because minting a scoped API token isn't something `wrangler` (or this session's
+OAuth login) can do.
 
 ## Auth-managed collection mutation boundary — H02 closed (spec 061, 2026-09-20, reviewed and refined 2026-09-23)
 
