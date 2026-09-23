@@ -1,11 +1,98 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-19 (spec 060).**
+> **Last updated: 2026-09-23 (spec 061).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Auth-managed collection mutation boundary — H02 closed (spec 061, 2026-09-20, reviewed and refined 2026-09-23)
+
+The last open item of roadmap packet H02. The users collection is an ordinary Forge collection too, and
+the ordinary content pipeline — `runtime.create/update/delete` and `POST/PUT/PATCH/DELETE /api/v1/users` —
+knew nothing about the lifecycle `UsersCollectionAuthAdapter` enforces (specs 058–060). One bounded step:
+a generic contract for "this adapter owns that collection" and one runtime guard. See
+[docs/specs/061-auth-managed-collection-mutation-boundary.md](specs/061-auth-managed-collection-mutation-boundary.md)
+for the reproduction table, the design and the rejected alternatives.
+
+- **Reproduced first** (`packages/runtime/src/auth-managed-collection.test.ts`, run against unmodified
+  `main` — 48 of 57 cases failed): a trusted `runtime.delete({ collection: 'users', id })` removed the only
+  administrator on InMemory **and** libSQL (users → 0) while `auth.deleteUser` refused it; generic
+  `update` demoted the last admin; generic `create` produced a row with an un-normalised email and a
+  caller-chosen `passwordHash`; over HTTP an admin got POST `201` / PUT·PATCH `200` / DELETE `204`; on a
+  hand-rolled `withAuthFields` collection (the shape `apps/www` and the demo use) an **editor could promote
+  themselves to admin** through `PUT /api/v1/users/:id`; deleting a `media` document that
+  `users.avatar` (`set-null`/`cascade`) referenced wrote into the users rows.
+- **Contract (`@forge-cms/auth`)**: one optional `AuthAdapter.managesCollection?(slug): boolean`.
+  `UsersCollectionAuthAdapter` claims exactly its configured `collection` (so `members` is protected and a
+  plain collection called `users` is not); `CompositeAuthAdapter` claims what any child claims; every other
+  adapter omits it (absent = `false`) and is unaffected.
+- **Guard (`@forge-cms/runtime`)**: `create`, `update`, `deleteDocumentInternal` and `restoreVersion` call
+  `assertNotAuthManaged` as their first step and throw the new `AuthManagedCollectionError` — HTTP `403`,
+  code `AUTH_MANAGED_COLLECTION`, one fixed message — **before** hooks, access checks and any read or
+  write, so it is identical for trusted (`overrideAccess: true`, the default), admin, viewer and anonymous
+  callers and for a document that does not exist, and a refusal has no side effects (pinned by a hook-spy
+  test). Relation cascade/set-null are covered because `deleteDocumentInternal`'s own mutator routes
+  through `deleteDocumentInternal`/`update`; the **low-level** `handleCascadeDelete`/`handleSetNullOnDelete`
+  called _without_ a mutator (their documented raw-adapter fallback, a `@forge-cms/runtime` export, not
+  the `DatabaseAdapter` escape hatch) get the same guard too, found in review. `handleCreate` also checks
+  before multipart parsing, not only inside `runtime.create` — found in review, so a managed, `upload:
+true` collection's create can no longer touch storage at all before the refusal (previously refused
+  correctly but only after a real, compensated write). No other handler changed (the existing `ForgeError`
+  → envelope mapping carries it). A `cascade`/`set-null`
+  relation whose dependent collection is managed is rejected up front in `checkDeleteRestrictions`
+  (`400`, before any write, message pinned by a test) — honestly: there is no supported way to clear the
+  reference and retry (see the known-limitations entry below), so it does not say "remove references
+  first". **Broad on purpose**: every generic write is refused, not a classified subset
+  of "sensitive" fields — nothing from the auth adapter's lifecycle is duplicated in the runtime.
+- **Unchanged**: reads (`find`/`findOne`/`findByID`/`count`/`depth:1` population, read access, hidden
+  fields), every non-managed collection, `preview` (non-persistent), custom adapters. The canonical mutation
+  surface is `createUser`/`updateUser`/`deleteUser`/`signup` and the host's `/api/auth/users*` routes.
+- **Found and fixed on the way** (`@forge-cms/auth`): `_sessionVersion` was written by `updateUser` on a
+  password change but never declared as a field. **On libSQL and D1 `updateUser(id, { password })` threw
+  `Unknown column '_sessionVersion'`** — password change/reset through the dedicated surface did not work
+  on any SQL backend (spec 058's session test only ever ran on InMemory) — and InMemory returned the counter
+  on every read. `AUTH_USER_FIELDS` now declares it (number, read/write `[]`), so `withAuthFields()` /
+  `defineUsersCollection()` create the column, the additive `syncSchema` migration adds it to existing
+  tables, and reads hide it. No backfill (missing = `0`); `withAuthFields()` now lets an explicit
+  declaration win per field.
+- **Evidence**: the 61-case runtime suite (Local API trusted/admin/viewer/anonymous × create/update/delete on
+  InMemory + libSQL, last-admin/first-admin, an auth-owned-field table, HTTP POST/PUT/PATCH/DELETE with
+  Bearer/cookie/anonymous and envelope checks, reads, custom slug `members` vs plain `users`, composite,
+  custom adapter, `restoreVersion`, cascade/set-null/restrict with the honest message pinned, the low-level
+  `handleCascadeDelete`/`handleSetNullOnDelete` primitives called without a mutator, a hook spy proving a
+  refusal has no side effects, a multipart-upload storage-spy regression, the raw-adapter boundary pinned);
+  auth unit + InMemory/libSQL parity tests for `managesCollection` and password change; the real local D1
+  and real libSQL tiny-project tests; the tiny-project E2E (same-origin admin generic PUT/DELETE/POST →
+  `403`, reads clean); `verify-release.mjs` from the packed tarballs. Reworked two existing tests that had
+  encoded the old behaviour (`browser-auth-integration.test.ts`: the CSRF coverage moved to an ordinary
+  function-access collection so a `403` cannot pass for the wrong reason). **Reviewed by the
+  `forge-rules-reviewer` and `spec-reviewer` agents** (auth-sensitive work, per this project's standing
+  practice): no rule violations; `spec-reviewer` independently re-ran the suites and confirmed all nine
+  acceptance criteria; six findings between the two passes, all addressed — two closed real gaps (a
+  low-level raw-write path and a pre-refusal storage side effect, both now guarded and regression-tested),
+  one dropped a dead `operation` field from the public error, one made the relation-cascade dead end
+  honest instead of promising a nonexistent remedy, two were documentation-only. See the spec's Outcome
+  for the full list and exact mutation-check numbers.
+- **Known limitations (stated, not hidden)**: (1) custom non-auth fields on a managed collection
+  (`avatar`, `jobTitle`, `status` in `apps/www`/the demo) are now **read-only through Forge's generic
+  surface** — `updateUser` only accepts email/name/role/password; widening it is the follow-up, not a
+  second write path. **Consequence, found in review**: a custom relation field on a managed collection
+  with `onDelete: 'cascade' | 'set-null'` makes a referenced document of the other collection
+  permanently undeletable through the supported surface — the pre-flight rejection says so honestly
+  rather than claiming "remove the reference first" (no collection here has such a field today).
+  (2) Direct `DatabaseAdapter` access is trusted low-level infrastructure and bypasses
+  runtime and auth guarantees alike (documented). (3) The generic content admin still lists the users
+  collection with edit actions that now fail with the message above; `describeCollections()` does not yet
+  say "managed" (users belong to `ForgeUsersWorkspaceComponent`) and — a pre-existing pattern, not a
+  regression, found in review alongside (3) — now also lists `_sessionVersion` as a plain number field
+  for the same reason `passwordHash` already was (`describe.ts` doesn't filter by field `access`). (4) A
+  multi-level cascade chain that reaches a managed collection is only discovered at that level
+  (pre-existing non-atomicity, D02).
+  (5) `pnpm check:api` tracks export **names** only, so the new optional `AuthAdapter` member is not in
+  the baseline (only `AuthManagedCollectionError` is). (6) Remote Turso and production D1 not exercised.
+- **Verified**: see "Verification" at the end of the spec's Outcome.
 
 ## Atomic write batches + first-admin provisioning (spec 060, 2026-09-19)
 
@@ -67,7 +154,7 @@ for the design, the verified backend semantics and the sufficiency evaluation.
   storage: not expressible — needs compensation with durable recovery.
 - **Known limitations (stated, not hidden)**: (1) the generic content CRUD path on the users collection
   (`/api/v1/users`, `runtime.update/delete`) **still bypasses** the last-admin/lifecycle invariants — rest of
-  H02, untouched. (2) D02, D03 and the DB + object-storage lifecycle are **not** migrated/solved. (3) Remote
+  H02, untouched. **Closed by spec 061 (entry above).** (2) D02, D03 and the DB + object-storage lifecycle are **not** migrated/solved. (3) Remote
   Turso and production D1 are not exercised; real-D1 evidence is same-isolate on local D1. (4) The guard relies
   on SQLite `changes()` and the `abs()` overflow error, verified on libSQL 0.17.3 and local D1. (5)
   `InMemoryDatabaseAdapter` accepts a duplicate primary key on `create` (libSQL/D1 reject it) —
@@ -150,7 +237,7 @@ RETURNING *` / `DELETE … RETURNING id`), so the decision is the database's and
   then compensate and refuse). Only the naive control shows a permanent zero-admin outcome.
 - **Known limitations (stated, not hidden)**: (1) the generic content CRUD path on the users collection
   (`/api/v1/users`, `runtime.update/delete`) does not run this guard — only `/api/auth/users*` /
-  `updateUser`/`deleteUser` do; that remaining H02 audit item is untouched. (2) Remote libSQL/Turso shares SQLite semantics but is not exercised by tests here, and the real-D1
+  `updateUser`/`deleteUser` do; that remaining H02 audit item is untouched. **Closed by spec 061 (entry above).** (2) Remote libSQL/Turso shares SQLite semantics but is not exercised by tests here, and the real-D1
   evidence is same-isolate against local D1 (that separate Worker isolates against remote D1 are
   serialized rests on Cloudflare's documented "processes queries one at a time"). InMemory does not
   validate column names (a typo'd `where` silently matches nothing there); a bad `others` rejects on all
@@ -1121,14 +1208,14 @@ passwordHash`~~ — **fixed 2026-07-22, spec 018.** `@forge-cms/auth` now export
 
 ## What's next
 
-**Next bounded step (recommended after spec 060, 2026-09-19): close the generic users-collection CRUD
-bypass (rest of roadmap H02).** The storage-level invariants now hold — last-admin (059) and first-admin
-provisioning (060) are decided by the database — but `PUT/DELETE /api/v1/users/:id` and
-`runtime.update/delete` on the users collection still run through the content pipeline, which knows nothing
-about them, so an ordinary content write can delete or demote the last admin. It is small, security-relevant,
-and roadmap D01 lists the H02 storage decisions as a dependency, so it comes before D03 (document + version
-in one `atomicWrite`, which spec 060 §8 shows now fits one batch) and D02 (cascade, which still needs a
-cross-collection guard and a cap rule). Nothing of that is started.
+**Next bounded step (recommended after spec 061, 2026-09-20): D01/D03 — make a document write and its
+version snapshot consistent with `atomicWrite()`.** H02 is complete: first-admin provisioning (060),
+last-admin (059) and the generic-CRUD boundary (061) all hold, so D01's H02 storage dependency is settled.
+Spec 060 §8 already shows D03's document + version write fits one batch
+(`[updateIf(doc, CAS, requireApplied), create(version)]`, plus a unique index and retry for version
+numbering); D02 (cascade) still needs a cross-collection "no referencing rows" guard and a cap rule, so it
+stays after D03. Nothing of that is started. Also open, small and independent: let `updateUser` carry the
+custom profile fields of a managed collection (known limitation 1 above) if a consumer needs it.
 
 Work is planned in [ROADMAP.md](ROADMAP.md), which sequences the remaining gaps by cost-of-delay.
 Each numbered item there gets its own spec in `docs/specs/` when picked up, per [SDD.md](SDD.md).

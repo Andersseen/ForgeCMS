@@ -89,4 +89,9 @@ export class CompositeAuthAdapter<TUser extends AuthUser = AuthUser> implements 
       await adapter.syncSchema?.();
     }
   }
+
+  /** A collection is managed when any child adapter manages it (spec 061); `false` if none does. */
+  managesCollection(slug: string): boolean {
+    return this.adapters.some((adapter) => adapter.managesCollection?.(slug) === true);
+  }
 }

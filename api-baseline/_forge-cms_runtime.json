@@ -3,6 +3,7 @@
   "AccessDeniedError",
   "AdapterSet",
   "AuthHandlerOptions",
+  "AuthManagedCollectionError",
   "BaseOperationArgs",
   "BlockDescription",
   "CollectionDescription",

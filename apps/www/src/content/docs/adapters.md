@@ -125,10 +125,21 @@ interface AuthAdapter<TUser extends AuthUser = AuthUser> {
   extractToken(request: Request): string | null;
   validateSession(token: string): Promise<AuthSession<TUser> | null>;
   requireAuth(request: Request): Promise<TUser>;
+  // optional, all additive: syncSchema?(), canHandleToken?(token), login?(…), signup?(…), and
+  managesCollection?(slug: string): boolean;
 }
 ```
 
 `requireAuth` throws `ForgeAuthError` with code `unauthorized`, `forbidden` or `expired`.
+
+**`managesCollection?(slug)`** declares that the adapter owns the identity and lifecycle of a Forge
+collection's documents. When it returns `true`, the runtime refuses generic `create`/`update`/`delete`
+of that collection with `AuthManagedCollectionError` (`403`, `AUTH_MANAGED_COLLECTION`) — Local API with
+`overrideAccess` `true` or `false`, and HTTP — because those writes would bypass the adapter's own
+invariants. Reads and every other collection are unaffected. Omit it (absent means `false`) unless your
+adapter stores users in a Forge collection and enforces rules on them; `UsersCollectionAuthAdapter`
+answers `true` for exactly its configured `collection`, and `CompositeAuthAdapter` for whatever any child
+claims.
 
 ### `UsersCollectionAuthAdapter`
 

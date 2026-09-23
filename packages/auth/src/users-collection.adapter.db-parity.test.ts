@@ -66,6 +66,37 @@ describe.each(adapters)('UsersCollectionAuthAdapter on %s (adapter parity)', (_n
     }
   });
 
+  // Spec 061: `updateUser({ password })` writes `_sessionVersion`. It was never a declared column, so on
+  // libSQL and D1 the write threw `Unknown column '_sessionVersion'` — a password change (and the
+  // admin's password reset) did not work on any SQL backend; only InMemory had ever run the test.
+  it('changes a password, invalidates earlier sessions and keeps _sessionVersion off every read', async () => {
+    const db = createDb();
+    await db.syncSchema([defineUsersCollection()]);
+    const auth = new UsersCollectionAuthAdapter({ devMode: true }).init({ userDatabase: db });
+
+    const created = await auth.createUser({ email: 'pw@example.com', password: 'password123' });
+    if (!created.ok) throw new Error('expected success');
+
+    await expect(
+      auth.updateUser(created.user.id, { password: 'a-different-password' })
+    ).resolves.toMatchObject({ email: 'pw@example.com' });
+
+    expect(await auth.validateSession(created.token)).toBeNull();
+    expect((await auth.login('pw@example.com', 'password123')).ok).toBe(false);
+    const relogin = await auth.login('pw@example.com', 'a-different-password');
+    expect(relogin.ok).toBe(true);
+    if (relogin.ok) expect(await auth.validateSession(relogin.token)).not.toBeNull();
+
+    // A second change bumps the counter again; the stored value is a number on every adapter.
+    await auth.updateUser(created.user.id, { password: 'yet-another-password' });
+    expect((await db.findById('users', created.user.id))?._sessionVersion).toBe(2);
+
+    for (const user of await auth.listUsers()) {
+      expect(user).not.toHaveProperty('_sessionVersion');
+      expect(user).not.toHaveProperty('passwordHash');
+    }
+  });
+
   it('is race-safe against a duplicate (normalized) email under the unique index', async () => {
     const db = createDb();
     await db.syncSchema([defineUsersCollection()]);

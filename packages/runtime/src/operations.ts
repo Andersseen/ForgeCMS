@@ -12,6 +12,7 @@ import {
   ValidationFailedError
 } from './errors.js';
 import { documentMatches, mergeWhere } from './access.js';
+import { assertNotAuthManaged } from './auth-managed.js';
 import { validateSort, validateWhere } from './query-validation.js';
 import { applyAutoSlugs, applyFieldDefaults } from './defaults.js';
 import { checkAccess, statusConstraint } from './read-policy.js';
@@ -385,6 +386,7 @@ export async function count(ctx: OperationContext, args: CountArgs): Promise<num
 
 export async function create(ctx: OperationContext, args: CreateArgs): Promise<DatabaseRecord> {
   const collection = getCollectionOrThrow(ctx, args.collection);
+  assertNotAuthManaged(ctx, args.collection);
   const user = args.user ?? null;
   const overrideAccess = args.overrideAccess !== false;
 
@@ -482,6 +484,7 @@ export async function create(ctx: OperationContext, args: CreateArgs): Promise<D
 
 export async function update(ctx: OperationContext, args: UpdateArgs): Promise<DatabaseRecord> {
   const collection = getCollectionOrThrow(ctx, args.collection);
+  assertNotAuthManaged(ctx, args.collection);
   const user = args.user ?? null;
   const overrideAccess = args.overrideAccess !== false;
 
@@ -618,6 +621,8 @@ export async function restoreVersion(
   args: RestoreVersionArgs
 ): Promise<DatabaseRecord> {
   const collection = getCollectionOrThrow(ctx, args.collection);
+  // A restore is an update; refuse it before reading the snapshot so the answer never depends on it.
+  assertNotAuthManaged(ctx, args.collection);
   if (!versionsEnabled(collection)) {
     throw new Error(`Collection '${args.collection}' does not have versions enabled`);
   }
@@ -683,6 +688,7 @@ async function deleteDocumentInternal(
 ): Promise<DatabaseRecord> {
   const key = `${args.collection}:${args.id}`;
   const collection = getCollectionOrThrow(ctx, args.collection);
+  assertNotAuthManaged(ctx, args.collection);
   const user = args.user ?? null;
   const overrideAccess = args.overrideAccess !== false;
 

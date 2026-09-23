@@ -128,4 +128,17 @@ export interface AuthAdapter<TUser extends AuthUser = AuthUser> {
    * just through a UI that happens to hide the field.
    */
   signup?(input: PublicSignupInput): Promise<AuthActionResult<TUser>>;
+  /**
+   * Optional (spec 061): does this adapter own the identity and lifecycle of the documents in the
+   * collection `slug`? When it returns `true`, `@forge-cms/runtime` refuses every generic content
+   * `create`/`update`/`delete` of that collection — Local API (trusted or not) and HTTP alike — because
+   * those bypass the adapter's own invariants (first-admin provisioning, last-admin protection,
+   * password hashing, email normalisation, session versioning). Reads are unaffected, and so is direct
+   * `DatabaseAdapter` access, which is trusted low-level infrastructure below these guarantees.
+   *
+   * Adapters that keep no users in a Forge collection (`ExternalAuthAdapter`, `SignedTokenAuthAdapter`,
+   * `ApiKeyAuthAdapter`, `InMemoryAuthAdapter`, any third-party adapter) simply omit it: absent means
+   * `false`. Fully optional and backward compatible.
+   */
+  managesCollection?(slug: string): boolean;
 }

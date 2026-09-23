@@ -251,6 +251,30 @@ describe('CompositeAuthAdapter', () => {
   });
 });
 
+describe('CompositeAuthAdapter.managesCollection (spec 061)', () => {
+  it('claims a collection when any child adapter manages it', () => {
+    const composite = new CompositeAuthAdapter([
+      new ApiKeyAuthAdapter(),
+      new UsersCollectionAuthAdapter({ devMode: true, collection: 'members' })
+    ]);
+    expect(composite.managesCollection('members')).toBe(true);
+    expect(composite.managesCollection('users')).toBe(false);
+  });
+
+  it('claims nothing when no child adapter manages a collection', () => {
+    const { adapter } = stubAdapter({ requireAuth: async () => ({ id: 'x' }) });
+    const composite = new CompositeAuthAdapter([new ApiKeyAuthAdapter(), adapter]);
+    expect(composite.managesCollection('users')).toBe(false);
+    expect(composite.managesCollection('_forge_api_keys')).toBe(false);
+  });
+
+  it('ignores a child whose managesCollection is absent or returns false', () => {
+    const { adapter } = stubAdapter({ requireAuth: async () => ({ id: 'x' }) });
+    const declines: AuthAdapter = { ...adapter, managesCollection: () => false };
+    expect(new CompositeAuthAdapter([adapter, declines]).managesCollection('anything')).toBe(false);
+  });
+});
+
 // AuthAdapter contract, run against a composite wrapping a real UsersCollectionAuthAdapter — proves
 // the composite itself satisfies the same contract every other adapter does.
 const contractDb = new InMemoryDatabaseAdapter();

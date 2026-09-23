@@ -1,6 +1,7 @@
 import type { CmsUser, CollectionDefinition, RelationFieldOptions } from '@forge-cms/core';
 import type { DatabaseRecord } from '@forge-cms/db';
 import type { OperationContext } from './context.js';
+import { assertNotAuthManaged, isAuthManagedCollection } from './auth-managed.js';
 import { InvalidInputError } from './errors.js';
 
 /**
@@ -53,10 +54,25 @@ export interface RelationIntegrityOptions {
   visited?: Set<string>;
 }
 
+/**
+ * The raw-adapter fallback used when a caller invokes `handleCascadeDelete`/`handleSetNullOnDelete`
+ * directly, without a `mutator` — a low-level primitive, but still a `@forge-cms/runtime` public export,
+ * not the raw `DatabaseAdapter` escape hatch itself. The boundary (spec 061) applies here too: it would
+ * otherwise be a second, undocumented generic-write path into a managed collection, reachable without
+ * ever going through `operations.ts`. `operations.ts`'s own `deleteDocumentInternal` always supplies a
+ * real mutator (backed by its own `deleteDocumentInternal`/`update`, already guarded), so this only
+ * changes behavior for a caller using the raw fallback on purpose.
+ */
 function defaultMutator(ctx: OperationContext): RelationMutator {
   return {
-    deleteDocument: (args) => ctx.adapters.database.delete(args.collection, args.id),
-    update: (args) => ctx.adapters.database.update(args.collection, args.id, args.data)
+    deleteDocument: (args) => {
+      assertNotAuthManaged(ctx, args.collection);
+      return ctx.adapters.database.delete(args.collection, args.id);
+    },
+    update: (args) => {
+      assertNotAuthManaged(ctx, args.collection);
+      return ctx.adapters.database.update(args.collection, args.id, args.data);
+    }
   };
 }
 
@@ -113,6 +129,16 @@ export async function findReferencingDocuments(
  * `required: true` field that has live references: a null value can never satisfy a required field, so
  * this is treated the same as `restrict` rather than failing deep inside a partially-completed cascade
  * with a generic validation error (spec 058 §5's required-field-on-set-null guard).
+ *
+ * The same applies to a `cascade`/`set-null` relation whose dependent collection is managed by the
+ * auth adapter (spec 061): the cascade would be a generic write into that collection, which the runtime
+ * refuses for everyone, so it is rejected here — before any mutation, with a message about the document
+ * being deleted rather than about the managed collection — instead of failing part-way through.
+ *
+ * There is deliberately no supported way to clear the reference and retry: the auth adapter's own
+ * `updateUser` only accepts email/name/role/password, not an arbitrary custom field, so this rejection
+ * is not "remove the reference, then delete" advice — see the error message, and spec 061 §7/Non-goals.
+ * The only way past it is the documented raw `DatabaseAdapter` escape hatch (outside runtime guarantees).
  */
 export async function checkDeleteRestrictions(
   ctx: OperationContext,
@@ -125,7 +151,9 @@ export async function checkDeleteRestrictions(
     for (const { fieldName, options } of relations) {
       const onDelete = options.onDelete ?? 'restrict';
       const unsafeRequiredSetNull = onDelete === 'set-null' && options.required === true;
-      if (onDelete !== 'restrict' && !unsafeRequiredSetNull) continue;
+      const authManagedDependent =
+        onDelete !== 'restrict' && isAuthManagedCollection(ctx, collection.slug);
+      if (onDelete !== 'restrict' && !unsafeRequiredSetNull && !authManagedDependent) continue;
 
       const referencing = await findReferencingDocuments(
         ctx,
@@ -136,6 +164,17 @@ export async function checkDeleteRestrictions(
       );
 
       if (referencing.length === 0) continue;
+
+      if (authManagedDependent) {
+        throw new InvalidInputError(
+          `Cannot delete document '${documentId}' from '${targetCollection.slug}': ` +
+            `${referencing.length} document(s) in '${collection.slug}' reference it with ` +
+            `onDelete '${onDelete}', but '${collection.slug}' is managed by the configured auth adapter, ` +
+            `so a relation cascade cannot change it. Clearing the reference on those document(s) is not ` +
+            `possible through generic collection CRUD or the auth adapter's user-management operations; ` +
+            `it requires direct database access, which is outside runtime guarantees`
+        );
+      }
 
       if (unsafeRequiredSetNull) {
         throw new InvalidInputError(

@@ -127,8 +127,10 @@ describe('real local D1 — full small-project server lifecycle', () => {
       })
     ).resolves.toBeTruthy();
 
-    // Role boundary: an editor may never manage users (not gated by the generic `posts` access rule
-    // at all — this exercises `defineUsersCollection()`'s own `access.create`, `isAdmin(user)`).
+    // Spec 061 — real local D1. `users` is managed by the auth adapter, so generic content CRUD on it is
+    // refused for *every* caller (this used to be gated only by `defineUsersCollection()`'s own
+    // `access.create`, `isAdmin(user)`, which a trusted `overrideAccess: true` call skips entirely).
+    const managed = { code: 'AUTH_MANAGED_COLLECTION', status: 403 };
     await expect(
       runtime.create({
         collection: 'users',
@@ -136,6 +138,33 @@ describe('real local D1 — full small-project server lifecycle', () => {
         user: editor.user,
         data: { email: 'nope@d1.test' }
       })
-    ).rejects.toThrow();
+    ).rejects.toMatchObject(managed);
+    await expect(
+      runtime.create({ collection: 'users', data: { email: 'trusted@d1.test', role: 'admin' } })
+    ).rejects.toMatchObject(managed);
+    await expect(
+      runtime.update({
+        collection: 'users',
+        id: editor.user.id,
+        data: { role: 'admin' },
+        overrideAccess: false,
+        user: editor.user
+      })
+    ).rejects.toMatchObject(managed);
+
+    // The only administrator survives a generic trusted delete, and the canonical path agrees.
+    await expect(runtime.delete({ collection: 'users', id: admin.user.id })).rejects.toMatchObject(
+      managed
+    );
+    await expect(auth.deleteUser(admin.user.id)).rejects.toMatchObject({ reason: 'last-admin' });
+    expect(await database.count('users', { role: 'admin' })).toBe(1);
+
+    // The dedicated surface works on D1, including a password change: `_sessionVersion` is now a
+    // declared column (before spec 061 this write threw `Unknown column '_sessionVersion'` on D1).
+    await expect(
+      auth.updateUser(editor.user.id, { password: 'a-new-password-1' })
+    ).resolves.toMatchObject({ email: 'editor@d1.test' });
+    expect(await auth.validateSession(editor.token)).toBeNull();
+    expect((await auth.login('editor@d1.test', 'a-new-password-1')).ok).toBe(true);
   });
 });

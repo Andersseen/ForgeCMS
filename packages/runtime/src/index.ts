@@ -115,6 +115,7 @@ export {
   AccessDeniedError,
   CsrfError,
   UniqueConstraintError,
+  AuthManagedCollectionError,
   isForgeError,
   toApiErrorBody,
   type ForgeErrorCode,

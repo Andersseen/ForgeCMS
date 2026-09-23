@@ -140,16 +140,17 @@ drafts and field-level read rules resolve as "not logged in".
 
 ## Status codes
 
-| Code  | When                                                               |
-| ----- | ------------------------------------------------------------------ |
-| `200` | OK                                                                 |
-| `201` | Created                                                            |
-| `204` | Deleted                                                            |
-| `400` | Validation failed (`details`), malformed query, bad JSON/multipart |
-| `401` | Authentication required, or access denied while unauthenticated    |
-| `403` | Authenticated but not permitted (including field-level writes)     |
-| `404` | Unknown collection or id — also an id an access rule hides         |
-| `500` | Unexpected                                                         |
+| Code  | When                                                                                                                                                               |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `200` | OK                                                                                                                                                                 |
+| `201` | Created                                                                                                                                                            |
+| `204` | Deleted                                                                                                                                                            |
+| `400` | Validation failed (`details`), malformed query, bad JSON/multipart                                                                                                 |
+| `401` | Authentication required, or access denied while unauthenticated                                                                                                    |
+| `403` | Authenticated but not permitted (including field-level writes)                                                                                                     |
+| `403` | `AUTH_MANAGED_COLLECTION`: create/update/delete of a collection an auth adapter manages (e.g. `users`) — use the auth user-management routes; reads are unaffected |
+| `404` | Unknown collection or id — also an id an access rule hides                                                                                                         |
+| `500` | Unexpected                                                                                                                                                         |
 
 ## Mounting the handlers
 

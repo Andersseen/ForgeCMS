@@ -807,3 +807,24 @@ describe('first-admin provisioning call shape (spec 060)', () => {
     expect(await db.count('_forge_bootstrap')).toBe(2);
   });
 });
+
+describe('managesCollection (spec 061)', () => {
+  it('claims exactly the configured collection — the default slug when none is configured', () => {
+    const auth = new UsersCollectionAuthAdapter({ devMode: true });
+    expect(auth.managesCollection('users')).toBe(true);
+    expect(auth.managesCollection('posts')).toBe(false);
+    expect(auth.managesCollection('_forge_bootstrap')).toBe(false);
+  });
+
+  it('follows the `collection` option, not the literal name "users"', () => {
+    const auth = new UsersCollectionAuthAdapter({ devMode: true, collection: 'members' });
+    expect(auth.managesCollection('members')).toBe(true);
+    expect(auth.managesCollection('users')).toBe(false);
+  });
+
+  it('does not need init() — it is a static property of the configuration', () => {
+    expect(
+      new UsersCollectionAuthAdapter({ collection: 'accounts' }).managesCollection('accounts')
+    ).toBe(true);
+  });
+});

@@ -11,14 +11,23 @@ import { isAdmin } from './roles.js';
  *
  * `access.read: []` means "no role may read this" — `filterReadableFields` strips `passwordHash` from
  * every API response even if a caller adds it to the collection by hand.
+ *
+ * `_sessionVersion` (spec 058 §6, the session-freshness counter a password change bumps) was written by
+ * `updateUser` but never declared: InMemory tolerated that, while libSQL and D1 reject a write to an
+ * undeclared column (`Unknown column '_sessionVersion'`), so a password change failed on both SQL
+ * backends — and InMemory returned the counter on every read, because `filterReadableFields` only hides
+ * *declared* fields. Declaring it (spec 061) creates the column, migrates existing tables additively and
+ * hides it. `write: []` is defence in depth only: `@forge-cms/runtime` already refuses every generic
+ * write to an auth-managed collection (`AuthAdapter.managesCollection`).
  */
 export const AUTH_USER_FIELDS = {
-  passwordHash: defineField.text({ access: { read: [], write: [] } })
+  passwordHash: defineField.text({ access: { read: [], write: [] } }),
+  _sessionVersion: defineField.number({ access: { read: [], write: [] } })
 } satisfies FieldMap;
 
 /**
- * Returns the collection with the auth adapter's own fields merged in. Explicit fields win, so a
- * caller that already declares `passwordHash` keeps their definition.
+ * Returns the collection with the auth adapter's own fields merged in. Explicit fields win, per field,
+ * so a caller that already declares `passwordHash` (or `_sessionVersion`) keeps their definition.
  *
  * `collection.fields` is spread first, `AUTH_USER_FIELDS` second, so `passwordHash` lands *after*
  * every field a caller actually declared (email, name, role, ...) instead of before all of them —
@@ -31,10 +40,12 @@ export const AUTH_USER_FIELDS = {
 export function withAuthFields<TSlug extends string, TFields extends FieldMap>(
   collection: CollectionDefinition<TSlug, TFields>
 ): CollectionDefinition<TSlug, TFields & typeof AUTH_USER_FIELDS> {
-  const hasOwnPasswordHash = 'passwordHash' in collection.fields;
+  const missingAuthFields = Object.fromEntries(
+    Object.entries(AUTH_USER_FIELDS).filter(([name]) => !(name in collection.fields))
+  );
   const fields = {
     ...collection.fields,
-    ...(!hasOwnPasswordHash && AUTH_USER_FIELDS)
+    ...missingAuthFields
   } as TFields & typeof AUTH_USER_FIELDS;
   return {
     ...collection,

@@ -9,6 +9,7 @@ export type ForgeErrorCode =
   | 'UNKNOWN_FIELD'
   | 'INVALID_QUERY'
   | 'UNIQUE_CONSTRAINT'
+  | 'AUTH_MANAGED_COLLECTION'
   | 'INTERNAL_ERROR';
 
 export class ForgeError extends Error {
@@ -100,6 +101,28 @@ export class UniqueConstraintError extends ForgeError {
     );
     this.collection = collection;
     this.fields = fields;
+  }
+}
+
+/**
+ * A generic `create`/`update`/`delete` targeted a collection whose lifecycle the configured
+ * `AuthAdapter` owns (`AuthAdapter.managesCollection`, spec 061). Those mutations would bypass the
+ * adapter's invariants — first-admin provisioning, last-admin protection, password hashing, email
+ * normalisation, session versioning — so they are refused for every caller, trusted (`overrideAccess:
+ * true`) or not. Deliberately says nothing about which adapter or how; the way out is the auth
+ * adapter's own user-management operations.
+ */
+export class AuthManagedCollectionError extends ForgeError {
+  readonly collection: string;
+
+  constructor(collection: string) {
+    super(
+      `Collection '${collection}' is managed by the configured auth adapter and cannot be mutated ` +
+        `through generic collection CRUD. Use the auth adapter's user-management operations instead.`,
+      403,
+      'AUTH_MANAGED_COLLECTION'
+    );
+    this.collection = collection;
   }
 }
 

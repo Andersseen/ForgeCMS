@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { defineCollection, defineField } from '@forge-cms/core';
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
 import { UsersCollectionAuthAdapter, defineUsersCollection } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
@@ -11,7 +12,16 @@ async function buildRuntime() {
   const db = new InMemoryDatabaseAdapter();
   const auth = new UsersCollectionAuthAdapter({ devMode: true });
   const runtime = new ForgeCmsRuntime({
-    collections: [defineUsersCollection()],
+    collections: [
+      defineUsersCollection(),
+      // An ordinary (non-auth-managed) collection with a function-based `access` rule — the shape the
+      // CSRF tests below need; `users` itself is auth-managed and refuses generic mutation (spec 061).
+      defineCollection({
+        slug: 'notes',
+        fields: { title: defineField.text({ required: true }) },
+        access: { update: ({ user }) => user !== null }
+      })
+    ],
     adapters: { database: db, auth, storage: new InMemoryStorageAdapter() },
     env: { userDatabase: db }
   });
@@ -269,12 +279,16 @@ describe('browser auth foundation: CSRF protection', () => {
     expect(response.status).toBe(204);
   });
 
-  it('rejects a cross-site cookie-only mutation against a collection with its own function-based access', async () => {
-    // `defineUsersCollection()` declares its own `access.update` (a function), which makes the route
-    // take the `resolveOptionalUser` branch in `resolveRequest` (no static `allowedRoles`/`requireAuth`
-    // gate) rather than `authorize()`'s. CSRF must still apply there — this is the exact collection
-    // shape this spec's own recommended helper produces.
+  // These two exercise the CSRF gate on a collection whose access is a *function* (the shape that makes
+  // `resolveRequest` take the `resolveOptionalUser` branch rather than `authorize()`'s). They used to run
+  // against `users`; spec 061 makes every generic mutation of the auth-managed `users` collection a
+  // `403 AUTH_MANAGED_COLLECTION`, which would pass a "cross-site is rejected" assertion for the wrong
+  // reason — so they use an ordinary collection with the same access shape, and the users collection
+  // gets its own assertion below that tells the two `403`s apart by code.
+  async function signupViewerWithNote() {
     const runtime = await buildRuntime();
+    const auth = runtime.adapters.auth as UsersCollectionAuthAdapter;
+    await auth.signup({ email: 'admin@example.com', password: 'password123' });
     const signup = await handleSignup(
       contextFor(
         new Request('https://forge.test/api/auth/signup', {
@@ -286,115 +300,80 @@ describe('browser auth foundation: CSRF protection', () => {
     );
     const token = extractCookieToken(setCookieHeader(signup) ?? '');
     const viewerId = (await jsonOf<{ data: { user: { id: string } } }>(signup)).data.user.id;
+    const note = await runtime.create({ collection: 'notes', data: { title: 'A note' } });
+    return { runtime, token, viewerId, noteId: note.id as string };
+  }
+
+  it('rejects a cross-site cookie-only mutation against a collection with its own function-based access', async () => {
+    const { runtime, token, noteId } = await signupViewerWithNote();
 
     const response = await handleUpdate(
       contextFor(
-        new Request(`https://forge.test/api/v1/users/${viewerId}`, {
+        new Request(`https://forge.test/api/v1/notes/${noteId}`, {
           method: 'PATCH',
           headers: { cookie: `forge_session=${token}`, origin: 'https://evil.test' },
-          body: JSON.stringify({ name: 'Cross-site write' })
+          body: JSON.stringify({ title: 'Cross-site write' })
         }),
-        { collection: 'users', id: viewerId }
+        { collection: 'notes', id: noteId }
       ),
       { runtime }
     );
     expect(response.status).toBe(403);
+    expect((await jsonOf<{ error: { code: string } }>(response)).error.code).toBe('FORBIDDEN');
+    expect(await runtime.findByID({ collection: 'notes', id: noteId })).toMatchObject({
+      title: 'A note'
+    });
   });
 
   it('allows the identical same-origin request against that same collection shape', async () => {
-    const runtime = await buildRuntime();
-    const signup = await handleSignup(
-      contextFor(
-        new Request('https://forge.test/api/auth/signup', {
-          method: 'POST',
-          body: JSON.stringify({ email: 'same-site-viewer@example.com', password: 'password123' })
-        })
-      ),
-      { runtime, enabled: true }
-    );
-    const token = extractCookieToken(setCookieHeader(signup) ?? '');
-    const viewerId = (await jsonOf<{ data: { user: { id: string } } }>(signup)).data.user.id;
+    const { runtime, token, noteId } = await signupViewerWithNote();
 
     const response = await handleUpdate(
       contextFor(
-        new Request(`https://forge.test/api/v1/users/${viewerId}`, {
+        new Request(`https://forge.test/api/v1/notes/${noteId}`, {
           method: 'PATCH',
           headers: { cookie: `forge_session=${token}`, origin: 'https://forge.test' },
-          body: JSON.stringify({ name: 'Same-site write' })
+          body: JSON.stringify({ title: 'Same-site write' })
         }),
-        { collection: 'users', id: viewerId }
+        { collection: 'notes', id: noteId }
       ),
       { runtime }
     );
     expect(response.status).toBe(200);
   });
+
+  it('on the auth-managed users collection a same-origin cookie mutation is refused by the boundary, a cross-site one by CSRF', async () => {
+    const { runtime, token, viewerId } = await signupViewerWithNote();
+    const patch = (origin: string) =>
+      handleUpdate(
+        contextFor(
+          new Request(`https://forge.test/api/v1/users/${viewerId}`, {
+            method: 'PATCH',
+            headers: { cookie: `forge_session=${token}`, origin },
+            body: JSON.stringify({ name: 'Renamed' })
+          }),
+          { collection: 'users', id: viewerId }
+        ),
+        { runtime }
+      );
+
+    const sameSite = await patch('https://forge.test');
+    expect(sameSite.status).toBe(403);
+    expect((await jsonOf<{ error: { code: string } }>(sameSite)).error.code).toBe(
+      'AUTH_MANAGED_COLLECTION'
+    );
+
+    const crossSite = await patch('https://evil.test');
+    expect(crossSite.status).toBe(403);
+    expect((await jsonOf<{ error: { code: string } }>(crossSite)).error.code).toBe('FORBIDDEN');
+  });
 });
 
 describe('defineUsersCollection(): role escalation cannot happen through the generic update route', () => {
-  it('a non-admin cannot write their own role, but can update their own name', async () => {
+  async function signupTwo() {
     const runtime = await buildRuntime();
-    const signup = await handleSignup(
-      contextFor(
-        new Request('https://forge.test/api/auth/signup', {
-          method: 'POST',
-          body: JSON.stringify({ email: 'plain-viewer@example.com', password: 'password123' })
-        })
-      ),
-      { runtime, enabled: true }
-    );
-    const { user } = (await jsonOf<{ data: { user: { id: string; role: string } } }>(signup)).data;
-    expect(user.role).toBe('admin'); // first signup ever — bootstrapped, per spec 053
-
-    // A second, non-first signup actually lands as `viewer`.
-    const secondSignup = await handleSignup(
-      contextFor(
-        new Request('https://forge.test/api/auth/signup', {
-          method: 'POST',
-          body: JSON.stringify({ email: 'second-viewer@example.com', password: 'password123' })
-        })
-      ),
-      { runtime, enabled: true }
-    );
-    const viewer = (await jsonOf<{ data: { user: { id: string; role: string } } }>(secondSignup))
-      .data.user;
-    expect(viewer.role).toBe('viewer');
-
-    // The viewer tries to PATCH their own record's `role` to `admin` — must be rejected: `role` has
-    // `access: { write: ['admin'] }` (see `user-fields.ts`), so `assertWritableFields` (403s) it even
-    // though the collection's row-level `update` access grants self-service on the record itself.
-    await expect(
-      runtime.update({
-        collection: 'users',
-        id: viewer.id,
-        data: { role: 'admin' },
-        user: { id: viewer.id, role: 'viewer' },
-        overrideAccess: false
-      })
-    ).rejects.toThrow();
-
-    const stillViewer = await runtime.findByID({
-      collection: 'users',
-      id: viewer.id,
-      user: { id: viewer.id, role: 'viewer' },
-      overrideAccess: false
-    });
-    expect(stillViewer.role).toBe('viewer');
-
-    // The same viewer CAN update their own name — the collection's self-service grant still works for
-    // fields that aren't role.
-    const renamed = await runtime.update({
-      collection: 'users',
-      id: viewer.id,
-      data: { name: 'Renamed By Self' },
-      user: { id: viewer.id, role: 'viewer' },
-      overrideAccess: false
-    });
-    expect(renamed.name).toBe('Renamed By Self');
-  });
-
-  it('an admin can change another user’s role', async () => {
-    const runtime = await buildRuntime();
-    const adminSignup = await handleSignup(
+    const auth = runtime.adapters.auth as UsersCollectionAuthAdapter;
+    const first = await handleSignup(
       contextFor(
         new Request('https://forge.test/api/auth/signup', {
           method: 'POST',
@@ -403,28 +382,88 @@ describe('defineUsersCollection(): role escalation cannot happen through the gen
       ),
       { runtime, enabled: true }
     );
-    const admin = (await jsonOf<{ data: { user: { id: string; role: string } } }>(adminSignup)).data
-      .user;
+    const admin = (await jsonOf<{ data: { user: { id: string; role: string } } }>(first)).data.user;
+    expect(admin.role).toBe('admin'); // first signup ever — bootstrapped, per spec 053
 
-    const viewerSignup = await handleSignup(
+    // A second, non-first signup actually lands as `viewer`.
+    const second = await handleSignup(
       contextFor(
         new Request('https://forge.test/api/auth/signup', {
           method: 'POST',
-          body: JSON.stringify({ email: 'promote-me@example.com', password: 'password123' })
+          body: JSON.stringify({ email: 'second-viewer@example.com', password: 'password123' })
         })
       ),
       { runtime, enabled: true }
     );
-    const viewer = (await jsonOf<{ data: { user: { id: string; role: string } } }>(viewerSignup))
-      .data.user;
+    const viewer = (await jsonOf<{ data: { user: { id: string; role: string } } }>(second)).data
+      .user;
+    expect(viewer.role).toBe('viewer');
+    return { runtime, auth, admin, viewer };
+  }
 
-    const promoted = await runtime.update({
+  it('a non-admin cannot escalate their own role — the generic route refuses every write to the record', async () => {
+    const { runtime, viewer } = await signupTwo();
+    const asViewer = { id: viewer.id, role: 'viewer' };
+
+    // Spec 061: `users` is auth-managed, so generic updates are refused outright — the field-level
+    // `role: { write: ['admin'] }` rule below is defence in depth, no longer the only line.
+    await expect(
+      runtime.update({
+        collection: 'users',
+        id: viewer.id,
+        data: { role: 'admin' },
+        user: asViewer,
+        overrideAccess: false
+      })
+    ).rejects.toMatchObject({ code: 'AUTH_MANAGED_COLLECTION', status: 403 });
+    await expect(
+      runtime.update({
+        collection: 'users',
+        id: viewer.id,
+        data: { name: 'Renamed By Self' },
+        user: asViewer,
+        overrideAccess: false
+      })
+    ).rejects.toMatchObject({ code: 'AUTH_MANAGED_COLLECTION' });
+
+    const stillViewer = await runtime.findByID({
       collection: 'users',
       id: viewer.id,
-      data: { role: 'editor' },
-      user: { id: admin.id, role: 'admin' },
+      user: asViewer,
       overrideAccess: false
     });
-    expect(promoted.role).toBe('editor');
+    expect(stillViewer).toMatchObject({ role: 'viewer' });
+  });
+
+  it('the field-level write rule on `role` still holds where a write is previewed (defence in depth)', async () => {
+    const { runtime, viewer } = await signupTwo();
+    await expect(
+      runtime.preview({
+        collection: 'users',
+        id: viewer.id,
+        data: { role: 'admin' },
+        user: { id: viewer.id, role: 'viewer' },
+        overrideAccess: false
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('an admin changes another user’s role through the dedicated surface, not generic CRUD', async () => {
+    const { runtime, auth, admin, viewer } = await signupTwo();
+    const asAdmin = { id: admin.id, role: 'admin' };
+
+    await expect(
+      runtime.update({
+        collection: 'users',
+        id: viewer.id,
+        data: { role: 'editor' },
+        user: asAdmin,
+        overrideAccess: false
+      })
+    ).rejects.toMatchObject({ code: 'AUTH_MANAGED_COLLECTION' });
+
+    await expect(auth.updateUser(viewer.id, { role: 'editor' })).resolves.toMatchObject({
+      role: 'editor'
+    });
   });
 });

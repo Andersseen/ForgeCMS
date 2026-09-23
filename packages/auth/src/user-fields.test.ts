@@ -38,6 +38,24 @@ describe('withAuthFields', () => {
     expect(AUTH_USER_FIELDS.passwordHash.options.access).toEqual({ read: [], write: [] });
   });
 
+  // Spec 061: `updateUser` writes `_sessionVersion` on a password change. Undeclared, libSQL/D1 reject
+  // the write (`Unknown column`) and InMemory returned the counter on every read.
+  it('declares _sessionVersion as a number field no role can read or write', () => {
+    const collection = withAuthFields(base);
+    expect(collection.fields._sessionVersion.kind).toBe('number');
+    expect(AUTH_USER_FIELDS._sessionVersion.options.access).toEqual({ read: [], write: [] });
+  });
+
+  it('lets an explicitly declared _sessionVersion win, independently of passwordHash', () => {
+    const custom = defineField.number({ min: 0 });
+    const collection = withAuthFields(
+      defineCollection({ slug: 'users', fields: { _sessionVersion: custom } })
+    );
+    expect(collection.fields._sessionVersion).toBe(custom);
+    // passwordHash was not declared, so it is still added — "explicit wins" is per field.
+    expect(collection.fields.passwordHash.kind).toBe('text');
+  });
+
   it('does not mutate the input collection', () => {
     withAuthFields(base);
     expect('passwordHash' in base.fields).toBe(false);
@@ -50,7 +68,12 @@ describe('withAuthFields', () => {
   // email. `passwordHash` must land after every field the caller actually declared.
   it('orders passwordHash after the caller-declared fields, not before them', () => {
     const collection = withAuthFields(base);
-    expect(Object.keys(collection.fields)).toEqual(['email', 'name', 'passwordHash']);
+    expect(Object.keys(collection.fields)).toEqual([
+      'email',
+      'name',
+      'passwordHash',
+      '_sessionVersion'
+    ]);
   });
 
   it('still puts an explicitly declared passwordHash wherever the caller put it', () => {
@@ -61,7 +84,7 @@ describe('withAuthFields', () => {
         fields: { passwordHash: custom, email: defineField.email({ required: true }) }
       })
     );
-    expect(Object.keys(collection.fields)).toEqual(['passwordHash', 'email']);
+    expect(Object.keys(collection.fields)).toEqual(['passwordHash', 'email', '_sessionVersion']);
   });
 
   // The actual bug this exists to fix: on a schemaless adapter an undeclared column is harmless,
@@ -70,5 +93,10 @@ describe('withAuthFields', () => {
   it('makes the generated users table include the passwordHash column', () => {
     expect(generateCreateTableSql(base)).not.toContain('passwordHash');
     expect(generateCreateTableSql(withAuthFields(base))).toContain('"passwordHash" TEXT');
+  });
+
+  it('makes the generated users table include the _sessionVersion column', () => {
+    expect(generateCreateTableSql(base)).not.toContain('_sessionVersion');
+    expect(generateCreateTableSql(withAuthFields(base))).toContain('"_sessionVersion" REAL');
   });
 });
