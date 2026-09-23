@@ -253,6 +253,15 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     return looksLikeSignedToken(token);
   }
 
+  /**
+   * This adapter owns the lifecycle of exactly one collection — the configured `collection` option, not
+   * the literal `'users'` (spec 061). `@forge-cms/runtime` refuses generic content CRUD on it; the
+   * canonical mutation surface is {@link createUser}/{@link updateUser}/{@link deleteUser}/{@link signup}.
+   */
+  managesCollection(slug: string): boolean {
+    return slug === this.collection;
+  }
+
   /** Provisions `_forge_bootstrap`'s unique-index-backed bootstrap slot (spec 058 §7a). */
   async syncSchema(): Promise<void> {
     await this.ensureBootstrapSchema(this.getDb());
@@ -501,8 +510,10 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
    * The second check, together with {@link deleteUser}'s, is the whole last-admin invariant: a users
    * collection can never end up with zero admins *through this adapter*, however the change is attempted
    * (self-demote, demoted by another admin, self-delete, deleted by another admin) and however many of
-   * them run at once. Writes that bypass it — the generic content CRUD routes on the users collection
-   * (`/api/v1/users`) or direct adapter access — do not run the guard (spec 059, known limitations).
+   * them run at once. Generic content CRUD on this collection (`runtime.create/update/delete`,
+   * `/api/v1/<collection>`) cannot bypass it: `@forge-cms/runtime` refuses those outright because
+   * {@link managesCollection} claims the collection (spec 061). Only direct `DatabaseAdapter` access —
+   * trusted low-level infrastructure — is below the guarantee.
    *
    * **Concurrency (spec 059):** any update that sets a non-admin role is one `updateIf()` carrying
    * {@link LAST_ADMIN_GUARD}, so the database decides "is another admin still there?" in the same

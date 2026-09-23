@@ -211,6 +211,37 @@ test('last-admin invariant: the sole admin cannot demote or delete themselves; a
   });
   expect(selfDelete.status()).toBe(409);
 
+  // Spec 061: the generic content API cannot bypass what the dedicated routes just enforced. Same
+  // session, same-origin, and an admin (so collection access would allow it) — refused because the
+  // users collection is managed by the auth adapter, not because of CSRF, role or the last-admin
+  // check. Reads on the same collection keep working and never expose auth-owned fields.
+  const jsonHeaders = { 'content-type': 'application/json', ...SAME_ORIGIN_HEADERS };
+  const genericAttempts = [
+    await page.request.put(`/api/v1/users/${adminId}`, {
+      data: { role: 'viewer' },
+      headers: jsonHeaders
+    }),
+    await page.request.delete(`/api/v1/users/${adminId}`, { headers: SAME_ORIGIN_HEADERS }),
+    await page.request.post('/api/v1/users', {
+      data: { email: 'rogue@tiny.e2e.test', role: 'admin' },
+      headers: jsonHeaders
+    })
+  ];
+  for (const attempt of genericAttempts) {
+    expect(attempt.status()).toBe(403);
+    const body = (await attempt.json()) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe('AUTH_MANAGED_COLLECTION');
+    expect(body.error.message).toContain('managed by the configured auth adapter');
+  }
+  const usersRead = await page.request.get('/api/v1/users');
+  expect(usersRead.status()).toBe(200);
+  const usersBody = (await usersRead.json()) as { data: Record<string, unknown>[] };
+  expect(usersBody.data.some((user) => user['id'] === adminId)).toBe(true);
+  for (const user of usersBody.data) {
+    expect(user).not.toHaveProperty('passwordHash');
+    expect(user).not.toHaveProperty('_sessionVersion');
+  }
+
   // A second admin makes both operations legitimate again.
   await page.goto('/admin/users');
   await page.getByRole('button', { name: 'New User' }).click();

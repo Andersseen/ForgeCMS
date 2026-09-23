@@ -162,6 +162,10 @@ it is how you get a `table users has no column named passwordHash` error in prod
 
 ## A note on the users collection
 
-The collection your `AuthAdapter` uses is a normal collection: you define it, you can add fields to
-it, and it shows up in the admin. `UsersCollectionAuthAdapter` defaults to the slug `users`. See
+The collection your `AuthAdapter` uses is a normal collection for _reading_: you define it, you can add
+fields to it, and it shows up in the admin. `UsersCollectionAuthAdapter` defaults to the slug `users`.
+It is **not** a normal collection for _writing_: while an auth adapter manages it, generic
+`create`/`update`/`delete` — the Local API (trusted or not) and `/api/v1/users` — are refused with
+`AUTH_MANAGED_COLLECTION`, and users are created, changed and deleted through the auth adapter
+(`createUser`, `updateUser`, `deleteUser`, `signup`). See [Browser auth](/docs/browser-auth) and
 [Adapters](/docs/adapters) for the auth side.

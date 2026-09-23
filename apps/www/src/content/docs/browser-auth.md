@@ -238,9 +238,22 @@ server-side check in `UsersCollectionAuthAdapter` — a users collection can nev
 through it, however the change is attempted, **including two admins removing each other at the same
 moment**: the check is a single conditional database write (`updateIf`/`deleteIf`), not a count followed
 by a write, so exactly one of two conflicting requests succeeds and the other gets the `last-admin`
-refusal. This holds across independent Workers on D1 and libSQL. It applies to the auth users routes
-(`/api/auth/users*`) only; if you also expose the users collection through the generic content routes
-(`/api/v1/users`), those do not run this guard.
+refusal. This holds across independent Workers on D1 and libSQL.
+
+**The users collection is not editable through the generic content API.** The collection
+`UsersCollectionAuthAdapter` manages is _owned_ by the adapter: `POST/PUT/PATCH/DELETE /api/v1/users`
+and `runtime.create/update/delete({ collection: 'users', … })` are refused with
+`403 { "error": { "code": "AUTH_MANAGED_COLLECTION", … } }` — for every caller, including trusted
+server code whose `overrideAccess` defaults to `true`, because a generic write would bypass everything
+above (first-admin provisioning, the last-admin invariant, password hashing, email normalisation,
+session versioning). Use `createUser` / `updateUser` / `deleteUser` / `signup` and the
+`/api/auth/users*` routes instead. Reads (`GET /api/v1/users`, `runtime.find`, relation population) work
+as before, with the same read access, and never return `passwordHash` or the internal `_sessionVersion`.
+The rule follows the adapter's `collection` option (`'members'`, `'accounts'`, …), not the name `users`,
+and it does not touch any other collection. Two consequences to know about: extra non-auth fields you
+add to the users collection (`avatar`, `jobTitle`, …) are read-only through Forge's generic surface, and
+direct `DatabaseAdapter` access (`runtime.adapters.database.update(…)`) is trusted low-level
+infrastructure that bypasses runtime and auth guarantees alike — like raw SQL under an ORM.
 
 Host apps that predate `forgeAdminAuthRoutes()`'s `/admin/login` convention (an existing top-level
 `/login` route, say) can point the shared layout at it instead of migrating the route:

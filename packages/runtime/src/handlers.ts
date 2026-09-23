@@ -15,6 +15,7 @@ import {
   toApiErrorBody
 } from './errors.js';
 import { assertCsrfSafe } from './csrf.js';
+import { assertNotAuthManaged } from './auth-managed.js';
 
 const WHERE_OPERATORS = new Set([
   'eq',
@@ -527,6 +528,12 @@ export async function handleCreate<TEnv = unknown>(
   const { collection, collectionSlug, user } = resolved;
 
   try {
+    // Checked before any multipart parsing so a create on an auth-managed upload-enabled collection
+    // (`operations.create` would refuse it anyway) never uploads an object to storage first — spec 061,
+    // reviewed finding: refusing only inside `runtime.create` left a real, if compensated, storage
+    // write on the happy path, and an orphaned object if the compensating delete itself failed.
+    assertNotAuthManaged(options.runtime, collectionSlug);
+
     const contentType = context.request.headers.get('content-type') ?? '';
     let data: Record<string, unknown>;
     let storageKey: string | undefined;

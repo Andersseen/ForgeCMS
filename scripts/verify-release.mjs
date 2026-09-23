@@ -225,8 +225,10 @@ import {
 } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import {
+  AuthManagedCollectionError,
   ForgeCmsRuntime,
   UniqueConstraintError,
+  handleDelete,
   handleLogin,
   handleSignup,
   handleLogout,
@@ -471,6 +473,44 @@ if (!signupCookie || !signupCookie.includes('HttpOnly') || !signupCookie.include
 // with the admin, through the packed public surface.
 if ((await authDb.count('_forge_bootstrap')) !== 1 || (await authDb.count('users', { role: 'admin' })) !== 1) {
   throw new Error('Expected exactly one bootstrap claim and one admin after the first signup');
+}
+
+// Spec 061, packed public surface: the users collection is owned by the auth adapter, so generic content
+// CRUD cannot touch it — Local API (trusted default) and HTTP — while the dedicated surface still works.
+if (usersAuth.managesCollection('users') !== true || usersAuth.managesCollection('posts') !== false) {
+  throw new Error('Expected UsersCollectionAuthAdapter.managesCollection to claim exactly its own collection');
+}
+const onlyAdminId = signupBody.data.user.id;
+let managedError;
+try {
+  await authRuntime.delete({ collection: 'users', id: onlyAdminId });
+} catch (error) {
+  managedError = error;
+}
+if (
+  !(managedError instanceof AuthManagedCollectionError) ||
+  managedError.code !== 'AUTH_MANAGED_COLLECTION' ||
+  managedError.status !== 403 ||
+  (await authDb.count('users')) !== 1
+) {
+  throw new Error('Expected a trusted generic delete of the auth-managed users collection to be refused');
+}
+const managedHttp = await handleDelete(
+  {
+    request: new Request('https://forge.test/api/v1/users/' + onlyAdminId, {
+      method: 'DELETE',
+      headers: { authorization: 'Bearer ' + signupBody.data.token }
+    }),
+    params: { collection: 'users', id: onlyAdminId },
+    env: {}
+  },
+  { runtime: authRuntime }
+);
+if (managedHttp.status !== 403 || (await managedHttp.json()).error.code !== 'AUTH_MANAGED_COLLECTION') {
+  throw new Error('Expected DELETE /api/v1/users/:id to answer 403 AUTH_MANAGED_COLLECTION');
+}
+if ((await authDb.count('users', { role: 'admin' })) !== 1) {
+  throw new Error('Expected the only administrator to survive generic deletion');
 }
 
 // Atomic write batch (spec 060), packed public surface: all-or-nothing with typed errors.

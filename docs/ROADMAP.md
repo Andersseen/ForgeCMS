@@ -24,6 +24,11 @@
 > atomic write batch (`DatabaseAdapter.atomicWrite`) that spec 059 named as the next primitive, and uses
 > it to make first-admin provisioning all-or-nothing. D02/D03 have the storage capability they needed but
 > are **not** migrated; the generic users-collection CRUD bypass (rest of H02) is still open.
+>
+> **2026-09-20 update:** [spec 061](specs/061-auth-managed-collection-mutation-boundary.md) closes that
+> last H02 item: a collection an auth adapter manages (`AuthAdapter.managesCollection`) refuses generic
+> `create`/`update`/`delete` through the Local API (trusted or not) and HTTP, so the lifecycle guarantees
+> of specs 058–060 can no longer be bypassed. H02 is complete; next bounded step is D01/D03.
 
 ## Product direction
 

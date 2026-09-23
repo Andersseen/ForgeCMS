@@ -66,7 +66,7 @@ interface BreadcrumbItem {
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="min-h-screen flex bg-background">
+    <div class="h-dvh flex bg-background overflow-hidden">
       <!-- Mobile trigger -->
       <div class="fixed top-4 left-4 z-10 md:hidden">
         <button
@@ -162,7 +162,7 @@ interface BreadcrumbItem {
       </volt-sidebar>
 
       <!-- Main Content -->
-      <div class="flex-1 overflow-auto min-w-0 flex flex-col">
+      <div class="flex-1 min-w-0 flex flex-col overflow-hidden">
         <!-- Header -->
         <div
           class="h-14 border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0"
@@ -225,7 +225,7 @@ interface BreadcrumbItem {
         </div>
 
         <!-- Page Content -->
-        <div class="flex-1 p-6">
+        <div class="flex-1 min-h-0 overflow-y-auto p-6">
           <router-outlet />
         </div>
       </div>

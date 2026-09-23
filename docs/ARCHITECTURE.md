@@ -112,6 +112,20 @@ paying for a DB round-trip or signature verification), and, since spec 053, `log
 and `signup?(input)` (both return `AuthActionResult` — `{ ok: true, token, user } | { ok: false, reason }`)
 — adapters that support password-based browser auth implement these; `packages/runtime`'s
 `handleLogin`/`handleSignup` feature-detect them rather than importing a concrete adapter.
+One more optional method, since spec 061: `managesCollection?(slug)` — "does this adapter own the
+identity and lifecycle of that collection's documents?". `UsersCollectionAuthAdapter` answers `true` for
+exactly its configured `collection`; `CompositeAuthAdapter` answers `true` if any child does; adapters
+that keep no users in a Forge collection omit it (absent = `false`). `@forge-cms/runtime` consults it —
+never a concrete adapter class and never a slug convention — through the **auth-managed-collection
+boundary**: `operations.create`/`update`/`deleteDocument` (and therefore `restoreVersion`, relation
+cascade/set-null and every HTTP handler) throw `AuthManagedCollectionError` (`403`,
+`AUTH_MANAGED_COLLECTION`) for a claimed collection as their first step — before hooks, access checks
+and any read or write, for every caller, whatever `overrideAccess` says: `overrideAccess: true` bypasses
+_authorization_, not the auth subsystem's data-integrity invariants (first-admin provisioning,
+last-admin protection, password hashing, email normalisation, session versioning), which live in exactly
+one place, the adapter's `createUser`/`updateUser`/`deleteUser`/`signup`. Reads stay ordinary content
+reads. Direct `DatabaseAdapter` access is trusted low-level infrastructure and sits below the boundary.
+
 `UsersCollectionAuthAdapter` and `SignedTokenAuthAdapter`'s shared `extractToken` also falls back to a
 `forge_session` cookie (`@forge-cms/auth`'s `cookie.ts`) when no `Authorization` header is present —
 `ApiKeyAuthAdapter` keeps its own independent, Bearer-only `extractToken`, unaffected.
@@ -132,6 +146,7 @@ See `packages/storage/src/index.ts` — mirror of the others (init + file CRUD).
 - List: `{ data: T[], meta: { collection, count, limit?, offset? } }`
 - Item: `{ data: T }` (create → HTTP 201)
 - Error: `{ error: { code: string, message: string, details?: unknown } }` with 400/401/403/404/500
+  (`403` also carries `AUTH_MANAGED_COLLECTION` for a generic write to an auth-managed collection, spec 061)
 - Delete: HTTP 204, empty body
 
 `@forge-cms/angular`'s `CmsApiService` and the admin UI parse exactly this shape.

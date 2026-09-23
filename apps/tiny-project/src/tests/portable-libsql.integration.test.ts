@@ -140,4 +140,37 @@ describe('portable libSQL profile — full small-project server lifecycle', () =
       })
     ).rejects.toThrow();
   });
+
+  // Spec 061 on the portable profile: the auth adapter owns the users collection, so generic content
+  // CRUD cannot delete/demote/create users, while the dedicated surface (incl. a password change, which
+  // needs the declared `_sessionVersion` column on a real SQL backend) keeps working.
+  it('refuses generic mutation of the auth-managed users collection; the dedicated surface works', async () => {
+    const auth = runtime.adapters.auth as UsersCollectionAuthAdapter;
+    const admin = await auth.login('owner@tiny.test', 'password123');
+    if (!admin.ok) throw new Error('expected success');
+    const managed = { code: 'AUTH_MANAGED_COLLECTION', status: 403 };
+    const adminsBefore = await database.count('users', { role: 'admin' });
+
+    await expect(runtime.delete({ collection: 'users', id: admin.user.id })).rejects.toMatchObject(
+      managed
+    );
+    await expect(
+      runtime.update({ collection: 'users', id: admin.user.id, data: { role: 'viewer' } })
+    ).rejects.toMatchObject(managed);
+    await expect(
+      runtime.create({ collection: 'users', data: { email: 'trusted@tiny.test', role: 'admin' } })
+    ).rejects.toMatchObject(managed);
+    expect(await database.count('users', { role: 'admin' })).toBe(adminsBefore);
+
+    // Only one admin exists, so the canonical path refuses the same deletion for its own reason.
+    await expect(auth.deleteUser(admin.user.id)).rejects.toMatchObject({ reason: 'last-admin' });
+
+    await expect(
+      auth.updateUser(admin.user.id, { password: 'rotated-password-1' })
+    ).resolves.toMatchObject({
+      email: 'owner@tiny.test'
+    });
+    expect(await auth.validateSession(admin.token)).toBeNull();
+    expect((await auth.login('owner@tiny.test', 'rotated-password-1')).ok).toBe(true);
+  });
 });
