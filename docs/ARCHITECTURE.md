@@ -97,8 +97,25 @@ malformed operation, on SQL adapters an unknown column/collection) rejects befor
 libSQL runs one `client.batch(…, 'write')`, D1 one `batch()`, InMemory stages a copy and publishes it in one
 synchronous turn (one adapter instance only). A network failure after the request left the process is
 outcome-unknown — no exactly-once promise. It backs `UsersCollectionAuthAdapter`'s first-admin
-provisioning (claim + admin in one batch) and is the storage capability D02 (relation cascades) and D03
-(document + version) will build on; neither uses it yet.
+provisioning (claim + admin in one batch) and, since spec 062, every versioned content write (below). D02
+(relation cascades) does not use it yet.
+
+**Document / version history consistency (spec 062, `@forge-cms/runtime`).** A `versions`-enabled
+collection's history lives in the internal collection `_versions_<slug>` (`versionCollectionDefinition()`
+in `versions.ts`), which carries a compound unique index `(documentId, versionNumber)` and an internal
+`snapshotFormat` marker. `operations.create` allocates the document id itself and writes
+`[create document, create version 1]` as one `atomicWrite()`; `operations.update` reads the latest version
+number **before** the document, runs the unchanged access/validation/hook pipeline, then writes
+`[update document, create version N+1]` as one batch. Because every committed versioned mutation commits
+its version number with it, a writer that lost a race collides on the unique index and its whole batch
+rolls back — surfaced as `ConcurrentModificationError` (409, `CONCURRENT_MODIFICATION`), never retried
+automatically (hooks may have side effects). Snapshots are full restorable content (declared fields +
+`_status`, never `id`/timestamps/`_storageKey`). `restoreVersion` is still `update()` (spec 058), fed the
+difference between the snapshot and the current document, computed inside `update()` after its reads.
+Manual `createVersion` is a single insert with a bounded (3-attempt) number-allocation retry. History is
+retained indefinitely; deleting a document leaves it orphaned (404 to untrusted readers). Versioned
+collections require `atomicWrite()`; `syncSchema()` refuses an adapter without it and reports (never
+repairs) pre-062 duplicate version identities that block the index.
 
 ### AuthAdapter (`@forge-cms/auth`)
 

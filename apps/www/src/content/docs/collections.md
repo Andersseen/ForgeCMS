@@ -141,7 +141,54 @@ await runtime.find({ collection: 'posts', status: 'all', user, overrideAccess: f
 await runtime.find({ collection: 'posts', overrideAccess: false, user: null });
 ```
 
-This is publication status, not version history — there is no diff, restore or autosave.
+This is publication status, not version history — see [Version history](#version-history) below.
+
+## Version history
+
+Set `versions: true` and every write keeps a snapshot you can list and restore:
+
+```ts
+const posts = defineCollection({ slug: 'posts', versions: true, fields: { … } });
+
+const history = await runtime.listVersions({ collection: 'posts', documentId: id }); // newest first
+await runtime.restoreVersion({ collection: 'posts', versionId: history[1].id });
+```
+
+What you can rely on:
+
+- **The document and its snapshot are written together.** `create` writes the document and version 1,
+  `update` and `restoreVersion` write the change and the next version, as one atomic database write
+  (`DatabaseAdapter.atomicWrite()`). If either part fails, neither is saved. File uploads are the
+  exception: an upload's stored object is not part of that write.
+- **A snapshot is the full content**, not just the fields an update touched: every field the collection
+  declares (`null` when empty), plus `_status` on a drafts collection. It never contains `id`,
+  `created_at`, `updated_at` or the internal storage key, and a restore never changes them.
+- **Two edits to the same document at once don't silently overwrite each other.** If two updates
+  start from the same version, one saves and the other fails with `ConcurrentModificationError`
+  (HTTP `409`, `CONCURRENT_MODIFICATION`) and saves nothing. Forge does not retry it for you, because
+  your `before*` hooks may already have run. Reload the document and submit the change again.
+- **Version numbers are unique per document** (`1, 2, 3, …`), enforced by a unique database index.
+- **Restore runs the normal update pipeline**: update access, field write rules (checked for the
+  fields the restore actually changes), validation and hooks, then writes one version labelled
+  `Restored from version N`. A snapshot from before a field became required fails validation. Old
+  versions stay readable, but they are not automatically valid documents today.
+- **History is kept indefinitely.** Deleting a document does not delete its versions. Over HTTP the
+  history of a deleted document answers `404`, and a restore of it answers `404`. You can't create a
+  new document with the id of a deleted document that still has history.
+- Call `runtime.syncSchema()` at startup (as in setup above): it creates the version-number index the
+  conflict detection relies on.
+- A `before*` hook must not call `update()` on the document being updated: that saves a version first,
+  so the outer update fails with `ConcurrentModificationError`. Change `data` in the hook instead.
+- `runtime.createVersion()` (Local API only) stores a snapshot you pass in yourself: no hooks, no access
+  checks, stored exactly as given.
+- `versions: { autosave: true }` is accepted but currently does nothing. There is no editor autosave.
+
+**Upgrading from an earlier release:** `syncSchema()` adds the version-number index to existing
+`_versions_*` tables. Two updates that ran at the same moment in earlier releases could leave two rows
+with the same version number for one document. If your database has such rows, `syncSchema()` stops
+with a message listing them. Forge never deletes or renumbers history for you: back up the database,
+decide which rows to keep, fix them, then restart. Snapshots written by earlier releases hold only the
+fields that update changed; restoring one applies only those fields.
 
 ## Registering collections
 

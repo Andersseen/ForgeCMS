@@ -7,6 +7,7 @@
   "BaseOperationArgs",
   "BlockDescription",
   "CollectionDescription",
+  "ConcurrentModificationError",
   "CountArgs",
   "CreateArgs",
   "CreateVersionArgs",

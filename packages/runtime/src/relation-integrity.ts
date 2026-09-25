@@ -3,6 +3,7 @@ import type { DatabaseRecord } from '@forge-cms/db';
 import type { OperationContext } from './context.js';
 import { assertNotAuthManaged, isAuthManagedCollection } from './auth-managed.js';
 import { InvalidInputError } from './errors.js';
+import { versionsEnabled } from './versions.js';
 
 /**
  * Relation integrity utilities for handling cascade, restrict, and set-null on delete.
@@ -71,6 +72,15 @@ function defaultMutator(ctx: OperationContext): RelationMutator {
     },
     update: (args) => {
       assertNotAuthManaged(ctx, args.collection);
+      // A raw write to a versioned document would commit a change with no version row, silently
+      // breaking the version-number serialization every versioned update relies on (spec 062 §3).
+      const target = ctx.getCollection(args.collection);
+      if (target && versionsEnabled(target)) {
+        throw new Error(
+          `Collection '${args.collection}' has versions enabled; pass a mutator backed by the runtime's ` +
+            `update() so the change and its version snapshot are written together (spec 062).`
+        );
+      }
       return ctx.adapters.database.update(args.collection, args.id, args.data);
     }
   };

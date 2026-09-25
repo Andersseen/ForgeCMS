@@ -150,6 +150,8 @@ drafts and field-level read rules resolve as "not logged in".
 | `403` | Authenticated but not permitted (including field-level writes)                                                                                                     |
 | `403` | `AUTH_MANAGED_COLLECTION`: create/update/delete of a collection an auth adapter manages (e.g. `users`) — use the auth user-management routes; reads are unaffected |
 | `404` | Unknown collection or id — also an id an access rule hides                                                                                                         |
+| `409` | `UNIQUE_CONSTRAINT`: a unique field/index value (or an `id`) is already taken — `details.fields` names it                                                          |
+| `409` | `CONCURRENT_MODIFICATION`: another write to the same versioned document committed first; nothing was saved — reload and retry                                      |
 | `500` | Unexpected                                                                                                                                                         |
 
 ## Mounting the handlers

@@ -10,6 +10,7 @@ export type ForgeErrorCode =
   | 'INVALID_QUERY'
   | 'UNIQUE_CONSTRAINT'
   | 'AUTH_MANAGED_COLLECTION'
+  | 'CONCURRENT_MODIFICATION'
   | 'INTERNAL_ERROR';
 
 export class ForgeError extends Error {
@@ -123,6 +124,29 @@ export class AuthManagedCollectionError extends ForgeError {
       'AUTH_MANAGED_COLLECTION'
     );
     this.collection = collection;
+  }
+}
+
+/**
+ * A versioned document mutation lost a race (spec 062): another write committed a new version of the
+ * same document after this one read it, so this one's document write and snapshot were rolled back
+ * together — nothing was written. Forge never retries it automatically (`before*` hooks may already
+ * have run); re-read the document and submit again. Deliberately names the public collection slug,
+ * never the internal `_versions_*` table whose unique index detected the conflict.
+ */
+export class ConcurrentModificationError extends ForgeError {
+  readonly collection: string;
+  readonly id: string;
+
+  constructor(collection: string, id: string) {
+    super(
+      `Document '${id}' in '${collection}' was changed by another request while this one was in ` +
+        `progress; nothing was written. Reload it and try again.`,
+      409,
+      'CONCURRENT_MODIFICATION'
+    );
+    this.collection = collection;
+    this.id = id;
   }
 }
 

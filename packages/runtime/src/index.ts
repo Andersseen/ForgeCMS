@@ -116,6 +116,7 @@ export {
   CsrfError,
   UniqueConstraintError,
   AuthManagedCollectionError,
+  ConcurrentModificationError,
   isForgeError,
   toApiErrorBody,
   type ForgeErrorCode,

@@ -1,10 +1,14 @@
 import { getLogger, validateCollection } from '@forge-cms/core';
 import type { AccessQuery, CmsUser, CollectionDefinition, DraftStatus } from '@forge-cms/core';
 import type { DatabaseRecord, DatabaseWhere, SortInput } from '@forge-cms/db';
-import { isUniqueConstraintError as isDbUniqueConstraintError } from '@forge-cms/db';
+import {
+  isAtomicWriteConditionError,
+  isUniqueConstraintError as isDbUniqueConstraintError
+} from '@forge-cms/db';
 import type { OperationContext } from './context.js';
 import {
   AccessDeniedError,
+  ConcurrentModificationError,
   ForgeError,
   InvalidInputError,
   NotFoundError,
@@ -30,8 +34,18 @@ import {
 } from './hooks.js';
 import { assertWritableFields, filterReadableFields, FieldAccessError } from './field-access.js';
 import { populateRecord, populateRecords } from './populate.js';
-import { createVersion, getVersion, versionsEnabled } from './versions.js';
-import type { RestoreVersionArgs } from './versions.js';
+import {
+  buildSnapshot,
+  buildVersionRecord,
+  diffAgainst,
+  isVersionIdentityConflict,
+  readLatestVersionNumber,
+  readVersionForRestore,
+  restoreTarget,
+  versionsCollectionSlug,
+  versionsEnabled
+} from './versions.js';
+import type { RestorableVersion, RestoreVersionArgs } from './versions.js';
 import {
   isLocalizedCollection,
   storeLocalizedDocument,
@@ -146,6 +160,132 @@ async function runWrite<T>(collection: string, op: () => Promise<T>): Promise<T>
     if (isDbUniqueConstraintError(err)) throw new UniqueConstraintError(collection, err.fields);
     throw err;
   }
+}
+
+/**
+ * The database for a versioned write. Document + snapshot must be one atomic batch (spec 062), so an
+ * adapter without `atomicWrite()` is refused rather than silently downgraded to two separate writes.
+ * `syncSchema()` already refuses it up front; this is the same check at the point of use.
+ */
+function atomicDatabase(ctx: OperationContext, collection: CollectionDefinition) {
+  const database = ctx.adapters.database;
+  if (typeof (database as Partial<typeof database>).atomicWrite !== 'function') {
+    throw new Error(
+      `Collection '${collection.slug}' has versions enabled, which requires a DatabaseAdapter ` +
+        `implementing atomicWrite() (specs 060/062); '${database.name}' does not.`
+    );
+  }
+  return database;
+}
+
+/**
+ * Maps what a rolled-back document + snapshot batch threw to the runtime's typed errors (spec 062 §3).
+ * The version table's `(documentId, versionNumber)` index is an internal detail: on update it means
+ * another writer committed first (`ConcurrentModificationError`); on create it means the id is already
+ * taken by an existing — possibly deleted — document's history, reported like any duplicate id. The
+ * internal table name never reaches the caller.
+ */
+function toVersionedWriteError(
+  err: unknown,
+  collection: CollectionDefinition,
+  id: string,
+  operation: 'create' | 'update'
+): unknown {
+  if (isVersionIdentityConflict(err, collection)) {
+    return operation === 'create'
+      ? new UniqueConstraintError(collection.slug, ['id'])
+      : new ConcurrentModificationError(collection.slug, id);
+  }
+  if (isDbUniqueConstraintError(err)) return new UniqueConstraintError(collection.slug, err.fields);
+  // The batch's plain `update` requires its row: the document was deleted after it was read.
+  if (isAtomicWriteConditionError(err)) return notFound(collection.slug, id);
+  return err;
+}
+
+/**
+ * Versioned create (spec 062 §2): the document and its version 1 in one `atomicWrite()`. The batch is
+ * declarative and cannot feed a generated id from one operation into the next, so the id is allocated
+ * here — the caller's own non-empty string `id` if it supplied one (as every adapter already honours),
+ * otherwise a UUID, which is what the adapters would have generated.
+ */
+async function createWithSnapshot(
+  ctx: OperationContext,
+  collection: CollectionDefinition,
+  data: Record<string, unknown>,
+  user: CmsUser | null
+): Promise<DatabaseRecord> {
+  const database = atomicDatabase(ctx, collection);
+  const id = typeof data.id === 'string' && data.id !== '' ? data.id : crypto.randomUUID();
+
+  let results: Awaited<ReturnType<typeof database.atomicWrite>>;
+  try {
+    results = await database.atomicWrite([
+      { type: 'create', collection: collection.slug, data: { ...data, id } },
+      {
+        type: 'create',
+        collection: versionsCollectionSlug(collection.slug),
+        data: buildVersionRecord({
+          documentId: id,
+          versionNumber: 1,
+          data: buildSnapshot(collection, data),
+          user,
+          full: true
+        })
+      }
+    ]);
+  } catch (err) {
+    throw toVersionedWriteError(err, collection, id, 'create');
+  }
+
+  const [created] = results;
+  if (created?.type !== 'create') throw new Error('atomicWrite returned no created document');
+  return created.record;
+}
+
+/**
+ * Versioned update (spec 062 §3): the document patch and snapshot `versionNumber` in one
+ * `atomicWrite()`. `versionNumber` is one past the latest version the caller observed *before* it read
+ * the document, so if anyone committed in between, this batch's snapshot collides with theirs on the
+ * unique `(documentId, versionNumber)` index and the whole batch — document patch included — rolls back.
+ */
+async function updateWithSnapshot(
+  ctx: OperationContext,
+  collection: CollectionDefinition,
+  input: {
+    id: string;
+    data: Record<string, unknown>;
+    snapshot: Record<string, unknown>;
+    versionNumber: number;
+    user: CmsUser | null;
+    label?: string;
+  }
+): Promise<DatabaseRecord> {
+  const database = atomicDatabase(ctx, collection);
+
+  let results: Awaited<ReturnType<typeof database.atomicWrite>>;
+  try {
+    results = await database.atomicWrite([
+      { type: 'update', collection: collection.slug, id: input.id, data: input.data },
+      {
+        type: 'create',
+        collection: versionsCollectionSlug(collection.slug),
+        data: buildVersionRecord({
+          documentId: input.id,
+          versionNumber: input.versionNumber,
+          data: input.snapshot,
+          user: input.user,
+          full: true,
+          ...(input.label !== undefined && { label: input.label })
+        })
+      }
+    ]);
+  } catch (err) {
+    throw toVersionedWriteError(err, collection, input.id, 'update');
+  }
+
+  const [updated] = results;
+  if (updated?.type !== 'update') throw new Error('atomicWrite returned no updated document');
+  return updated.record;
 }
 
 /**
@@ -452,19 +592,10 @@ export async function create(ctx: OperationContext, args: CreateArgs): Promise<D
     'beforeChange hook'
   );
 
-  const record = await runWrite(args.collection, () =>
-    ctx.adapters.database.create(args.collection, data)
-  );
-
-  // Create initial version if versions are enabled
-  if (versionsEnabled(collection)) {
-    await createVersion(ctx, {
-      collection: args.collection,
-      documentId: record.id as string,
-      data,
-      user
-    });
-  }
+  // A versioned document and its version 1 commit together or not at all (spec 062 §2).
+  const record = versionsEnabled(collection)
+    ? await createWithSnapshot(ctx, collection, data, user)
+    : await runWrite(args.collection, () => ctx.adapters.database.create(args.collection, data));
 
   await runAfterChangeHooks(collection, {
     operation: 'create',
@@ -483,6 +614,19 @@ export async function create(ctx: OperationContext, args: CreateArgs): Promise<D
 }
 
 export async function update(ctx: OperationContext, args: UpdateArgs): Promise<DatabaseRecord> {
+  return updateDocument(ctx, args);
+}
+
+/**
+ * The update pipeline. `restore` (only ever passed by {@link restoreVersion}) replaces `args.data` with
+ * the difference between that version's content and the document as read *here* — after the version
+ * number was observed — so a restore is serialized exactly like any other update (spec 062 §6).
+ */
+async function updateDocument(
+  ctx: OperationContext,
+  args: UpdateArgs,
+  restore?: RestorableVersion
+): Promise<DatabaseRecord> {
   const collection = getCollectionOrThrow(ctx, args.collection);
   assertNotAuthManaged(ctx, args.collection);
   const user = args.user ?? null;
@@ -490,13 +634,23 @@ export async function update(ctx: OperationContext, args: UpdateArgs): Promise<D
 
   await runBeforeOperationHooks(collection, { operation: 'update', user, overrideAccess });
 
+  // Spec 062 §3: the latest version number is read BEFORE the document. A write that commits version
+  // N+1 therefore proves nobody committed between this observation and the document read below — the
+  // unique (documentId, versionNumber) index turns any such interleaving into a rolled-back conflict.
+  const versioned = versionsEnabled(collection);
+  const latestVersion = versioned
+    ? await readLatestVersionNumber(ctx.adapters.database, collection, args.id)
+    : 0;
+
   const existing = await ctx.adapters.database.findById(args.collection, args.id);
   if (!existing) throw notFound(args.collection, args.id);
+
+  const input = restore ? diffAgainst(restoreTarget(collection, restore), existing) : args.data;
 
   const decision = await checkAccess(collection, 'update', {
     ...args,
     id: args.id,
-    data: args.data,
+    data: input,
     doc: existing
   });
   if (decision.where && !documentMatches(existing, decision.where)) {
@@ -505,7 +659,7 @@ export async function update(ctx: OperationContext, args: UpdateArgs): Promise<D
 
   if (args.overrideAccess === false) {
     try {
-      await assertWritableFields(args.data, collection, user, 'update');
+      await assertWritableFields(input, collection, user, 'update');
     } catch (err) {
       if (err instanceof FieldAccessError) throw new AccessDeniedError(err.message);
       throw err;
@@ -515,8 +669,8 @@ export async function update(ctx: OperationContext, args: UpdateArgs): Promise<D
   // Process localized fields if the collection has locales configured
   const processedData =
     isLocalizedCollection(collection) && args.locale
-      ? storeLocalizedDocument(args.data, collection, args.locale, existing)
-      : args.data;
+      ? storeLocalizedDocument(input, collection, args.locale, existing)
+      : input;
 
   let data = await runRejectableStage(
     async () =>
@@ -569,20 +723,21 @@ export async function update(ctx: OperationContext, args: UpdateArgs): Promise<D
     'beforeChange hook'
   );
 
-  const record = await runWrite(args.collection, () =>
-    ctx.adapters.database.update(args.collection, args.id, data)
-  );
-
-  // Create a version snapshot if versions are enabled
-  if (versionsEnabled(collection)) {
-    await createVersion(ctx, {
-      collection: args.collection,
-      documentId: args.id,
-      data,
-      user,
-      ...(args.versionLabel !== undefined && { label: args.versionLabel })
-    });
-  }
+  // A versioned update commits its patch and a full snapshot of the resulting content together
+  // (spec 062 §3/§5). `{ ...existing, ...data }` is exactly what the batch leaves in the row: the batch
+  // only commits if no one else wrote this document since `existing` was read.
+  const record = versioned
+    ? await updateWithSnapshot(ctx, collection, {
+        id: args.id,
+        data,
+        snapshot: buildSnapshot(collection, { ...existing, ...data }),
+        versionNumber: latestVersion + 1,
+        user,
+        ...(args.versionLabel !== undefined && { label: args.versionLabel })
+      })
+    : await runWrite(args.collection, () =>
+        ctx.adapters.database.update(args.collection, args.id, data)
+      );
 
   await runAfterChangeHooks(collection, {
     operation: 'update',
@@ -602,19 +757,17 @@ export async function update(ctx: OperationContext, args: UpdateArgs): Promise<D
 }
 
 /**
- * Restores a document to a specific historical version — spec 058 §2. Unlike the pre-058
- * implementation (which wrote through `ctx.adapters.database.update()` directly, bypassing access,
- * validation, and hooks), this fetches the raw version snapshot and then calls this module's own
- * `update()`, so a restore gets exactly the same update-access/row-policy/field-write/validation/hook
- * pipeline a normal update gets, and creates exactly one labeled version (via `versionLabel`) instead
- * of a second, bespoke version write.
+ * Restores a document to a specific historical version — spec 058 §2, made atomic by spec 062. The raw
+ * snapshot is read (trusted — restore's authorization gate is `update()`'s own update-access check on
+ * the *current* document, see spec 058 §2) and handed to this module's own update pipeline, which turns
+ * it into a patch of only the fields that differ from the current document (spec 062 §6) and then runs
+ * the normal update-access / row-policy / field-write / validation / hook pipeline. The patch and one
+ * snapshot labeled `Restored from version N` commit in one atomic batch, so a forbidden, invalid or
+ * conflicting restore leaves both the document and its history unchanged.
  *
- * The version snapshot itself is always fetched unfiltered (`overrideAccess: true` on the internal
- * `getVersion` call) — restore's authorization gate is `update()`'s own update-access check on the
- * *current* document, exactly like calling `update()` directly would behave; there is no separate
- * "can this caller read this document's history" gate for restore (see spec 058 §2 for the reasoning).
- * A forbidden or invalid restore throws before `update()` ever reaches the adapter write, so both the
- * current document and its history are left unchanged.
+ * System metadata (`id`, `created_at`, `updated_at`, `_storageKey`) is never restored. A full (spec 062)
+ * snapshot sets every currently declared field, so a snapshot that predates a now-required field fails
+ * current validation instead of producing an invalid document.
  */
 export async function restoreVersion(
   ctx: OperationContext,
@@ -627,20 +780,20 @@ export async function restoreVersion(
     throw new Error(`Collection '${args.collection}' does not have versions enabled`);
   }
 
-  const version = await getVersion(ctx, {
-    collection: args.collection,
-    versionId: args.versionId,
-    overrideAccess: true
-  });
+  const restorable = await readVersionForRestore(ctx, collection, args.versionId);
 
-  return update(ctx, {
-    collection: args.collection,
-    id: version.documentId,
-    data: version.data,
-    ...(args.user !== undefined && { user: args.user }),
-    ...(args.overrideAccess !== undefined && { overrideAccess: args.overrideAccess }),
-    versionLabel: `Restored from version ${version.versionNumber}`
-  });
+  return updateDocument(
+    ctx,
+    {
+      collection: args.collection,
+      id: restorable.version.documentId,
+      data: {},
+      ...(args.user !== undefined && { user: args.user }),
+      ...(args.overrideAccess !== undefined && { overrideAccess: args.overrideAccess }),
+      versionLabel: `Restored from version ${restorable.version.versionNumber}`
+    },
+    restorable
+  );
 }
 
 const MEDIA_URL_PREFIX = '/api/media/';

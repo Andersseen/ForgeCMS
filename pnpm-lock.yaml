@@ -688,6 +688,12 @@ importers:
         specifier: workspace:*
         version: link:../storage
     devDependencies:
+      '@forge-cms/testing':
+        specifier: workspace:*
+        version: link:../testing
+      '@libsql/client':
+        specifier: 0.17.3
+        version: 0.17.3
       typescript:
         specifier: 'catalog:'
         version: 5.9.2
