@@ -477,9 +477,14 @@ export interface Version {
   id: string;
   /** The id of the document this version belongs to. */
   documentId: string;
-  /** Monotonically increasing version number within the document. */
+  /** Version number within the document: `1, 2, 3, …`, unique per document (not guaranteed gapless). */
   versionNumber: number;
-  /** The full document data at this version. */
+  /**
+   * The document's restorable content at this version. Automatic snapshots (since spec 062) hold every
+   * declared field (`null` when unset) plus `_status` on drafts collections, never `id`/timestamps/
+   * `_storageKey`. Snapshots written before spec 062 hold only the fields that update changed; a manual
+   * `createVersion()` holds exactly the data it was given.
+   */
   data: Record<string, unknown>;
   /** When this version was created. */
   createdAt: string;

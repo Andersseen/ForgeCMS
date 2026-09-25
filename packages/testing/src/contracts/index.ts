@@ -28,3 +28,12 @@ export {
   type FirstAdminHarnessFactory,
   type FirstAdminUsers
 } from './bootstrap.js';
+export {
+  runVersionHistoryContractTests,
+  type VersionHistoryContractOptions,
+  type VersionHistoryDatabase,
+  type VersionHistoryHarness,
+  type VersionHistoryHarnessFactory,
+  type VersionHistoryRuntime,
+  type VersionHistoryVersion
+} from './version-history.js';

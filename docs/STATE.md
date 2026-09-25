@@ -1,11 +1,67 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-23 (admin layout fix).**
+> **Last updated: 2026-09-25 (spec 062 — document/version history consistency).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Document / version history consistency — D03 (spec 062, 2026-09-25)
+
+Roadmap D03 plus the document/history slice of D01 (audit F10). Versioned content writes now use spec
+060's `atomicWrite()`. See
+[docs/specs/062-document-version-history-consistency.md](specs/062-document-version-history-consistency.md)
+for the D01 behavior table and the design.
+
+- **Reproduced first** (throwaway probe on unmodified `main`, InMemory **and** on-disk libSQL with
+  independent clients, identical output): a failed snapshot insert left a created document with **0**
+  versions, and an updated document ahead of its history; two gated writers both "succeeded" with
+  version numbers `2,2,1` and the last writer silently won; `update({ title })` stored
+  `{"title":"Updated"}` as the "full document" snapshot; re-creating a deleted document's id **adopted
+  its history** (`2:attacker,1:secret v1`).
+- **Now**: versioned `create` = one batch `[document (runtime-allocated id), version 1]`; versioned
+  `update` = one batch `[document patch, version N+1]`; `restoreVersion` is still `update()` (spec 058)
+  and inherits it. `_versions_<slug>` has a compound unique `(documentId, versionNumber)` index (existing
+  compound-index machinery) and an internal `snapshotFormat` column. `update()` reads the latest version
+  number **before** the document, so a writer that lost a race collides on the index and its whole batch
+  rolls back → new `ConcurrentModificationError` (`409`, `CONCURRENT_MODIFICATION`, no internal table
+  name). No automatic retry of document updates (hooks may have side effects); `after*` hooks only run on
+  commit. A mutation test (swapping the two reads) makes the interleaving test fail, i.e. the ordering is
+  guarded. No `_revision` column, no new `DatabaseAdapter` method.
+- **Snapshots are full content**: every declared field (`null` when unset) + `_status` on drafts
+  collections; never `id`/`created_at`/`updated_at`/`_storageKey`. Restore applies only the fields that
+  differ from the current document (so field-write rules apply to what actually changes), never restores
+  system keys, and — for a full snapshot — sets fields the snapshot lacks to `null`, so an old snapshot
+  that predates a now-required field fails validation with nothing written. Pre-062 snapshots (patches,
+  unmarked) restore only the fields they contain.
+- **Manual `createVersion`**: unchanged public semantics (verbatim data, no hooks/owner check); number
+  allocation retries at most 3 attempts, then `ConcurrentModificationError`.
+- **Retention (defined, no cleanup)**: history is kept indefinitely; deleting a document orphans it
+  (untrusted list/get → 404, restore → 404, trusted reads still see it); an orphaned history blocks
+  re-creating that id (`UniqueConstraintError`, `fields: ['id']`).
+- **Upgrade**: `syncSchema()` adds the column + index additively. Pre-062 duplicate version identities
+  make it fail with a message listing them and an inspection query — never deleted/renumbered (input for
+  0.7 / M03). Proven on libSQL and D1 with an old-shape table.
+- **Evidence**: `@forge-cms/testing/contracts` gains `runVersionHistoryContractTests` (duck-typed,
+  gate-driven, failures injected _inside_ the batch and state re-read from the database), run on
+  InMemory, on-disk libSQL with independent clients, and real local D1/workerd with independent adapters
+  (+ a `BEFORE INSERT` trigger for a non-constraint failure on both SQL backends). Plus
+  `packages/runtime/src/version-consistency.test.ts` (multi-type full snapshot incl. localized/relation/
+  group/drafts, invalid old-schema restore, hooks, deleted owner, HTTP 409, legacy restore, upgrade) and a
+  packed-consumer check in `scripts/verify-release.mjs`. Production D1 / remote Turso not exercised.
+- **Found in review, fixed**: the public raw fallback of `handleCascadeDelete`/`handleSetNullOnDelete`
+  (no `mutator`) now refuses a versioned target instead of writing it without a version row;
+  `Version` docs in `@forge-cms/core` corrected (patch changeset). Documented: `syncSchema()` is required
+  for the InMemory guarantee; a `before*` hook updating its own versioned document makes the outer update
+  conflict.
+- **Recorded, not changed**: `versions.autosave` is accepted but inert. **Security finding (confirmed
+  over HTTP, not fixed here):** generic create/update accept the system keys `id`, `created_at`,
+  `updated_at`, `_storageKey` from any caller who may write the document — an `editor` repointed an upload
+  document's `_storageKey` and its `DELETE` removed a different stored object. InMemory `create` has no
+  primary-key check.
+- Changeset `document-version-history-consistency.md` (runtime + testing, minor); API baseline: runtime
+  `ConcurrentModificationError`, testing/contracts `runVersionHistoryContractTests` + harness types.
 
 ## Admin shell: fixed sidebar/header, scrollable content only (2026-09-23)
 
@@ -1193,8 +1249,9 @@ passwordHash`~~ — **fixed 2026-07-22, spec 018.** `@forge-cms/auth` now export
 12. **The admin relation field is a bare text input** where you paste a document id by hand, and
     `richtext`/`upload` fall back to a textarea/text input. Composite fields render properly
     (spec 022) but scalar widgets are still primitive — ROADMAP item 032.
-13. **No versions/revisions.** Spec 017 shipped draft/published status only: no history, no diff, no
-    restore, no autosave — ROADMAP item 024.
+13. ~~**No versions/revisions.**~~ Versions exist since Phase 0.3.2 and are consistent since spec 062
+    (atomic document + full snapshot, unique version identity). Still missing: diff, history UI,
+    retention cleanup, and `versions.autosave` is inert.
 14. **No globals** (singleton documents). `apps/www` fakes one with a `site_config` collection —
     ROADMAP item 023.
 15. **No localisation.** Changes the storage shape, so it gets more expensive the longer real data
@@ -1232,14 +1289,15 @@ passwordHash`~~ — **fixed 2026-07-22, spec 018.** `@forge-cms/auth` now export
 
 ## What's next
 
-**Next bounded step (recommended after spec 061, 2026-09-20): D01/D03 — make a document write and its
-version snapshot consistent with `atomicWrite()`.** H02 is complete: first-admin provisioning (060),
-last-admin (059) and the generic-CRUD boundary (061) all hold, so D01's H02 storage dependency is settled.
-Spec 060 §8 already shows D03's document + version write fits one batch
-(`[updateIf(doc, CAS, requireApplied), create(version)]`, plus a unique index and retry for version
-numbering); D02 (cascade) still needs a cross-collection "no referencing rows" guard and a cap rule, so it
-stays after D03. Nothing of that is started. Also open, small and independent: let `updateUser` carry the
-custom profile fields of a managed collection (known limitation 1 above) if a consumer needs it.
+**Next bounded step (recommended after spec 062, 2026-09-25): close the generic system-field write
+path.** Spec 062 confirmed over HTTP that `create`/`update` accept `id`, `created_at`, `updated_at` and
+`_storageKey` from any caller allowed to write the document, and that a repointed `_storageKey` makes a
+later delete remove a different stored object. Small, security-relevant, runtime-only (reject or strip
+system keys from untrusted input; decide whether trusted callers may set `id`). After that: **D02**
+(relation lifecycle atomicity — needs a cross-collection "no referencing rows" guard and a rule for the
+25-operation cap). D03 is done except retention cleanup, which needs a product decision first. Also open,
+small and independent: let `updateUser` carry the custom profile fields of a managed collection (spec 061
+known limitation 1) if a consumer needs it.
 
 Work is planned in [ROADMAP.md](ROADMAP.md), which sequences the remaining gaps by cost-of-delay.
 Each numbered item there gets its own spec in `docs/specs/` when picked up, per [SDD.md](SDD.md).

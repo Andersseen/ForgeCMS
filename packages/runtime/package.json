@@ -50,6 +50,8 @@
     "@forge-cms/storage": "workspace:*"
   },
   "devDependencies": {
+    "@forge-cms/testing": "workspace:*",
+    "@libsql/client": "0.17.3",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

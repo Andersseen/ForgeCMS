@@ -226,6 +226,7 @@ import {
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import {
   AuthManagedCollectionError,
+  ConcurrentModificationError,
   ForgeCmsRuntime,
   UniqueConstraintError,
   handleDelete,
@@ -550,6 +551,69 @@ if (!(conditionError instanceof AtomicWriteConditionError) || (await batchDb.fin
   throw new Error('Expected requireApplied to fail the batch with AtomicWriteConditionError and roll back');
 }
 if (ATOMIC_WRITE_MAX_OPERATIONS !== 25) throw new Error('Expected the documented batch cap of 25');
+
+// Spec 062, packed public surface: a versioned document and its snapshot are one atomic write, the
+// snapshot is the full content, and a writer that loses the race gets ConcurrentModificationError with
+// nothing written. The race is forced by committing a competing version right before the batch.
+const historyStore = new InMemoryDatabaseAdapter();
+let beforeBatch: (() => Promise<unknown>) | undefined;
+const historyDb = new Proxy(historyStore, {
+  get(target, property) {
+    if (property === 'atomicWrite') {
+      return async (operations: AtomicWriteOperation[]) => {
+        const action = beforeBatch;
+        beforeBatch = undefined;
+        if (action) await action();
+        return target.atomicWrite(operations);
+      };
+    }
+    const value = Reflect.get(target, property, target);
+    return typeof value === 'function' ? value.bind(target) : value;
+  }
+});
+const historyRuntime = new ForgeCmsRuntime({
+  collections: [
+    defineCollection({
+      slug: 'pages',
+      versions: true,
+      fields: { title: defineField.text({ required: true }), body: defineField.text() }
+    })
+  ],
+  adapters: { database: historyDb, auth: new InMemoryAuthAdapter(), storage: new InMemoryStorageAdapter() }
+});
+historyRuntime.init();
+await historyRuntime.syncSchema();
+const page = await historyRuntime.create({ collection: 'pages', data: { title: 'v1', body: 'kept' } });
+await historyRuntime.update({ collection: 'pages', id: String(page.id), data: { title: 'v2' } });
+const [latestPageVersion] = await historyRuntime.listVersions({ collection: 'pages', documentId: String(page.id) });
+if (
+  latestPageVersion?.versionNumber !== 2 ||
+  JSON.stringify(latestPageVersion.data) !== JSON.stringify({ title: 'v2', body: 'kept' })
+) {
+  throw new Error('Expected version 2 to be the full content snapshot of the updated page');
+}
+beforeBatch = () =>
+  historyStore.create('_versions_pages', {
+    id: 'competing',
+    documentId: page.id,
+    versionNumber: 3,
+    data: '{}',
+    createdAt: new Date().toISOString()
+  });
+let raceError: unknown;
+try {
+  await historyRuntime.update({ collection: 'pages', id: String(page.id), data: { title: 'lost' } });
+} catch (error) {
+  raceError = error;
+}
+if (
+  !(raceError instanceof ConcurrentModificationError) ||
+  raceError.status !== 409 ||
+  raceError.code !== 'CONCURRENT_MODIFICATION' ||
+  (await historyStore.findById('pages', String(page.id)))?.title !== 'v2'
+) {
+  throw new Error('Expected a lost version race to reject with ConcurrentModificationError and write nothing');
+}
 
 const loginResponse = await handleLogin(
   {

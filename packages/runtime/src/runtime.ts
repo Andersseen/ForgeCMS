@@ -5,10 +5,8 @@ import type {
   CollectionDocument,
   CollectionRegistry,
   CollectionSlug,
-  GlobalDefinition,
-  AnyField
+  GlobalDefinition
 } from '@forge-cms/core';
-import { defineField } from '@forge-cms/core';
 import type { DatabaseRecord } from '@forge-cms/db';
 import type { OperationContext } from './context.js';
 import * as operations from './operations.js';
@@ -92,29 +90,59 @@ export class ForgeCmsRuntime<
       ]);
     }
 
-    // Create version tables for collections with versions enabled
-    for (const collection of this.config.collections) {
-      if (
-        collection.versions === true ||
-        (typeof collection.versions === 'object' && collection.versions !== null)
-      ) {
-        const versionFields: Record<string, AnyField> = {
-          documentId: defineField.text({ required: true }),
-          versionNumber: defineField.number({ required: true }),
-          data: defineField.json({ required: true }),
-          createdAt: defineField.date({ required: true }),
-          createdBy: defineField.text(),
-          autosave: defineField.boolean(),
-          label: defineField.text()
-        };
-
-        await this.adapters.database.syncSchema([
-          {
-            slug: `_versions_${collection.slug}`,
-            fields: versionFields
-          }
-        ]);
+    // Version tables for collections with versions enabled (spec 062 §1/§8).
+    const versioned = this.config.collections.filter((c) => versionOps.versionsEnabled(c));
+    if (versioned.length > 0) {
+      const database = this.adapters.database as Partial<typeof this.adapters.database>;
+      if (typeof database.atomicWrite !== 'function') {
+        throw new Error(
+          `Collections with versions enabled (${versioned.map((c) => `'${c.slug}'`).join(', ')}) ` +
+            `require a DatabaseAdapter implementing atomicWrite() — a document and its version ` +
+            `snapshot must commit together (specs 060/062); '${String(database.name)}' does not.`
+        );
       }
+    }
+    for (const collection of versioned) {
+      await this.syncVersionTable(collection);
+    }
+  }
+
+  /**
+   * Creates/extends one `_versions_<slug>` table additively. Adding its unique
+   * `(documentId, versionNumber)` index fails on a database that already holds duplicate version
+   * identities (only the pre-062 read-then-insert race produced them): history is then reported, never
+   * deleted, renumbered or merged — the operator decides (spec 062 §8, roadmap 0.7 / M03).
+   */
+  private async syncVersionTable(collection: CollectionDefinition): Promise<void> {
+    const definition = versionOps.versionCollectionDefinition(collection.slug);
+    try {
+      await this.adapters.database.syncSchema([definition]);
+    } catch (err) {
+      let duplicates: versionOps.DuplicateVersionIdentity[];
+      try {
+        duplicates = await versionOps.findDuplicateVersionIdentities(
+          this.adapters.database,
+          definition.slug
+        );
+      } catch {
+        throw err;
+      }
+      if (duplicates.length === 0) throw err;
+
+      const examples = duplicates
+        .slice(0, 5)
+        .map((d) => `document "${d.documentId}" version ${d.versionNumber} (${d.rows} rows)`)
+        .join('; ');
+      throw new Error(
+        `Cannot add the unique (documentId, versionNumber) index to "${definition.slug}": it already ` +
+          `contains ${duplicates.length} duplicate version ${duplicates.length === 1 ? 'identity' : 'identities'} ` +
+          `— e.g. ${examples}. They were produced by concurrent updates before ForgeCMS enforced ` +
+          `version identity. ForgeCMS will not delete, renumber or merge version history automatically. ` +
+          `Inspect them with: SELECT "documentId", "versionNumber", COUNT(*) FROM "${definition.slug}" ` +
+          `GROUP BY "documentId", "versionNumber" HAVING COUNT(*) > 1; decide which rows to keep ` +
+          `(renumber or delete the extras after taking a backup), then restart.`,
+        { cause: err }
+      );
     }
   }
 

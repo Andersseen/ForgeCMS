@@ -9,6 +9,12 @@
   "LastAdminHarness",
   "LastAdminHarnessFactory",
   "LastAdminUsers",
+  "VersionHistoryContractOptions",
+  "VersionHistoryDatabase",
+  "VersionHistoryHarness",
+  "VersionHistoryHarnessFactory",
+  "VersionHistoryRuntime",
+  "VersionHistoryVersion",
   "WriteGate",
   "createWriteGate",
   "runAnalyticsWriterContractTests",
@@ -20,5 +26,6 @@
   "runDatabaseAdapterQueryContractTests",
   "runFirstAdminBootstrapContractTests",
   "runLastAdminConcurrencyContractTests",
-  "runStorageAdapterContractTests"
+  "runStorageAdapterContractTests",
+  "runVersionHistoryContractTests"
 ]

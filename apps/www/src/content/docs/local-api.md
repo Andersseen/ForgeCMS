@@ -219,19 +219,49 @@ const removed = await runtime.delete({ collection: 'posts', id });
 Returns the deleted document, having run `beforeDelete` and `afterDelete`. It does **not** delete
 related storage objects or clean up references.
 
+## Version history
+
+On a `versions: true` collection (see [Collections → Version history](/docs/collections#version-history)):
+
+```ts
+const history = await runtime.listVersions({ collection: 'posts', documentId: id, limit: 20 });
+const version = await runtime.getVersion({ collection: 'posts', versionId });
+const restored = await runtime.restoreVersion({
+  collection: 'posts',
+  versionId,
+  user,
+  overrideAccess: false
+});
+await runtime.createVersion({
+  collection: 'posts',
+  documentId: id,
+  data: snapshot,
+  label: 'Launch'
+});
+```
+
+`create`/`update`/`restoreVersion` save the document and its snapshot as one atomic write. When another
+write reaches the same document first, `update`/`restoreVersion` throw `ConcurrentModificationError`
+and save nothing. Hooks run in this order: `before*` hooks run first, then the atomic write, then
+`afterChange` and `afterOperation`. When the write fails, the `before*` hooks have already run (a
+database rollback can't undo side effects they caused), and the `after*` hooks don't run. Forge does
+not retry: re-read the document and submit again.
+
 ## Errors
 
 Typed, each carrying its HTTP status — so the transport layer maps them without a translation table:
 
-| Error                   | Status | Thrown when                                                                                                           |
-| ----------------------- | ------ | --------------------------------------------------------------------------------------------------------------------- |
-| `NotFoundError`         | 404    | Unknown collection, unknown id, invisible document                                                                    |
-| `InvalidInputError`     | 400    | Malformed query, bad JSON, bad multipart body                                                                         |
-| `UnknownFieldError`     | 400    | `where`/`sort` names a field the collection doesn't have                                                              |
-| `InvalidQueryError`     | 400    | Malformed `and`/`or` group (empty, wrong shape), bad operator/sort direction, `containsValue` on a non-relation field |
-| `ValidationFailedError` | 400    | Field validation failed — carries `details`                                                                           |
-| `UnauthorizedError`     | 401    | Authentication required                                                                                               |
-| `AccessDeniedError`     | 403    | Authenticated but not permitted                                                                                       |
+| Error                         | Status | Thrown when                                                                                                           |
+| ----------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------- |
+| `NotFoundError`               | 404    | Unknown collection, unknown id, invisible document                                                                    |
+| `InvalidInputError`           | 400    | Malformed query, bad JSON, bad multipart body                                                                         |
+| `UnknownFieldError`           | 400    | `where`/`sort` names a field the collection doesn't have                                                              |
+| `InvalidQueryError`           | 400    | Malformed `and`/`or` group (empty, wrong shape), bad operator/sort direction, `containsValue` on a non-relation field |
+| `ValidationFailedError`       | 400    | Field validation failed — carries `details`                                                                           |
+| `UnauthorizedError`           | 401    | Authentication required                                                                                               |
+| `AccessDeniedError`           | 403    | Authenticated but not permitted                                                                                       |
+| `UniqueConstraintError`       | 409    | A unique field/index (or a duplicate `id`) already exists — carries `details.fields`                                  |
+| `ConcurrentModificationError` | 409    | A versioned document changed after this update read it; nothing was saved — reload and retry                          |
 
 ```ts
 import { isForgeError, ValidationFailedError } from '@forge-cms/runtime';
