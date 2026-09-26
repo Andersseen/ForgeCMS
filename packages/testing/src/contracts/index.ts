@@ -37,3 +37,13 @@ export {
   type VersionHistoryRuntime,
   type VersionHistoryVersion
 } from './version-history.js';
+export {
+  createBatchHold,
+  relationLifecycleCollections,
+  runRelationLifecycleContractTests,
+  type BatchHold,
+  type RelationLifecycleDatabase,
+  type RelationLifecycleHarness,
+  type RelationLifecycleHarnessFactory,
+  type RelationLifecycleRuntime
+} from './relation-lifecycle.js';

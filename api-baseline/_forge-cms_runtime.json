@@ -120,5 +120,6 @@
   "toApiErrorBody",
   "update",
   "updateGlobal",
+  "validateRelationSchema",
   "versionsEnabled"
 ]

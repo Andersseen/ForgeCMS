@@ -1,11 +1,87 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-26 (system-field mutation boundary, spec 063).**
+> **Last updated: 2026-09-26 (relation lifecycle consistency — D02, spec 064).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Relation lifecycle consistency — D02 (spec 064, 2026-09-26)
+
+Roadmap 0.6 D02 / audit F09. See
+[docs/specs/064-relation-lifecycle-consistency.md](specs/064-relation-lifecycle-consistency.md) for the
+supported matrix and exact semantics.
+
+- **Reproduced first** on `main` (`ee25b7e`):
+  - **Partial cascade.** `authors ←cascade posts ←cascade comments`; a comment's `beforeDelete`
+    throws. The delete rejected but left `{ A, P2, C }` with **P1 already deleted**.
+  - **Race, on-disk libSQL (two clients) and local D1 (workerd, two adapters).** The deleter was held
+    after it saw zero references; a second writer created `post → A`; then the deleter was released.
+    Both committed: a dangling `post.author`.
+  - **Silently ignored shapes.** A delete succeeded while the target was still referenced by an
+    `upload` field, by a `relation` inside a `group`, or by a global. `create({ hero: 'no-such-media' })`
+    was accepted. A localized relation could not be written at all, yet its `onDelete` was accepted.
+- **Now:**
+  - **`atomicWrite` gains `assertCount`** (`{ collection, where?, equals }`, read-only). It fails the
+    batch with `AtomicWriteConditionError` unless the count matches at that point of the batch. On SQL
+    it is one aggregate statement raising the spec-060 overflow guard. Implemented on InMemory, libSQL
+    and D1.
+  - **Delete = plan → prepare → one batch → finalize** (`relation-lifecycle.ts`, `operations.ts`).
+    - _Plan:_ reads only. BFS over `collection:id`; bounded `findMany(limit 26)`.
+    - _Final-state judgement:_ restrict blocks only for a surviving referrer; a surviving required
+      set-null refuses the delete; auth-managed cascade/set-null is refused (spec 061).
+    - _Size limit:_ a plan over 25 operations is refused before any hook.
+    - _Prepare:_ root and dependent `beforeDelete`s. Set-null updates go through the same
+      `prepareUpdate` as `update()`.
+    - _Commit:_ one `atomicWrite` —
+      - set-nulls (`updateIf` CAS on `updated_at`, or spec 062's update + snapshot);
+      - cascaded `deleteIf`s (CAS);
+      - the root delete;
+      - one `assertCount(…, 0)` per referring field.
+    - _Finalize:_ storage cleanup by captured `_storageKey`, then after-hooks.
+  - **Writes validate targets.** `create`, `update` and `updateGlobalDocument` do one `count` per target
+    collection (`400` if missing), then run the matching `assertCount` in the same batch as the write
+    and its snapshot. A concurrent deletion of the target gives `409`.
+    - Updates validate only the relation values they change.
+    - References an update re-sends unchanged must still be on the row when it commits
+      (`echoedReferenceGuard`). A whole-document save can therefore not undo a concurrent set-null
+      (found in review).
+    - Set-null dependents' hook-written relations are checked too.
+    - `in` lists are chunked to 90 ids for D1.
+  - **Upload fields and globals restrict** deletion of their targets.
+  - **Startup validation** (`ForgeCmsRuntime` constructor, `validateRelationSchema`) refuses:
+    - nested (`group`/`array`/`blocks`) references;
+    - localized references;
+    - unregistered targets;
+    - global `onDelete` other than restrict;
+    - `cascade`/`set-null` onto an auth-managed target.
+  - `ConcurrentModificationError` takes an optional message; legacy `handleCascadeDelete`/
+    `handleSetNullOnDelete`/`checkDeleteRestrictions` are deprecated (non-atomic, unused by
+    `runtime.delete`); `findOrphanedDocuments` covers upload fields.
+  - **apps/www:** `posts.tags` pointed at an unregistered `tags` collection. It is now registered, and the
+    seed writes real tag rows and the real admin id instead of the string `'admin'`.
+- **Evidence:**
+  - `relation-lifecycle.test.ts` (runtime): the matrix, late hook/validation failures, a libSQL trigger
+    failing the last cascaded delete, versioned/upload dependents, target validation incl. `409` on
+    create/update/versioned/global, and HTTP mapping.
+  - The new `runRelationLifecycleContractTests` two-writer contract (6 scenarios) on InMemory, on-disk
+    libSQL and local D1 (`packages/cloudflare/test/workers/relation-lifecycle.test.ts`, with a D1
+    trigger-injected late failure).
+  - `assertCount` cases in the shared atomic-write contract on all three adapters.
+  - Production D1 / remote Turso are not exercised.
+- **Open / recorded:**
+  - A user deleted through the auth adapter's `deleteUser` does not consult content relations to the
+    users collection, so `post.author → users` can dangle after a user deletion. This is the one open
+    matrix cell.
+  - Before-hook side effects are not transactional (D01).
+  - Non-versioned CAS is `updated_at` (millisecond) precision.
+  - Recorded as decisions (spec §4):
+    - target validation lets a relation writer probe whether an id exists in a collection it cannot
+      read;
+    - a hook's non-string relation output is neither validated nor checked;
+    - relation targets must live in the content database.
+  - Target checks are chunked to 90 ids per statement (D1 allows 100 bound parameters).
 
 ## System-field mutation boundary — cross-object deletion closed (spec 063, 2026-09-26)
 
@@ -1372,9 +1448,14 @@ passwordHash`~~ — **fixed 2026-07-22, spec 018.** `@forge-cms/auth` now export
 
 ## What's next
 
-**Next bounded step (recommended after spec 063, 2026-09-26): D02** (relation lifecycle atomicity —
-needs a cross-collection "no referencing rows" guard and a rule for the 25-operation cap). The
-system-field write path spec 062 flagged is closed by spec 063. D03 is done except retention cleanup, which needs a product decision first. Also open,
+**Next bounded step (recommended after spec 064, 2026-09-26): close D02's one open cell.** Make the auth
+adapter's user deletion honour content relations that target the users collection. The runtime would
+hand the adapter "no reference remains" `assertCount` guards to fold into its `deleteUser` batch;
+restrict only, no cascades through the auth lifecycle. It is small and bounded, and it hits the most
+common schema here (tiny-project's required `post.author → users`). Until it lands D02 is not complete.
+After it: D04 (globals first write, localization certification, DB + R2 lifecycle) ranks above H04
+(host-level auth limits). The system-field write path spec 062 flagged is closed by spec 063. D03 is done except retention
+cleanup, which needs a product decision first. Also open,
 small and independent: let `updateUser` carry the custom profile fields of a managed collection (spec 061
 known limitation 1) if a consumer needs it.
 

@@ -97,8 +97,33 @@ malformed operation, on SQL adapters an unknown column/collection) rejects befor
 libSQL runs one `client.batch(…, 'write')`, D1 one `batch()`, InMemory stages a copy and publishes it in one
 synchronous turn (one adapter instance only). A network failure after the request left the process is
 outcome-unknown — no exactly-once promise. It backs `UsersCollectionAuthAdapter`'s first-admin
-provisioning (claim + admin in one batch) and, since spec 062, every versioned content write (below). D02
-(relation cascades) does not use it yet.
+provisioning (claim + admin in one batch) and, since spec 062, every versioned content write (below).
+Since spec 064 there is a sixth, read-only operation, `{ type: 'assertCount', collection, where?, equals }`.
+It fails the batch unless exactly `equals` rows match at that point of the batch. On SQL it is one
+aggregate statement raising the same overflow guard. This is the cross-collection guard relation
+integrity commits with (below).
+
+**Relation lifecycle (spec 064, `@forge-cms/runtime`, `relation-lifecycle.ts`).** Supported references are
+top-level `relation`/`upload` fields of collections and globals. The `ForgeCmsRuntime` constructor refuses
+the rest (`validateRelationSchema`): nested in `group`/`array`/`blocks`, localized, to an unregistered
+collection, a global `onDelete` other than restrict, and `cascade`/`set-null` onto an auth-managed target.
+A **delete** runs in four phases:
+
+1. `planRelationDelete` works out the graph with bounded reads only (breadth-first over `collection:id`;
+   restrict and required set-null judged on the final state; more than 25 operations is refused).
+2. `operations.ts` runs every before-hook and validation. Set-null dependents go through the same
+   `prepareUpdate` as `update()`.
+3. It commits one `atomicWrite`:
+   - set-null patches: `updateIf` guarded by the `updated_at` read, or spec 062's update + snapshot;
+   - cascaded `deleteIf`s guarded by `updated_at`;
+   - the root delete;
+   - one `assertCount(…, 0)` per referring field.
+4. After the commit: storage cleanup, then after-hooks.
+
+A **write** checks every relation target it changes with one `count` per target collection (`400` if
+missing). It carries `assertCount(target, { id: { in } }, n)` in the same batch as the write (and its
+snapshot). A delete and a reference write racing on libSQL/D1 therefore serialize: exactly one commits.
+Conflicts are `409 CONCURRENT_MODIFICATION`. Dependents keep spec 058's trusted access.
 
 **Document / version history consistency (spec 062, `@forge-cms/runtime`).** A `versions`-enabled
 collection's history lives in the internal collection `_versions_<slug>` (`versionCollectionDefinition()`

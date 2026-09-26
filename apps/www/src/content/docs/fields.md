@@ -113,7 +113,10 @@ defineField.relation({ collection: 'tags', many: true }); // an array of ids
 ```
 
 Stored as ids. Ask for `depth: 1` on a read and they are replaced with the referenced documents,
-using **one batched query per relation field** — not one per document.
+using **one batched query per relation field** — not one per document. Written ids must exist, and
+`onDelete` (`restrict` by default, `cascade`, `set-null`) is enforced atomically — see
+[Relation integrity](/docs/collections). Only top-level, non-localized relations are supported; one
+inside a `group`/`array`/`blocks` is refused at startup.
 
 ### `upload`
 
@@ -122,7 +125,9 @@ defineField.upload({ collection: 'media' });
 ```
 
 Structurally a single `relation` pointing at an upload-enabled collection, but it tells the admin to
-render a media picker and the client to expect file metadata. See [Uploads](/docs/uploads).
+render a media picker and the client to expect file metadata. See [Uploads](/docs/uploads). Like a
+relation it must name an existing document, and it always **restricts**: a media document cannot be
+deleted while an `upload` field still points at it.
 
 ## Composite kinds
 

@@ -1,9 +1,11 @@
 import { validateCollection } from '@forge-cms/core';
 import type { CmsUser, GlobalDefinition } from '@forge-cms/core';
-import type { DatabaseRecord } from '@forge-cms/db';
+import type { AtomicWriteOperation, DatabaseRecord } from '@forge-cms/db';
+import { isAtomicWriteConditionError } from '@forge-cms/db';
 import type { OperationContext } from './context.js';
 import {
   AccessDeniedError,
+  ConcurrentModificationError,
   ForgeError,
   InvalidInputError,
   NotFoundError,
@@ -25,6 +27,11 @@ import {
 } from './hooks.js';
 import { assertWritableFields, filterReadableFields, FieldAccessError } from './field-access.js';
 import { screenHookOutput, screenUpdateInput } from './system-fields.js';
+import {
+  collectWrittenTargets,
+  targetAssertions,
+  verifyTargetsExist
+} from './relation-lifecycle.js';
 
 const GLOBAL_ID = 'global';
 
@@ -266,7 +273,19 @@ export async function updateGlobal(
   const globalCollection = `_global_${global.slug}`;
   let record: DatabaseRecord;
 
-  if (existing) {
+  // A global's relation/upload targets must exist, now and when it commits (spec 064 §4) — a global
+  // reference restricts deletion of its target, so it must never be written pointing at nothing.
+  const targets = collectWrittenTargets(global.fields, data, existing ?? undefined);
+  if (targets.size > 0) {
+    await verifyTargetsExist(ctx, targets);
+    record = await writeGlobalWithAssertions(ctx, {
+      global,
+      table: globalCollection,
+      data,
+      exists: existing !== null,
+      assertions: targetAssertions(targets)
+    });
+  } else if (existing) {
     record = await ctx.adapters.database.update(globalCollection, GLOBAL_ID, data);
   } else {
     record = await ctx.adapters.database.create(globalCollection, { ...data, id: GLOBAL_ID });
@@ -292,4 +311,44 @@ export async function updateGlobal(
     result
   });
   return result;
+}
+
+/**
+ * A global write carrying relation-target assertions (spec 064 §4): the assertions and the create/update
+ * of the single global row commit together. A failed assertion means a target was deleted after it was
+ * verified — a `409`, nothing written. The first-write race between two creators is D04's, unchanged:
+ * the loser still gets the row's primary-key conflict.
+ */
+async function writeGlobalWithAssertions(
+  ctx: OperationContext,
+  input: {
+    global: GlobalDefinition;
+    table: string;
+    data: Record<string, unknown>;
+    exists: boolean;
+    assertions: AtomicWriteOperation[];
+  }
+): Promise<DatabaseRecord> {
+  const write: AtomicWriteOperation = input.exists
+    ? { type: 'update', collection: input.table, id: GLOBAL_ID, data: input.data }
+    : { type: 'create', collection: input.table, data: { ...input.data, id: GLOBAL_ID } };
+  let results: Awaited<ReturnType<typeof ctx.adapters.database.atomicWrite>>;
+  try {
+    results = await ctx.adapters.database.atomicWrite([...input.assertions, write]);
+  } catch (err) {
+    if (isAtomicWriteConditionError(err)) {
+      throw new ConcurrentModificationError(
+        input.global.slug,
+        GLOBAL_ID,
+        `A document referenced by this write to global '${input.global.slug}' was deleted by another ` +
+          `request while it was in progress; nothing was written. Reload and try again.`
+      );
+    }
+    throw err;
+  }
+  const written = results[input.assertions.length];
+  if (written?.type !== 'create' && written?.type !== 'update') {
+    throw new Error('atomicWrite returned no global record');
+  }
+  return written.record;
 }

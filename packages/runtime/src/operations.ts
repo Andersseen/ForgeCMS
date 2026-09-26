@@ -1,7 +1,14 @@
 import { getLogger, validateCollection } from '@forge-cms/core';
 import type { AccessQuery, CmsUser, CollectionDefinition, DraftStatus } from '@forge-cms/core';
-import type { DatabaseRecord, DatabaseWhere, SortInput } from '@forge-cms/db';
+import type {
+  AtomicWriteOperation,
+  DatabaseRecord,
+  DatabaseWhere,
+  SortInput,
+  WriteCondition
+} from '@forge-cms/db';
 import {
+  ATOMIC_WRITE_MAX_OPERATIONS,
   isAtomicWriteConditionError,
   isUniqueConstraintError as isDbUniqueConstraintError
 } from '@forge-cms/db';
@@ -53,11 +60,14 @@ import {
   resolveLocalizedDocument
 } from './localization.js';
 import {
-  checkDeleteRestrictions,
-  handleCascadeDelete,
-  handleSetNullOnDelete
-} from './relation-integrity.js';
-import type { RelationMutator } from './relation-integrity.js';
+  collectWrittenTargets,
+  echoedReferenceGuard,
+  planRelationDelete,
+  setNullPatch,
+  targetAssertions,
+  verifyTargetsExist
+} from './relation-lifecycle.js';
+import type { PlannedDelete, PlannedSetNull } from './relation-lifecycle.js';
 
 /** A page of documents plus everything a paginator needs. */
 export interface PaginatedDocs<TDoc = DatabaseRecord> {
@@ -180,17 +190,36 @@ function atomicDatabase(ctx: OperationContext, collection: CollectionDefinition)
 }
 
 /**
+ * A relation target named by a write was deleted after the write verified it existed (spec 064 §4): the
+ * batch's `assertCount` failed and nothing was written. Reported as a conflict, never as bad input —
+ * "the target was missing to begin with" is only ever reported from the pre-batch read.
+ */
+function targetVanished(collection: CollectionDefinition, id: string): ConcurrentModificationError {
+  return new ConcurrentModificationError(
+    collection.slug,
+    id,
+    `A document referenced by this write to '${collection.slug}' was deleted by another request while ` +
+      `it was in progress; nothing was written. Reload and try again.`
+  );
+}
+
+/**
  * Maps what a rolled-back document + snapshot batch threw to the runtime's typed errors (spec 062 §3).
  * The version table's `(documentId, versionNumber)` index is an internal detail: on update it means
  * another writer committed first (`ConcurrentModificationError`); on create it means the id is already
  * taken by an existing — possibly deleted — document's history, reported like any duplicate id. The
  * internal table name never reaches the caller.
+ *
+ * With relation-target assertions in the batch (spec 064) an `AtomicWriteConditionError` on create can
+ * only be an assertion (creates never have to apply); on update it is either an assertion or the plain
+ * `update` of a document deleted meanwhile — the database does not say which, so both are a `409`.
  */
 function toVersionedWriteError(
   err: unknown,
   collection: CollectionDefinition,
   id: string,
-  operation: 'create' | 'update'
+  operation: 'create' | 'update',
+  hasAssertions: boolean
 ): unknown {
   if (isVersionIdentityConflict(err, collection)) {
     return operation === 'create'
@@ -198,14 +227,25 @@ function toVersionedWriteError(
       : new ConcurrentModificationError(collection.slug, id);
   }
   if (isDbUniqueConstraintError(err)) return new UniqueConstraintError(collection.slug, err.fields);
-  // The batch's plain `update` requires its row: the document was deleted after it was read.
-  if (isAtomicWriteConditionError(err)) return notFound(collection.slug, id);
+  if (isAtomicWriteConditionError(err)) {
+    if (!hasAssertions) return notFound(collection.slug, id);
+    return operation === 'create'
+      ? targetVanished(collection, id)
+      : new ConcurrentModificationError(
+          collection.slug,
+          id,
+          `Document '${id}' in '${collection.slug}', or a document this update references, was changed ` +
+            `or deleted by another request while this one was in progress; nothing was written. Reload ` +
+            `it and try again.`
+        );
+  }
   return err;
 }
 
 /**
- * Versioned create (spec 062 §2): the document and its version 1 in one `atomicWrite()`. The batch is
- * declarative and cannot feed a generated id from one operation into the next, so the id is allocated
+ * Versioned create (spec 062 §2): the document and its version 1 in one `atomicWrite()`, preceded by
+ * the write's relation-target assertions (spec 064) — one batch, never a second transaction. The batch
+ * is declarative and cannot feed a generated id from one operation into the next, so the id is allocated
  * here — a trusted caller's explicit `id` if it supplied one (spec 063 §2), otherwise a UUID, which is
  * what the adapters would have generated. `row` is what the document row persists (content plus any
  * Forge-owned metadata such as `_storageKey`); the snapshot is built from content only.
@@ -213,15 +253,21 @@ function toVersionedWriteError(
 async function createWithSnapshot(
   ctx: OperationContext,
   collection: CollectionDefinition,
-  input: { row: Record<string, unknown>; id: string | undefined; user: CmsUser | null }
+  input: {
+    row: Record<string, unknown>;
+    id: string | undefined;
+    user: CmsUser | null;
+    assertions: AtomicWriteOperation[];
+  }
 ): Promise<DatabaseRecord> {
   const database = atomicDatabase(ctx, collection);
   const id = input.id ?? crypto.randomUUID();
-  const { row, user } = input;
+  const { row, user, assertions } = input;
 
   let results: Awaited<ReturnType<typeof database.atomicWrite>>;
   try {
     results = await database.atomicWrite([
+      ...assertions,
       { type: 'create', collection: collection.slug, data: { ...row, id } },
       {
         type: 'create',
@@ -236,58 +282,185 @@ async function createWithSnapshot(
       }
     ]);
   } catch (err) {
-    throw toVersionedWriteError(err, collection, id, 'create');
+    throw toVersionedWriteError(err, collection, id, 'create', assertions.length > 0);
   }
 
-  const [created] = results;
+  const created = results[assertions.length];
   if (created?.type !== 'create') throw new Error('atomicWrite returned no created document');
   return created.record;
 }
 
 /**
- * Versioned update (spec 062 §3): the document patch and snapshot `versionNumber` in one
- * `atomicWrite()`. `versionNumber` is one past the latest version the caller observed *before* it read
- * the document, so if anyone committed in between, this batch's snapshot collides with theirs on the
- * unique `(documentId, versionNumber)` index and the whole batch — document patch included — rolls back.
+ * The document write and snapshot of a prepared versioned update (spec 062 §3), as batch operations.
+ * `versionNumber` is one past the latest version observed *before* the document was read, so if anyone
+ * committed in between, the snapshot collides with theirs on the unique `(documentId, versionNumber)`
+ * index and the whole batch — document patch included — rolls back. Shared by `update()` and by the
+ * set-null updates a relation delete folds into its own batch (spec 064 §5), so there is one mechanism.
  */
-async function updateWithSnapshot(
-  ctx: OperationContext,
-  collection: CollectionDefinition,
-  input: {
-    id: string;
-    data: Record<string, unknown>;
-    snapshot: Record<string, unknown>;
-    versionNumber: number;
-    user: CmsUser | null;
-    label?: string;
-  }
-): Promise<DatabaseRecord> {
-  const database = atomicDatabase(ctx, collection);
+function versionedUpdateOperations(
+  prepared: PreparedUpdate,
+  echoGuard?: DatabaseWhere
+): AtomicWriteOperation[] {
+  const { collection, id, data, existing } = prepared;
+  return [
+    echoGuard === undefined
+      ? { type: 'update', collection: collection.slug, id, data }
+      : {
+          type: 'updateIf',
+          collection: collection.slug,
+          id,
+          data,
+          condition: { targetMatches: echoGuard },
+          requireApplied: true
+        },
+    {
+      type: 'create',
+      collection: versionsCollectionSlug(collection.slug),
+      data: buildVersionRecord({
+        documentId: id,
+        versionNumber: prepared.latestVersion + 1,
+        // `{ ...existing, ...data }` is exactly what the batch leaves in the row: it only commits if
+        // no one else wrote this document since `existing` was read.
+        data: buildSnapshot(collection, { ...existing, ...data }),
+        user: prepared.user,
+        full: true,
+        ...(prepared.versionLabel !== undefined && { label: prepared.versionLabel })
+      })
+    }
+  ];
+}
 
-  let results: Awaited<ReturnType<typeof database.atomicWrite>>;
+/**
+ * Commits a prepared update: a versioned document with its snapshot (spec 062), and any relation-target
+ * assertions (spec 064) in the same single batch. A non-versioned update with nothing to assert keeps
+ * the plain single-call write.
+ */
+async function commitUpdate(
+  ctx: OperationContext,
+  prepared: PreparedUpdate,
+  assertions: AtomicWriteOperation[],
+  echoGuard?: DatabaseWhere
+): Promise<DatabaseRecord> {
+  const { collection, id, data } = prepared;
+
+  if (prepared.versioned) {
+    const database = atomicDatabase(ctx, collection);
+    let results: Awaited<ReturnType<typeof database.atomicWrite>>;
+    try {
+      results = await database.atomicWrite([
+        ...assertions,
+        ...versionedUpdateOperations(prepared, echoGuard)
+      ]);
+    } catch (err) {
+      throw toVersionedWriteError(
+        err,
+        collection,
+        id,
+        'update',
+        assertions.length > 0 || echoGuard !== undefined
+      );
+    }
+    const updated = results[assertions.length];
+    if (updated?.type === 'update' || (updated?.type === 'updateIf' && updated.applied)) {
+      return updated.record;
+    }
+    throw new Error('atomicWrite returned no updated document');
+  }
+
+  if (assertions.length === 0 && echoGuard === undefined) {
+    return runWrite(collection.slug, () => ctx.adapters.database.update(collection.slug, id, data));
+  }
+
+  // Not required to apply: a document that is gone, or no longer holds the references this update
+  // re-sends, is `applied: false` (nothing written), so the only thing that can fail the batch is a
+  // target assertion.
+  let results: Awaited<ReturnType<typeof ctx.adapters.database.atomicWrite>>;
   try {
-    results = await database.atomicWrite([
-      { type: 'update', collection: collection.slug, id: input.id, data: input.data },
+    results = await ctx.adapters.database.atomicWrite([
+      ...assertions,
       {
-        type: 'create',
-        collection: versionsCollectionSlug(collection.slug),
-        data: buildVersionRecord({
-          documentId: input.id,
-          versionNumber: input.versionNumber,
-          data: input.snapshot,
-          user: input.user,
-          full: true,
-          ...(input.label !== undefined && { label: input.label })
-        })
+        type: 'updateIf',
+        collection: collection.slug,
+        id,
+        data,
+        condition: echoGuard === undefined ? {} : { targetMatches: echoGuard }
       }
     ]);
   } catch (err) {
-    throw toVersionedWriteError(err, collection, input.id, 'update');
+    if (isAtomicWriteConditionError(err)) throw targetVanished(collection, id);
+    if (isDbUniqueConstraintError(err))
+      throw new UniqueConstraintError(collection.slug, err.fields);
+    throw err;
   }
+  const updated = results[assertions.length];
+  if (updated?.type !== 'updateIf') throw new Error('atomicWrite returned no update result');
+  if (updated.applied) return updated.record;
+  // Which of the two it was only picks the error: nothing was written either way.
+  if (!(await ctx.adapters.database.findById(collection.slug, id))) {
+    throw notFound(collection.slug, id);
+  }
+  throw new ConcurrentModificationError(
+    collection.slug,
+    id,
+    `A reference this update re-sends on document '${id}' in '${collection.slug}' was cleared by ` +
+      `another request (its target was deleted) while this one was in progress; nothing was written. ` +
+      `Reload it and try again.`
+  );
+}
 
-  const [updated] = results;
-  if (updated?.type !== 'update') throw new Error('atomicWrite returned no updated document');
-  return updated.record;
+/**
+ * Commits a new non-versioned document. With relation-target assertions the create joins them in one
+ * batch (spec 064 §4); a create never has to apply, so a failed batch condition is always an assertion.
+ */
+async function commitCreate(
+  ctx: OperationContext,
+  collection: CollectionDefinition,
+  row: Record<string, unknown>,
+  assertions: AtomicWriteOperation[]
+): Promise<DatabaseRecord> {
+  if (assertions.length === 0) {
+    return runWrite(collection.slug, () => ctx.adapters.database.create(collection.slug, row));
+  }
+  let results: Awaited<ReturnType<typeof ctx.adapters.database.atomicWrite>>;
+  try {
+    results = await ctx.adapters.database.atomicWrite([
+      ...assertions,
+      { type: 'create', collection: collection.slug, data: row }
+    ]);
+  } catch (err) {
+    if (isAtomicWriteConditionError(err)) {
+      throw targetVanished(collection, typeof row.id === 'string' ? row.id : '(new)');
+    }
+    if (isDbUniqueConstraintError(err))
+      throw new UniqueConstraintError(collection.slug, err.fields);
+    throw err;
+  }
+  const created = results[assertions.length];
+  if (created?.type !== 'create') throw new Error('atomicWrite returned no created document');
+  return created.record;
+}
+
+/**
+ * Validates the relation targets a write introduces and returns the assertions that keep them valid
+ * until it commits (spec 064 §4). A known-missing target is a `400` here, before any write.
+ */
+async function relationTargetGuards(
+  ctx: OperationContext,
+  collection: CollectionDefinition,
+  data: Record<string, unknown>,
+  existing?: Record<string, unknown>,
+  /** A create's explicit id: a self reference names the document the same batch creates. */
+  selfId?: string
+): Promise<AtomicWriteOperation[]> {
+  const targets = collectWrittenTargets(collection.fields, data, existing);
+  const self = selfId !== undefined ? targets.get(collection.slug) : undefined;
+  if (self && selfId !== undefined) {
+    self.ids.delete(selfId);
+    if (self.ids.size === 0) targets.delete(collection.slug);
+  }
+  if (targets.size === 0) return [];
+  await verifyTargetsExist(ctx, targets);
+  return targetAssertions(targets);
 }
 
 /**
@@ -626,17 +799,20 @@ async function createDocument(
   );
   data = screenHookOutput(data, {}, 'beforeChange', args.collection);
 
+  // Every relation target this document names must exist, now and when it commits (spec 064 §4).
+  const assertions = await relationTargetGuards(ctx, collection, data, undefined, explicitId);
+
   // Forge-owned metadata joins the content only here, at the persistence boundary (spec 063 §4/§5).
   const row = storageKey !== undefined ? { ...data, _storageKey: storageKey } : data;
 
   // A versioned document and its version 1 commit together or not at all (spec 062 §2).
   const record = versionsEnabled(collection)
-    ? await createWithSnapshot(ctx, collection, { row, id: explicitId, user })
-    : await runWrite(args.collection, () =>
-        ctx.adapters.database.create(
-          args.collection,
-          explicitId !== undefined ? { ...row, id: explicitId } : row
-        )
+    ? await createWithSnapshot(ctx, collection, { row, id: explicitId, user, assertions })
+    : await commitCreate(
+        ctx,
+        collection,
+        explicitId !== undefined ? { ...row, id: explicitId } : row,
+        assertions
       );
 
   await runAfterChangeHooks(collection, {
@@ -660,15 +836,44 @@ export async function update(ctx: OperationContext, args: UpdateArgs): Promise<D
 }
 
 /**
- * The update pipeline. `restore` (only ever passed by {@link restoreVersion}) replaces `args.data` with
- * the difference between that version's content and the document as read *here* — after the version
- * number was observed — so a restore is serialized exactly like any other update (spec 062 §6).
+ * Everything an update decided before writing (spec 064 §5): the stored document it was decided
+ * against, the final patch after hooks and screening, and — for a versioned collection — the version
+ * number observed before that read. Produced by {@link prepareUpdate}, committed either on its own
+ * ({@link commitUpdate}) or folded into a relation delete's batch, then finished by {@link finalizeUpdate}.
  */
-async function updateDocument(
+interface PreparedUpdate {
+  collection: CollectionDefinition;
+  id: string;
+  args: UpdateArgs;
+  user: CmsUser | null;
+  overrideAccess: boolean;
+  existing: DatabaseRecord;
+  data: Record<string, unknown>;
+  versioned: boolean;
+  latestVersion: number;
+  versionLabel: string | undefined;
+}
+
+/**
+ * The update pipeline up to — never including — the write: `beforeOperation`, version-number read (spec
+ * 062 §3: before the document), document read, access, system-field screening, field-write access,
+ * locale storage, `beforeValidate`, validation, `beforeChange`. One implementation for `update()`,
+ * `restoreVersion()` and relation set-null (spec 064), so none of them can drift.
+ *
+ * `restore` (only ever passed by {@link restoreVersion}) replaces `args.data` with the difference between
+ * that version's content and the document as read *here* — after the version number was observed — so a
+ * restore is serialized exactly like any other update (spec 062 §6). `patch` computes the request from
+ * the document as read here (relation set-null); returning `null` means there is nothing to change, and
+ * the preparation stops (`null`) before any further hook.
+ */
+async function prepareUpdate(
   ctx: OperationContext,
   args: UpdateArgs,
-  restore?: RestorableVersion
-): Promise<DatabaseRecord> {
+  options: {
+    restore?: RestorableVersion;
+    patch?: (existing: DatabaseRecord) => Record<string, unknown> | null;
+  } = {}
+): Promise<PreparedUpdate | null> {
   const collection = getCollectionOrThrow(ctx, args.collection);
   assertNotAuthManaged(ctx, args.collection);
   const user = args.user ?? null;
@@ -687,7 +892,16 @@ async function updateDocument(
   const existing = await ctx.adapters.database.findById(args.collection, args.id);
   if (!existing) throw notFound(args.collection, args.id);
 
-  const requested = restore ? diffAgainst(restoreTarget(collection, restore), existing) : args.data;
+  let requested: Record<string, unknown>;
+  if (options.restore) {
+    requested = diffAgainst(restoreTarget(collection, options.restore), existing);
+  } else if (options.patch) {
+    const patch = options.patch(existing);
+    if (patch === null) return null;
+    requested = patch;
+  } else {
+    requested = args.data;
+  }
 
   const decision = await checkAccess(collection, 'update', {
     ...args,
@@ -771,22 +985,27 @@ async function updateDocument(
   );
   data = screenHookOutput(data, existing, 'beforeChange', args.collection);
 
-  // A versioned update commits its patch and a full snapshot of the resulting content together
-  // (spec 062 §3/§5). `{ ...existing, ...data }` is exactly what the batch leaves in the row: the batch
-  // only commits if no one else wrote this document since `existing` was read.
-  const record = versioned
-    ? await updateWithSnapshot(ctx, collection, {
-        id: args.id,
-        data,
-        snapshot: buildSnapshot(collection, { ...existing, ...data }),
-        versionNumber: latestVersion + 1,
-        user,
-        ...(args.versionLabel !== undefined && { label: args.versionLabel })
-      })
-    : await runWrite(args.collection, () =>
-        ctx.adapters.database.update(args.collection, args.id, data)
-      );
+  return {
+    collection,
+    id: args.id,
+    args,
+    user,
+    overrideAccess,
+    existing,
+    data,
+    versioned,
+    latestVersion,
+    versionLabel: args.versionLabel
+  };
+}
 
+/** The post-commit half of an update: `afterChange`, the read pipeline, `afterOperation`. */
+async function finalizeUpdate(
+  ctx: OperationContext,
+  prepared: PreparedUpdate,
+  record: DatabaseRecord
+): Promise<DatabaseRecord> {
+  const { collection, data, existing, user, overrideAccess } = prepared;
   await runAfterChangeHooks(collection, {
     operation: 'update',
     data,
@@ -797,11 +1016,37 @@ async function updateDocument(
     overrideAccess
   });
 
-  const [doc] = await prepareForRead(ctx, collection, [record], args);
+  const [doc] = await prepareForRead(ctx, collection, [record], prepared.args);
   const result = doc ?? record;
 
   await runAfterOperationHooks(collection, { operation: 'update', user, overrideAccess, result });
   return result;
+}
+
+async function updateDocument(
+  ctx: OperationContext,
+  args: UpdateArgs,
+  restore?: RestorableVersion
+): Promise<DatabaseRecord> {
+  const prepared = await prepareUpdate(ctx, args, restore ? { restore } : {});
+  if (!prepared) throw new Error('update preparation produced no change'); // unreachable without `patch`
+
+  // Only relation values this update changes are validated (spec 064 §4) — a partial update never
+  // fails over a reference it does not touch.
+  const assertions = await relationTargetGuards(
+    ctx,
+    prepared.collection,
+    prepared.data,
+    prepared.existing
+  );
+  // …and the references it re-sends unchanged must still be there when it commits.
+  const echoGuard = echoedReferenceGuard(
+    prepared.collection.fields,
+    prepared.data,
+    prepared.existing
+  );
+  const record = await commitUpdate(ctx, prepared, assertions, echoGuard);
+  return finalizeUpdate(ctx, prepared, record);
 }
 
 /**
@@ -855,31 +1100,70 @@ function ownedStorageKey(doc: DatabaseRecord): string | null {
   return typeof storageKey === 'string' && storageKey.length > 0 ? storageKey : null;
 }
 
+/**
+ * Compare-and-set against the document a relation delete planned with (spec 064 §5): it is only
+ * written if nobody changed it since. A row without `updated_at` (written outside the pipeline) can only
+ * be guarded by existence. Millisecond precision — see the spec's concurrency notes.
+ */
+function unchangedSince(doc: DatabaseRecord): WriteCondition {
+  return typeof doc.updated_at === 'string'
+    ? { targetMatches: { updated_at: doc.updated_at } }
+    : {};
+}
+
+/** Storage cleanup for a committed upload-document delete: best-effort, logged, never atomic (spec 063 §6). */
+async function cleanUpStorage(
+  ctx: OperationContext,
+  collection: CollectionDefinition,
+  doc: DatabaseRecord
+): Promise<void> {
+  if (collection.upload !== true) return;
+  const storageKey = ownedStorageKey(doc);
+  if (storageKey === null) {
+    getLogger().warn?.(
+      `Upload document '${collection.slug}/${String(doc.id)}' has no Forge-recorded storage key; no ` +
+        `storage object was deleted (spec 063 §6)`
+    );
+    return;
+  }
+  try {
+    await ctx.adapters.storage.delete(storageKey);
+  } catch (cleanupErr) {
+    // The document is already gone; failing the whole operation over cleanup would be worse than a
+    // best-effort delete that gets logged and left for manual follow-up.
+    getLogger().error(
+      `Failed to clean up storage object '${storageKey}' after document deletion`,
+      cleanupErr
+    );
+  }
+}
+
+/**
+ * Deletes a document together with its whole relation graph (spec 064 §5) — plan, prepare, **one**
+ * `atomicWrite`, finalize:
+ *
+ * 1. **Plan** (reads only): root `beforeOperation`, read, access; then {@link planRelationDelete} walks
+ *    every cascade/set-null/restrict reference to its fixpoint, judges restrict and required set-null
+ *    against the final state, and refuses a plan that cannot fit in one batch — before any `before*`
+ *    hook of the graph and before any write.
+ * 2. **Prepare** (hooks, validation; no writes): root `beforeDelete`; each cascaded document's
+ *    `beforeOperation` + `beforeDelete`; each set-null document through the same {@link prepareUpdate}
+ *    `update()` uses. Dependents run with `overrideAccess: true` — a consequence of an authorized delete,
+ *    like a database's own `ON DELETE CASCADE` (spec 058 §5) — but never skip validation or hooks.
+ * 3. **Commit**: set-null patches (versioned: spec 062's update + snapshot), cascaded deletes guarded by
+ *    the `updated_at` they were planned with, the root delete, and finally one "no reference remains"
+ *    `assertCount` per referring field — all in one batch, so a late failure or a reference created
+ *    concurrently leaves every row unchanged.
+ * 4. **Finalize** (after commit): storage cleanup for deleted upload documents, then after-hooks —
+ *    dependents first, root last.
+ *
+ * Before-hooks are not transactional: a side effect they performed outside the database survives a
+ * rollback of the batch (roadmap D01).
+ */
 export async function deleteDocument(
   ctx: OperationContext,
   args: DeleteArgs
 ): Promise<DatabaseRecord> {
-  return deleteDocumentInternal(ctx, args, new Set<string>());
-}
-
-/**
- * The real implementation behind {@link deleteDocument}, plus every cascade-triggered dependent
- * delete (spec 058 §5) — cascade's `RelationMutator.deleteDocument` calls straight back into this
- * function with the same `visited` set, so a multi-level cascade chain runs the full pipeline (access,
- * hooks, relation integrity) at every level. Cycle/diamond protection lives entirely on the *caller*
- * side (`handleCascadeDelete`/`handleSetNullOnDelete` check `visited` before ever invoking the
- * mutator — see that module) — this function marks its own key visited (below) precisely so those
- * caller-side checks can see it, but does not re-check its own key at entry: by the time this function
- * is reached through the mutator, the caller has already decided this key needs processing exactly
- * once, and re-checking here would treat "the caller just claimed this key" as "already done" and skip
- * the actual deletion — see this spec's implementation notes for the regression this caused.
- */
-async function deleteDocumentInternal(
-  ctx: OperationContext,
-  args: DeleteArgs,
-  visited: Set<string>
-): Promise<DatabaseRecord> {
-  const key = `${args.collection}:${args.id}`;
   const collection = getCollectionOrThrow(ctx, args.collection);
   assertNotAuthManaged(ctx, args.collection);
   const user = args.user ?? null;
@@ -899,59 +1183,69 @@ async function deleteDocumentInternal(
     throw new AccessDeniedError();
   }
 
+  // 1. Plan — reads only.
+  const plan = await planRelationDelete(ctx, { collection, doc: existing });
+  const dependents = plan.deletes.slice(1);
+
+  // 2. Prepare — hooks and validation, root first; nothing is written yet.
   await runRejectableStage(
     () => runBeforeDeleteHooks(collection, { user, overrideAccess, id: args.id, doc: existing }),
     'beforeDelete hook'
   );
+  for (const dependent of dependents) {
+    await prepareDependentDelete(dependent, user);
+  }
+  const updates: PreparedUpdate[] = [];
+  // A set-null dependent's hooks may write other relation values; those are checked like any update's.
+  const targetGuards: AtomicWriteOperation[] = [];
+  for (const planned of plan.setNulls) {
+    const prepared = await prepareSetNull(ctx, planned, user);
+    if (!prepared) continue;
+    updates.push(prepared);
+    targetGuards.push(
+      ...(await relationTargetGuards(ctx, prepared.collection, prepared.data, prepared.existing))
+    );
+  }
 
-  visited.add(key);
+  // 3. Commit — one batch, or the plain single delete when nothing else is involved.
+  let updatedRecords: DatabaseRecord[] = [];
+  if (
+    dependents.length === 0 &&
+    updates.length === 0 &&
+    plan.assertions.length === 0 &&
+    targetGuards.length === 0
+  ) {
+    await ctx.adapters.database.delete(args.collection, args.id);
+  } else {
+    updatedRecords = await commitRelationDelete(
+      ctx,
+      { collection, id: args.id },
+      dependents,
+      updates,
+      [...targetGuards, ...plan.assertions]
+    );
+  }
 
-  // Check relation integrity constraints (restrict, and required-field-on-set-null) before any
-  // mutation happens.
-  await checkDeleteRestrictions(ctx, collection, args.id);
-
-  // Handle cascade and set-null before deleting — routed through this module's own
-  // `deleteDocument`/`update` via a `RelationMutator`, so dependent mutations get the full pipeline
-  // (access, field-write checks, validation, hooks, version snapshots) instead of a raw adapter write.
-  // Both run with `overrideAccess: true`: a cascade/set-null is a consequence of an already-authorized
-  // delete, the same way a database's own `ON DELETE CASCADE` doesn't re-run application ACL per
-  // cascaded row — a deliberate, documented choice, not an oversight (spec 058 §5).
-  const mutator: RelationMutator = {
-    deleteDocument: (a) => deleteDocumentInternal(ctx, { ...a, overrideAccess: true }, visited),
-    update: (a) => update(ctx, { ...a, overrideAccess: true })
-  };
-  const integrityOptions = { mutator, visited, ...(user !== null && { user }) };
-  await handleCascadeDelete(ctx, collection, args.id, integrityOptions);
-  await handleSetNullOnDelete(ctx, collection, args.id, integrityOptions);
-
-  // The database delete must succeed — and only then does the underlying storage object get
-  // removed. Deleting the object first (or on a rejected/failed database delete) would orphan the
-  // document from its file; deleting it only after confirms the document is really gone.
-  await ctx.adapters.database.delete(args.collection, args.id);
-
-  if (collection.upload === true) {
-    const storageKey = ownedStorageKey(existing);
-    if (storageKey === null) {
-      getLogger().warn?.(
-        `Upload document '${args.collection}/${args.id}' has no Forge-recorded storage key; no ` +
-          `storage object was deleted (spec 063 §6)`
-      );
-    } else {
-      try {
-        await ctx.adapters.storage.delete(storageKey);
-      } catch (cleanupErr) {
-        // The document is already gone; failing the whole operation over cleanup would be worse
-        // than a best-effort delete that gets logged and left for manual follow-up.
-        getLogger().error(
-          `Failed to clean up storage object '${storageKey}' after document deletion`,
-          cleanupErr
-        );
-      }
-    }
+  // 4. Finalize — storage first (so a slow or failing hook cannot skip it), then after-hooks,
+  // dependents first and the root last, as before spec 064.
+  for (const { collection: target, doc } of plan.deletes) {
+    await cleanUpStorage(ctx, target, doc);
+  }
+  for (const { collection: target, doc } of [...dependents].reverse()) {
+    const hookArgs = { user, overrideAccess: true, id: doc.id as string, doc };
+    await runAfterDeleteHooks(target, hookArgs);
+    await runAfterOperationHooks(target, {
+      operation: 'delete',
+      user,
+      overrideAccess: true,
+      result: doc
+    });
+  }
+  for (const [index, prepared] of updates.entries()) {
+    await finalizeUpdate(ctx, prepared, updatedRecords[index] ?? prepared.existing);
   }
 
   await runAfterDeleteHooks(collection, { user, overrideAccess, id: args.id, doc: existing });
-
   await runAfterOperationHooks(collection, {
     operation: 'delete',
     user,
@@ -959,6 +1253,133 @@ async function deleteDocumentInternal(
     result: existing
   });
   return existing;
+}
+
+/** A cascaded document's before-phase: the same hooks its own delete runs (trusted, spec 058 §5). */
+async function prepareDependentDelete(planned: PlannedDelete, user: CmsUser | null): Promise<void> {
+  const { collection, doc } = planned;
+  await runBeforeOperationHooks(collection, { operation: 'delete', user, overrideAccess: true });
+  await runRejectableStage(
+    () =>
+      runBeforeDeleteHooks(collection, {
+        user,
+        overrideAccess: true,
+        id: doc.id as string,
+        doc
+      }),
+    'beforeDelete hook'
+  );
+}
+
+/**
+ * A set-null dependent through the normal update preparation, with the patch computed from the document
+ * as read there (spec 062's read order for a versioned dependent). `null` when there is nothing left to
+ * clear — the document no longer references the deleted ids, or no longer exists; the batch's final
+ * assertions still prove no reference survives.
+ */
+async function prepareSetNull(
+  ctx: OperationContext,
+  planned: PlannedSetNull,
+  user: CmsUser | null
+): Promise<PreparedUpdate | null> {
+  try {
+    return await prepareUpdate(
+      ctx,
+      {
+        collection: planned.collection.slug,
+        id: planned.id,
+        data: {},
+        overrideAccess: true,
+        ...(user !== null && { user })
+      },
+      { patch: (doc) => setNullPatch(planned, doc) }
+    );
+  } catch (err) {
+    if (err instanceof NotFoundError) return null;
+    throw err;
+  }
+}
+
+/**
+ * The single batch of a relation delete. Order: set-null patches, cascaded deletes, the root delete,
+ * then the reference assertions — which therefore see the final state, including this batch's own
+ * writes. Any failed condition (a dependent changed since it was planned, a reference created
+ * concurrently, a dependent's snapshot losing its version race) rolls the whole batch back and is a
+ * `409` about the root; nothing was written. Returns the committed row of each set-null update, in order.
+ */
+async function commitRelationDelete(
+  ctx: OperationContext,
+  root: { collection: CollectionDefinition; id: string },
+  dependents: PlannedDelete[],
+  updates: PreparedUpdate[],
+  assertions: AtomicWriteOperation[]
+): Promise<DatabaseRecord[]> {
+  const operations: AtomicWriteOperation[] = [];
+  const updateAt: number[] = [];
+  for (const prepared of updates) {
+    updateAt.push(operations.length);
+    if (prepared.versioned) {
+      atomicDatabase(ctx, prepared.collection);
+      operations.push(...versionedUpdateOperations(prepared));
+    } else {
+      operations.push({
+        type: 'updateIf',
+        collection: prepared.collection.slug,
+        id: prepared.id,
+        data: prepared.data,
+        condition: unchangedSince(prepared.existing),
+        requireApplied: true
+      });
+    }
+  }
+  for (const { collection, doc } of dependents) {
+    operations.push({
+      type: 'deleteIf',
+      collection: collection.slug,
+      id: doc.id as string,
+      condition: unchangedSince(doc),
+      requireApplied: true
+    });
+  }
+  operations.push({ type: 'delete', collection: root.collection.slug, id: root.id });
+  operations.push(...assertions);
+  // Hook-written relation values of set-null dependents can add target checks after planning counted
+  // the batch; still refuse rather than chunk (spec 064 §5). Before-hooks have run by now; nothing is written.
+  if (operations.length > ATOMIC_WRITE_MAX_OPERATIONS) {
+    throw new InvalidInputError(
+      `Cannot delete document '${root.id}' from '${root.collection.slug}': its dependents' hooks added ` +
+        `relation checks that take it past ${ATOMIC_WRITE_MAX_OPERATIONS} database operations, the most ` +
+        `ForgeCMS commits atomically in one operation. Nothing was changed.`
+    );
+  }
+
+  let results: Awaited<ReturnType<typeof ctx.adapters.database.atomicWrite>>;
+  try {
+    results = await ctx.adapters.database.atomicWrite(operations);
+  } catch (err) {
+    const versionRace = updates.some(
+      (prepared) => prepared.versioned && isVersionIdentityConflict(err, prepared.collection)
+    );
+    if (versionRace || isAtomicWriteConditionError(err)) {
+      throw new ConcurrentModificationError(
+        root.collection.slug,
+        root.id,
+        `Deleting document '${root.id}' from '${root.collection.slug}' conflicted with a concurrent ` +
+          `change to it or to a document that references it; nothing was deleted or changed. Reload and ` +
+          `try again.`
+      );
+    }
+    if (isDbUniqueConstraintError(err)) throw new UniqueConstraintError(err.collection, err.fields);
+    throw err;
+  }
+
+  return updateAt.map((at) => {
+    const result = results[at];
+    if (result && (result.type === 'update' || (result.type === 'updateIf' && result.applied))) {
+      return result.record;
+    }
+    throw new Error('atomicWrite returned no record for a set-null update');
+  });
 }
 
 export interface PreviewArgs extends BaseOperationArgs {

@@ -29,6 +29,14 @@
 > last H02 item: a collection an auth adapter manages (`AuthAdapter.managesCollection`) refuses generic
 > `create`/`update`/`delete` through the Local API (trusted or not) and HTTP, so the lifecycle guarantees
 > of specs 058–060 can no longer be bypassed. H02 is complete; next bounded step is D01/D03.
+>
+> **2026-09-26 update:** [spec 064](specs/064-relation-lifecycle-consistency.md) implements D02. The
+> atomic batch gains a read-only `assertCount` guard, and a relation delete's whole cascade / set-null /
+> restrict graph is planned with reads, hooked and validated, then committed as **one** batch that ends
+> with "no reference remains" assertions. Relation writes validate their targets in the same batch.
+> Unsupported reference shapes (nested, localized, unregistered target) are refused at startup. One cell
+> stays open: a user deleted through the auth adapter can leave content relations to it dangling — see
+> the spec's matrix.
 
 ## Product direction
 

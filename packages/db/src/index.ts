@@ -40,6 +40,7 @@ export { assertValidWriteCondition } from './write-condition.js';
 export {
   ATOMIC_WRITE_MAX_OPERATIONS,
   ATOMIC_WRITE_REQUIRE_APPLIED_SQL,
+  ATOMIC_WRITE_ASSERT_COUNT_SELECT,
   AtomicWriteConditionError,
   isAtomicWriteConditionError,
   assertValidAtomicWrite,
@@ -125,6 +126,21 @@ export type AtomicWriteOperation<TRecord extends DatabaseRecord = DatabaseRecord
       condition: WriteCondition;
       /** Fail (and roll back) the whole batch when this write does not apply. Default `false`: `applied: false` is a valid result. */
       requireApplied?: boolean;
+    }
+  | {
+      /**
+       * A read-only precondition (spec 064): the batch fails with `AtomicWriteConditionError`, and nothing
+       * commits, unless exactly `equals` rows of `collection` match `where` **at this point of the batch**
+       * — earlier operations of the same batch are visible, later ones are not. Writes nothing. This is the
+       * cross-collection guard relation integrity needs ("no row references X any more", "every target
+       * still exists"), evaluated inside the same transaction as the writes it protects.
+       */
+      type: 'assertCount';
+      collection: string;
+      /** Rows to count; omitted or `{}` counts every row. The ordinary `DatabaseWhere` language. */
+      where?: DatabaseWhere;
+      /** A non-negative integer. */
+      equals: number;
     };
 
 /** Result of one operation, in the same position and with the same `type` as the input operation. */
@@ -133,7 +149,8 @@ export type AtomicWriteResult<TRecord extends DatabaseRecord = DatabaseRecord> =
   | { type: 'update'; record: TRecord }
   | { type: 'delete' }
   | ({ type: 'updateIf' } & ConditionalUpdateResult<TRecord>)
-  | ({ type: 'deleteIf' } & ConditionalDeleteResult);
+  | ({ type: 'deleteIf' } & ConditionalDeleteResult)
+  | { type: 'assertCount' };
 
 export interface DatabaseAdapter<TRecord extends DatabaseRecord = DatabaseRecord> {
   readonly name: string;
@@ -187,8 +204,8 @@ export interface DatabaseAdapter<TRecord extends DatabaseRecord = DatabaseRecord
    *
    * - Success → one result per operation, same order/length as the input (empty batch → `[]`, no I/O).
    *   Later operations observe the effects of earlier ones. Records are hydrated as the single calls do.
-   * - `update` of a missing row, or a `requireApplied` conditional that does not apply → rejects with
-   *   `AtomicWriteConditionError`. Without `requireApplied`, `updateIf`/`deleteIf` report `applied: false`
+   * - `update` of a missing row, a `requireApplied` conditional that does not apply, or an `assertCount`
+   *   whose count differs (spec 064) → rejects with `AtomicWriteConditionError`. Without `requireApplied`, `updateIf`/`deleteIf` report `applied: false`
    *   (spec 059) and the rest of the batch still commits. `delete` of a missing row is a no-op.
    * - Unique-index violation, including between two operations of the batch → `UniqueConstraintError`
    *   (`collection` names the table that conflicted). Nothing persisted.

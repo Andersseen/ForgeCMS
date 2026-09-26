@@ -475,11 +475,16 @@ describe('Query completeness (spec 050)', () => {
       tags: defineField.relation({ collection: 'tags', many: true })
     }
   });
+  // Relation targets must be registered and must exist (spec 064).
+  const tags = defineCollection({ slug: 'tags', fields: { label: defineField.text() } });
 
   let runtime: ForgeCmsRuntime;
 
   beforeEach(async () => {
-    runtime = buildRuntime([articles]);
+    runtime = buildRuntime([articles, tags]);
+    for (const id of ['a', 'b']) {
+      await runtime.create({ collection: 'tags', data: { id, label: id } });
+    }
     await runtime.create({
       collection: 'articles',
       data: {

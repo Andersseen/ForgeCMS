@@ -192,6 +192,50 @@ with a message listing them. Forge never deletes or renumbers history for you: b
 decide which rows to keep, fix them, then restart. Snapshots written by earlier releases hold only the
 fields that update changed; restoring one applies only those fields.
 
+## Relation integrity
+
+A top-level `relation` field chooses what happens to documents that reference a deleted document:
+
+```ts
+author: defineField.relation({ collection: 'authors', onDelete: 'cascade' }); // delete them too
+editor: defineField.relation({ collection: 'authors', onDelete: 'set-null' }); // clear the reference
+reviewer: defineField.relation({ collection: 'authors' }); // 'restrict' (default): refuse the delete
+```
+
+- **One atomic delete.** `delete()` first works out everything a delete implies, using reads only. That
+  covers cascades of cascades, `set-null` updates (single → `null`; `many` → the id is removed from the
+  array) and `restrict` checks. Next it runs every `beforeDelete`/`beforeChange` hook and validation.
+  Only then does it commit all the row changes in **one** database batch. A hook, validation or
+  database failure anywhere in the graph changes nothing. After-hooks run once it has committed.
+- **Final state decides.** A `restrict` reference blocks the delete only if the document holding it
+  survives. A document deleted by the same cascade does not block. A surviving `required` field
+  configured `set-null` refuses the delete, because it cannot become `null`.
+- **Concurrency.** If a reference to a deleted document is created, or a dependent document is edited,
+  while the delete is in progress, the delete fails with `409 CONCURRENT_MODIFICATION` and nothing
+  changes; reload and retry.
+- **Bounded.** One delete commits at most 25 database operations. That total counts cascaded deletes,
+  set-null updates (plus one version snapshot each on a versioned collection) and one reference check
+  per referring field. A larger graph is refused before any hook runs. It is never split into several
+  commits; delete or detach dependents in smaller steps.
+- **Writes check targets.** `create`/`update`/`updateGlobalDocument` refuse a relation or upload value
+  naming a document that does not exist (`400 INVALID_INPUT`). If the target is deleted while the write
+  is in progress, the write fails with `409`. An update only checks the references it changes. A
+  reference it re-sends unchanged must still be on the document when it saves: if a delete cleared it
+  meanwhile, the save fails with `409` instead of putting the deleted id back.
+- **`upload` fields and globals restrict.** A document referenced by an `upload` field, or by any
+  relation/upload field of a global, cannot be deleted while that reference exists.
+- **Not supported, refused at startup:** a `relation`/`upload` inside `group`, `array` or `blocks` (the
+  value lives in a JSON column Forge cannot query); a localized `relation`/`upload`; a relation to a
+  collection that is not registered; `onDelete` other than `restrict` on a global. Also refused:
+  `cascade`/`set-null` onto a collection managed by the auth adapter (users are deleted only through
+  the auth adapter). Lift such a reference to a top-level field, or keep the id in a `text`/`json`
+  field as an explicitly unchecked reference.
+- **Known gap:** deleting a _user_ through the auth adapter (`deleteUser`) does not consult relations
+  that point at the users collection, so `post.author → users` can be left dangling by a user deletion.
+- Dependent writes run as trusted consequences of the authorized delete (`overrideAccess: true`), but
+  with their normal validation and hooks. Uploaded files of cascaded upload documents are removed after
+  the database commit; a storage failure is logged and does not undo the delete.
+
 ## Registering collections
 
 ```ts

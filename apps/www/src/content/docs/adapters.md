@@ -90,6 +90,12 @@ const [claim, user] = await database.atomicWrite([
   a conditional operation may report `applied: false` and the rest of the batch still commits — use
   `requireApplied` whenever a later operation depends on it (e.g. a document compare-and-set followed by
   its snapshot insert). `delete` of a missing row is a no-op.
+- `{ type: 'assertCount', collection, where?, equals }` writes nothing. It fails the batch with
+  `AtomicWriteConditionError` unless exactly `equals` rows match `where` **at that point of the
+  batch**: earlier operations are visible, later ones are not. It is the cross-collection guard relation
+  integrity uses. Examples: "no row still references X" is `equals: 0` over `{ author: { in: [X] } }`;
+  "every target still exists" is `equals: ids.length` over `{ id: { in: ids } }`. `equals` must be a
+  non-negative integer. Its result is `{ type: 'assertCount' }`.
 - Invalid input — more than `ATOMIC_WRITE_MAX_OPERATIONS` (25) operations, a malformed operation, and on
   the SQL adapters an unknown column or unregistered collection — rejects **before anything is written**.
 - Retry: `UniqueConstraintError` and `AtomicWriteConditionError` mean "known rolled back". A network
@@ -100,7 +106,8 @@ const [claim, user] = await database.atomicWrite([
   synchronous turn (atomic within one adapter instance only). Writing your own adapter? It must be
   genuinely atomic — a loop of independent writes is not an implementation. If you are SQLite-based, reuse
   the exported `assertValidAtomicWrite`, `toAtomicWriteError`, `atomicWriteMustApply` (which operations
-  must be followed by the guard statement) and `ATOMIC_WRITE_REQUIRE_APPLIED_SQL`, and run
+  must be followed by the guard statement), `ATOMIC_WRITE_REQUIRE_APPLIED_SQL` and
+  `ATOMIC_WRITE_ASSERT_COUNT_SELECT` (`assertCount`'s statement, before `FROM`), and run
   `runDatabaseAdapterAtomicWriteContractTests`. `UsersCollectionAuthAdapter` refuses to initialise over a
   database that lacks `atomicWrite`, because first-admin provisioning depends on it.
 
