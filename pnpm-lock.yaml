@@ -293,6 +293,12 @@ importers:
       '@libsql/client':
         specifier: 0.17.3
         version: 0.17.3
+      '@strata-sc/analog':
+        specifier: 0.1.0
+        version: 0.1.0
+      '@strata-sc/core':
+        specifier: 0.1.0
+        version: 0.1.0
       '@voltui/components':
         specifier: 1.0.1
         version: 1.0.1(acd190704102591c7490c8bc161f1646)
@@ -3259,6 +3265,14 @@ packages:
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
+  '@strata-sc/analog@0.1.0':
+    resolution: {integrity: sha512-5XhNqbwUNm6cg4ICOXodcg5yVF6rHJy6mS+3NTTvvcguDH8xUWTgTorxCHlGDLRAw0MlU90V7FRz9E6m9du1aQ==}
+    engines: {node: '>=22'}
+
+  '@strata-sc/core@0.1.0':
+    resolution: {integrity: sha512-OUPwNE8uC7JjL6cY0e5zw++2h2F0u2GBo4NEsr2AFd1JHfvaXQSglzVYULLxcdC2W9Q8rAKV5LA5UlTLMKNSkA==}
+    engines: {node: '>=22'}
 
   '@tailwindcss/node@4.3.0':
     resolution: {integrity: sha512-aFb4gUhFOgdh9AXo4IzBEOzBkkAxm9VigwDJnMIYv3lcfXCJVesNfbEaBl4BNgVRyid92AmdviqwBUBRKSeY3g==}
@@ -7078,7 +7092,7 @@ snapshots:
       lmdb: 3.5.1
       postcss: 8.5.14
       tailwindcss: 4.3.0
-      vitest: 4.1.6(@types/node@22.15.3)(@vitest/coverage-v8@4.1.6)(jsdom@27.3.0)(vite@7.1.4(@types/node@22.15.3)(jiti@2.7.0)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.48.0)(tsx@4.22.3))
+      vitest: 4.1.6(@types/node@22.15.3)(@vitest/coverage-v8@4.1.6)(jsdom@27.4.0)(vite@7.1.4(@types/node@22.15.3)(jiti@2.7.0)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.48.0)(tsx@4.22.3))
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'
@@ -8899,6 +8913,12 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
+  '@strata-sc/analog@0.1.0':
+    dependencies:
+      '@strata-sc/core': 0.1.0
+
+  '@strata-sc/core@0.1.0': {}
+
   '@tailwindcss/node@4.3.0':
     dependencies:
       '@jridgewell/remapping': 2.3.5
@@ -9250,7 +9270,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.6(@types/node@22.15.3)(@vitest/coverage-v8@4.1.6)(jsdom@27.3.0)(vite@7.1.4(@types/node@22.15.3)(jiti@2.7.0)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.48.0)(tsx@4.22.3))
+      vitest: 4.1.6(@types/node@22.15.3)(@vitest/coverage-v8@4.1.6)(jsdom@27.4.0)(vite@7.1.4(@types/node@22.15.3)(jiti@2.7.0)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.48.0)(tsx@4.22.3))
 
   '@vitest/expect@4.1.6':
     dependencies:

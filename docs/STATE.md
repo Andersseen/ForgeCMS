@@ -1,11 +1,45 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-25 (spec 062 — document/version history consistency).**
+> **Last updated: 2026-09-25 (first Strata consumer route in tiny-project).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## First Strata consumer route — tiny-project `GET /api/v1/:collection` (2026-09-25)
+
+`apps/tiny-project` is the first real external consumer of Strata, installed from npm (no links or
+path aliases). Exactly one route moved; no `packages/*` change and no changeset.
+
+- **What changed**: `src/server/routes/api/v1/[collection].get.ts` (H3 `defineEventHandler`) is
+  deleted. `GET /api/v1/:collection` is now `CollectionsController.list`
+  (`src/server/strata/collections.controller.ts`, `@Controller('/api/v1')` + `@Get('/:collection')`),
+  registered on `nitroApp.router` by the Nitro plugin `src/server/plugins/strata.ts`. It builds the
+  same `ApiContext` (`params.collection` from `request.params`, the Cloudflare env from
+  `request.context.cloudflare.env`) and returns `handleList`'s `Response` untouched. `getServerRuntime`
+  still owns the runtime. Every other tiny-project route is still H3.
+- **Consumer tuple (verified)**: TypeScript 5.9.2, Angular 21.2.10, Analog 2.5.2 (Nitro 2.13.4),
+  H3 1.15.0, Vite 7.1.4, `@strata-sc/core` 0.1.0, `@strata-sc/analog` 0.1.0 (npm scope `@strata-sc`).
+  Standard (TC39) decorators work because no tsconfig sets `experimentalDecorators`, and Nitro's
+  esbuild (`es2019`) lowers them for Node and workerd.
+- **Known Strata gap (0.1.0)**: `StrataAnalogRequest` exposes no Web Standard `Request`, so
+  `toForgeRequest` rebuilds a bodyless one from `url`/`method`/`headers`, without an `AbortSignal`.
+  Its URL origin is synthetic (`http://localhost`, observed in dev) because Nitro 2 events have no
+  `event.web`. `handleList` is unaffected because it reads only the method, auth/`accept-language`
+  headers and the query string. **No mutating route can move until Strata exposes the canonical
+  request**: CSRF compares `Origin` with `request.url`'s origin, and writes need the body.
+- **Equivalence evidence**: a 25-request differential probe (anon/cookie/bad bearer/bad cookie ×
+  filters, `in`, `where=`, sort, pagination, depth, locale/`accept-language`, 400/401/404, plus
+  HEAD 405 and OPTIONS 204) gave byte-identical status, headers and body for H3 and Strata, both on the
+  Node dev server and on `wrangler pages dev` (workerd + local D1, with rows confirmed in the D1
+  SQLite). New transport-agnostic e2e test "list API contract" passed on H3 before the swap and on
+  Strata after. `src/server/strata/strata-registration.test.ts` asserts the plugin registers
+  `get /api/v1/:collection` and that no file-system route for that URL remains. Strata stays in the
+  Nitro worker chunk only; `dist/client` and `dist/ssr` contain none of it.
+- **Gates**: tiny-project typecheck/test (11)/build, `e2e:tiny-project` 10/10, `test:cloudflare`,
+  `test:libsql`, repo `lint`/`typecheck`/`test`/`build`/`format:check`, all green. The tiny-project
+  Cloudflare and libSQL suites do not go through HTTP, so they cover the runtime, not this route.
 
 ## Document / version history consistency — D03 (spec 062, 2026-09-25)
 
