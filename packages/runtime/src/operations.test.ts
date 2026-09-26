@@ -6,6 +6,7 @@ import type { DatabaseAdapter } from '@forge-cms/db';
 import { InMemoryAuthAdapter } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import { ForgeCmsRuntime } from './runtime.js';
+import { createUpload } from './operations.js';
 import {
   AccessDeniedError,
   InvalidQueryError,
@@ -978,38 +979,46 @@ describe('Local API delete cleans up upload storage objects (spec 051)', () => {
     const { runtime, storage } = buildMediaRuntime();
     await storage.put({ key: 'media/hello.txt', body: new TextEncoder().encode('hello') });
 
-    const doc = await runtime.create({
-      collection: 'media',
-      // `_storageKey` is a system field (like `id`/`_status`), not part of the collection's
-      // declared, typed fields — the typed Local API's `InferFields` deliberately excludes it.
-      data: {
-        _storageKey: 'media/hello.txt',
-        filename: 'hello.txt',
-        url: '/api/media/media/hello.txt',
-        contentType: 'text/plain'
-      } as Record<string, unknown>
-    });
+    // `_storageKey` is Forge-owned (spec 063): only the upload pipeline's package-private
+    // `createUpload` records it — the same path `handleCreate`'s multipart branch takes.
+    const doc = await createUpload(
+      runtime,
+      {
+        collection: 'media',
+        data: {
+          filename: 'hello.txt',
+          url: '/api/media/media/hello.txt',
+          contentType: 'text/plain'
+        }
+      },
+      'media/hello.txt'
+    );
 
     expect(await storage.get('media/hello.txt')).not.toBeNull();
     await runtime.delete({ collection: 'media', id: doc.id as string });
     expect(await storage.get('media/hello.txt')).toBeNull();
   });
 
-  it('falls back to a URL-derived key when an older record has no _storageKey', async () => {
+  // Spec 063 §6 removed spec 051's URL-derived fallback: `url` is caller-writable content, so a
+  // document pointing its `url` at another object's URL used to delete that object on delete.
+  it('never derives a deletion target from `url` when a record has no _storageKey', async () => {
     const { runtime, storage } = buildMediaRuntime();
-    await storage.put({ key: 'media/legacy.txt', body: new TextEncoder().encode('legacy') });
+    await storage.put({ key: 'media/other.txt', body: new TextEncoder().encode('not mine') });
 
     const doc = await runtime.create({
       collection: 'media',
       data: {
         filename: 'legacy.txt',
-        url: '/api/media/media/legacy.txt',
+        url: '/api/media/media/other.txt',
         contentType: 'text/plain'
       }
     });
 
     await runtime.delete({ collection: 'media', id: doc.id as string });
-    expect(await storage.get('media/legacy.txt')).toBeNull();
+    await expect(runtime.findByID({ collection: 'media', id: doc.id as string })).rejects.toThrow(
+      NotFoundError
+    );
+    expect(await storage.get('media/other.txt')).not.toBeNull();
   });
 
   it('does not touch storage when deleting a document from a non-upload collection', async () => {
@@ -1042,14 +1051,11 @@ describe('Local API delete cleans up upload storage objects (spec 051)', () => {
     runtime.init();
     await storage.put({ key: 'guarded/keep.txt', body: new TextEncoder().encode('keep') });
 
-    const doc = await runtime.create({
-      collection: 'guarded_media',
-      data: {
-        _storageKey: 'guarded/keep.txt',
-        filename: 'keep.txt',
-        url: '/api/media/keep.txt'
-      } as Record<string, unknown>
-    });
+    const doc = await createUpload(
+      runtime,
+      { collection: 'guarded_media', data: { filename: 'keep.txt', url: '/api/media/keep.txt' } },
+      'guarded/keep.txt'
+    );
 
     await expect(
       runtime.delete({ collection: 'guarded_media', id: doc.id as string, overrideAccess: false })

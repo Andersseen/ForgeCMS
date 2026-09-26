@@ -34,6 +34,7 @@ import {
 } from './hooks.js';
 import { assertWritableFields, filterReadableFields, FieldAccessError } from './field-access.js';
 import { populateRecord, populateRecords } from './populate.js';
+import { screenCreateInput, screenHookOutput, screenUpdateInput } from './system-fields.js';
 import {
   buildSnapshot,
   buildVersionRecord,
@@ -205,29 +206,30 @@ function toVersionedWriteError(
 /**
  * Versioned create (spec 062 §2): the document and its version 1 in one `atomicWrite()`. The batch is
  * declarative and cannot feed a generated id from one operation into the next, so the id is allocated
- * here — the caller's own non-empty string `id` if it supplied one (as every adapter already honours),
- * otherwise a UUID, which is what the adapters would have generated.
+ * here — a trusted caller's explicit `id` if it supplied one (spec 063 §2), otherwise a UUID, which is
+ * what the adapters would have generated. `row` is what the document row persists (content plus any
+ * Forge-owned metadata such as `_storageKey`); the snapshot is built from content only.
  */
 async function createWithSnapshot(
   ctx: OperationContext,
   collection: CollectionDefinition,
-  data: Record<string, unknown>,
-  user: CmsUser | null
+  input: { row: Record<string, unknown>; id: string | undefined; user: CmsUser | null }
 ): Promise<DatabaseRecord> {
   const database = atomicDatabase(ctx, collection);
-  const id = typeof data.id === 'string' && data.id !== '' ? data.id : crypto.randomUUID();
+  const id = input.id ?? crypto.randomUUID();
+  const { row, user } = input;
 
   let results: Awaited<ReturnType<typeof database.atomicWrite>>;
   try {
     results = await database.atomicWrite([
-      { type: 'create', collection: collection.slug, data: { ...data, id } },
+      { type: 'create', collection: collection.slug, data: { ...row, id } },
       {
         type: 'create',
         collection: versionsCollectionSlug(collection.slug),
         data: buildVersionRecord({
           documentId: id,
           versionNumber: 1,
-          data: buildSnapshot(collection, data),
+          data: buildSnapshot(collection, row),
           user,
           full: true
         })
@@ -525,6 +527,32 @@ export async function count(ctx: OperationContext, args: CountArgs): Promise<num
 }
 
 export async function create(ctx: OperationContext, args: CreateArgs): Promise<DatabaseRecord> {
+  return createDocument(ctx, args, undefined);
+}
+
+/**
+ * The multipart upload pipeline's create (spec 063 §5) — **package-private**: exported for
+ * `handlers.ts` only, never from the package entry point. `storageKey` is the key Forge itself just
+ * generated and stored the object under; it is merged into the persisted row only, outside caller
+ * `data` and hook `data`, so no caller of the public mutation surface can choose or rewrite it.
+ */
+export async function createUpload(
+  ctx: OperationContext,
+  args: CreateArgs,
+  storageKey: string
+): Promise<DatabaseRecord> {
+  const collection = getCollectionOrThrow(ctx, args.collection);
+  if (collection.upload !== true) {
+    throw new Error(`Collection '${args.collection}' is not upload-enabled`);
+  }
+  return createDocument(ctx, args, storageKey);
+}
+
+async function createDocument(
+  ctx: OperationContext,
+  args: CreateArgs,
+  storageKey: string | undefined
+): Promise<DatabaseRecord> {
   const collection = getCollectionOrThrow(ctx, args.collection);
   assertNotAuthManaged(ctx, args.collection);
   const user = args.user ?? null;
@@ -533,9 +561,13 @@ export async function create(ctx: OperationContext, args: CreateArgs): Promise<D
   await runBeforeOperationHooks(collection, { operation: 'create', user, overrideAccess });
   await checkAccess(collection, 'create', { ...args, data: args.data });
 
+  // Spec 063: Forge-owned metadata never comes from the caller. A trusted caller's explicit `id` is
+  // held aside (hooks never see or change it) and re-attached at persistence.
+  const { content, id: explicitId } = screenCreateInput(args.data, overrideAccess);
+
   if (args.overrideAccess === false) {
     try {
-      await assertWritableFields(args.data, collection, user, 'create');
+      await assertWritableFields(content, collection, user, 'create');
     } catch (err) {
       if (err instanceof FieldAccessError) throw new AccessDeniedError(err.message);
       throw err;
@@ -544,7 +576,7 @@ export async function create(ctx: OperationContext, args: CreateArgs): Promise<D
 
   // Defaults and auto-slugs are resolved before any hook runs, so a hook still gets the last word
   // and validation only ever sees the final value.
-  const seeded = applyAutoSlugs(collection, applyFieldDefaults(collection, args.data));
+  const seeded = applyAutoSlugs(collection, applyFieldDefaults(collection, content));
 
   // Process localized fields if the collection has locales configured
   const processedData =
@@ -567,6 +599,7 @@ export async function create(ctx: OperationContext, args: CreateArgs): Promise<D
       }),
     'beforeValidate hook'
   );
+  data = screenHookOutput(data, {}, 'beforeValidate', args.collection);
 
   assertDraftStatus(collection, data);
   if (collection.drafts === true && data._status === undefined) {
@@ -591,11 +624,20 @@ export async function create(ctx: OperationContext, args: CreateArgs): Promise<D
       }),
     'beforeChange hook'
   );
+  data = screenHookOutput(data, {}, 'beforeChange', args.collection);
+
+  // Forge-owned metadata joins the content only here, at the persistence boundary (spec 063 §4/§5).
+  const row = storageKey !== undefined ? { ...data, _storageKey: storageKey } : data;
 
   // A versioned document and its version 1 commit together or not at all (spec 062 §2).
   const record = versionsEnabled(collection)
-    ? await createWithSnapshot(ctx, collection, data, user)
-    : await runWrite(args.collection, () => ctx.adapters.database.create(args.collection, data));
+    ? await createWithSnapshot(ctx, collection, { row, id: explicitId, user })
+    : await runWrite(args.collection, () =>
+        ctx.adapters.database.create(
+          args.collection,
+          explicitId !== undefined ? { ...row, id: explicitId } : row
+        )
+      );
 
   await runAfterChangeHooks(collection, {
     operation: 'create',
@@ -645,17 +687,21 @@ async function updateDocument(
   const existing = await ctx.adapters.database.findById(args.collection, args.id);
   if (!existing) throw notFound(args.collection, args.id);
 
-  const input = restore ? diffAgainst(restoreTarget(collection, restore), existing) : args.data;
+  const requested = restore ? diffAgainst(restoreTarget(collection, restore), existing) : args.data;
 
   const decision = await checkAccess(collection, 'update', {
     ...args,
     id: args.id,
-    data: input,
+    data: requested,
     doc: existing
   });
   if (decision.where && !documentMatches(existing, decision.where)) {
     throw new AccessDeniedError();
   }
+
+  // Spec 063: echoes of the stored metadata are dropped; changing `id`, a timestamp or `_storageKey`
+  // is refused for every caller, `overrideAccess` included.
+  const input = screenUpdateInput(requested, existing);
 
   if (args.overrideAccess === false) {
     try {
@@ -689,6 +735,7 @@ async function updateDocument(
       }),
     'beforeValidate hook'
   );
+  data = screenHookOutput(data, existing, 'beforeValidate', args.collection);
 
   assertDraftStatus(collection, data);
 
@@ -722,6 +769,7 @@ async function updateDocument(
       }),
     'beforeChange hook'
   );
+  data = screenHookOutput(data, existing, 'beforeChange', args.collection);
 
   // A versioned update commits its patch and a full snapshot of the resulting content together
   // (spec 062 §3/§5). `{ ...existing, ...data }` is exactly what the batch leaves in the row: the batch
@@ -796,23 +844,15 @@ export async function restoreVersion(
   );
 }
 
-const MEDIA_URL_PREFIX = '/api/media/';
-
 /**
- * Resolves the storage key a stored upload's underlying object lives under: the `_storageKey` every
- * upload-created document carries, or (for an older/manually-created record without one) a fallback
- * parsed from its `url`, matching the default `/api/media/<collection>/<key>` shape `handleFile` and
- * every `StorageAdapter`'s default `getPublicUrl` use.
+ * The storage object a deleted upload document owns: only the `_storageKey` Forge's own upload
+ * pipeline recorded (spec 063 §6). There is deliberately no fallback derived from `url` — that is a
+ * declared, caller-writable content field, and deleting whatever it points at let any caller with
+ * create/update + delete access destroy another document's object.
  */
-function resolveStorageKey(collectionSlug: string, doc: DatabaseRecord): string | null {
+function ownedStorageKey(doc: DatabaseRecord): string | null {
   const storageKey = doc._storageKey;
-  if (typeof storageKey === 'string' && storageKey.length > 0) return storageKey;
-
-  const url = doc.url;
-  if (typeof url !== 'string') return null;
-  const prefix = `${MEDIA_URL_PREFIX}${collectionSlug}/`;
-  const idx = url.indexOf(prefix);
-  return idx === -1 ? null : url.slice(idx + MEDIA_URL_PREFIX.length);
+  return typeof storageKey === 'string' && storageKey.length > 0 ? storageKey : null;
 }
 
 export async function deleteDocument(
@@ -890,8 +930,13 @@ async function deleteDocumentInternal(
   await ctx.adapters.database.delete(args.collection, args.id);
 
   if (collection.upload === true) {
-    const storageKey = resolveStorageKey(args.collection, existing);
-    if (storageKey) {
+    const storageKey = ownedStorageKey(existing);
+    if (storageKey === null) {
+      getLogger().warn?.(
+        `Upload document '${args.collection}/${args.id}' has no Forge-recorded storage key; no ` +
+          `storage object was deleted (spec 063 §6)`
+      );
+    } else {
       try {
         await ctx.adapters.storage.delete(storageKey);
       } catch (cleanupErr) {
@@ -979,16 +1024,19 @@ export async function preview(ctx: OperationContext, args: PreviewArgs): Promise
       throw notFound(args.collection, args.id);
     }
 
+    // Preview models a permitted update, so it takes the same content input (spec 063 §7).
+    const input = screenUpdateInput(args.data, existing);
+
     if (args.overrideAccess === false) {
       try {
-        await assertWritableFields(args.data, collection, user, 'update');
+        await assertWritableFields(input, collection, user, 'update');
       } catch (err) {
         if (err instanceof FieldAccessError) throw new AccessDeniedError(err.message);
         throw err;
       }
     }
 
-    previewData = { ...existing, ...args.data };
+    previewData = { ...existing, ...input };
   } else {
     await checkAccess(collection, 'create', {
       user,
@@ -996,16 +1044,18 @@ export async function preview(ctx: OperationContext, args: PreviewArgs): Promise
       data: args.data
     });
 
+    const { content, id } = screenCreateInput(args.data, args.overrideAccess !== false);
+
     if (args.overrideAccess === false) {
       try {
-        await assertWritableFields(args.data, collection, user, 'create');
+        await assertWritableFields(content, collection, user, 'create');
       } catch (err) {
         if (err instanceof FieldAccessError) throw new AccessDeniedError(err.message);
         throw err;
       }
     }
 
-    previewData = args.data;
+    previewData = id !== undefined ? { ...content, id } : content;
   }
 
   previewData = applyAutoSlugs(

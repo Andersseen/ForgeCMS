@@ -38,6 +38,12 @@ The HTTP layer is transport only: it parses the query string, resolves the user,
 { "error": "title is required", "details": [{ "field": "title", "message": "title is required", "code": "required" }] }
 ```
 
+Write bodies (`POST`/`PATCH`/preview) carry content fields and, on a `drafts` collection, `_status`.
+`id`, `created_at`, `updated_at` and `_storageKey` are Forge's: a `POST` containing any of them is a
+`400 INVALID_INPUT`, and a `PATCH` may only echo their stored values back (echoes are dropped).
+Round-tripping the document you read therefore works. See
+[Local API → System metadata](/docs/local-api#system-metadata).
+
 `meta.count` is the length of this page; `meta.totalDocs` is the total matching the query. Clients
 (`@forge-cms/angular`, the admin UI) depend on this envelope — do not change it in a fork without
 changing them.
@@ -145,7 +151,7 @@ drafts and field-level read rules resolve as "not logged in".
 | `200` | OK                                                                                                                                                                 |
 | `201` | Created                                                                                                                                                            |
 | `204` | Deleted                                                                                                                                                            |
-| `400` | Validation failed (`details`), malformed query, bad JSON/multipart                                                                                                 |
+| `400` | Validation failed (`details`), malformed query, bad JSON/multipart, a write of `id`/`created_at`/`updated_at`/`_storageKey` (`INVALID_INPUT`)                      |
 | `401` | Authentication required, or access denied while unauthenticated                                                                                                    |
 | `403` | Authenticated but not permitted (including field-level writes)                                                                                                     |
 | `403` | `AUTH_MANAGED_COLLECTION`: create/update/delete of a collection an auth adapter manages (e.g. `users`) — use the auth user-management routes; reads are unaffected |

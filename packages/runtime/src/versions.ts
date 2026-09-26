@@ -7,6 +7,7 @@ import { ConcurrentModificationError, NotFoundError } from './errors.js';
 import { documentMatches } from './access.js';
 import { checkAccess, statusConstraint } from './read-policy.js';
 import { filterReadableFields } from './field-access.js';
+import { FORGE_OWNED_KEYS } from './system-fields.js';
 
 export interface ListVersionsArgs {
   collection: string;
@@ -227,9 +228,6 @@ export async function createVersion(
 /** Marker stored in `snapshotFormat` on every automatic snapshot written since spec 062. */
 const FULL_SNAPSHOT = 'full';
 
-/** Adapter/system metadata — never part of restorable content (spec 062 §5). */
-const SYSTEM_KEYS = new Set(['id', 'created_at', 'updated_at', '_storageKey']);
-
 export function versionsCollectionSlug(collectionSlug: string): string {
   return `_versions_${collectionSlug}`;
 }
@@ -360,7 +358,8 @@ export function restoreTarget(
     else if (restorable.full) target[name] = null;
   }
   if (collection.drafts === true && data._status !== undefined) target._status = data._status;
-  for (const key of SYSTEM_KEYS) delete target[key];
+  // Adapter/system metadata is never restorable content (spec 062 §5, spec 063).
+  for (const key of FORGE_OWNED_KEYS) delete target[key];
   return target;
 }
 

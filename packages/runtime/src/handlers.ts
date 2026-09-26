@@ -491,7 +491,9 @@ async function buildMultipartBody<TEnv>(
 
   const url = await runtime.adapters.storage.getPublicUrl(key);
 
-  const data: Record<string, unknown> = { _storageKey: key };
+  // The generated key travels separately from `data` (spec 063 §5): it is Forge-owned metadata, not
+  // caller content, and only `createUpload` may persist it.
+  const data: Record<string, unknown> = {};
   const derived: Record<string, unknown> = {
     filename: file.name,
     url,
@@ -548,13 +550,17 @@ export async function handleCreate<TEnv = unknown>(
 
     try {
       const locale = parseLocale(new URL(context.request.url));
-      const doc = await options.runtime.create({
+      const createArgs = {
         collection: collectionSlug,
         data,
         user,
         overrideAccess: false,
         ...(locale !== undefined && { locale })
-      });
+      };
+      const doc =
+        storageKey !== undefined
+          ? await operations.createUpload(options.runtime, createArgs, storageKey)
+          : await options.runtime.create(createArgs);
 
       return jsonResponse({ data: doc }, 201);
     } catch (createErr) {

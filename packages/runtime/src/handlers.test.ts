@@ -1574,3 +1574,184 @@ describe('handlePreview HTTP boundary (spec 058)', () => {
     expect(stored?.title).toBe('Owner note');
   });
 });
+
+// Spec 063 — the reproduced cross-object deletion exploit, end to end over HTTP, as an editor who
+// legitimately has create/update/delete on the upload collection.
+describe('system-field mutation boundary over HTTP (spec 063)', () => {
+  const media = defineCollection({
+    slug: 'media',
+    fields: {
+      filename: defineField.text({ required: true }),
+      url: defineField.text({ required: true }),
+      contentType: defineField.text(),
+      filesize: defineField.number(),
+      alt: defineField.text()
+    },
+    upload: true,
+    access: { read: () => true, create: () => true, update: () => true, delete: () => true }
+  });
+
+  function setup() {
+    const auth = new InMemoryAuthAdapter();
+    auth.registerSession('editor-token', {
+      user: { id: 'editor-1', email: 'editor@example.com', role: 'editor' }
+    });
+    const storage = new InMemoryStorageAdapter();
+    const runtime = new ForgeCmsRuntime({
+      collections: [media],
+      adapters: { database: new InMemoryDatabaseAdapter(), auth, storage }
+    });
+    runtime.init();
+    return { runtime, storage };
+  }
+
+  function jsonRequest(method: string, id: string | undefined, body?: unknown) {
+    return {
+      request: new Request(`https://forge.test/api/v1/media${id ? `/${id}` : ''}`, {
+        method,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer editor-token' },
+        ...(body !== undefined && { body: JSON.stringify(body) })
+      }),
+      env: {},
+      params: { collection: 'media', ...(id !== undefined && { id }) }
+    };
+  }
+
+  async function upload(
+    runtime: ForgeCmsRuntime,
+    name: string,
+    spoof: Record<string, string> = {}
+  ) {
+    const form = new FormData();
+    form.set('file', new File([`contents of ${name}`], name, { type: 'application/pdf' }));
+    for (const [key, value] of Object.entries(spoof)) form.set(key, value);
+    const response = await handleCreate(
+      {
+        request: new Request('https://forge.test/api/v1/media', {
+          method: 'POST',
+          body: form,
+          headers: { authorization: 'Bearer editor-token' }
+        }),
+        env: {},
+        params: { collection: 'media' }
+      },
+      { runtime }
+    );
+    expect(response.status).toBe(201);
+    return ((await response.json()) as { data: Record<string, unknown> }).data;
+  }
+
+  it('PATCH { _storageKey: <B> } is rejected; deleting A removes only A’s object', async () => {
+    const { runtime, storage } = setup();
+    const a = await upload(runtime, 'a.pdf');
+    const b = await upload(runtime, 'victim.pdf');
+    const aKey = (await runtime.adapters.database.findById('media', a.id as string))?._storageKey;
+    const bRowBefore = await runtime.adapters.database.findById('media', b.id as string);
+    const bKey = bRowBefore?._storageKey as string;
+
+    const patch = await handleUpdate(jsonRequest('PATCH', a.id as string, { _storageKey: bKey }), {
+      runtime
+    });
+    expect(patch.status).toBe(400);
+    expect(await patch.json()).toEqual({
+      error: {
+        code: 'INVALID_INPUT',
+        message: "Field '_storageKey' is managed by Forge and cannot be written"
+      }
+    });
+    expect((await runtime.adapters.database.findById('media', a.id as string))?._storageKey).toBe(
+      aKey
+    );
+
+    const deleted = await handleDelete(jsonRequest('DELETE', a.id as string), { runtime });
+    expect(deleted.status).toBe(204);
+
+    expect(await storage.get(aKey as string)).toBeNull();
+    expect(await storage.get(bKey)).not.toBeNull();
+    expect(await runtime.adapters.database.findById('media', b.id as string)).toEqual(bRowBefore);
+  });
+
+  it('a JSON-created document whose url points at another object cannot delete it', async () => {
+    const { runtime, storage } = setup();
+    const victim = await upload(runtime, 'victim.pdf');
+    const victimKey = (await runtime.adapters.database.findById('media', victim.id as string))
+      ?._storageKey as string;
+
+    const created = await handleCreate(
+      jsonRequest('POST', undefined, { filename: 'decoy', url: victim.url }),
+      { runtime }
+    );
+    expect(created.status).toBe(201);
+    const decoy = ((await created.json()) as { data: { id: string } }).data;
+
+    expect((await handleDelete(jsonRequest('DELETE', decoy.id), { runtime })).status).toBe(204);
+    expect(await storage.get(victimKey)).not.toBeNull();
+  });
+
+  it('multipart parts named after system keys cannot spoof them; the key stays Forge-generated', async () => {
+    const { runtime, storage } = setup();
+    const doc = await upload(runtime, 'a.pdf', {
+      _storageKey: 'private/victim.pdf',
+      id: 'spoofed-id',
+      created_at: '1999-01-01T00:00:00.000Z',
+      updated_at: '1999-01-01T00:00:00.000Z'
+    });
+    const row = await runtime.adapters.database.findById('media', doc.id as string);
+
+    expect(doc.id).not.toBe('spoofed-id');
+    expect(row?._storageKey).toMatch(/^media\/[0-9a-f-]{36}-a\.pdf$/);
+    expect(row?.created_at).not.toBe('1999-01-01T00:00:00.000Z');
+    expect(await storage.get(row?._storageKey as string)).not.toBeNull();
+  });
+
+  it('normal lifecycle: upload, read, metadata update (echoing the read document), delete', async () => {
+    const { runtime, storage } = setup();
+    const doc = await upload(runtime, 'a.pdf');
+    const read = await handleRead(jsonRequest('GET', doc.id as string), { runtime });
+    const readDoc = ((await read.json()) as { data: Record<string, unknown> }).data;
+
+    const updated = await handleUpdate(
+      jsonRequest('PATCH', doc.id as string, { ...readDoc, alt: 'described' }),
+      { runtime }
+    );
+    expect(updated.status).toBe(200);
+    const key = (await runtime.adapters.database.findById('media', doc.id as string))
+      ?._storageKey as string;
+    expect(await storage.get(key)).not.toBeNull();
+
+    expect((await handleDelete(jsonRequest('DELETE', doc.id as string), { runtime })).status).toBe(
+      204
+    );
+    expect(await storage.get(key)).toBeNull();
+  });
+
+  it('HTTP create cannot choose id or timestamps; HTTP update cannot change them', async () => {
+    const { runtime } = setup();
+    for (const key of ['id', 'created_at', 'updated_at', '_storageKey']) {
+      const response = await handleCreate(
+        jsonRequest('POST', undefined, { filename: 'f', url: 'u', [key]: 'forged' }),
+        { runtime }
+      );
+      expect(response.status).toBe(400);
+    }
+    expect(await runtime.adapters.database.count('media')).toBe(0);
+
+    const doc = await upload(runtime, 'a.pdf');
+    for (const key of ['id', 'created_at', 'updated_at']) {
+      const response = await handleUpdate(
+        jsonRequest('PATCH', doc.id as string, { [key]: 'forged' }),
+        { runtime }
+      );
+      expect(response.status).toBe(400);
+    }
+  });
+
+  it('HTTP preview rejects system keys as content', async () => {
+    const { runtime } = setup();
+    const response = await handlePreview(
+      jsonRequest('POST', undefined, { filename: 'p', url: 'u', _storageKey: 'x' }),
+      { runtime }
+    );
+    expect(response.status).toBe(400);
+  });
+});
