@@ -1,5 +1,12 @@
 # @forge-cms/api
 
+## 0.6.0
+
+### Patch Changes
+
+- Updated dependencies [b2c32c3]
+  - @forge-cms/core@0.6.0
+
 ## 0.5.0
 
 ### Patch Changes

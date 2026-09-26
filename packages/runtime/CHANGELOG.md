@@ -1,5 +1,167 @@
 # @forge-cms/runtime
 
+## 0.6.0
+
+### Minor Changes
+
+- 1c22996: Auth-managed collections can no longer be mutated through generic collection CRUD (spec 061). This
+  closes the last open part of roadmap H02: the users collection could still be created into, updated and
+  deleted through `runtime.create/update/delete` and `POST/PUT/PATCH/DELETE /api/v1/users`, bypassing
+  everything `UsersCollectionAuthAdapter` enforces — the last-admin invariant, first-admin provisioning,
+  password hashing, email normalisation and session versioning. A trusted `runtime.delete({ collection:
+'users', id })` removed the only administrator; a hand-rolled `withAuthFields` users collection let an
+  editor promote themselves to admin.
+
+  **Behaviour change (breaking for anyone who wrote users through the generic content API).**
+  `AuthAdapter` gains one optional method, `managesCollection?(slug): boolean`. Adapters that keep users
+  in a Forge collection declare it: `UsersCollectionAuthAdapter` claims exactly its configured
+  `collection` (not the literal `'users'`), and `CompositeAuthAdapter` claims whatever any child claims.
+  `@forge-cms/runtime` then refuses every `create`/`update`/`delete` of a claimed collection — Local API
+  with `overrideAccess` `true` (the default) or `false`, and HTTP — with the new
+  `AuthManagedCollectionError`: HTTP `403`, code `AUTH_MANAGED_COLLECTION`, the same message for every
+  caller and for a document that does not exist. The refusal happens before hooks, access checks and any
+  read or write, so it has no side effects. `restoreVersion` and relation cascade/set-null are covered too;
+  deleting a document that a managed collection references with `onDelete: 'cascade' | 'set-null'` is now
+  rejected up front (`400`) instead of writing into it. Reads, other collections and adapters that omit
+  `managesCollection` (`ExternalAuthAdapter`, `SignedTokenAuthAdapter`, `ApiKeyAuthAdapter`,
+  `InMemoryAuthAdapter`, custom adapters) are unaffected. Use `createUser` / `updateUser` / `deleteUser` /
+  `signup` (and the host's `/api/auth/users*` routes) for user lifecycle. Custom non-auth fields on a
+  managed collection (`avatar`, `jobTitle`, …) are therefore read-only through Forge's generic surface.
+  Direct `DatabaseAdapter` access is trusted low-level infrastructure and remains below this guarantee.
+
+  **Also fixed (found while auditing auth-owned fields).** `updateUser(id, { password })` threw `Unknown
+column '_sessionVersion'` on libSQL and D1 — the session-freshness counter was written but never
+  declared, so a password change did not work on any SQL backend, and InMemory returned the counter on
+  every read. `AUTH_USER_FIELDS` now declares `_sessionVersion` (number, unreadable and unwritable by every
+  role) next to `passwordHash`, so `withAuthFields()` / `defineUsersCollection()` create the column, the
+  additive `syncSchema` migration adds it to existing tables, and it is hidden from reads. Existing rows
+  need no backfill (a missing value means `0`). `withAuthFields()` now lets an explicit declaration win
+  per field.
+
+- b2c32c3: Versioned documents and their history can no longer diverge (spec 062).
+  - **One atomic write.** On a `versions`-enabled collection, `create()` writes the document and version 1,
+    and `update()` / `restoreVersion()` write the document change and its new snapshot, in one
+    `DatabaseAdapter.atomicWrite()` batch. If the snapshot cannot be written the document change is rolled
+    back too (previously the document could be created or changed with no matching history).
+  - **Unique version identity.** The internal `_versions_<collection>` table gets a unique
+    `(documentId, versionNumber)` index. `syncSchema()` adds it (plus an internal `snapshotFormat` column)
+    additively. **Upgrade note:** a database that already holds duplicate version numbers for one document —
+    possible only from the old concurrent-update race — cannot get the index; `syncSchema()` then fails with a
+    message listing the duplicates and a query to inspect them. Forge never deletes, renumbers or merges
+    history for you: decide which rows to keep, fix them (after a backup), restart.
+  - **Concurrent updates conflict instead of silently overwriting.** Two updates of the same versioned
+    document racing from the same state: one commits, the other rejects with the new
+    `ConcurrentModificationError` (HTTP `409`, code `CONCURRENT_MODIFICATION`) and writes nothing. Forge does
+    not retry it for you (`before*` hooks may already have run) — re-read and resubmit. `afterChange` /
+    `afterOperation` only run for a committed write.
+  - **Full snapshots.** `Version.data` of an automatic snapshot is now the full restorable content — every
+    declared field (`null` when unset) plus `_status` on drafts collections — instead of just the update's
+    patch. It never contains `id`, `created_at`, `updated_at` or `_storageKey`, and a restore never rewrites
+    them. Snapshots written before this release keep their old (patch) shape and restore only the fields
+    they contain.
+  - **Restore** still runs the normal update pipeline, now with only the fields that actually change, so
+    field-level write rules apply to what the restore modifies. A full snapshot that predates a
+    now-required field fails current validation instead of producing an invalid document.
+  - Re-creating a document with the id of a deleted document whose history is still retained is refused
+    with `UniqueConstraintError` (`fields: ['id']`) instead of adopting that history.
+  - Manual `createVersion()` retries its version-number allocation (at most 3 attempts) and otherwise
+    throws `ConcurrentModificationError`; it still stores `data` verbatim.
+  - Versioned collections now require a `DatabaseAdapter` implementing `atomicWrite()` (every built-in
+    adapter does); `syncSchema()` refuses otherwise.
+
+  `@forge-cms/testing/contracts` adds `runVersionHistoryContractTests`, the deterministic two-writer and
+  fault-injection suite used against InMemory, libSQL and real local D1.
+
+- e5151aa: **Security:** callers can no longer write Forge-owned document metadata (spec 063).
+  - **`_storageKey` belongs to the upload pipeline.** Before, anyone with update + delete access on one
+    upload document could `PATCH { "_storageKey": "<another object's key>" }` and then delete the
+    document, which deleted the **other** object from storage. Now `create`, `update`, `preview`,
+    `restoreVersion`, `updateGlobalDocument` and every HTTP handler refuse `_storageKey`, whether or not
+    `overrideAccess` is set. Only the multipart upload flow records it, through an internal path that is
+    not exported.
+  - **Deletion only uses `_storageKey`.** Spec 051's fallback that derived the object key from `url` is
+    removed, because `url` is an editable field and could point at another document's file. **Upgrade
+    note:** deleting an upload document that has no `_storageKey` (created from JSON, or recorded before
+    storage keys existed) no longer deletes any object; Forge logs a warning and the object must be
+    removed by hand.
+  - **`id`, `created_at` and `updated_at`.**
+    - A create containing `created_at`, `updated_at` or `_storageKey` returns
+      `400 INVALID_INPUT` ("Field '<key>' is managed by Forge and cannot be written"), and nothing is
+      written.
+    - An update or preview may contain these keys only with their stored values. Those echoes are
+      dropped (a `null` counts as not set), so clients that send back the whole document they read keep
+      working, and the adapter now
+      stamps a new `updated_at`. On libSQL/D1, a stale `updated_at` sent back this way used to overwrite
+      the new stamp.
+    - A caller-chosen `id` on create is refused over HTTP and with `overrideAccess: false`. Trusted Local
+      API code can still pass a non-empty string `id` for seeds and imports.
+  - **Hooks.** `beforeValidate`/`beforeChange` hooks (collections and globals) may change content and
+    `_status`, not these keys. A hook that changes one fails the operation with an internal error (500).
+    Hooks no longer see a trusted create's explicit `id` or the upload key in `data`; both appear on the
+    returned `doc`.
+  - `_status` stays writable on `drafts` collections and globals.
+  - `runtime.adapters.database` remains the raw layer outside every CMS check.
+  - No new exports.
+
+### Patch Changes
+
+- d718fbd: Foundation hardening (spec 058): closes several confirmed access-bypass and concurrency gaps in
+  alternate content paths that did not go through the normal Local API pipeline.
+
+  `@forge-cms/runtime`:
+  - Version history (`listVersions`/`getVersion`) now enforces the owning document's current read
+    access, row-level policy, and draft visibility, and projects field-level hidden values out of
+    returned snapshots — an untrusted caller could previously enumerate/read the history of a document
+    they could not otherwise read or see hidden fields of.
+  - `restoreVersion` now routes through the same `update()` pipeline as a normal write (access,
+    field-write checks, validation, hooks, one labeled version) instead of writing through the adapter
+    directly, bypassing all of that.
+  - `preview()` (Local API and HTTP) now enforces create/update access, field-write access, and
+    field-read projection, and forwards caller identity into relation population — previously it read
+    the raw stored document and merged caller data with no access enforcement at all. The HTTP
+    `handlePreview` handler now delegates to `preview()` instead of duplicating (and independently
+    under-enforcing) the same logic; its unused `allowDraftPreview` option is removed.
+  - Relation/upload population (`depth: 1`) now enforces the _target_ collection's own read/row/draft
+    policy, not just field-level projection — a readable parent no longer grants visibility into an
+    unreadable or draft target.
+  - Relation integrity (cascade/set-null on delete) now enforces self-relations (previously silently
+    skipped for same-collection relations), routes dependent mutations through the real delete/update
+    pipeline (hooks, validation, versions, recursive relation integrity) with cycle protection, uses a
+    real database query instead of a full-table scan for many-relation lookups, and rejects a
+    `set-null` relation on a `required` field before any mutation instead of deep inside a partial
+    cascade.
+  - Globals now enforce draft visibility on read and support `depth: 1` relation population instead of
+    silently ignoring it.
+
+  `@forge-cms/auth` (`UsersCollectionAuthAdapter`):
+  - Sessions are re-validated against the current user row on every request: a demoted or renamed
+    user's session reflects the change immediately, and a deleted user's session is invalidated. A
+    password change invalidates every session issued before it.
+  - The first-admin bootstrap race (two concurrent signups both becoming admin) is closed using an
+    atomic, unique-index-backed claim, scoped per users-collection.
+  - The last-admin removal race is narrowed with a post-write re-verification and best-effort
+    compensation; this is an explicitly bounded, non-atomic mitigation, not a full fix — see
+    `docs/specs/058-foundation-hardening-runtime-policy-consistency.md` §7b for the documented residual
+    gap.
+
+  `@forge-cms/angular`:
+  - `ForgeCmsConfig` gains an optional `authBaseUrl` so a host mounted under a custom path can
+    configure the auth transport without replacing `CmsApiService` (previously every auth method
+    hardcoded `/api/auth/*`, while content methods already honored `baseUrl`).
+  - `getCollections()` now preserves the server's Forge error code/message instead of throwing a
+    generic `Error`.
+
+- Updated dependencies [31bae06]
+- Updated dependencies [1c22996]
+- Updated dependencies [664ad5b]
+- Updated dependencies [d718fbd]
+- Updated dependencies [b2c32c3]
+  - @forge-cms/db@0.6.0
+  - @forge-cms/auth@0.6.0
+  - @forge-cms/core@0.6.0
+  - @forge-cms/storage@0.6.0
+  - @forge-cms/api@0.6.0
+
 ## 0.5.0
 
 ### Patch Changes

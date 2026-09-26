@@ -1,5 +1,13 @@
 # @forge-cms/core
 
+## 0.6.0
+
+### Patch Changes
+
+- b2c32c3: Clarify the `Version` type's docs: `versionNumber` is unique per document (not guaranteed gapless), and
+  `data` is the full restorable content for automatic snapshots since spec 062, the changed fields only for
+  older snapshots, and exactly the given data for a manual `createVersion()`.
+
 ## 0.5.0
 
 ## 0.4.0
