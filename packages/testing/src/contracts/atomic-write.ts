@@ -25,6 +25,7 @@ export interface AtomicWriteContractOptions {
 
 const ITEMS = 'atomic_items';
 const OTHER = 'atomic_other';
+const REFS = 'atomic_refs';
 const MAX_OPERATIONS = 25;
 
 const LAST_ADMIN = { keepAtLeast: { where: { role: 'admin' }, others: 1 } };
@@ -43,9 +44,9 @@ async function rejection(promise: Promise<unknown>): Promise<{ code?: unknown } 
  * commit or none does, results come back in order, later operations see earlier ones, conditional
  * operations reuse spec 059's `WriteCondition`, and invalid input never partially commits.
  *
- * Uses two fixed collections, `atomic_items` and `atomic_other` — an adapter over a persistent store must
- * be empty of both between tests (the InMemory/libSQL suites get that from a fresh adapter;
- * `packages/cloudflare/test/workers` clears the two tables in a `beforeEach`).
+ * Uses three fixed collections, `atomic_items`, `atomic_other` and `atomic_refs` — an adapter over a
+ * persistent store must be empty of all of them between tests (the InMemory/libSQL suites get that from a
+ * fresh adapter; `packages/cloudflare/test/workers` clears the tables in a `beforeEach`).
  */
 export function runDatabaseAdapterAtomicWriteContractTests(
   createAdapter: () => ContractAtomicDatabaseAdapter,
@@ -71,6 +72,14 @@ export function runDatabaseAdapterAtomicWriteContractTests(
       slug: OTHER,
       fields: { label: defineField.text({ unique: true }) }
     });
+    /** References into `atomic_items`, for the spec-064 `assertCount` cases. */
+    const refs = defineCollection({
+      slug: REFS,
+      fields: {
+        owner: defineField.relation({ collection: ITEMS }),
+        tags: defineField.relation({ collection: ITEMS, many: true })
+      }
+    });
 
     /** Results are duck-typed: the real `AtomicWriteResult` union is not assignable to a string-keyed record. */
     const write = async (operations: readonly Row[]): Promise<Row[]> =>
@@ -78,7 +87,7 @@ export function runDatabaseAdapterAtomicWriteContractTests(
 
     beforeEach(async () => {
       adapter = createAdapter();
-      await adapter.syncSchema([items, other]);
+      await adapter.syncSchema([items, other, refs]);
     });
 
     // --- operation builders ------------------------------------------------------------------------
@@ -556,6 +565,145 @@ export function runDatabaseAdapterAtomicWriteContractTests(
           expect(await exists('valid')).toBe(false);
         });
       }
+    });
+
+    // --- assertCount (spec 064) ------------------------------------------------------------------------
+    describe('assertCount (spec 064)', () => {
+      const assertCount = (collection: string, equals: number, where?: Row): Row => ({
+        type: 'assertCount',
+        collection,
+        equals,
+        ...(where !== undefined && { where })
+      });
+      const createRef = (id: string, data: Row): Row => ({
+        type: 'create',
+        collection: REFS,
+        data: { id, ...data }
+      });
+
+      it('passes when the count matches, writes nothing itself and reports its own result', async () => {
+        await seed('a');
+        await seed('b');
+        const results = await write([assertCount(ITEMS, 2), create('c')]);
+        expect(results.map((r) => r.type)).toEqual(['assertCount', 'create']);
+        expect(results[0]).toEqual({ type: 'assertCount' });
+        expect(await adapter.count(ITEMS)).toBe(3);
+      });
+
+      it('equals: 0 holds on an empty match and fails on any match', async () => {
+        await seed('a', { role: 'admin' });
+        await write([assertCount(ITEMS, 0, { role: 'editor' }), create('b')]);
+        expect(await exists('b')).toBe(true);
+
+        const error = await rejection(
+          write([create('c'), assertCount(ITEMS, 0, { role: 'admin' })])
+        );
+        expect(error.code).toBe('ATOMIC_WRITE_CONDITION_FAILED');
+        expect(await exists('c')).toBe(false);
+      });
+
+      it('a failing assertion rolls back every earlier operation, across collections', async () => {
+        await seed('a', { name: 'before' });
+        const error = await rejection(
+          write([
+            update('a', { name: 'after' }),
+            { type: 'create', collection: OTHER, data: { label: 'x' } },
+            remove('a'),
+            assertCount(ITEMS, 5)
+          ])
+        );
+        expect(error.code).toBe('ATOMIC_WRITE_CONDITION_FAILED');
+        expect(await field('a', 'name')).toBe('before');
+        expect(await adapter.count(OTHER)).toBe(0);
+      });
+
+      it('sees the effects of earlier operations of the same batch, not later ones', async () => {
+        await seed('a', { role: 'admin' });
+        await write([
+          remove('a'),
+          assertCount(ITEMS, 0, { role: 'admin' }),
+          create('b', { role: 'admin' }),
+          assertCount(ITEMS, 1, { role: 'admin' })
+        ]);
+        expect(await exists('a')).toBe(false);
+        expect(await exists('b')).toBe(true);
+      });
+
+      it('counts with `in` (every target still exists) — one assertion for several ids', async () => {
+        await seed('a');
+        await seed('b');
+        await write([assertCount(ITEMS, 2, { id: { in: ['a', 'b'] } }), createRef('r1', {})]);
+        const error = await rejection(
+          write([createRef('r2', {}), assertCount(ITEMS, 3, { id: { in: ['a', 'b', 'gone'] } })])
+        );
+        expect(error.code).toBe('ATOMIC_WRITE_CONDITION_FAILED');
+        expect(await adapter.count(REFS)).toBe(1);
+      });
+
+      it('counts single and many relation references (eq / in / containsValue)', async () => {
+        await seed('a');
+        await seed('b');
+        await write([
+          createRef('r1', { owner: 'a', tags: ['a', 'b'] }),
+          createRef('r2', { owner: 'b', tags: ['b'] }),
+          assertCount(REFS, 1, { owner: 'a' }),
+          assertCount(REFS, 2, { owner: { in: ['a', 'b'] } }),
+          assertCount(REFS, 1, { tags: { containsValue: 'a' } }),
+          assertCount(REFS, 2, {
+            or: [{ tags: { containsValue: 'a' } }, { tags: { containsValue: 'b' } }]
+          }),
+          assertCount(REFS, 0, { tags: { containsValue: 'zzz' } })
+        ]);
+        expect(await adapter.count(REFS)).toBe(2);
+
+        // After the batch's own writes remove every reference, a "no reference remains" guard holds.
+        await write([
+          { type: 'delete', collection: REFS, id: 'r1' },
+          { type: 'update', collection: REFS, id: 'r2', data: { owner: null, tags: [] } },
+          assertCount(REFS, 0, { or: [{ owner: 'a' }, { tags: { containsValue: 'a' } }] }),
+          assertCount(REFS, 0, { owner: 'b' })
+        ]);
+        expect(await adapter.count(REFS)).toBe(1);
+      });
+
+      for (const equals of [-1, 1.5, Number.NaN, '1', undefined]) {
+        it(`rejects equals = ${String(equals)} before writing anything`, async () => {
+          const error = await rejection(
+            write([create('a'), { type: 'assertCount', collection: ITEMS, equals }])
+          );
+          expect(error).toBeInstanceOf(RangeError);
+          expect(await exists('a')).toBe(false);
+        });
+      }
+
+      it('rejects a non-object where before writing anything', async () => {
+        const error = await rejection(
+          write([create('a'), { type: 'assertCount', collection: ITEMS, equals: 0, where: [] }])
+        );
+        expect(error).toBeInstanceOf(TypeError);
+        expect(await exists('a')).toBe(false);
+      });
+
+      if (rejectsUnknownColumns) {
+        it('rejects an unknown column in its where before writing anything', async () => {
+          await expect(write([create('a'), assertCount(ITEMS, 0, { nope: 1 })])).rejects.toThrow();
+          expect(await exists('a')).toBe(false);
+        });
+      }
+
+      it('a guarded write racing a reference insert: never both', async () => {
+        await seed('target');
+        // "Delete the target only if nothing references it" vs "reference the target only if it exists".
+        const del = write([assertCount(REFS, 0, { owner: 'target' }), remove('target')]);
+        const ref = write([
+          assertCount(ITEMS, 1, { id: { in: ['target'] } }),
+          createRef('r', { owner: 'target' })
+        ]);
+        const results = await Promise.allSettled([del, ref]);
+        expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+        const dangling = !(await exists('target')) && (await adapter.count(REFS)) > 0;
+        expect(dangling).toBe(false);
+      });
     });
 
     // --- independent writers -----------------------------------------------------------------------

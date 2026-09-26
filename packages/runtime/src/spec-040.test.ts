@@ -87,7 +87,9 @@ describe('depth: 1 populates upload fields (finding 9)', () => {
   });
 
   it('nulls an upload pointing at a document that no longer exists', async () => {
-    await runtime.delete({ collection: 'media', id: imageId });
+    // Since spec 064 a referenced upload cannot be deleted through the runtime (upload references
+    // restrict); a dangling one can still exist in data written before it, which population must survive.
+    await runtime.adapters.database.delete('media', imageId);
     const { docs } = await runtime.find({ collection: 'services', depth: 1 });
 
     expect(docs[0]?.image).toBeNull();

@@ -377,24 +377,28 @@ if (!compositeRejected) throw new Error('Expected an unauthenticated request to 
 // Query completeness & adapter parity (spec 050): nested and/or, findOne, multi-field sort, and
 // relation-array containsValue, all through the packed public surface only.
 const queryDb = new InMemoryDatabaseAdapter();
+const articles2 = defineCollection({
+  slug: 'articles2',
+  fields: {
+    title: defineField.text({ required: true }),
+    category: defineField.text(),
+    status: defineField.text(),
+    featured: defineField.boolean(),
+    views: defineField.number(),
+    tags: defineField.relation({ collection: 'tags', many: true })
+  }
+});
+// A relation must name a registered collection whose targets exist (spec 064).
+const tags2 = defineCollection({ slug: 'tags', fields: { label: defineField.text() } });
 const queryRuntime = new ForgeCmsRuntime({
-  collections: [
-    defineCollection({
-      slug: 'articles2',
-      fields: {
-        title: defineField.text({ required: true }),
-        category: defineField.text(),
-        status: defineField.text(),
-        featured: defineField.boolean(),
-        views: defineField.number(),
-        tags: defineField.relation({ collection: 'tags', many: true })
-      }
-    })
-  ],
+  collections: [articles2, tags2],
   adapters: { database: queryDb, auth: new InMemoryAuthAdapter(), storage: new InMemoryStorageAdapter() }
 });
 queryRuntime.init();
 await queryRuntime.syncSchema();
+for (const id of ['a', 'b']) {
+  await queryDb.create('tags', { id, label: id });
+}
 
 await queryRuntime.create({
   collection: 'articles2',
@@ -437,6 +441,65 @@ const membership = await queryRuntime.find({
 });
 if (membership.docs.length !== 1 || membership.docs[0].title !== 'News') {
   throw new Error('Expected containsValue to filter by relation-array membership');
+}
+
+// Relation lifecycle (spec 064), through the packed public surface only: unsupported reference shapes
+// are refused at startup, a missing target is refused, a cascade commits as one batch, and the
+// \`assertCount\` batch operation guards across collections.
+let nestedRejected = false;
+try {
+  new ForgeCmsRuntime({
+    collections: [
+      defineCollection({ slug: 'owners', fields: { name: defineField.text() } }),
+      defineCollection({
+        slug: 'nested',
+        fields: {
+          meta: defineField.group({ fields: { owner: defineField.relation({ collection: 'owners' }) } })
+        }
+      })
+    ],
+    adapters: { database: new InMemoryDatabaseAdapter(), auth: new InMemoryAuthAdapter(), storage: new InMemoryStorageAdapter() }
+  });
+} catch (error) {
+  nestedRejected = error instanceof Error && error.message.includes("'meta.owner'");
+}
+if (!nestedRejected) throw new Error('Expected a nested relation to be refused at startup');
+
+const relationDb = new InMemoryDatabaseAdapter();
+const relationRuntime = new ForgeCmsRuntime({
+  collections: [
+    defineCollection({ slug: 'owners', fields: { name: defineField.text() } }),
+    defineCollection({
+      slug: 'things',
+      fields: { owner: defineField.relation({ collection: 'owners', onDelete: 'cascade' }) }
+    })
+  ],
+  adapters: { database: relationDb, auth: new InMemoryAuthAdapter(), storage: new InMemoryStorageAdapter() }
+});
+relationRuntime.init();
+await relationRuntime.syncSchema();
+let missingTargetRejected = false;
+try {
+  await relationRuntime.create({ collection: 'things', data: { owner: 'ghost' } });
+} catch (error) {
+  missingTargetRejected = (error as { code?: string }).code === 'INVALID_INPUT';
+}
+if (!missingTargetRejected) throw new Error('Expected a missing relation target to be refused');
+const owner = await relationRuntime.create({ collection: 'owners', data: { name: 'o' } });
+await relationRuntime.create({ collection: 'things', data: { owner: owner.id } });
+await relationRuntime.delete({ collection: 'owners', id: owner.id as string });
+if ((await relationDb.count('things')) !== 0) throw new Error('Expected the cascade to commit');
+let assertionFailed = false;
+try {
+  await relationDb.atomicWrite([
+    { type: 'create', collection: 'owners', data: { name: 'x' } },
+    { type: 'assertCount', collection: 'owners', equals: 0 }
+  ]);
+} catch (error) {
+  assertionFailed = error instanceof AtomicWriteConditionError;
+}
+if (!assertionFailed || (await relationDb.count('owners')) !== 0) {
+  throw new Error('Expected a failed assertCount to roll back the whole batch');
 }
 
 // Browser auth foundation (spec 053): defineUsersCollection + UsersCollectionAuthAdapter +

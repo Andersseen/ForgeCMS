@@ -1,5 +1,6 @@
 [
   "AtomicWriteContractOptions",
+  "BatchHold",
   "FirstAdminContender",
   "FirstAdminDatabase",
   "FirstAdminHarnessFactory",
@@ -9,6 +10,10 @@
   "LastAdminHarness",
   "LastAdminHarnessFactory",
   "LastAdminUsers",
+  "RelationLifecycleDatabase",
+  "RelationLifecycleHarness",
+  "RelationLifecycleHarnessFactory",
+  "RelationLifecycleRuntime",
   "VersionHistoryContractOptions",
   "VersionHistoryDatabase",
   "VersionHistoryHarness",
@@ -16,7 +21,9 @@
   "VersionHistoryRuntime",
   "VersionHistoryVersion",
   "WriteGate",
+  "createBatchHold",
   "createWriteGate",
+  "relationLifecycleCollections",
   "runAnalyticsWriterContractTests",
   "runAuthAdapterContractTests",
   "runDatabaseAdapterAtomicWriteContractTests",
@@ -26,6 +33,7 @@
   "runDatabaseAdapterQueryContractTests",
   "runFirstAdminBootstrapContractTests",
   "runLastAdminConcurrencyContractTests",
+  "runRelationLifecycleContractTests",
   "runStorageAdapterContractTests",
   "runVersionHistoryContractTests"
 ]

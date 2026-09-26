@@ -13,7 +13,7 @@ import { D1DatabaseAdapter } from '../../src/d1.adapter.js';
 // suite's own inner one (outer hooks first).
 describe('D1DatabaseAdapter — real local D1 binding: atomic write batch contract (spec 060)', () => {
   beforeEach(async () => {
-    for (const table of ['atomic_items', 'atomic_other']) {
+    for (const table of ['atomic_items', 'atomic_other', 'atomic_refs']) {
       try {
         await env.DB.exec(`DELETE FROM "${table}"`);
       } catch {

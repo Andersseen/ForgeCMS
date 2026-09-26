@@ -9,6 +9,7 @@ import type {
 } from '@forge-cms/core';
 import type { DatabaseRecord } from '@forge-cms/db';
 import type { OperationContext } from './context.js';
+import { validateRelationSchema } from './relation-lifecycle.js';
 import * as operations from './operations.js';
 import type {
   CountArgs,
@@ -62,6 +63,16 @@ export class ForgeCmsRuntime<
   readonly adapters: AdapterSet;
 
   constructor(config: ForgeCmsConfig<TEnv, TCollections>) {
+    // Reference shapes relation integrity cannot enforce are refused here, at startup, instead of being
+    // accepted and silently ignored on every delete (spec 064 §2).
+    const relationErrors = validateRelationSchema(
+      config.collections,
+      config.globals ?? [],
+      (slug) => config.adapters.auth.managesCollection?.(slug) === true
+    );
+    if (relationErrors.length > 0) {
+      throw new Error(`Unsupported relation configuration:\n${relationErrors.join('\n')}`);
+    }
     this.config = config;
     this.adapters = config.adapters;
   }

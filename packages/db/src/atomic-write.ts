@@ -11,16 +11,18 @@ export const ATOMIC_WRITE_MAX_OPERATIONS = 25;
 
 /**
  * Thrown by `atomicWrite()` when an operation that had to apply did not: a plain `update` whose row is
- * missing, or an `updateIf`/`deleteIf` with `requireApplied: true` whose row is missing or whose
- * condition failed. Nothing in the batch was persisted. "Missing" and "refused" are not distinguished
- * (as for spec 059's `applied: false`); re-read to find out, knowing the answer is advisory.
+ * missing, an `updateIf`/`deleteIf` with `requireApplied: true` whose row is missing or whose condition
+ * failed, or an `assertCount` whose count differed (spec 064). Nothing in the batch was persisted.
+ * Which operation failed is not reported (D1 gives no statement index), and "missing" and "refused"
+ * are not distinguished (as for spec 059's `applied: false`); re-read to find out, knowing the answer is
+ * advisory.
  */
 export class AtomicWriteConditionError extends Error {
   readonly code = 'ATOMIC_WRITE_CONDITION_FAILED' as const;
 
   constructor(options?: { cause?: unknown }) {
     super(
-      'Atomic write rolled back: an operation that had to apply did not (its target row was missing or its condition did not hold). Nothing was written.',
+      'Atomic write rolled back: an operation that had to apply did not (its target row was missing, its condition did not hold, or a count assertion failed). Nothing was written.',
       options
     );
     this.name = 'AtomicWriteConditionError';
@@ -42,6 +44,15 @@ export function isAtomicWriteConditionError(err: unknown): err is AtomicWriteCon
  */
 export const ATOMIC_WRITE_REQUIRE_APPLIED_SQL =
   'SELECT abs(CASE WHEN changes() = 0 THEN -9223372036854775808 ELSE 0 END)';
+
+/**
+ * The `assertCount` statement (spec 064), minus its `FROM`/`WHERE`: one aggregate row whose evaluation
+ * raises the same "integer overflow" as {@link ATOMIC_WRITE_REQUIRE_APPLIED_SQL} — and so aborts and rolls
+ * back the batch — exactly when the count differs from the single bound parameter. Using the same
+ * failure keeps one classifier ({@link toAtomicWriteError}) and one public error for both.
+ */
+export const ATOMIC_WRITE_ASSERT_COUNT_SELECT =
+  'SELECT abs(CASE WHEN COUNT(*) = ? THEN 0 ELSE -9223372036854775808 END)';
 
 const GUARD_FAILURE_MESSAGE = /integer overflow/i;
 
@@ -109,12 +120,28 @@ export function assertValidAtomicWrite(operations: readonly AtomicWriteOperation
       type !== 'update' &&
       type !== 'delete' &&
       type !== 'updateIf' &&
-      type !== 'deleteIf'
+      type !== 'deleteIf' &&
+      type !== 'assertCount'
     ) {
       fail(index, `unknown type ${JSON.stringify(type)}`);
     }
     if (typeof op.collection !== 'string' || op.collection === '') {
       fail(index, 'collection must be a non-empty string');
+    }
+    if (type === 'assertCount') {
+      if (
+        op.where !== undefined &&
+        (typeof op.where !== 'object' || op.where === null || Array.isArray(op.where))
+      ) {
+        fail(index, 'where must be an object when present');
+      }
+      const equals = op.equals;
+      if (typeof equals !== 'number' || !Number.isSafeInteger(equals) || equals < 0) {
+        throw new RangeError(
+          `atomicWrite operation ${index}: assertCount.equals must be a non-negative integer, got ${String(equals)}`
+        );
+      }
+      return;
     }
     if (type !== 'create' && (typeof op.id !== 'string' || op.id === '')) {
       fail(index, 'id must be a non-empty string');

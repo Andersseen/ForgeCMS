@@ -1,4 +1,5 @@
 [
+  "ATOMIC_WRITE_ASSERT_COUNT_SELECT",
   "ATOMIC_WRITE_MAX_OPERATIONS",
   "ATOMIC_WRITE_REQUIRE_APPLIED_SQL",
   "AtomicWriteConditionError",
@@ -26,6 +27,7 @@
   "WriteCondition",
   "assertValidAtomicWrite",
   "assertValidWriteCondition",
+  "atomicWriteMustApply",
   "clearTableCache",
   "fieldKindToSqlType",
   "fromDbValue",
@@ -42,7 +44,6 @@
   "isWhereValue",
   "matchesCondition",
   "matchesWhere",
-  "atomicWriteMustApply",
   "normalizeSort",
   "parseSqliteUniqueConstraintMessage",
   "resolveCollectionIndexes",

@@ -349,6 +349,14 @@ export class InMemoryDatabaseAdapter implements DatabaseAdapter {
           results.push({ type: 'deleteIf', applied });
           break;
         }
+        case 'assertCount': {
+          // Counts the staged rows, so every earlier operation of this batch is visible (spec 064).
+          const where = operation.where;
+          const count = where ? rows.filter((r) => matchesWhere(r, where)).length : rows.length;
+          if (count !== operation.equals) throw new AtomicWriteConditionError();
+          results.push({ type: 'assertCount' });
+          break;
+        }
       }
     }
 

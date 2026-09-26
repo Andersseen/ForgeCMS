@@ -103,6 +103,7 @@ export {
   handleSetNullOnDelete,
   findOrphanedDocuments
 } from './relation-integrity.js';
+export { validateRelationSchema } from './relation-lifecycle.js';
 
 export {
   ForgeError,

@@ -133,15 +133,20 @@ export class AuthManagedCollectionError extends ForgeError {
  * together — nothing was written. Forge never retries it automatically (`before*` hooks may already
  * have run); re-read the document and submit again. Deliberately names the public collection slug,
  * never the internal `_versions_*` table whose unique index detected the conflict.
+ *
+ * Spec 064 reuses it for relation lifecycle conflicts — a referenced document deleted while a write was
+ * in progress, or a relation delete whose graph changed before it committed — with a `message` saying
+ * so. The meaning is the same: another request changed what this one depended on; nothing was written.
  */
 export class ConcurrentModificationError extends ForgeError {
   readonly collection: string;
   readonly id: string;
 
-  constructor(collection: string, id: string) {
+  constructor(collection: string, id: string, message?: string) {
     super(
-      `Document '${id}' in '${collection}' was changed by another request while this one was in ` +
-        `progress; nothing was written. Reload it and try again.`,
+      message ??
+        `Document '${id}' in '${collection}' was changed by another request while this one was in ` +
+          `progress; nothing was written. Reload it and try again.`,
       409,
       'CONCURRENT_MODIFICATION'
     );

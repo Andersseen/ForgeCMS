@@ -1,4 +1,9 @@
-import type { CmsUser, CollectionDefinition, RelationFieldOptions } from '@forge-cms/core';
+import type {
+  CmsUser,
+  CollectionDefinition,
+  RelationFieldOptions,
+  UploadFieldOptions
+} from '@forge-cms/core';
 import type { DatabaseRecord } from '@forge-cms/db';
 import type { OperationContext } from './context.js';
 import { assertNotAuthManaged, isAuthManagedCollection } from './auth-managed.js';
@@ -6,19 +11,15 @@ import { InvalidInputError } from './errors.js';
 import { versionsEnabled } from './versions.js';
 
 /**
- * Relation integrity utilities for handling cascade, restrict, and set-null on delete.
+ * Low-level relation integrity helpers (restrict / cascade / set-null on delete), kept as public
+ * `@forge-cms/runtime` exports.
  *
- * Spec 058 §5 hardening: dependent mutations (cascade delete, set-null update) now route through a
- * caller-supplied {@link RelationMutator} — structurally typed here so this module never imports
- * `operations.ts` (which imports *this* module for `checkDeleteRestrictions`/etc.; a two-way import
- * would be a cycle). `operations.ts`'s `deleteDocument` supplies a real mutator backed by its own
- * `deleteDocument`/`update` functions, so a cascade/set-null gets the full pipeline (access, field-
- * write checks, validation, hooks, version snapshots, and — for cascade — recursive relation-integrity
- * on each dependent document) instead of a raw, unchecked adapter write. A caller that does not supply
- * a mutator (every pre-058 direct caller of these exported functions, including this package's own
- * unit tests) gets the previous raw-adapter-write behavior unchanged — these functions remain usable as
- * low-level primitives, they just don't recurse in that mode (matching their pre-058 one-level-only
- * behavior, documented explicitly rather than silently changed).
+ * **Since spec 064 `runtime.delete()` does not use the mutating helpers here.** It plans the whole
+ * cascade/set-null/restrict graph with reads only and commits it as one atomic batch
+ * (`relation-lifecycle.ts` + `operations.ts`). `handleCascadeDelete`/`handleSetNullOnDelete` still work as
+ * before (spec 058: through a caller-supplied {@link RelationMutator}, or raw adapter writes without one),
+ * but each of their writes commits on its own — a later failure leaves earlier ones in place, and a
+ * reference created concurrently is not detected. Use `runtime.delete()` for guarantees.
  */
 
 export interface RelationMutator {
@@ -134,6 +135,9 @@ export async function findReferencingDocuments(
 }
 
 /**
+ * @deprecated Since spec 064 `runtime.delete()` checks restrictions against the final state of its
+ * whole plan, inside one atomic batch; this one-level, read-only pre-check remains for direct callers.
+ *
  * Checks if a document can be deleted based on relation constraints. Throws {@link InvalidInputError}
  * — before any mutation happens — if deletion is restricted, or if a `set-null` relation targets a
  * `required: true` field that has live references: a null value can never satisfy a required field, so
@@ -203,6 +207,9 @@ export async function checkDeleteRestrictions(
 }
 
 /**
+ * @deprecated Not atomic — each dependent delete commits on its own. `runtime.delete()` (spec 064)
+ * commits the whole cascade graph in one batch and no longer calls this.
+ *
  * Handles cascade delete: deletes all documents that reference the deleted document. With a real
  * mutator supplied, each dependent delete recurses through the full delete pipeline (its own
  * `checkDeleteRestrictions`/cascade/set-null included) — so a cascade chain several levels deep is
@@ -255,6 +262,9 @@ export async function handleCascadeDelete(
 }
 
 /**
+ * @deprecated Not atomic — each update commits on its own. `runtime.delete()` (spec 064) commits its
+ * set-null updates in the same batch as the delete and no longer calls this.
+ *
  * Handles set-null: sets relation fields to null (or removes the id from a many-relation array) in
  * all referencing documents. Skips a document already processed elsewhere in this same delete
  * operation (cascade-deleted, or already set-null'd via another field/path) via the shared `visited`
@@ -308,7 +318,10 @@ export async function handleSetNullOnDelete(
 }
 
 /**
- * Finds orphaned documents: documents with relation fields pointing to non-existent documents.
+ * Finds orphaned documents: documents whose top-level `relation` or `upload` field points at a document
+ * that does not exist. Diagnostic only — nothing is repaired. Since spec 064 a successfully committed
+ * supported write or delete cannot create one; orphans found here predate it, or were written through
+ * the raw `DatabaseAdapter` or the auth adapter's user lifecycle.
  */
 export async function findOrphanedDocuments(
   ctx: OperationContext,
@@ -318,15 +331,16 @@ export async function findOrphanedDocuments(
   const allDocs = await ctx.adapters.database.findMany({ collection: collection.slug });
 
   for (const [fieldName, field] of Object.entries(collection.fields)) {
-    if (field.kind !== 'relation') continue;
+    if (field.kind !== 'relation' && field.kind !== 'upload') continue;
 
-    const options = field.options as RelationFieldOptions;
+    const options = field.options as RelationFieldOptions | UploadFieldOptions;
     const targetCollection = options.collection;
+    const many = field.kind === 'relation' && (options as RelationFieldOptions).many === true;
 
     for (const doc of allDocs) {
       const value = doc[fieldName];
 
-      if (options.many && Array.isArray(value)) {
+      if (many && Array.isArray(value)) {
         // Check each ID in the array
         for (const id of value) {
           if (typeof id === 'string') {

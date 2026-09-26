@@ -12,6 +12,7 @@ import type {
 } from '@forge-cms/db';
 import {
   ATOMIC_WRITE_REQUIRE_APPLIED_SQL,
+  ATOMIC_WRITE_ASSERT_COUNT_SELECT,
   assertValidAtomicWrite,
   assertValidWriteCondition,
   atomicWriteMustApply,
@@ -541,6 +542,17 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
           const where = this.buildWriteCondition(collection, operation.id, operation.condition);
           push(`DELETE FROM "${collection}" WHERE ${where.sql} RETURNING "id"`, where.bindings);
           toResult.push((rows) => ({ type: 'deleteIf', applied: rows.length > 0 }));
+          break;
+        }
+        case 'assertCount': {
+          // One aggregate row that raises the spec-060 overflow guard — aborting and rolling back the
+          // whole batch — when the count differs (spec 064). The `equals` placeholder precedes the WHERE's.
+          const { clause, bindings } = this.buildWhereClause(collection, operation.where);
+          push(`${ATOMIC_WRITE_ASSERT_COUNT_SELECT} FROM "${collection}"${clause}`, [
+            operation.equals,
+            ...bindings
+          ]);
+          toResult.push(() => ({ type: 'assertCount' }));
           break;
         }
       }

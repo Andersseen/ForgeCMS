@@ -13,4 +13,9 @@ export interface OperationContext {
   getCollection(slug: string): CollectionDefinition | undefined;
   getGlobal(slug: string): GlobalDefinition | undefined;
   getCollections(): readonly CollectionDefinition[];
+  /**
+   * Every registered global. Optional so a structural implementation written before spec 064 still
+   * type-checks; without it, relation integrity cannot see references held by globals.
+   */
+  getGlobals?(): readonly GlobalDefinition[];
 }

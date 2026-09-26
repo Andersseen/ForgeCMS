@@ -40,6 +40,16 @@ const posts = defineCollection({
   }
 });
 
+// The target of `posts.tags`. A relation must name a registered collection (spec 064): before it did,
+// `posts.tags` pointed at a collection that did not exist and every tag id was an unchecked string.
+const tags = defineCollection({
+  slug: 'tags',
+  admin: { useAsTitle: 'label' },
+  fields: {
+    label: defineField.text({ required: true })
+  }
+});
+
 const products = defineCollection({
   slug: 'products',
   fields: {
@@ -189,6 +199,7 @@ const landingPages = defineCollection({
 const collections = [
   pages,
   posts,
+  tags,
   products,
   media,
   users,
@@ -262,12 +273,17 @@ async function seedIfEmpty(runtime: ForgeCmsRuntime): Promise<void> {
   if (existing.length > 0) return;
 
   // Seed the demo admin user so the published login credentials keep working.
-  await auth.createUser({
+  const admin = await auth.createUser({
     email: 'demo@forgecms.dev',
     password: 'forgecms-demo',
     name: 'Demo Admin',
     role: 'admin'
   });
+
+  // Seeded through the raw adapter (below the runtime's relation checks), so every id a seeded
+  // relation names must really exist — targets first, then the documents that reference them.
+  await db.create('tags', { id: 'cms', label: 'CMS' });
+  await db.create('tags', { id: 'angular', label: 'Angular' });
 
   await db.create('pages', {
     title: 'Home',
@@ -304,7 +320,7 @@ async function seedIfEmpty(runtime: ForgeCmsRuntime): Promise<void> {
     tags: ['cms', 'angular'],
     category: 'tutorial',
     publishedAt: new Date().toISOString(),
-    author: 'admin',
+    ...(admin.ok && { author: admin.user.id }),
     _status: 'published'
   });
 

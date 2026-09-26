@@ -537,6 +537,20 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
           toResult.push((rows) => ({ type: 'deleteIf', applied: rows.length > 0 }));
           break;
         }
+        case 'assertCount': {
+          // `SELECT abs(CASE WHEN COUNT(*) = ? …) FROM t WHERE …` — one aggregate row that raises the
+          // spec-060 overflow guard, rolling the batch back, when the count differs (spec 064).
+          const where = this.buildWhereCondition(
+            table,
+            this.getCollectionDef(collection),
+            operation.where
+          );
+          const guard = sql`abs(CASE WHEN COUNT(*) = ${operation.equals} THEN 0 ELSE -9223372036854775808 END)`;
+          const query = db.select({ guard }).from(table);
+          push((where !== undefined ? query.where(where) : query).toSQL());
+          toResult.push(() => ({ type: 'assertCount' }));
+          break;
+        }
       }
 
       if (atomicWriteMustApply(operation))
