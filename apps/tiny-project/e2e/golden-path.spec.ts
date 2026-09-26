@@ -282,6 +282,90 @@ test('signup is opt-in, cannot select a role, and never elevates past the second
   await logout(page);
 });
 
+// The HTTP contract of `GET /api/v1/:collection`, asserted purely at the wire — it knows nothing
+// about which transport wrapper serves the route, so it must pass unchanged across a transport swap.
+test('list API contract: query, pagination, filter, sort, depth, errors and read access are preserved', async ({
+  page,
+  request
+}) => {
+  await loginAs(page, SECOND_ADMIN_EMAIL, SECOND_ADMIN_PASSWORD);
+  const me = (await (await page.request.get('/api/auth/me')).json()) as { data: { id: string } };
+  const authorId = me.data.id;
+
+  const stamp = Date.now();
+  const slugs = [`list-contract-a-${stamp}`, `list-contract-b-${stamp}`];
+  for (const [index, slug] of slugs.entries()) {
+    const created = await page.request.post('/api/v1/posts', {
+      data: { title: `List Contract ${index === 0 ? 'A' : 'B'} ${stamp}`, slug, author: authorId },
+      headers: { 'content-type': 'application/json', ...SAME_ORIGIN_HEADERS }
+    });
+    expect(created.status()).toBe(201);
+  }
+
+  type ListBody = {
+    data: { id: string; title: string; slug: string; author: unknown }[];
+    meta: Record<string, unknown>;
+  };
+  const list = async (query: string) => {
+    const response = await page.request.get(`/api/v1/posts${query}`);
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain('application/json');
+    return (await response.json()) as ListBody;
+  };
+
+  // Envelope.
+  const all = await list('?status=all');
+  expect(Object.keys(all).sort()).toEqual(['data', 'meta']);
+  expect(all.meta).toMatchObject({ collection: 'posts', count: all.data.length });
+  expect(all.meta['totalDocs']).toBeGreaterThanOrEqual(3);
+
+  // Filter by field equality.
+  const filtered = await list(`?status=all&slug=${slugs[0]}`);
+  expect(filtered.data.map((doc) => doc.slug)).toEqual([slugs[0]]);
+
+  // Pagination.
+  const firstPage = await list('?status=all&sort=title&order=asc&limit=1&offset=0');
+  const secondPage = await list('?status=all&sort=title&order=asc&limit=1&offset=1');
+  expect(firstPage.data).toHaveLength(1);
+  expect(firstPage.meta).toMatchObject({ limit: 1, offset: 0, count: 1, hasNextPage: true });
+  expect(secondPage.meta).toMatchObject({ limit: 1, offset: 1, hasPrevPage: true });
+  expect(secondPage.data[0]?.id).not.toBe(firstPage.data[0]?.id);
+
+  // Sort order.
+  const asc = (await list('?status=all&sort=title&order=asc')).data.map((doc) => doc.title);
+  const desc = (await list('?status=all&sort=title&order=desc')).data.map((doc) => doc.title);
+  expect(asc).toEqual([...asc].sort());
+  expect(desc).toEqual([...asc].reverse());
+
+  // Relation depth.
+  const shallow = await list(`?status=all&slug=${slugs[0]}&depth=0`);
+  const populated = await list(`?status=all&slug=${slugs[0]}&depth=1`);
+  expect(shallow.data[0]?.author).toBe(authorId);
+  expect(populated.data[0]?.author).toMatchObject({ id: authorId });
+
+  // Error contract: invalid query and unknown collection.
+  const invalid = await page.request.get('/api/v1/posts?limit=abc');
+  expect(invalid.status()).toBe(400);
+  expect(((await invalid.json()) as { error: { code: string } }).error.code).toBe('INVALID_QUERY');
+  const unknown = await page.request.get('/api/v1/does-not-exist');
+  expect(unknown.status()).toBe(404);
+  expect(await unknown.json()).toEqual({
+    error: { code: 'NOT_FOUND', message: "Collection 'does-not-exist' not found" }
+  });
+
+  // Read access follows the caller's credentials: drafts and auth-only collections are the
+  // authenticated view; the anonymous `request` fixture carries no session cookie.
+  const anonymousDrafts = await request.get(`/api/v1/posts?slug=${slugs[0]}`);
+  expect(anonymousDrafts.status()).toBe(200);
+  expect(((await anonymousDrafts.json()) as ListBody).data).toEqual([]);
+  const anonymousUsers = await request.get('/api/v1/users');
+  const authenticatedUsers = await page.request.get('/api/v1/users');
+  expect(authenticatedUsers.status()).toBe(200);
+  expect(anonymousUsers.status()).not.toBe(200);
+
+  await logout(page);
+});
+
 test('CSRF: a cross-site forged cookie mutation is rejected; unauthenticated writes are 401', async ({
   page,
   request
