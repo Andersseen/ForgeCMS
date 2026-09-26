@@ -201,6 +201,10 @@ const post = await runtime.create({
 Applies defaults and auto-slugs, runs `beforeValidate` → validation → `beforeChange` → the write →
 `afterChange`, and returns the stored document.
 
+Trusted server code (the default `overrideAccess: true`) may pass a deterministic `data.id` — a
+non-empty string — for seeds, imports and sync. With `overrideAccess: false` (and over HTTP) a
+caller-chosen `id` is refused. See [System metadata](#system-metadata) for the other keys.
+
 ## `update`
 
 ```ts
@@ -208,7 +212,35 @@ const post = await runtime.update({ collection: 'posts', id, data: { title: 'New
 ```
 
 Partial by design: fields you omit keep their stored values, and a required field already present on
-the record does not have to be repeated.
+the record does not have to be repeated. Sending back the whole document you read is fine: `id`, the
+timestamps and `_storageKey` are dropped when they equal the stored values, and the adapter stamps a
+fresh `updated_at`.
+
+## System metadata
+
+`id`, `created_at`, `updated_at` and `_storageKey` belong to Forge. The CMS mutation API (`create`,
+`update`, `restoreVersion`, `preview`, `updateGlobalDocument` and every HTTP handler) never lets a
+caller change them — whether or not `overrideAccess` is set. `overrideAccess: true` skips
+**authorization**, not the integrity of Forge's own metadata.
+
+| Key           | `create`                                           | `update` / `preview` of an existing document |
+| ------------- | -------------------------------------------------- | -------------------------------------------- |
+| `id`          | trusted: optional non-empty string; untrusted: 400 | unchanged echo dropped, otherwise 400        |
+| `created_at`  | 400                                                | unchanged echo dropped, otherwise 400        |
+| `updated_at`  | 400                                                | unchanged echo dropped, otherwise 400        |
+| `_storageKey` | 400 — set only by the multipart upload pipeline    | unchanged echo dropped, otherwise 400        |
+| `_status`     | writable on a `drafts: true` collection            | writable on a `drafts: true` collection      |
+
+A refused key is an `InvalidInputError` (`400`, `INVALID_INPUT`): _Field '\_storageKey' is managed
+by Forge and cannot be written_. Nothing is written. A `null` value counts as "not set" and is
+dropped like an echo. Hooks follow the same rule: they may change
+content and `_status`, and a hook that sets one of these keys fails the operation with a `500` (it is a
+server-code bug, not a bad request). Hooks never see a trusted create's explicit `id` in `data`; it is
+on the returned `doc`.
+
+Code that genuinely needs raw persistence — importing rows with their original timestamps, attaching
+an object that is already in storage — writes through `runtime.adapters.database`. That layer bypasses
+access, hooks, validation and this boundary by design.
 
 ## `delete`
 
@@ -216,8 +248,11 @@ the record does not have to be repeated.
 const removed = await runtime.delete({ collection: 'posts', id });
 ```
 
-Returns the deleted document, having run `beforeDelete` and `afterDelete`. It does **not** delete
-related storage objects or clean up references.
+Returns the deleted document, having run `beforeDelete` and `afterDelete`. On an `upload: true`
+collection, it then deletes the storage object recorded in the document's `_storageKey`, and only that
+object. A document without one (created from JSON, or a record from before storage keys existed)
+deletes no object. The `url` field is never used to choose what to delete. Relation rules
+(`onDelete`) run as documented in [Collections](/docs/collections).
 
 ## Version history
 
@@ -254,7 +289,7 @@ Typed, each carrying its HTTP status — so the transport layer maps them withou
 | Error                         | Status | Thrown when                                                                                                           |
 | ----------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------- |
 | `NotFoundError`               | 404    | Unknown collection, unknown id, invisible document                                                                    |
-| `InvalidInputError`           | 400    | Malformed query, bad JSON, bad multipart body                                                                         |
+| `InvalidInputError`           | 400    | Malformed query, bad JSON, bad multipart body, writing Forge-owned metadata (`id`, timestamps, `_storageKey`)         |
 | `UnknownFieldError`           | 400    | `where`/`sort` names a field the collection doesn't have                                                              |
 | `InvalidQueryError`           | 400    | Malformed `and`/`or` group (empty, wrong shape), bad operator/sort direction, `containsValue` on a non-relation field |
 | `ValidationFailedError`       | 400    | Field validation failed — carries `details`                                                                           |

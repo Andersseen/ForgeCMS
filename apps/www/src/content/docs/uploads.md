@@ -35,7 +35,9 @@ curl -X POST http://localhost:5173/api/v1/media \
 
 The part **must be named `file`** — anything else is a `400`. What happens next:
 
-1. the bytes are stored through the `StorageAdapter` under `<collection>/<uuid>-<filename>`;
+1. the bytes are stored through the `StorageAdapter` under `<collection>/<uuid>-<filename>`, and
+   that key is recorded on the document as `_storageKey`. Only this pipeline can set it: no JSON
+   body, form field, hook or Local API call can choose or change it;
 2. `getPublicUrl(key)` produces the URL;
 3. a normal document is created, carrying whichever of `filename`, `url`, `contentType` and
    `filesize` your collection actually declares — fields you did not declare are dropped rather than
@@ -113,8 +115,13 @@ const doc = await cms.uploadFile('media', file, { alt: 'Treatment room' });
 
 Know these before building on it:
 
-- **Deleting a document does not delete its stored object.** The bytes stay in the bucket. A
-  `beforeDelete`/`afterDelete` hook can do it in userland, but nothing is built in.
+- **Deleting a document deletes exactly the object in its `_storageKey`**, after the database
+  delete succeeds. A document without one (created from JSON, or recorded before storage keys existed)
+  deletes no object, and Forge logs a warning. Before spec 063, Forge guessed the key from `url`.
+  `url` is an editable field, so that guess could point at somebody else's file, and it was removed.
+  Clean up objects from such older records by hand.
+- **No Local API upload.** Server code that must attach an object already in storage writes the row
+  through `runtime.adapters.database` (the raw layer, outside every CMS check).
 - **No image resizing, thumbnails or variants.** What you upload is what you serve.
 - **No presigned/direct-to-storage uploads** — bytes go through your server, which matters for large
   files on a Worker.

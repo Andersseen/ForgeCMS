@@ -46,6 +46,11 @@ const bookings = defineCollection({
 
 `afterChange` also gets `result` as an alias of `doc`, kept for backwards compatibility.
 
+`beforeValidate`/`beforeChange` may change content fields and `_status`, never Forge's own metadata
+(`id`, `created_at`, `updated_at`, `_storageKey`). Returning one with a different value than the
+stored document fails the operation with a `500`. Returning `{ ...previousData, ...data }` is fine,
+because unchanged values are dropped.
+
 ## Failing a write
 
 **Before-hooks can reject.** Throw and the operation stops with `400` and your message:

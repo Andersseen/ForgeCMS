@@ -1,11 +1,60 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-25 (first Strata consumer route in tiny-project).**
+> **Last updated: 2026-09-26 (system-field mutation boundary, spec 063).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## System-field mutation boundary — cross-object deletion closed (spec 063, 2026-09-26)
+
+Security fix recorded by spec 062 §11. See
+[docs/specs/063-system-field-mutation-boundary.md](specs/063-system-field-mutation-boundary.md) for the
+policy matrix.
+
+- **Reproduced first** (throwaway probe on `main` `d7f8ca5`, real HTTP handlers, `editor` with
+  create/update/delete on an upload collection):
+  - `PATCH A { _storageKey: <B's key> }` → `200`, then `DELETE A` → `204` **deleted B's object** and
+    left A's orphaned.
+  - A JSON-created document whose `url` pointed at B's URL deleted B the same way, through spec 051's
+    URL-derived fallback.
+  - HTTP create accepted `id` and `created_at`; PATCH rewrote `created_at` and silently ignored `id`.
+  - A `beforeChange` hook could inject `_storageKey`/`created_at`.
+  - Preview echoed system keys back as content.
+  - `updateGlobalDocument` persisted `created_at`/`_storageKey`.
+  - On libSQL, the admin form's whole-document save left `updated_at` **stale**: SQL adapters apply
+    caller `updated_at` after their own stamp.
+- **Now**: `id`/`created_at`/`updated_at`/`_storageKey` are Forge-owned (`system-fields.ts`).
+  - **Caller input.** `create`, `update`, `restoreVersion`, `preview`, `updateGlobalDocument` and every
+    handler screen caller data after the access and row checks. An unchanged echo is dropped; anything
+    else is `400 INVALID_INPUT` ("Field '<key>' is managed by Forge and cannot be written"). This
+    applies to every caller: `overrideAccess: true` skips authorization, not metadata integrity.
+  - **Explicit ids.** A trusted create may pass an explicit non-empty string `id` (seeds/imports; spec
+    062 relies on it); an untrusted create may not.
+  - **Hooks.** Hook output is screened too; a changed key fails the operation (`500`), and hooks never
+    see the explicit `id` or the upload key in `data`.
+  - **Uploads.** The multipart upload persists its generated key through the package-private
+    `createUpload` (not exported).
+  - **Deletion.** `deleteDocument` deletes only `_storageKey`'s object; the URL fallback is removed. A
+    record without a key deletes no object and logs a warning (upgrade note in the Local API/uploads
+    docs).
+  - **Drafts.** `_status` stays writable.
+  - **Admin form.** `ForgeCollectionFormComponent` stops submitting these keys.
+  - **Raw adapter.** `runtime.adapters.database` remains the raw escape hatch.
+- **Evidence**:
+  - `system-fields.test.ts`: 90 tests on InMemory **and** on-disk libSQL (the matrix, hooks, preview,
+    globals, versioned upload + restore). Mutation check: disabling the screen failed 62 of the first 88.
+  - HTTP exploit/URL-variant/multipart-spoof/normal-lifecycle tests in `handlers.test.ts`.
+  - Real local D1 + R2 (workerd): the exploit regression, the normal cleanup through the real multipart
+    handler, and the timestamp/id rules (`storage-lifecycle.test.ts`).
+  - Production D1/R2 not exercised.
+- **Gates**: see the spec's Outcome.
+- **Recorded, not fixed**:
+  - Read responses still include `_storageKey`.
+  - `_status` on a non-drafts collection is accepted by validation.
+  - There is no Local API upload operation.
+  - InMemory primary-key uniqueness (spec 062 §11).
 
 ## First Strata consumer route — tiny-project `GET /api/v1/:collection` (2026-09-25)
 
@@ -1323,13 +1372,9 @@ passwordHash`~~ — **fixed 2026-07-22, spec 018.** `@forge-cms/auth` now export
 
 ## What's next
 
-**Next bounded step (recommended after spec 062, 2026-09-25): close the generic system-field write
-path.** Spec 062 confirmed over HTTP that `create`/`update` accept `id`, `created_at`, `updated_at` and
-`_storageKey` from any caller allowed to write the document, and that a repointed `_storageKey` makes a
-later delete remove a different stored object. Small, security-relevant, runtime-only (reject or strip
-system keys from untrusted input; decide whether trusted callers may set `id`). After that: **D02**
-(relation lifecycle atomicity — needs a cross-collection "no referencing rows" guard and a rule for the
-25-operation cap). D03 is done except retention cleanup, which needs a product decision first. Also open,
+**Next bounded step (recommended after spec 063, 2026-09-26): D02** (relation lifecycle atomicity —
+needs a cross-collection "no referencing rows" guard and a rule for the 25-operation cap). The
+system-field write path spec 062 flagged is closed by spec 063. D03 is done except retention cleanup, which needs a product decision first. Also open,
 small and independent: let `updateUser` carry the custom profile fields of a managed collection (spec 061
 known limitation 1) if a consumer needs it.
 

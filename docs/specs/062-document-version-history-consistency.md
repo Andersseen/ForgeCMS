@@ -320,7 +320,8 @@ Mutate `data` in the hook instead.
   `DELETE` → `204`), deleted the **other** stored object `private/victim.pdf` and left the document's own
   file in place: anyone with update + delete access on one upload document can delete arbitrary objects
   in the bucket. Restore no longer writes any of these keys (§6); closing the generic path is the
-  recommended next bounded step (see Outcome).
+  recommended next bounded step (see Outcome). _(Closed by
+  [spec 063](063-system-field-mutation-boundary.md), 2026-09-26.)_
 - `InMemoryDatabaseAdapter.create` does not enforce primary-key uniqueness (SQL adapters do).
 - `Version.label` is `null` on the SQL adapters for an unlabeled version (typed `label?: string`; absent
   on InMemory) — pre-existing parity nit.

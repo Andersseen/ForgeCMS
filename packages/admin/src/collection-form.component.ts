@@ -3,6 +3,7 @@ import { VoltButton, VoltCard } from '@voltui/components';
 import type { FieldMeta } from '@forge-cms/angular';
 import { ForgeFieldControlComponent } from './field-control.component.js';
 import { normaliseReferences } from './references.js';
+import { toSubmitPayload } from './form-payload.js';
 
 /**
  * Modal chrome is hand-rolled (plain Tailwind overlay), not @voltui/components' VoltDialog: that
@@ -94,7 +95,8 @@ export class ForgeCollectionFormComponent {
   onSubmit(event: Event): void {
     event.preventDefault();
     // Field controls emit already-typed values (numbers as numbers, relations as arrays, composite
-    // fields as objects/arrays), so there is nothing left to coerce here.
-    this.save.emit({ ...this.formValue() });
+    // fields as objects/arrays), so there is nothing left to coerce here. Forge-owned metadata the
+    // document was loaded with is not submitted (spec 063).
+    this.save.emit(toSubmitPayload(this.formValue()));
   }
 }

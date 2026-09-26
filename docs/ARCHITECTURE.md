@@ -117,6 +117,19 @@ retained indefinitely; deleting a document leaves it orphaned (404 to untrusted 
 collections require `atomicWrite()`; `syncSchema()` refuses an adapter without it and reports (never
 repairs) pre-062 duplicate version identities that block the index.
 
+**System-field mutation boundary (spec 063, `@forge-cms/runtime`).** `id`, `created_at`, `updated_at`
+and `_storageKey` are Forge-owned (`FORGE_OWNED_KEYS`, `system-fields.ts`); `_status` is lifecycle input
+on drafts collections/globals. The CMS mutation API (`create`/`update`/`restoreVersion`/`preview`/
+`updateGlobal` and every handler) screens caller `data` after the access/row checks and before hooks:
+a value equal to the stored one is an echo and is dropped, anything else is `InvalidInputError` (400) —
+for every caller, `overrideAccess: true` included (it bypasses authorization, not metadata integrity).
+Trusted create may pass an explicit non-empty string `id`, held outside hook `data` and attached at
+persistence; untrusted create may not. Hook output is screened after `beforeValidate` and `beforeChange`
+(a changed key → plain `Error`, 500). `_storageKey` is merged into the persisted row only by the
+package-private `createUpload` (called by `handleCreate`'s multipart branch, not exported from the
+package), and `deleteDocument` deletes only that key's object — no URL-derived fallback. The raw
+`DatabaseAdapter` is below this boundary by design.
+
 ### AuthAdapter (`@forge-cms/auth`)
 
 `name`, `init(env)`, `extractToken(request)`, `validateSession(token)` → `AuthSession | null`,

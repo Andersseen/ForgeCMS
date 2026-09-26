@@ -24,6 +24,7 @@ import {
   runFieldHooks
 } from './hooks.js';
 import { assertWritableFields, filterReadableFields, FieldAccessError } from './field-access.js';
+import { screenHookOutput, screenUpdateInput } from './system-fields.js';
 
 const GLOBAL_ID = 'global';
 
@@ -197,16 +198,21 @@ export async function updateGlobal(
     ...(existing !== null && { doc: existing })
   });
 
+  // Spec 063: a global row's `id`/timestamps/`_storageKey` belong to Forge. Echoes of the stored row
+  // are dropped; before the first write there is nothing to echo, so any of them is refused.
+  const stored = existing ?? {};
+  const input = screenUpdateInput(args.data, stored);
+
   if (args.overrideAccess === false) {
     try {
-      await assertWritableFields(args.data, collectionProxy, user, existing ? 'update' : 'create');
+      await assertWritableFields(input, collectionProxy, user, existing ? 'update' : 'create');
     } catch (err) {
       if (err instanceof FieldAccessError) throw new AccessDeniedError(err.message);
       throw err;
     }
   }
 
-  const seeded = applyFieldDefaults(collectionProxy, args.data);
+  const seeded = applyFieldDefaults(collectionProxy, input);
 
   let data = await runRejectableStage(
     async () =>
@@ -223,6 +229,7 @@ export async function updateGlobal(
       }),
     'beforeValidate hook'
   );
+  data = screenHookOutput(data, stored, 'beforeValidate', `global '${global.slug}'`);
 
   if (global.drafts === true && data._status === undefined) {
     data = { ...data, _status: 'draft' };
@@ -254,6 +261,7 @@ export async function updateGlobal(
       }),
     'beforeChange hook'
   );
+  data = screenHookOutput(data, stored, 'beforeChange', `global '${global.slug}'`);
 
   const globalCollection = `_global_${global.slug}`;
   let record: DatabaseRecord;
