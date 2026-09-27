@@ -255,6 +255,16 @@ add to the users collection (`avatar`, `jobTitle`, …) are read-only through Fo
 direct `DatabaseAdapter` access (`runtime.adapters.database.update(…)`) is trusted low-level
 infrastructure that bypasses runtime and auth guarantees alike — like raw SQL under an ORM.
 
+**A user that content references cannot be deleted.** If a post's `author`, a `many` reviewers list or
+a global's relation still points at a user, `deleteUser` throws `UserMutationError` with reason
+`'referenced'`, and `DELETE /api/auth/users/:id` answers `409` with a message giving only how many
+references remain. Re-point or remove those references, then delete the user. Forge never cascades
+or clears them for you. The reference check, the last-admin check and the delete commit as one database
+batch, so a reference written by another request at the same moment makes the delete fail; the two can
+never both succeed. `ForgeCmsRuntime` sets this up automatically for the adapter you pass it; a
+`UsersCollectionAuthAdapter` used on its own, without a runtime, does not know the content schema and
+deletes as before.
+
 Host apps that predate `forgeAdminAuthRoutes()`'s `/admin/login` convention (an existing top-level
 `/login` route, say) can point the shared layout at it instead of migrating the route:
 

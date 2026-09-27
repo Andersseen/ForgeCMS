@@ -198,6 +198,29 @@ function referencesAny(referrer: ReferenceField, ids: readonly string[]): Databa
   return { [referrer.fieldName]: { in: [...ids] } };
 }
 
+/**
+ * "No row references any of `ids` in `target` any more" — one `assertCount(…, 0)` per referring field of
+ * a collection or global. The single definition of the final-state reference guard, shared by a content
+ * delete's plan and by the guard an auth adapter commits with its own user delete (spec 065).
+ */
+export function noReferenceAssertions(
+  ctx: OperationContext,
+  target: string,
+  ids: readonly string[]
+): AtomicWriteOperation[] {
+  return referrersOf(ctx, target).map((referrer) => ({
+    type: 'assertCount',
+    collection: referrer.table,
+    where: referencesAny(referrer, ids),
+    equals: 0
+  }));
+}
+
+/** Whether any supported relation/upload field of a collection or global references `target`. */
+export function isReferenced(ctx: OperationContext, target: string): boolean {
+  return referrersOf(ctx, target).length > 0;
+}
+
 // --- target validation for writes (spec 064 §4) -----------------------------------------------------
 
 /** Target collection → the unique ids a write references there, plus the fields that wrote them. */
@@ -506,17 +529,9 @@ export async function planRelationDelete(
     setNulls.push({ collection: first.collection, id: first.id, removals });
   }
 
-  const assertions: AtomicWriteOperation[] = [];
-  for (const [target, ids] of deletedIds) {
-    for (const referrer of referrersOf(ctx, target)) {
-      assertions.push({
-        type: 'assertCount',
-        collection: referrer.table,
-        where: referencesAny(referrer, [...ids]),
-        equals: 0
-      });
-    }
-  }
+  const assertions = [...deletedIds].flatMap(([target, ids]) =>
+    noReferenceAssertions(ctx, target, [...ids])
+  );
 
   const operations =
     deletes.size +

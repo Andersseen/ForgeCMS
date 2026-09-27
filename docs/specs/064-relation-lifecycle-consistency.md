@@ -373,3 +373,6 @@ Deviations:
 **D02 status:** every matrix cell is supported or explicitly refused, except one still open: a user
 deleted through the auth adapter can leave content relations to the users collection dangling (§1).
 D02 stays open until that cell is closed.
+
+> **2026-09-27:** that cell is closed by
+> [spec 065](065-auth-managed-delete-relation-integrity.md); D02 is complete.

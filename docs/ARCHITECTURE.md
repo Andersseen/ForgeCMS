@@ -181,6 +181,22 @@ last-admin protection, password hashing, email normalisation, session versioning
 one place, the adapter's `createUser`/`updateUser`/`deleteUser`/`signup`. Reads stay ordinary content
 reads. Direct `DatabaseAdapter` access is trusted low-level infrastructure and sits below the boundary.
 
+**Relation guard for auth-managed deletes (spec 065).** The auth adapter owns user deletion, while only
+the runtime knows which content fields reference users. So the runtime hands the guard over as data,
+and the dependency direction stays `auth → core/db`:
+
+- **Wiring.** At construction, for every registered collection the adapter manages, `ForgeCmsRuntime`
+  calls the optional `AuthAdapter.setManagedDeleteGuard(slug, { database, assertions(id) })`.
+  `assertions(id)` is `relation-lifecycle.ts`'s `noReferenceAssertions`, the same "no reference
+  remains" `assertCount`s a content delete ends its batch with.
+- **The delete.** `UsersCollectionAuthAdapter.deleteUser` commits
+  `[...assertions, deleteIf(users, id, LAST_ADMIN_GUARD)]` as one `atomicWrite`. Relation integrity and
+  the last-admin invariant are therefore decided together, by the database. A failed assertion is
+  reported as `UserMutationError('referenced')`. Auth-managed targets are restrict only.
+- **Composite and custom adapters.** `CompositeAuthAdapter` forwards the guard to every managing child.
+  A managing adapter that cannot accept it makes the runtime refuse to start if its collection is
+  referenced.
+
 `UsersCollectionAuthAdapter` and `SignedTokenAuthAdapter`'s shared `extractToken` also falls back to a
 `forge_session` cookie (`@forge-cms/auth`'s `cookie.ts`) when no `Authorization` header is present —
 `ApiKeyAuthAdapter` keeps its own independent, Bearer-only `extractToken`, unaffected.

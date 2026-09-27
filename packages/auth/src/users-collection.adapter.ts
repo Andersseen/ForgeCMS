@@ -1,12 +1,22 @@
 import type { CollectionDefinition } from '@forge-cms/core';
 import { defineField } from '@forge-cms/core';
-import type { DatabaseAdapter, DatabaseRecord, WriteCondition } from '@forge-cms/db';
-import { isUniqueConstraintError } from '@forge-cms/db';
+import type {
+  AtomicWriteOperation,
+  DatabaseAdapter,
+  DatabaseRecord,
+  WriteCondition
+} from '@forge-cms/db';
+import {
+  ATOMIC_WRITE_MAX_OPERATIONS,
+  isAtomicWriteConditionError,
+  isUniqueConstraintError
+} from '@forge-cms/db';
 import type {
   AuthActionResult,
   AuthAdapter,
   AuthSession,
   AuthUser,
+  ManagedDeleteGuard,
   PublicSignupInput
 } from './index.js';
 import { ForgeAuthError, UserMutationError } from './index.js';
@@ -260,6 +270,22 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
    */
   managesCollection(slug: string): boolean {
     return slug === this.collection;
+  }
+
+  private readonly deleteGuards: ManagedDeleteGuard[] = [];
+
+  /**
+   * Runtime wiring (spec 065) — see `AuthAdapter.setManagedDeleteGuard`. `ForgeCmsRuntime` calls it at
+   * construction; afterwards {@link deleteUser} commits the guard's relation assertions in the same batch
+   * as the delete. Accepts only this adapter's own collection. Guards **accumulate**: when several runtimes
+   * share this adapter, every one of them is enforced, so a later runtime whose schema references nothing
+   * can never lift an earlier one's protection. A `UsersCollectionAuthAdapter` used without a runtime has
+   * no guard and deletes exactly as before.
+   */
+  setManagedDeleteGuard(collection: string, guard: ManagedDeleteGuard): boolean {
+    if (collection !== this.collection) return false;
+    if (!this.deleteGuards.includes(guard)) this.deleteGuards.push(guard);
+    return true;
   }
 
   /** Provisions `_forge_bootstrap`'s unique-index-backed bootstrap slot (spec 058 §7a). */
@@ -558,22 +584,122 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     // Not applied: either the user vanished meanwhile, or the guard refused. Only this re-read can tell
     // them apart; the refusal itself was decided atomically by the database.
     if (!(await db.findById(this.collection, id))) return null;
-    throw new UserMutationError('Cannot remove the last remaining admin', 'last-admin');
+    throw lastAdminError();
   }
 
   /**
-   * Deletes a user; rejects (via {@link UserMutationError}) removing the last remaining admin. One
-   * `deleteIf()` carrying {@link LAST_ADMIN_GUARD} — see {@link updateUser} for the concurrency
-   * guarantee. Deleting a user who does not exist (or was deleted meanwhile) is a no-op; deleting a
-   * non-admin is never held back.
+   * Deletes a user. Rejects (via {@link UserMutationError}) removing the last remaining admin
+   * (`'last-admin'`), and — once a runtime has wired its relation guard (spec 065) — deleting a user that
+   * content or a global still references (`'referenced'`; restrict only: references are never cleared or
+   * cascaded). Deleting a user who does not exist (or was deleted meanwhile) is a no-op.
+   *
+   * **Concurrency:** one batch — the relation guard's `assertCount`s, then a `deleteIf()` carrying
+   * {@link LAST_ADMIN_GUARD} — so both invariants are decided by the database in the same transaction
+   * as the delete (see {@link updateUser}). A read-only preflight before it only produces the precise
+   * "N documents reference it" message; it is never what makes the delete safe. With no guard wired
+   * (or nothing referencing the collection), this is the spec-059 `deleteIf()` alone.
    */
   async deleteUser(id: string): Promise<void> {
     const db = this.getDb();
-    const result = await db.deleteIf(this.collection, id, LAST_ADMIN_GUARD);
-    if (result.applied) return;
-
-    if (await db.findById(this.collection, id)) {
-      throw new UserMutationError('Cannot remove the last remaining admin', 'last-admin');
+    if (this.deleteGuards.length > 0 && !(await db.findById(this.collection, id))) return;
+    const assertions = this.relationGuardFor(db, id);
+    if (assertions.length === 0) {
+      const result = await db.deleteIf(this.collection, id, LAST_ADMIN_GUARD);
+      if (result.applied) return;
+      if (await db.findById(this.collection, id)) throw lastAdminError();
+      return;
     }
+
+    let referencing = 0;
+    for (const assertion of assertions) {
+      if (assertion.type !== 'assertCount') continue;
+      const count = await db.count(assertion.collection, assertion.where);
+      if (count !== assertion.equals) referencing += Math.abs(count - assertion.equals);
+    }
+    if (referencing > 0) {
+      // Counted per referring field, so one document referencing the user twice counts twice.
+      const one = referencing === 1;
+      throw new UserMutationError(
+        `User cannot be deleted: it is still referenced ${referencing} time${one ? '' : 's'} by content. ` +
+          `Change or remove ${one ? 'that reference' : 'those references'} first.`,
+        'referenced'
+      );
+    }
+
+    let results;
+    try {
+      results = await db.atomicWrite([
+        ...assertions,
+        { type: 'deleteIf', collection: this.collection, id, condition: LAST_ADMIN_GUARD }
+      ]);
+    } catch (err) {
+      // The `deleteIf` is not `requireApplied`, so only a relation assertion can fail this batch: a
+      // reference appeared after the preflight. Nothing was deleted.
+      if (isAtomicWriteConditionError(err)) {
+        throw new UserMutationError(
+          'User cannot be deleted: a document started referencing it while it was being deleted. ' +
+            'Nothing was changed. Change or remove that reference first.',
+          'referenced'
+        );
+      }
+      throw err;
+    }
+    const deleted = results[results.length - 1];
+    if (deleted?.type !== 'deleteIf') {
+      throw new Error(
+        'atomicWrite returned an unexpected result for the user delete batch — check the users collection'
+      );
+    }
+    if (deleted.applied) return;
+    // Not applied: the user vanished meanwhile (no-op), or the last-admin guard refused.
+    if (await db.findById(this.collection, id)) throw lastAdminError();
   }
+
+  /**
+   * The wired relation assertions for deleting `id` (spec 065), checked before anything is read or
+   * written: only read-only `assertCount`s, addressed to this adapter's own database (otherwise they
+   * could not share the delete's transaction), and few enough to fit one atomic batch with the delete.
+   * Each violation fails closed — the delete is refused rather than run unguarded.
+   */
+  private relationGuardFor(db: DatabaseAdapter, id: string): readonly AtomicWriteOperation[] {
+    const assertions: AtomicWriteOperation[] = [];
+    const seen = new Set<string>();
+    for (const guard of this.deleteGuards) {
+      const own = guard.assertions(id);
+      if (own.length === 0) continue;
+      if (own.some((assertion) => assertion.type !== 'assertCount')) {
+        throw new Error(
+          'A managed delete guard may only contain assertCount operations (spec 065)'
+        );
+      }
+      if (guard.database !== db) {
+        throw new Error(
+          `Cannot delete user '${id}': '${this.collection}' is referenced by content, but this adapter's ` +
+            `userDatabase is a different database than the content database, so the reference check ` +
+            `cannot run in the same transaction as the delete (spec 065). Use one database for both.`
+        );
+      }
+      // Runtimes sharing this adapter with the same schema hand over identical assertions.
+      for (const assertion of own) {
+        const key = JSON.stringify(assertion);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        assertions.push(assertion);
+      }
+    }
+    if (assertions.length === 0) return assertions;
+    if (assertions.length + 1 > ATOMIC_WRITE_MAX_OPERATIONS) {
+      throw new Error(
+        `Cannot delete user '${id}': checking the ${assertions.length} reference fields that point at ` +
+          `'${this.collection}' together with the delete needs more than ${ATOMIC_WRITE_MAX_OPERATIONS} ` +
+          `database operations, the most ForgeCMS commits atomically. Nothing was changed. Reduce the ` +
+          `number of relation/upload fields referencing '${this.collection}'.`
+      );
+    }
+    return assertions;
+  }
+}
+
+function lastAdminError(): UserMutationError {
+  return new UserMutationError('Cannot remove the last remaining admin', 'last-admin');
 }

@@ -1,11 +1,82 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-26 (relation lifecycle consistency — D02, spec 064).**
+> **Last updated: 2026-09-27 (auth-managed delete relation integrity — D02 complete, spec 065).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Auth-managed delete relation integrity — D02 complete (spec 065, 2026-09-27)
+
+Closes spec 064's one open cell. See
+[docs/specs/065-auth-managed-delete-relation-integrity.md](specs/065-auth-managed-delete-relation-integrity.md)
+for the final D02 matrix.
+
+- **Reproduced first** on `main` (`309906f`):
+  - **On-disk libSQL, two clients.** Client A created `p1.author = u2`; client B called
+    `auth.deleteUser(u2)`. Result: `u2` deleted, and `p1.author` still named it.
+  - **InMemory, libSQL and local D1 (workerd).** The new contract, run against the unfixed source,
+    showed every referenced-user delete (single, many, global, referenced last admin) committing.
+  - **Delete-first ordering** (user deleted while a reference write is held) was already refused by
+    spec 064's target assertion.
+- **Now:**
+  - **The bridge.** New optional `AuthAdapter.setManagedDeleteGuard(collection, guard)`, with type
+    `ManagedDeleteGuard { database, assertions(id) }`.
+    - `ForgeCmsRuntime` calls it at construction for every registered collection the adapter manages.
+      No consumer setup change is needed.
+    - `assertions(id)` is `noReferenceAssertions`, extracted from spec 064's planner. It is now the
+      single definition of "no reference remains".
+    - `@forge-cms/auth` still depends only on core/db.
+  - **`UsersCollectionAuthAdapter.deleteUser`** commits the guard's assertions and its last-admin
+    `deleteIf` as one `atomicWrite`.
+    - A read-only preflight exists only for the "still referenced N times" message.
+    - A failed assertion (a reference appeared meanwhile) is also reported as `'referenced'`. This
+      classification is exact: the `deleteIf` is not `requireApplied`, so only an assertion can fail
+      the batch.
+    - A missing user is still a no-op (checked before any guard validation), and last-admin behaves
+      as before.
+    - Guards accumulate. Every runtime sharing one adapter is enforced, so an auxiliary runtime whose
+      schema references nothing cannot lift protection (found in the spec review).
+    - Known liveness limitation: a user referenced from the users collection itself (e.g.
+      `manager → users`, only writable via raw DB today) cannot be deleted until that reference is
+      cleared.
+  - **Errors.** New `UserMutationFailureReason` `'referenced'`. The first-party user routes already
+    map it to `409`. Messages give only a count, never document titles, collection or table names.
+  - **Fail-closed cases** (plain `Error`, before any write):
+    - more than 24 referring fields (the batch cap);
+    - `userDatabase` is not the content database;
+    - a guard containing anything other than `assertCount`.
+  - **Composite and custom adapters.** `CompositeAuthAdapter` forwards the guard to every managing
+    child. A custom adapter that manages a **referenced** collection without implementing the method
+    makes the runtime refuse to start. Adapters that manage nothing are untouched.
+- **Evidence.** New `runAuthManagedDeleteContractTests` (9 scenarios, independent writers via
+  `createBatchHold`, managed collection named `<prefix>_members`, not `users`). It runs on InMemory,
+  on-disk libSQL (`packages/runtime/src/auth-managed-delete.test.ts`) and local D1
+  (`packages/cloudflare/test/workers/relation-lifecycle.test.ts`). Scenarios:
+  - single, many and global references;
+  - referenced last admin;
+  - missing user;
+  - writer first (new document, and an existing one moved onto the user) → the delete is refused;
+  - delete first → the write is refused (`409`).
+
+  The runtime unit tests cover the batch shape, no leaks, the renamed collection next to an unmanaged
+  `users` collection, composite wiring, third-party startup refusal, the oversized guard set, the split
+  database and spec 061's refusal. Production D1 and remote Turso are not exercised.
+
+- **Verification (2026-09-27):**
+  - Passed: `format:check`, `lint` (0 errors; 4 existing warnings in `db/libsql.adapter.ts`),
+    `typecheck`, `test`, `build`, `test:libsql`, `test:cloudflare` (221 + 1), `check:api` (baseline
+    updated: auth +1, testing/contracts +8), `release:verify`, `e2e:www` 19, `e2e:tiny-project` 10,
+    `e2e:demo` 9.
+  - Tests changed to match the new policy: `test:libsql`'s sole-admin delete now expects
+    `'referenced'`, because that admin authored posts. Two spec-064 test stubs managing a referenced
+    collection now opt into the guard.
+- **D02 is complete.** Every matrix cell is supported or refused explicitly. Remaining boundaries by
+  design:
+  - raw `DatabaseAdapter` writes;
+  - before-hook side effects (D01);
+  - a standalone `UsersCollectionAuthAdapter` with no runtime (it cannot know the content schema).
 
 ## Relation lifecycle consistency — D02 (spec 064, 2026-09-26)
 
@@ -71,9 +142,8 @@ supported matrix and exact semantics.
   - `assertCount` cases in the shared atomic-write contract on all three adapters.
   - Production D1 / remote Turso are not exercised.
 - **Open / recorded:**
-  - A user deleted through the auth adapter's `deleteUser` does not consult content relations to the
-    users collection, so `post.author → users` can dangle after a user deletion. This is the one open
-    matrix cell.
+  - ~~A user deleted through the auth adapter's `deleteUser` does not consult content relations to the
+    users collection.~~ **Closed by spec 065 (entry above).**
   - Before-hook side effects are not transactional (D01).
   - Non-versioned CAS is `updated_at` (millisecond) precision.
   - Recorded as decisions (spec §4):
@@ -1448,16 +1518,14 @@ passwordHash`~~ — **fixed 2026-07-22, spec 018.** `@forge-cms/auth` now export
 
 ## What's next
 
-**Next bounded step (recommended after spec 064, 2026-09-26): close D02's one open cell.** Make the auth
-adapter's user deletion honour content relations that target the users collection. The runtime would
-hand the adapter "no reference remains" `assertCount` guards to fold into its `deleteUser` batch;
-restrict only, no cascades through the auth lifecycle. It is small and bounded, and it hits the most
-common schema here (tiny-project's required `post.author → users`). Until it lands D02 is not complete.
-After it: D04 (globals first write, localization certification, DB + R2 lifecycle) ranks above H04
-(host-level auth limits). The system-field write path spec 062 flagged is closed by spec 063. D03 is done except retention
-cleanup, which needs a product decision first. Also open,
-small and independent: let `updateUser` carry the custom profile fields of a managed collection (spec 061
-known limitation 1) if a consumer needs it.
+**Next bounded step (recommended after spec 065, 2026-09-27): D04.** D02 is complete. Certify
+globals, localization and the DB ↔ object-storage lifecycle. Begin with global first-write concurrency
+and with the combinations that are accepted today but inert. D04 ranks above H04 (host-level auth
+limits): its gaps are data-integrity gaps reachable by ordinary writes, while H04 is abuse hardening at
+the host. The system-field write path spec 062 flagged is closed by spec 063. D03 is done except
+retention cleanup, which needs a product decision first. Also open, small and independent: let
+`updateUser` carry the custom profile fields of a managed collection (spec 061 known limitation 1) if a
+consumer needs it.
 
 Work is planned in [ROADMAP.md](ROADMAP.md), which sequences the remaining gaps by cost-of-delay.
 Each numbered item there gets its own spec in `docs/specs/` when picked up, per [SDD.md](SDD.md).

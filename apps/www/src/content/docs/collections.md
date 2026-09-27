@@ -230,8 +230,13 @@ reviewer: defineField.relation({ collection: 'authors' }); // 'restrict' (defaul
   `cascade`/`set-null` onto a collection managed by the auth adapter (users are deleted only through
   the auth adapter). Lift such a reference to a top-level field, or keep the id in a `text`/`json`
   field as an explicitly unchecked reference.
-- **Known gap:** deleting a _user_ through the auth adapter (`deleteUser`) does not consult relations
-  that point at the users collection, so `post.author → users` can be left dangling by a user deletion.
+- **Users are restrict-only.** Deleting a _user_ through the auth adapter (`deleteUser`) is refused
+  while any relation/upload field or global still references it (`UserMutationError`, reason
+  `'referenced'`, `409` from the user routes). Change or remove those references first. Nothing is
+  cleared or cascaded for you. The check and the delete commit together, so a reference written
+  meanwhile makes the delete fail rather than dangle. `ForgeCmsRuntime` wires this automatically; a
+  custom auth adapter that manages a referenced collection must implement `setManagedDeleteGuard`, or
+  the runtime refuses to start.
 - Dependent writes run as trusted consequences of the authorized delete (`overrideAccess: true`), but
   with their normal validation and hooks. Uploaded files of cascaded upload documents are removed after
   the database commit; a storage failure is logged and does not undo the delete.

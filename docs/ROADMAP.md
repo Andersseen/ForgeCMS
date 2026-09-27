@@ -37,6 +37,11 @@
 > Unsupported reference shapes (nested, localized, unregistered target) are refused at startup. One cell
 > stays open: a user deleted through the auth adapter can leave content relations to it dangling — see
 > the spec's matrix.
+>
+> **2026-09-27 update:** [spec 065](specs/065-auth-managed-delete-relation-integrity.md) closes that
+> cell. `ForgeCmsRuntime` hands the auth adapter the same "no reference remains" guards, and
+> `UsersCollectionAuthAdapter.deleteUser` commits them with its last-admin guard in one batch, so a
+> referenced user is refused (restrict only). **D02 is complete.** Next bounded step: D04.
 
 ## Product direction
 

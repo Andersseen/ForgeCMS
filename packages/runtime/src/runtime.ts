@@ -9,7 +9,11 @@ import type {
 } from '@forge-cms/core';
 import type { DatabaseRecord } from '@forge-cms/db';
 import type { OperationContext } from './context.js';
-import { validateRelationSchema } from './relation-lifecycle.js';
+import {
+  isReferenced,
+  noReferenceAssertions,
+  validateRelationSchema
+} from './relation-lifecycle.js';
 import * as operations from './operations.js';
 import type {
   CountArgs,
@@ -75,6 +79,35 @@ export class ForgeCmsRuntime<
     }
     this.config = config;
     this.adapters = config.adapters;
+    this.wireManagedDeleteGuards();
+  }
+
+  /**
+   * Hands every auth-managed collection's relation guard to the auth adapter (spec 065), so its own
+   * user delete commits "nothing references this document" in the same batch — no setup code needed.
+   * An adapter that manages a referenced collection but cannot enforce the guard is refused here: it
+   * would otherwise delete documents that content still references.
+   */
+  private wireManagedDeleteGuards(): void {
+    const auth = this.adapters.auth;
+    for (const { slug } of this.config.collections) {
+      if (auth.managesCollection?.(slug) !== true) continue;
+      const referenced = isReferenced(this, slug);
+      const enforced =
+        auth.setManagedDeleteGuard?.(slug, {
+          database: this.adapters.database,
+          assertions: (id) => noReferenceAssertions(this, slug, [id])
+        }) === true;
+      if (referenced && !enforced) {
+        throw new Error(
+          `Unsupported relation configuration: collection '${slug}' is managed by the auth adapter ` +
+            `'${auth.name}' and referenced by relation/upload fields, but that adapter cannot enforce ` +
+            `those references when it deletes a document (it does not implement setManagedDeleteGuard, ` +
+            `spec 065), so a deletion could leave them dangling. Use an adapter that supports it (e.g. ` +
+            `UsersCollectionAuthAdapter), or store the id in a text field as an explicit unchecked reference.`
+        );
+      }
+    }
   }
 
   /** Initialise all adapters with the runtime environment */

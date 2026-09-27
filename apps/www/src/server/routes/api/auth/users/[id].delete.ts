@@ -5,8 +5,8 @@ import { requireAdminAuth } from '../../../../api/auth-request';
 /**
  * DELETE /api/auth/users/:id
  *
- * Deletes a user. Rejects (409) deleting the sole remaining admin — see
- * `UsersCollectionAuthAdapter.deleteUser` (spec 054).
+ * Deletes a user. Rejects (409) deleting the sole remaining admin, or a user that content still
+ * references (spec 065) — see `UsersCollectionAuthAdapter.deleteUser` (spec 054).
  */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id');

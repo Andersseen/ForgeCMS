@@ -47,3 +47,13 @@ export {
   type RelationLifecycleHarnessFactory,
   type RelationLifecycleRuntime
 } from './relation-lifecycle.js';
+export {
+  authManagedDeleteSchema,
+  runAuthManagedDeleteContractTests,
+  type AuthManagedDeleteContender,
+  type AuthManagedDeleteDatabase,
+  type AuthManagedDeleteHarness,
+  type AuthManagedDeleteHarnessFactory,
+  type AuthManagedDeleteRuntime,
+  type AuthManagedDeleteUsers
+} from './auth-managed-delete.js';

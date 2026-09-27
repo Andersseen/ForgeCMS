@@ -1,4 +1,4 @@
-import type { AuthAdapter, AuthSession, AuthUser } from './index.js';
+import type { AuthAdapter, AuthSession, AuthUser, ManagedDeleteGuard } from './index.js';
 import { ForgeAuthError } from './index.js';
 
 /**
@@ -93,5 +93,22 @@ export class CompositeAuthAdapter<TUser extends AuthUser = AuthUser> implements 
   /** A collection is managed when any child adapter manages it (spec 061); `false` if none does. */
   managesCollection(slug: string): boolean {
     return this.adapters.some((adapter) => adapter.managesCollection?.(slug) === true);
+  }
+
+  /**
+   * Hands the guard to **every** child that manages `collection` (spec 065) — each of them can delete its
+   * documents, so each must enforce it. `true` only if at least one child manages the collection and
+   * every such child accepted the guard; children that manage nothing are never touched. `false` makes
+   * the runtime treat the composite as unable to protect that collection.
+   */
+  setManagedDeleteGuard(collection: string, guard: ManagedDeleteGuard): boolean {
+    let managed = false;
+    let enforced = true;
+    for (const adapter of this.adapters) {
+      if (adapter.managesCollection?.(collection) !== true) continue;
+      managed = true;
+      if (adapter.setManagedDeleteGuard?.(collection, guard) !== true) enforced = false;
+    }
+    return managed && enforced;
   }
 }
