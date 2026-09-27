@@ -42,6 +42,12 @@
 > cell. `ForgeCmsRuntime` hands the auth adapter the same "no reference remains" guards, and
 > `UsersCollectionAuthAdapter.deleteUser` commits them with its last-admin guard in one batch, so a
 > referenced user is refused (restrict only). **D02 is complete.** Next bounded step: D04.
+>
+> **2026-09-27 update:** [spec 066](specs/066-global-lifecycle-and-localization.md) is D04 part 1.
+> Globals enforce access queries, take partial writes and survive a simultaneous first write.
+> Localization gains globals support and works on libSQL/D1, where every localized write used to fail.
+> Unsupported localization and global options are refused at startup. Remaining D04 work: the
+> DB ↔ object-storage lifecycle and the collection locale-merge race.
 
 ## Product direction
 

@@ -29,6 +29,8 @@
   "assertValidWriteCondition",
   "atomicWriteMustApply",
   "clearTableCache",
+  "decodeFieldValue",
+  "encodeFieldValue",
   "fieldKindToSqlType",
   "fromDbValue",
   "generateAddColumnSql",

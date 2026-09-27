@@ -9,6 +9,9 @@ import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
  * needs yet, and they cost a migration story this project does not have.
  */
 export function fieldKindToSqlType(field: AnyField): string {
+  // A localized field holds one value per locale — a JSON map in a TEXT column, whatever its kind
+  // (spec 066). Before, a localized field got its kind's column and every SQL write of its map failed.
+  if (field.options.localized === true) return 'TEXT';
   switch (field.kind) {
     case 'text':
     case 'relation':
@@ -51,6 +54,32 @@ export function toDbValue(value: unknown, kind: AnyField['kind']): unknown {
     default:
       return value;
   }
+}
+
+/**
+ * {@link toDbValue} for a declared field: a `localized` field's per-locale map is stored as one JSON
+ * document (spec 066); every other field is encoded by its kind. What SQL adapters write.
+ */
+export function encodeFieldValue(value: unknown, field: AnyField): unknown {
+  if (field.options.localized === true) {
+    if (value === null || value === undefined) return null;
+    // Always encoded, so decoding is unambiguous (a stored "2024" is never read back as a number).
+    return JSON.stringify(value);
+  }
+  return toDbValue(value, field.kind);
+}
+
+/** The inverse of {@link encodeFieldValue}: what SQL adapters hydrate a stored column into. */
+export function decodeFieldValue(value: unknown, field: AnyField): unknown {
+  if (field.options.localized === true) {
+    if (typeof value !== 'string') return value ?? null;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+  return fromDbValue(value, field.kind);
 }
 
 export function fromDbValue(value: unknown, kind: AnyField['kind']): unknown {

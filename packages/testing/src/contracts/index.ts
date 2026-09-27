@@ -57,3 +57,11 @@ export {
   type AuthManagedDeleteRuntime,
   type AuthManagedDeleteUsers
 } from './auth-managed-delete.js';
+export {
+  globalLifecycleGlobals,
+  runGlobalLifecycleContractTests,
+  type GlobalLifecycleDatabase,
+  type GlobalLifecycleHarness,
+  type GlobalLifecycleHarnessFactory,
+  type GlobalLifecycleRuntime
+} from './global-lifecycle.js';

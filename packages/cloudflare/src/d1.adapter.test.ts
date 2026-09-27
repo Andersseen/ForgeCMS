@@ -482,6 +482,12 @@ class MockD1PreparedStatement implements D1PreparedStatement {
       record[col] = typeof value === 'boolean' ? (value ? 1 : 0) : value;
     });
 
+    // `id` is the PRIMARY KEY: real D1 rejects a second row with it (spec 066).
+    if (rows.has(record.id as string)) {
+      throw new Error(
+        `D1_ERROR: UNIQUE constraint failed: ${table}.id: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_PRIMARYKEY)`
+      );
+    }
     this.assertNoUniqueConflict(table, record);
     rows.set(record.id as string, record);
     return { results: [record as T], success: true };

@@ -21,7 +21,8 @@ import {
   generateAddColumnSql,
   generateIndexSql,
   toDbValue,
-  fromDbValue,
+  encodeFieldValue,
+  decodeFieldValue,
   toOperatorValues,
   toUniqueConstraintError,
   normalizeSort
@@ -279,7 +280,7 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
       if (key === 'id') continue;
       assertValidColumn(key, collectionDef);
       const field = collectionDef?.fields[key];
-      record[key] = field ? toDbValue(value, field.kind) : value;
+      record[key] = field ? encodeFieldValue(value, field) : value;
     }
     return record;
   }
@@ -354,7 +355,7 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
       if (key === 'id') continue;
       assertValidColumn(key, collectionDef);
       const field = collectionDef?.fields[key];
-      updates[key] = field ? toDbValue(value, field.kind) : value;
+      updates[key] = field ? encodeFieldValue(value, field) : value;
     }
     return updates;
   }
@@ -608,7 +609,7 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     const hydrated: DatabaseRecord = {};
     for (const [key, value] of Object.entries(row)) {
       const field = collectionDef.fields[key];
-      hydrated[key] = field ? fromDbValue(value, field.kind) : value;
+      hydrated[key] = field ? decodeFieldValue(value, field) : value;
     }
     return hydrated;
   }

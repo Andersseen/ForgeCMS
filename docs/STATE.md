@@ -1,11 +1,63 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-27 (auth-managed delete relation integrity — D02 complete, spec 065).**
+> **Last updated: 2026-09-27 (global lifecycle + localization — D04 part 1, spec 066).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Global lifecycle and localization — D04 part 1 (spec 066, 2026-09-27)
+
+Roadmap 0.6 D04, first bounded part (globals + localization; the file lifecycle is next). See
+[docs/specs/066-global-lifecycle-and-localization.md](specs/066-global-lifecycle-and-localization.md).
+
+- **Reproduced first** (runtime probes on the unfixed code, InMemory and on-disk libSQL):
+  - a query-returning global `access.read`/`update` was treated as "allowed";
+  - a later global write was not partial: required fields had to be re-sent, defaults reset
+    (`theme: dark → light`), and a published global fell back to `draft`;
+  - writing one locale replaced the whole map (no `locale` for globals);
+  - **localized fields failed on every SQL write** (`[object Object]` bound on libSQL), so localization
+    only worked on InMemory;
+  - localized non-text kinds could never pass validation;
+  - simultaneous first writes to a global leaked `UniqueConstraintError … "_global_site" (id)`, while
+    InMemory let both commit (no primary-key check);
+  - global slug `autoGenerate` did nothing.
+- **Now:**
+  - global reads and updates enforce access queries (no match → `null`/`403`; a query rule cannot
+    authorize the first write);
+  - later writes are partial like collection updates (merged validation, first-write-only defaults and
+    draft status, `previousData`, auto-slugs);
+  - `defineGlobal({ locales })` plus `locale` / `?locale=` on read and write, with a `400` for an
+    undeclared locale;
+  - locale merges commit with a compare-and-set on `updated_at` (`409` if the row changed);
+  - a lost first-write race is a clean `409`.
+  - `@forge-cms/db` gains `encodeFieldValue`/`decodeFieldValue`: localized maps are stored as JSON in
+    TEXT columns on libSQL and D1.
+  - Refused at startup (`validateLocalizationSchema`, `validateGlobalSchema`):
+    - a localized field without `locales`;
+    - a localized field of a kind other than `text`/`textarea`;
+    - a localized field nested in a composite field;
+    - global `access.create`/`delete` and delete hooks.
+  - InMemory and the D1 unit-test mock reject a duplicate `id`, as SQL always did.
+- **Evidence:**
+  - `packages/runtime/src/global-lifecycle.test.ts` (19 tests);
+  - `runGlobalLifecycleContractTests` (simultaneous first write, simultaneous locale edits,
+    simultaneous partial edits) on InMemory, on-disk libSQL and local D1
+    (`packages/cloudflare/test/workers/global-lifecycle.test.ts`, plus a real-D1 localized collection
+    round-trip);
+  - DatabaseAdapter contract: localized round-trip and duplicate-id cases.
+- **Open (D04 remaining):**
+  - the DB ↔ object-storage lifecycle (R2 fault recovery, browser upload journey);
+  - **concurrent edits of different locales on a collection** (same read-merge-write shape, not
+    changed here);
+  - filtering/sorting on localized fields (not supported, documented);
+  - The CAS is on `updated_at`. A CAS writer waits until its own stamp is strictly later than the one it
+    read, so same-millisecond writes are told apart (found in review). Clock skew between isolates is a
+    recorded residual.
+  - Found in review, shared with collection `update()` and left for one cross-cutting fix:
+    - a write's response ignores the caller's read rule;
+    - the update-access query is checked before the write, not inside it.
 
 ## Auth-managed delete relation integrity — D02 complete (spec 065, 2026-09-27)
 
@@ -1518,14 +1570,12 @@ passwordHash`~~ — **fixed 2026-07-22, spec 018.** `@forge-cms/auth` now export
 
 ## What's next
 
-**Next bounded step (recommended after spec 065, 2026-09-27): D04.** D02 is complete. Certify
-globals, localization and the DB ↔ object-storage lifecycle. Begin with global first-write concurrency
-and with the combinations that are accepted today but inert. D04 ranks above H04 (host-level auth
-limits): its gaps are data-integrity gaps reachable by ordinary writes, while H04 is abuse hardening at
-the host. The system-field write path spec 062 flagged is closed by spec 063. D03 is done except
-retention cleanup, which needs a product decision first. Also open, small and independent: let
-`updateUser` carry the custom profile fields of a managed collection (spec 061 known limitation 1) if a
-consumer needs it.
+**Next bounded step (recommended after spec 066, 2026-09-27): finish D04.** Globals and localization
+are certified (spec 066). What remains is the DB ↔ object-storage lifecycle: DB failure after the
+object is stored, and object-deletion failure after the DB change, with the documented
+cleanup/recovery outcome and no secret logs. It extends the existing workerd R2 fault suite. Fold in
+the small collection locale-merge race (the same CAS as spec 066's global fix). After D04: H04
+(host-level auth limits). D03 is done except retention cleanup, which needs a product decision.
 
 Work is planned in [ROADMAP.md](ROADMAP.md), which sequences the remaining gaps by cost-of-delay.
 Each numbered item there gets its own spec in `docs/specs/` when picked up, per [SDD.md](SDD.md).

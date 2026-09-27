@@ -15,6 +15,7 @@ import {
   validateRelationSchema
 } from './relation-lifecycle.js';
 import * as operations from './operations.js';
+import { validateLocalizationSchema } from './localization.js';
 import type {
   CountArgs,
   CreateArgs,
@@ -76,6 +77,25 @@ export class ForgeCmsRuntime<
     );
     if (relationErrors.length > 0) {
       throw new Error(`Unsupported relation configuration:\n${relationErrors.join('\n')}`);
+    }
+    // Global options that could never apply are refused too, instead of silently ignored (spec 066).
+    const globalErrors = [
+      ...globalOps.validateGlobalSchema(config.globals ?? []),
+      ...validateLocalizationSchema([
+        ...config.collections.map((c) => ({
+          label: `Collection '${c.slug}'`,
+          fields: c.fields,
+          ...(c.locales !== undefined && { locales: c.locales })
+        })),
+        ...(config.globals ?? []).map((g) => ({
+          label: `Global '${g.slug}'`,
+          fields: g.fields,
+          ...(g.locales !== undefined && { locales: g.locales })
+        }))
+      ])
+    ];
+    if (globalErrors.length > 0) {
+      throw new Error(`Unsupported global/localization configuration:\n${globalErrors.join('\n')}`);
     }
     this.config = config;
     this.adapters = config.adapters;

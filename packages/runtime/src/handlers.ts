@@ -681,10 +681,12 @@ export async function handleGlobalRead<TEnv = unknown>(
   const { globalSlug, user } = resolved;
 
   try {
+    const locale = parseLocale(new URL(context.request.url));
     const doc = await options.runtime.getGlobalDocument({
       global: globalSlug,
       user,
-      overrideAccess: false
+      overrideAccess: false,
+      ...(locale !== undefined && { locale })
     });
 
     if (!doc) {
@@ -706,11 +708,13 @@ export async function handleGlobalUpdate<TEnv = unknown>(
   const { globalSlug, user } = resolved;
 
   try {
+    const locale = parseLocale(new URL(context.request.url));
     const doc = await options.runtime.updateGlobalDocument({
       global: globalSlug,
       data: await readJsonBody(context.request),
       user,
-      overrideAccess: false
+      overrideAccess: false,
+      ...(locale !== undefined && { locale })
     });
 
     return jsonResponse({ data: doc });

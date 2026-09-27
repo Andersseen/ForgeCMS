@@ -241,6 +241,54 @@ reviewer: defineField.relation({ collection: 'authors' }); // 'restrict' (defaul
   with their normal validation and hooks. Uploaded files of cascaded upload documents are removed after
   the database commit; a storage failure is logged and does not undo the delete.
 
+## Globals
+
+A global is a singleton document, such as site settings. You define it with `defineGlobal` and pass it
+to `ForgeCmsRuntime({ globals })`:
+
+```ts
+const site = defineGlobal({
+  slug: 'site',
+  drafts: true,
+  locales: ['en', 'es'],
+  access: { read: () => true, update: ({ user }) => user?.role === 'admin' },
+  fields: {
+    title: defineField.text({ required: true }),
+    theme: defineField.text({ defaultValue: 'light' }),
+    tagline: defineField.text({ localized: true })
+  }
+});
+```
+
+- **Writes.** The first `updateGlobalDocument` creates the row; later ones are **partial**, like a
+  collection update. Omitted fields keep their values, and defaults and the draft status apply only to
+  the first write.
+- **Concurrent first writes.** If two first writes race, exactly one commits and the other gets `409`.
+- **Access.** A global has `read` and `update` access only. An access rule that returns a query must
+  match the stored row. Such a rule cannot authorize the first write, because there is no row yet;
+  seed it from trusted server code.
+- **Refused at startup:** `access.create`/`access.delete` and delete hooks on a global. A global is
+  never created through `create` nor deleted, so they could never apply.
+
+## Localization
+
+- **Declaring it.** Declare `locales` on a collection or global, and mark `text`/`textarea` fields
+  `localized: true`. Each such field stores one value per locale.
+- **Writing.** Write with `locale` (Local API) or `?locale=` (HTTP). Only that locale changes; the
+  others are kept.
+- **Concurrent edits.** On a global, two simultaneous per-locale edits (each written with `locale`)
+  cannot silently drop one: the later gets `409`. A write without `locale` that sends the whole map
+  replaces it, last writer wins.
+- **Reading.** A read with `locale` resolves each localized field, falling back to the language and
+  then to the first declared locale. A read without it returns the whole `{ en, es }` map.
+- **Storage.** On libSQL and D1 the map is stored as JSON in a TEXT column. Filtering or sorting on a
+  localized field is not supported.
+- **Refused at startup:**
+  - a localized field without `locales`;
+  - a localized field of any other kind;
+  - a localized field nested in a `group`/`array`/`blocks`;
+  - a localized `relation`/`upload`.
+
 ## Registering collections
 
 ```ts

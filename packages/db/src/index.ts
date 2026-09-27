@@ -7,6 +7,8 @@ export {
   fieldKindToSqlType,
   toDbValue,
   fromDbValue,
+  encodeFieldValue,
+  decodeFieldValue,
   generateCreateTableSql,
   generateAddColumnSql,
   resolveCollectionIndexes,
