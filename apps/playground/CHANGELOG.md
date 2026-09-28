@@ -1,5 +1,16 @@
 # @forge-cms/playground
 
+## 0.0.11
+
+### Patch Changes
+
+- Updated dependencies [0d39736]
+  - @forge-cms/auth@0.7.0
+  - @forge-cms/runtime@0.7.0
+  - @forge-cms/core@0.7.0
+  - @forge-cms/db@0.7.0
+  - @forge-cms/storage@0.7.0
+
 ## 0.0.10
 
 ### Patch Changes

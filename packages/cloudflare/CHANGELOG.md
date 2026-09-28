@@ -1,5 +1,13 @@
 # @forge-cms/cloudflare
 
+## 0.7.0
+
+### Patch Changes
+
+- @forge-cms/core@0.7.0
+- @forge-cms/db@0.7.0
+- @forge-cms/storage@0.7.0
+
 ## 0.6.0
 
 ### Minor Changes
