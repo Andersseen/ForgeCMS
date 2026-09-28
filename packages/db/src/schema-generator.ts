@@ -8,7 +8,7 @@ import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
  * document. Join tables would only buy the ability to query *inside* nested data, which nothing
  * needs yet, and they cost a migration story this project does not have.
  */
-export function fieldKindToSqlType(field: AnyField): string {
+export function fieldKindToSqlType(field: AnyField): SqlColumnType {
   // A localized field holds one value per locale — a JSON map in a TEXT column, whatever its kind
   // (spec 066). Before, a localized field got its kind's column and every SQL write of its map failed.
   if (field.options.localized === true) return 'TEXT';
@@ -126,21 +126,77 @@ function assertValidCollectionSchema(collection: CollectionDefinition): void {
   }
 }
 
-export function generateCreateTableSql(collection: CollectionDefinition): string {
+/** SQLite storage type Forge declares for a column. */
+export type SqlColumnType = 'TEXT' | 'REAL' | 'INTEGER';
+
+/** One column of a Forge table: a system column Forge owns, or a declared field. */
+export interface DesiredColumn {
+  name: string;
+  type: SqlColumnType;
+  role: 'primary-key' | 'system' | 'field';
+  /** The declared field, for `role: 'field'`. */
+  field?: AnyField;
+}
+
+/** The physical table Forge wants for a collection: the one source DDL generation and planning share (spec 070). */
+export interface DesiredTable {
+  name: string;
+  columns: DesiredColumn[];
+  indexes: ResolvedIndex[];
+}
+
+/**
+ * The desired physical schema of a collection: `id`/`created_at`/`updated_at`, `_status` for drafts,
+ * `_storageKey` for uploads, then one column per declared field, plus its resolved indexes. Everything
+ * that creates tables or plans changes reads this, so DDL and drift detection cannot disagree.
+ */
+export function desiredTableSchema(collection: CollectionDefinition): DesiredTable {
   assertValidCollectionSchema(collection);
-  const fieldColumns = Object.entries(collection.fields)
-    .map(([name, field]) => `"${name}" ${fieldKindToSqlType(field)}`)
+  const columns: DesiredColumn[] = [
+    { name: 'id', type: 'TEXT', role: 'primary-key' },
+    { name: 'created_at', type: 'TEXT', role: 'system' },
+    { name: 'updated_at', type: 'TEXT', role: 'system' }
+  ];
+  if (collection.drafts === true) columns.push({ name: '_status', type: 'TEXT', role: 'system' });
+  if (collection.upload === true) {
+    columns.push({ name: '_storageKey', type: 'TEXT', role: 'system' });
+  }
+  for (const [name, field] of Object.entries(collection.fields)) {
+    columns.push({ name, type: fieldKindToSqlType(field), role: 'field', field });
+  }
+  return { name: collection.slug, columns, indexes: resolveCollectionIndexes(collection) };
+}
+
+/** `CREATE TABLE IF NOT EXISTS` for a desired table. */
+export function createTableSql(table: DesiredTable): string {
+  const columns = table.columns
+    .map((c) => `"${c.name}" ${c.type}${c.role === 'primary-key' ? ' PRIMARY KEY' : ''}`)
     .join(', ');
+  return `CREATE TABLE IF NOT EXISTS "${table.name}" (${columns})`;
+}
 
-  const statusColumn = collection.drafts === true ? ', "_status" TEXT' : '';
-  const storageKeyColumn = collection.upload === true ? ', "_storageKey" TEXT' : '';
+/** `ALTER TABLE … ADD COLUMN` for one desired column. */
+export function addColumnSql(table: string, column: DesiredColumn): string {
+  return `ALTER TABLE "${table}" ADD COLUMN "${column.name}" ${column.type}`;
+}
 
-  return `CREATE TABLE IF NOT EXISTS "${collection.slug}" ("id" TEXT PRIMARY KEY, "created_at" TEXT, "updated_at" TEXT${statusColumn}${storageKeyColumn}${fieldColumns ? ', ' + fieldColumns : ''})`;
+/** `CREATE [UNIQUE] INDEX IF NOT EXISTS` for one resolved index. */
+export function createIndexSql(table: string, index: ResolvedIndex): string {
+  const uniqueClause = index.unique ? 'UNIQUE ' : '';
+  const columns = index.fields.map((f) => `"${f}"`).join(', ');
+  return `CREATE ${uniqueClause}INDEX IF NOT EXISTS "${index.name}" ON "${table}" (${columns})`;
+}
+
+export function generateCreateTableSql(collection: CollectionDefinition): string {
+  return createTableSql(desiredTableSchema(collection));
 }
 
 /**
  * Additive migration: one `ALTER TABLE ... ADD COLUMN` per field in the collection's current
  * definition that isn't already a column on the existing table. Never drops or retypes columns.
+ *
+ * @deprecated Since spec 070 the SQL adapters plan schema changes (`planSqliteSchema`), which also
+ * covers `_status`/`_storageKey`, types and indexes. Kept for compatibility; it only sees fields.
  */
 export function generateAddColumnSql(
   collection: CollectionDefinition,
@@ -209,11 +265,9 @@ export function resolveCollectionIndexes(collection: CollectionDefinition): Reso
  * which already depends on this package) so the two SQLite-backed adapters cannot diverge.
  */
 export function generateIndexSql(collection: CollectionDefinition): string[] {
-  return resolveCollectionIndexes(collection).map((index) => {
-    const uniqueClause = index.unique ? 'UNIQUE ' : '';
-    const columns = index.fields.map((f) => `"${f}"`).join(', ');
-    return `CREATE ${uniqueClause}INDEX IF NOT EXISTS "${index.name}" ON "${collection.slug}" (${columns})`;
-  });
+  return resolveCollectionIndexes(collection).map((index) =>
+    createIndexSql(collection.slug, index)
+  );
 }
 
 const tableCache = new Map<string, SQLiteTable>();
@@ -223,24 +277,18 @@ export function getOrCreateDrizzleTable(collection: CollectionDefinition): SQLit
   const cached = tableCache.get(collection.slug);
   if (cached) return cached;
 
-  const columns: Record<string, ReturnType<typeof text>> = {
-    id: text('id').primaryKey(),
-    created_at: text('created_at'),
-    updated_at: text('updated_at'),
-    ...(collection.drafts === true && { _status: text('_status') }),
-    ...(collection.upload === true && { _storageKey: text('_storageKey') })
-  };
-
-  for (const [name, field] of Object.entries(collection.fields)) {
-    switch (fieldKindToSqlType(field)) {
+  const columns: Record<string, ReturnType<typeof text>> = {};
+  for (const column of desiredTableSchema(collection).columns) {
+    switch (column.type) {
       case 'INTEGER':
-        columns[name] = integer(name) as unknown as ReturnType<typeof text>;
+        columns[column.name] = integer(column.name) as unknown as ReturnType<typeof text>;
         break;
       case 'REAL':
-        columns[name] = real(name) as unknown as ReturnType<typeof text>;
+        columns[column.name] = real(column.name) as unknown as ReturnType<typeof text>;
         break;
       default:
-        columns[name] = text(name);
+        columns[column.name] =
+          column.role === 'primary-key' ? text(column.name).primaryKey() : text(column.name);
         break;
     }
   }

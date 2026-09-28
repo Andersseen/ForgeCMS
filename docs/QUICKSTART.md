@@ -133,19 +133,20 @@ via Web `Request`, and Cloudflare Workers can all call the same handlers.
 `runtime.syncSchema()` asks the configured database adapter to create or update the storage shape for
 registered collections and globals.
 
-For the built-in SQLite-style adapters, it is intentionally additive:
+For the built-in SQLite-style adapters (libSQL, D1), it **plans before it changes anything**
+(spec 070):
 
-- It creates missing tables.
-- It adds missing columns.
-- It creates configured indexes where supported.
-- It does not drop columns.
-- It does not rename columns.
-- It does not change column types.
-- It does not migrate or backfill existing data.
+- A fresh database: every table and index is created.
+- New optional fields, new collections and new indexes: applied automatically, in one transaction.
+- Anything that would drop, rename, retype, reinterpret or backfill data: nothing is executed, and
+  `syncSchema()` throws a `SchemaDriftError` whose `plan` lists every change and what to do about it.
+  Examples: a removed field, `text` → `number`, `localized` switched on, a relation made `many`, a
+  new required field on a table with rows, `unique` added over duplicate rows.
+- Renames are never guessed.
 
-This makes `syncSchema()` convenient during development and acceptable on startup for small early
-deployments, including D1-backed deployments, but it is not a complete migration system. Destructive
-schema changes still need a deliberate migration plan.
+`runtime.planSchema()` returns the same plan read-only. It is useful in a deploy check. There is no
+migration runner yet. See [SCHEMA-UPGRADES.md](SCHEMA-UPGRADES.md) for the full classification and
+how to migrate by hand.
 
 ## Angular and admin packages
 

@@ -1,4 +1,4 @@
-import type { AtomicWriteOperation, DatabaseAdapter } from '@forge-cms/db';
+import type { AtomicWriteOperation, DatabaseAdapter, SchemaPlan } from '@forge-cms/db';
 export { InMemoryAuthAdapter } from './in-memory.adapter.js';
 export { ExternalAuthAdapter } from './external.adapter.js';
 export type { ExternalAuthConfig } from './external.adapter.js';
@@ -129,6 +129,12 @@ export interface AuthAdapter<TUser extends AuthUser = AuthUser> {
   requireAuth(request: Request): Promise<TUser>;
   /** Optional schema/table bootstrap, invoked by `ForgeCmsRuntime.syncSchema()`. */
   syncSchema?(): Promise<void>;
+  /**
+   * Optional, read-only drift plan for the tables {@link syncSchema} would create or upgrade (spec
+   * 070) — `_forge_bootstrap`, `_forge_api_keys`. `ForgeCmsRuntime.planSchema()` merges it into its own
+   * plan, so drift here also stops `ForgeCmsRuntime.syncSchema()` before any table is touched.
+   */
+  planSchema?(): Promise<SchemaPlan>;
   /**
    * Optional cheap, synchronous format check: does this token even look like one of ours? Lets
    * `CompositeAuthAdapter` skip an adapter's `requireAuth()` (a DB round-trip, an HMAC verification —

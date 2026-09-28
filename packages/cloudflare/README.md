@@ -45,7 +45,9 @@ To activate D1 later:
    database_name = "forge-cms"
    database_id = "your-database-id"
    ```
-3. Run migrations: `pnpm --filter @forge-cms/db db:push`
+3. Call `runtime.syncSchema()` on startup. It creates the tables, applies safe additive changes and
+   refuses any change that needs a reviewed migration (`SchemaDriftError`, nothing executed; spec
+   070). See [docs/SCHEMA-UPGRADES.md](../../docs/SCHEMA-UPGRADES.md).
 
 ### 2. R2 Storage
 

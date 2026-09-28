@@ -11,14 +11,14 @@ import type {
 } from './index.js';
 import {
   getOrCreateDrizzleTable,
-  generateCreateTableSql,
-  generateAddColumnSql,
-  generateIndexSql,
   encodeFieldValue,
   decodeFieldValue,
   clearTableCache
 } from './schema-generator.js';
 import { toUniqueConstraintError } from './constraint-error.js';
+import type { SchemaPlan } from './schema-plan.js';
+import { planSqliteSchema, syncSqliteSchema } from './sqlite-schema.js';
+import type { SqliteSchemaExecutor } from './sqlite-schema.js';
 import { assertValidWriteCondition } from './write-condition.js';
 import {
   ATOMIC_WRITE_REQUIRE_APPLIED_SQL,
@@ -107,33 +107,35 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
   }
 
   async syncSchema(collections: CollectionDefinition[]): Promise<void> {
-    const db = this.getDb();
     // Upserts by slug rather than clearing first: an `AuthAdapter.syncSchema()` (e.g.
     // `ApiKeyAuthAdapter`) calls this again with just its own internal collection, often on the same
     // adapter instance as the main runtime — clearing here would unregister every consumer collection
     // the first call just registered, and every subsequent query for it would throw "not registered".
     clearTableCache();
-
-    for (const collection of collections) {
-      this.collections.set(collection.slug, collection);
-      const createSql = generateCreateTableSql(collection);
-      await db.run(sql.raw(createSql));
-
-      const existingColumns = await this.getExistingColumns(collection.slug);
-      for (const alterSql of generateAddColumnSql(collection, existingColumns)) {
-        await db.run(sql.raw(alterSql));
-      }
-
-      for (const indexSql of generateIndexSql(collection)) {
-        await db.run(sql.raw(indexSql));
-      }
-    }
+    for (const collection of collections) this.collections.set(collection.slug, collection);
+    // Plan first, then one transactional batch of safe DDL — or a SchemaDriftError with nothing run (spec 070).
+    await syncSqliteSchema(this.schemaExecutor(), collections);
   }
 
-  private async getExistingColumns(tableName: string): Promise<string[]> {
-    if (!this.client) throw new Error('LibSqlDatabaseAdapter not initialized. Call init() first.');
-    const result = await this.client.execute(`PRAGMA table_info("${tableName}")`);
-    return result.rows.map((row) => row.name as string);
+  planSchema(collections: CollectionDefinition[]): Promise<SchemaPlan> {
+    return planSqliteSchema(this.schemaExecutor(), collections);
+  }
+
+  /** Schema reads through `execute`, schema writes through libSQL's transactional `batch(…, 'write')`. */
+  private schemaExecutor(): SqliteSchemaExecutor {
+    const client = this.getClient();
+    return {
+      async query(sql, args = []) {
+        const result = await client.execute({ sql, args: args as InValue[] });
+        return result.rows.map((row) => ({ ...row }));
+      },
+      async batch(statements) {
+        await client.batch(
+          statements.map((s) => ({ sql: s.sql, args: (s.args ?? []) as InValue[] })),
+          'write'
+        );
+      }
+    };
   }
 
   async findById(collection: string, id: string): Promise<DatabaseRecord | null> {

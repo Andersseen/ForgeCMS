@@ -81,3 +81,9 @@ export {
   type WriteAccessRuntime,
   type WriteHold
 } from './write-access.js';
+export {
+  runSchemaDriftContractTests,
+  type SchemaDriftAdapter,
+  type SchemaDriftHarness,
+  type SchemaDriftPlanLike
+} from './schema-drift.js';

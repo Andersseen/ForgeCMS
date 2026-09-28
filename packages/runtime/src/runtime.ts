@@ -7,7 +7,13 @@ import type {
   CollectionSlug,
   GlobalDefinition
 } from '@forge-cms/core';
-import type { DatabaseRecord } from '@forge-cms/db';
+import type { DatabaseRecord, SchemaChange, SchemaPlan } from '@forge-cms/db';
+import {
+  SchemaDriftError,
+  formatSchemaPlan,
+  mergeSchemaPlans,
+  resolveCollectionIndexes
+} from '@forge-cms/db';
 import type { OperationContext } from './context.js';
 import {
   isReferenced,
@@ -145,27 +151,19 @@ export class ForgeCmsRuntime<
     return this;
   }
 
-  /** Sync database schema for all registered collections and globals */
+  /**
+   * Creates and additively upgrades every table the CMS uses: collections, `_global_<slug>`,
+   * `_versions_<slug>`, `_forge_storage_intents`, and the auth adapter's own tables.
+   *
+   * Plan first (spec 070): when the database implements `planSchema`, the whole schema — including the
+   * auth adapter's tables — is planned before anything runs. Any change that needs a reviewed
+   * migration throws `SchemaDriftError` with **no table touched anywhere**. Otherwise each area is
+   * synced (fresh tables and safe additive changes only). A database without `planSchema` keeps its
+   * own `syncSchema` behaviour, unplanned.
+   */
   async syncSchema(): Promise<void> {
-    await this.adapters.database.syncSchema(this.config.collections);
-    await this.adapters.auth.syncSchema?.();
-    // Durable storage-cleanup intents (spec 067), only where uploads exist.
-    if (hasUploadCollections(this.config.collections)) {
-      await this.adapters.database.syncSchema([storageIntentsDefinition()]);
-    }
-
-    for (const global of this.config.globals ?? []) {
-      await this.adapters.database.syncSchema([
-        {
-          slug: `_global_${global.slug}`,
-          fields: global.fields,
-          ...(global.drafts === true && { drafts: true })
-        }
-      ]);
-    }
-
-    // Version tables for collections with versions enabled (spec 062 §1/§8).
     const versioned = this.config.collections.filter((c) => versionOps.versionsEnabled(c));
+    // Checked before anything is created: history needs a document and its snapshot to commit together.
     if (versioned.length > 0) {
       const database = this.adapters.database as Partial<typeof this.adapters.database>;
       if (typeof database.atomicWrite !== 'function') {
@@ -176,16 +174,117 @@ export class ForgeCmsRuntime<
         );
       }
     }
+
+    if (typeof this.adapters.database.planSchema === 'function') {
+      const plan = await this.planSchema();
+      if (plan.blocking) throw await this.schemaDriftError(plan);
+    }
+
+    await this.adapters.database.syncSchema(this.config.collections);
+    await this.adapters.auth.syncSchema?.();
+    // Durable storage-cleanup intents (spec 067), only where uploads exist.
+    if (hasUploadCollections(this.config.collections)) {
+      await this.adapters.database.syncSchema([storageIntentsDefinition()]);
+    }
+    for (const global of this.config.globals ?? []) {
+      await this.adapters.database.syncSchema([globalTableDefinition(global)]);
+    }
+    // Version tables for collections with versions enabled (spec 062 §1/§8).
     for (const collection of versioned) {
       await this.syncVersionTable(collection);
     }
   }
 
   /**
+   * The complete schema drift plan (spec 070) for every table {@link syncSchema} manages, merged with
+   * the auth adapter's own (`AuthAdapter.planSchema`). Read-only: inspects the database and runs
+   * aggregate probes, never DDL or writes. Throws when the database adapter cannot inspect its
+   * persisted schema — an uninspectable schema is never reported as compatible.
+   */
+  async planSchema(): Promise<SchemaPlan> {
+    const database = this.adapters.database;
+    if (typeof database.planSchema !== 'function') {
+      throw new Error(
+        `The '${database.name}' database adapter cannot inspect its persisted schema: it does not ` +
+          `implement DatabaseAdapter.planSchema() (spec 070), so ForgeCMS cannot tell whether that ` +
+          `schema is compatible with this configuration.`
+      );
+    }
+    const plans = [await database.planSchema(this.tableDefinitions())];
+    const auth = await this.adapters.auth.planSchema?.();
+    if (auth) plans.push(auth);
+    return mergeSchemaPlans(plans);
+  }
+
+  /** Every table definition this runtime syncs through its database adapter. */
+  private tableDefinitions(): CollectionDefinition[] {
+    return [
+      ...this.config.collections,
+      ...(hasUploadCollections(this.config.collections) ? [storageIntentsDefinition()] : []),
+      ...(this.config.globals ?? []).map(globalTableDefinition),
+      ...this.config.collections
+        .filter((c) => versionOps.versionsEnabled(c))
+        .map((c) => versionOps.versionCollectionDefinition(c.slug))
+    ];
+  }
+
+  /**
+   * The refusal for a blocking plan. Duplicate version identities keep spec 062's domain diagnostic
+   * (examples and the inspection query) instead of the generic index conflict.
+   */
+  private async schemaDriftError(plan: SchemaPlan): Promise<SchemaDriftError> {
+    for (const collection of this.config.collections.filter((c) => versionOps.versionsEnabled(c))) {
+      const definition = versionOps.versionCollectionDefinition(collection.slug);
+      const identityIndex = resolveCollectionIndexes(definition)[0]?.name;
+      const conflict = plan.changes.find(
+        (change: SchemaChange) =>
+          change.table === definition.slug &&
+          change.target.name === identityIndex &&
+          (change.duplicateGroups ?? 0) > 0
+      );
+      if (!conflict) continue;
+      try {
+        // Registers just the identity columns with the adapter so the scan can read them (the blocked
+        // plan added none of the table's new columns). This sync blocks by construction, whatever
+        // another process does meanwhile: the stored version table always has `data`/`createdAt`,
+        // which this definition omits (`column-removed`). So it runs no DDL and writes no baseline.
+        // Like any refused sync, it leaves the adapter unfit for use until a sync succeeds; that
+        // successful sync registers the full definition again.
+        const identity = definition.fields;
+        await this.adapters.database
+          .syncSchema([
+            {
+              ...definition,
+              fields: {
+                ...(identity.documentId && { documentId: identity.documentId }),
+                ...(identity.versionNumber && { versionNumber: identity.versionNumber })
+              }
+            }
+          ])
+          .catch(() => undefined);
+        const duplicates = await versionOps.findDuplicateVersionIdentities(
+          this.adapters.database,
+          definition.slug
+        );
+        if (duplicates.length > 0) {
+          return new SchemaDriftError(
+            plan,
+            `${duplicateVersionMessage(definition.slug, duplicates)}\n\n${formatSchemaPlan(plan)}`
+          );
+        }
+      } catch {
+        // Fall through to the generic report, which still names the conflict.
+      }
+    }
+    return new SchemaDriftError(plan);
+  }
+
+  /**
    * Creates/extends one `_versions_<slug>` table additively. Adding its unique
    * `(documentId, versionNumber)` index fails on a database that already holds duplicate version
    * identities (only the pre-062 read-then-insert race produced them): history is then reported, never
-   * deleted, renumbered or merged — the operator decides (spec 062 §8, roadmap 0.7 / M03).
+   * deleted, renumbered or merged — the operator decides (spec 062 §8). Planning (spec 070) normally
+   * reports this before anything runs; this path covers adapters without `planSchema`.
    */
   private async syncVersionTable(collection: CollectionDefinition): Promise<void> {
     const definition = versionOps.versionCollectionDefinition(collection.slug);
@@ -202,21 +301,7 @@ export class ForgeCmsRuntime<
         throw err;
       }
       if (duplicates.length === 0) throw err;
-
-      const examples = duplicates
-        .slice(0, 5)
-        .map((d) => `document "${d.documentId}" version ${d.versionNumber} (${d.rows} rows)`)
-        .join('; ');
-      throw new Error(
-        `Cannot add the unique (documentId, versionNumber) index to "${definition.slug}": it already ` +
-          `contains ${duplicates.length} duplicate version ${duplicates.length === 1 ? 'identity' : 'identities'} ` +
-          `— e.g. ${examples}. They were produced by concurrent updates before ForgeCMS enforced ` +
-          `version identity. ForgeCMS will not delete, renumber or merge version history automatically. ` +
-          `Inspect them with: SELECT "documentId", "versionNumber", COUNT(*) FROM "${definition.slug}" ` +
-          `GROUP BY "documentId", "versionNumber" HAVING COUNT(*) > 1; decide which rows to keep ` +
-          `(renumber or delete the extras after taking a backup), then restart.`,
-        { cause: err }
-      );
+      throw new Error(duplicateVersionMessage(definition.slug, duplicates), { cause: err });
     }
   }
 
@@ -361,6 +446,35 @@ export class ForgeCmsRuntime<
       CollectionDocument<CollectionBySlug<TCollections, TSlug>>
     >;
   }
+}
+
+/** The internal table a global is stored in. */
+function globalTableDefinition(global: GlobalDefinition): CollectionDefinition {
+  return {
+    slug: `_global_${global.slug}`,
+    fields: global.fields,
+    ...(global.drafts === true && { drafts: true })
+  };
+}
+
+/** Spec 062's diagnostic for historical duplicate version identities. */
+function duplicateVersionMessage(
+  slug: string,
+  duplicates: versionOps.DuplicateVersionIdentity[]
+): string {
+  const examples = duplicates
+    .slice(0, 5)
+    .map((d) => `document "${d.documentId}" version ${d.versionNumber} (${d.rows} rows)`)
+    .join('; ');
+  return (
+    `Cannot add the unique (documentId, versionNumber) index to "${slug}": it already ` +
+    `contains ${duplicates.length} duplicate version ${duplicates.length === 1 ? 'identity' : 'identities'} ` +
+    `— e.g. ${examples}. They were produced by concurrent updates before ForgeCMS enforced ` +
+    `version identity. ForgeCMS will not delete, renumber or merge version history automatically. ` +
+    `Inspect them with: SELECT "documentId", "versionNumber", COUNT(*) FROM "${slug}" ` +
+    `GROUP BY "documentId", "versionNumber" HAVING COUNT(*) > 1; decide which rows to keep ` +
+    `(renumber or delete the extras after taking a backup), then restart.`
+  );
 }
 
 /**
