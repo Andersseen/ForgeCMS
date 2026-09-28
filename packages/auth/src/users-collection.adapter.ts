@@ -4,6 +4,7 @@ import type {
   AtomicWriteOperation,
   DatabaseAdapter,
   DatabaseRecord,
+  SchemaPlan,
   WriteCondition
 } from '@forge-cms/db';
 import {
@@ -343,6 +344,17 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
   /** Provisions `_forge_bootstrap`'s unique-index-backed bootstrap slot (spec 058 §7a). */
   async syncSchema(): Promise<void> {
     await this.ensureBootstrapSchema(this.getDb());
+  }
+
+  /**
+   * Drift plan for `_forge_bootstrap` (spec 070). The users table itself is the consumer's collection
+   * and is planned with the rest of them. A database without `planSchema` contributes an empty plan.
+   */
+  async planSchema(): Promise<SchemaPlan> {
+    const db = this.getDb();
+    return (
+      (await db.planSchema?.([buildBootstrapCollection()])) ?? { changes: [], blocking: false }
+    );
   }
 
   /**

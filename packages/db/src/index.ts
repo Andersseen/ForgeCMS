@@ -4,6 +4,10 @@ export { InMemoryDatabaseAdapter } from './in-memory.adapter.js';
 export { LibSqlDatabaseAdapter } from './libsql.adapter.js';
 export {
   type ResolvedIndex,
+  type DesiredTable,
+  type DesiredColumn,
+  type SqlColumnType,
+  desiredTableSchema,
   fieldKindToSqlType,
   toDbValue,
   fromDbValue,
@@ -55,7 +59,20 @@ export {
   parseSqliteUniqueConstraintMessage,
   toUniqueConstraintError
 } from './constraint-error.js';
+export {
+  type SchemaChange,
+  type SchemaChangeClassification,
+  type SchemaChangeKind,
+  type SchemaPlan,
+  SCHEMA_BASELINE_TABLE,
+  SchemaDriftError,
+  isSchemaDriftError,
+  formatSchemaPlan,
+  mergeSchemaPlans
+} from './schema-plan.js';
+export { type SqliteSchemaExecutor, planSqliteSchema, syncSqliteSchema } from './sqlite-schema.js';
 import type { DatabaseWhere, SortInput } from './where.js';
+import type { SchemaPlan } from './schema-plan.js';
 
 export type DatabaseRecord = Record<string, unknown>;
 
@@ -225,5 +242,18 @@ export interface DatabaseAdapter<TRecord extends DatabaseRecord = DatabaseRecord
   atomicWrite(
     operations: readonly AtomicWriteOperation<TRecord>[]
   ): Promise<AtomicWriteResult<TRecord>[]>;
+  /**
+   * Creates and additively upgrades the tables of `collections`. On adapters that implement
+   * {@link planSchema} (spec 070) this applies a plan: fresh tables and safe additive changes are
+   * executed (one transaction on SQL backends), and any drift that needs a reviewed migration throws
+   * `SchemaDriftError` with **nothing executed**. Never drops, renames, retypes or rewrites.
+   */
   syncSchema(collections: CollectionDefinition[]): Promise<void>;
+  /**
+   * Inspects the persisted schema of `collections` and returns the complete, deterministically
+   * ordered drift plan `syncSchema` would act on (spec 070). Read-only. Optional so third-party
+   * adapters keep compiling; `ForgeCmsRuntime.planSchema()` refuses an adapter without it rather than
+   * reporting its schema as compatible.
+   */
+  planSchema?(collections: CollectionDefinition[]): Promise<SchemaPlan>;
 }

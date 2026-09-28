@@ -1,3 +1,5 @@
+import type { SchemaPlan } from '@forge-cms/db';
+import { mergeSchemaPlans } from '@forge-cms/db';
 import type { AuthAdapter, AuthSession, AuthUser, ManagedDeleteGuard } from './index.js';
 import { ForgeAuthError } from './index.js';
 
@@ -88,6 +90,16 @@ export class CompositeAuthAdapter<TUser extends AuthUser = AuthUser> implements 
     for (const adapter of this.adapters) {
       await adapter.syncSchema?.();
     }
+  }
+
+  /** Every child's drift plan, merged (spec 070). */
+  async planSchema(): Promise<SchemaPlan> {
+    const plans: SchemaPlan[] = [];
+    for (const adapter of this.adapters) {
+      const plan = await adapter.planSchema?.();
+      if (plan) plans.push(plan);
+    }
+    return mergeSchemaPlans(plans);
   }
 
   /** A collection is managed when any child adapter manages it (spec 061); `false` if none does. */

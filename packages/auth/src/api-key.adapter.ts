@@ -1,6 +1,6 @@
 import type { CollectionDefinition } from '@forge-cms/core';
 import { defineField } from '@forge-cms/core';
-import type { DatabaseAdapter, DatabaseRecord } from '@forge-cms/db';
+import type { DatabaseAdapter, DatabaseRecord, SchemaPlan } from '@forge-cms/db';
 import type { AuthAdapter, AuthSession, AuthUser } from './index.js';
 import { ForgeAuthError } from './index.js';
 import { base64UrlEncode } from './token-signer.js';
@@ -220,6 +220,12 @@ export class ApiKeyAuthAdapter implements AuthAdapter {
 
   async syncSchema(): Promise<void> {
     await this.getDb().syncSchema([buildApiKeysCollection()]);
+  }
+
+  /** Drift plan for `_forge_api_keys` (spec 070); empty on a database without `planSchema`. */
+  async planSchema(): Promise<SchemaPlan> {
+    const db = this.getDb();
+    return (await db.planSchema?.([buildApiKeysCollection()])) ?? { changes: [], blocking: false };
   }
 
   extractToken(request: Request): string | null {

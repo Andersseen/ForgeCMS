@@ -8,6 +8,8 @@ import type {
   DatabaseRecord,
   DatabaseWhere,
   FindManyOptions,
+  SchemaPlan,
+  SqliteSchemaExecutor,
   WriteCondition
 } from '@forge-cms/db';
 import {
@@ -17,9 +19,8 @@ import {
   assertValidWriteCondition,
   atomicWriteMustApply,
   toAtomicWriteError,
-  generateCreateTableSql,
-  generateAddColumnSql,
-  generateIndexSql,
+  planSqliteSchema,
+  syncSqliteSchema,
   toDbValue,
   encodeFieldValue,
   decodeFieldValue,
@@ -82,34 +83,35 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
   }
 
   async syncSchema(collections: CollectionDefinition[]): Promise<void> {
-    const db = this.getDb();
     // Upserts by slug rather than clearing first: an `AuthAdapter.syncSchema()` (e.g.
     // `ApiKeyAuthAdapter`) calls this again with just its own internal collection, often on the same
     // adapter instance as the main runtime — clearing here would unregister every consumer collection
     // the first call just registered, and every subsequent query for it would throw "not registered".
-    for (const collection of collections) {
-      this.collections.set(collection.slug, collection);
-
-      const sql = generateCreateTableSql(collection);
-      await db.exec(sql);
-
-      const existingColumns = await this.getExistingColumns(collection.slug);
-      for (const alterSql of generateAddColumnSql(collection, existingColumns)) {
-        await db.exec(alterSql);
-      }
-
-      for (const indexSql of generateIndexSql(collection)) {
-        await db.exec(indexSql);
-      }
-    }
+    for (const collection of collections) this.collections.set(collection.slug, collection);
+    // Plan first, then one D1 batch (a transaction) of safe DDL — or a SchemaDriftError with nothing run (spec 070).
+    await syncSqliteSchema(this.schemaExecutor(), collections);
   }
 
-  private async getExistingColumns(tableName: string): Promise<string[]> {
+  planSchema(collections: CollectionDefinition[]): Promise<SchemaPlan> {
+    return planSqliteSchema(this.schemaExecutor(), collections);
+  }
+
+  /** Schema reads through prepared statements, schema writes through D1's transactional `batch()`. */
+  private schemaExecutor(): SqliteSchemaExecutor {
     const db = this.getDb();
-    const { results } = await db
-      .prepare(`PRAGMA table_info("${tableName}")`)
-      .all<{ name: string }>();
-    return results.map((r) => r.name);
+    const prepare = (sql: string, args: unknown[] = []) => {
+      const statement = db.prepare(sql);
+      return args.length > 0 ? statement.bind(...args) : statement;
+    };
+    return {
+      async query(sql, args) {
+        const { results } = await prepare(sql, args).all<Record<string, unknown>>();
+        return results;
+      },
+      async batch(statements) {
+        await db.batch(statements.map((s) => prepare(s.sql, s.args)));
+      }
+    };
   }
 
   async findById(collection: string, id: string): Promise<DatabaseRecord | null> {

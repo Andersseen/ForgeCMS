@@ -10,9 +10,18 @@ import { D1DatabaseAdapter } from './d1.adapter.js';
 import type { D1Database, D1PreparedStatement, D1Result } from './bindings.js';
 
 interface MockIndex {
+  name: string;
   table: string;
   columns: string[];
   unique: boolean;
+}
+
+/** Spec 070 schema planning traffic, which the SQL-capturing mocks below leave out of what they record. */
+function isSchemaRead(sql: string): boolean {
+  return sql.startsWith('PRAGMA') || /FROM (pragma_|"sqlite_master")/.test(sql);
+}
+function isSchemaWrite(sql: string): boolean {
+  return /^(CREATE|ALTER)\b/i.test(sql) || sql.startsWith('INSERT INTO "_forge_schema"');
 }
 
 type ParsedWhereNode =
@@ -232,9 +241,9 @@ function evalWhereNode(row: Record<string, unknown>, node: ParsedWhereNode | und
 /** Simple in-memory mock of D1Database for unit testing */
 class MockD1Database implements D1Database {
   private tables = new Map<string, Map<string, Record<string, unknown>>>();
-  /** Tracks column names per table, populated from CREATE TABLE / ALTER TABLE exec() calls,
-   *  so PRAGMA table_info (used by additive migrations) reflects reality. */
-  private schemas = new Map<string, Set<string>>();
+  /** Tracks column names → declared types per table, populated from CREATE TABLE / ALTER TABLE, so
+   *  `pragma_table_info` (read by schema planning, spec 070) reflects reality. */
+  private schemas = new Map<string, Map<string, string>>();
   /** Tracks indexes created via `CREATE [UNIQUE] INDEX`, so insert/update can enforce uniqueness the
    *  same way real SQLite/D1 would — this is what makes the adapter's constraint-error translation
    *  code path exercisable in a unit test, rather than only hand-constructed. */
@@ -248,33 +257,36 @@ class MockD1Database implements D1Database {
     const createMatch = query.match(/CREATE TABLE IF NOT EXISTS\s+"([^"]+)"\s*\(([^)]*)\)/i);
     if (createMatch) {
       const [, table, columnsPart] = createMatch;
-      const columns = new Set(
-        (columnsPart ?? '').split(',').map((c) => c.trim().match(/^"([^"]+)"/)?.[1] ?? '')
-      );
-      columns.delete('');
-      this.schemas.set(table!, columns);
+      const columns = new Map<string, string>();
+      for (const part of (columnsPart ?? '').split(',')) {
+        const m = part.trim().match(/^"([^"]+)"\s+(\w+)/);
+        if (m) columns.set(m[1]!, m[2]!);
+      }
+      if (!this.schemas.has(table!)) this.schemas.set(table!, columns);
       return { count: 0, duration: 0 };
     }
 
-    const alterMatch = query.match(/ALTER TABLE\s+"([^"]+)"\s+ADD COLUMN\s+"([^"]+)"/i);
+    const alterMatch = query.match(/ALTER TABLE\s+"([^"]+)"\s+ADD COLUMN\s+"([^"]+)"\s+(\w+)/i);
     if (alterMatch) {
-      const [, table, column] = alterMatch;
-      const columns = this.schemas.get(table!) ?? new Set<string>();
-      columns.add(column!);
+      const [, table, column, type] = alterMatch;
+      const columns = this.schemas.get(table!) ?? new Map<string, string>();
+      columns.set(column!, type!);
       this.schemas.set(table!, columns);
       return { count: 0, duration: 0 };
     }
 
     const indexMatch = query.match(
-      /CREATE\s+(UNIQUE\s+)?INDEX IF NOT EXISTS\s+"[^"]+"\s+ON\s+"([^"]+)"\s*\(([^)]*)\)/i
+      /CREATE\s+(UNIQUE\s+)?INDEX IF NOT EXISTS\s+"([^"]+)"\s+ON\s+"([^"]+)"\s*\(([^)]*)\)/i
     );
     if (indexMatch) {
-      const [, uniqueFlag, table, columnsPart] = indexMatch;
+      const [, uniqueFlag, name, table, columnsPart] = indexMatch;
       const columns = columnsPart!
         .split(',')
         .map((c) => c.trim().match(/^"([^"]+)"/)?.[1])
         .filter((c): c is string => Boolean(c));
-      this.indexes.push({ table: table!, columns, unique: Boolean(uniqueFlag) });
+      if (!this.indexes.some((i) => i.name === name)) {
+        this.indexes.push({ name: name!, table: table!, columns, unique: Boolean(uniqueFlag) });
+      }
       return { count: 0, duration: 0 };
     }
 
@@ -282,22 +294,41 @@ class MockD1Database implements D1Database {
     return { count: 0, duration: 0 };
   }
 
-  batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
-    return Promise.all(statements.map((s) => s.all<T>()));
+  /**
+   * Schema statements (spec 070's planned DDL and `_forge_schema` baseline upserts, sent as one batch)
+   * are applied like `exec()`; everything else runs as before.
+   */
+  async batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
+    const results: D1Result<T>[] = [];
+    for (const statement of statements) {
+      const { sql, values } = statement as MockD1PreparedStatement;
+      if (/^(CREATE|ALTER)\b/i.test(sql)) {
+        await this.exec(sql);
+        results.push({ results: [], success: true });
+      } else if (sql.startsWith('INSERT INTO "_forge_schema"')) {
+        const rows = this.tables.get('_forge_schema') ?? new Map<string, Record<string, unknown>>();
+        rows.set(String(values[0]), { id: values[0], snapshot: values[3] });
+        this.tables.set('_forge_schema', rows);
+        results.push({ results: [], success: true });
+      } else {
+        results.push(await statement.all<T>());
+      }
+    }
+    return results;
   }
 }
 
 class MockD1PreparedStatement implements D1PreparedStatement {
   private query: string;
   private tables: Map<string, Map<string, Record<string, unknown>>>;
-  private schemas: Map<string, Set<string>>;
+  private schemas: Map<string, Map<string, string>>;
   private indexes: MockIndex[];
   private bindings: unknown[] = [];
 
   constructor(
     query: string,
     tables: Map<string, Map<string, Record<string, unknown>>>,
-    schemas: Map<string, Set<string>>,
+    schemas: Map<string, Map<string, string>>,
     indexes: MockIndex[]
   ) {
     this.query = query;
@@ -342,6 +373,14 @@ class MockD1PreparedStatement implements D1PreparedStatement {
     return this;
   }
 
+  get sql(): string {
+    return this.query;
+  }
+
+  get values(): unknown[] {
+    return this.bindings;
+  }
+
   async first<T = unknown>(): Promise<T | null> {
     if (this.query.match(/SELECT\s+COUNT\s*\(/i)) {
       const { table, whereNode } = this.parseSelect();
@@ -374,13 +413,30 @@ class MockD1PreparedStatement implements D1PreparedStatement {
   }
 
   async all<T = unknown>(): Promise<D1Result<T>> {
-    const pragmaMatch = this.query.match(/PRAGMA table_info\("([^"]+)"\)/i);
-    if (pragmaMatch) {
-      const columns = this.schemas.get(pragmaMatch[1]!) ?? new Set<string>();
-      return {
-        results: Array.from(columns).map((name) => ({ name }) as T),
-        success: true
-      };
+    // Which table owns an index name (spec 070: index names are database-wide).
+    if (this.query.includes('FROM "sqlite_master"')) {
+      const index = this.indexes.find((i) => i.name === this.bindings[0]);
+      return { results: (index ? [{ tbl_name: index.table }] : []) as T[], success: true };
+    }
+
+    // Schema planning's metadata reads (spec 070): table-valued PRAGMA functions with a bound name.
+    const pragma = this.query.match(/FROM pragma_(table_info|index_list|index_info)\(\?\)/);
+    if (pragma) {
+      const name = String(this.bindings[0]);
+      let results: Record<string, unknown>[] = [];
+      if (pragma[1] === 'table_info') {
+        results = Array.from(this.schemas.get(name) ?? new Map<string, string>()).map(
+          ([column, type], cid) => ({ cid, name: column, type, pk: column === 'id' ? 1 : 0 })
+        );
+      } else if (pragma[1] === 'index_list') {
+        results = this.indexes
+          .filter((i) => i.table === name)
+          .map((i) => ({ name: i.name, unique: i.unique ? 1 : 0, origin: 'c', partial: 0 }));
+      } else {
+        const index = this.indexes.find((i) => i.name === name);
+        results = (index?.columns ?? []).map((column, seqno) => ({ seqno, name: column }));
+      }
+      return { results: results as T[], success: true };
     }
 
     const { table, whereNode, orderBy, limit, offset } = this.parseSelect();
@@ -928,10 +984,12 @@ describe('D1DatabaseAdapter conditional writes — emitted SQL (spec 059)', () =
           first: () => Promise.resolve(null),
           run: () => Promise.resolve({ results: [], success: true }),
           all: <T>() => {
-            if (!sql.startsWith('PRAGMA')) sent.push(entry);
-            return (
-              sql.startsWith('PRAGMA') ? Promise.resolve({ results: [], success: true }) : reply()
-            ) as Promise<D1Result<T>>;
+            // Schema planning's metadata reads (spec 070) are not the statements under test.
+            if (isSchemaRead(sql)) {
+              return Promise.resolve({ results: [], success: true }) as Promise<D1Result<T>>;
+            }
+            sent.push(entry);
+            return reply() as Promise<D1Result<T>>;
           },
           raw: () => Promise.resolve([])
         };
@@ -1094,7 +1152,7 @@ describe('D1DatabaseAdapter atomicWrite — emitted batch (spec 060)', () => {
             return Promise.resolve({ results: [], success: true });
           },
           all: <T>() => {
-            if (!sql.startsWith('PRAGMA')) perStatement.push(sql);
+            if (!isSchemaRead(sql)) perStatement.push(sql);
             return Promise.resolve({ results: [], success: true }) as Promise<D1Result<T>>;
           },
           raw: () => Promise.resolve([])
@@ -1104,7 +1162,10 @@ describe('D1DatabaseAdapter atomicWrite — emitted batch (spec 060)', () => {
       },
       exec: () => Promise.resolve({ count: 0, duration: 0 }),
       batch: <T>(statements: D1PreparedStatement[]) => {
-        batches.push(statements.map((s) => entries.get(s)!));
+        const sent = statements.map((s) => entries.get(s)!);
+        // `syncSchema`'s one DDL batch (spec 070) is not an atomicWrite under test.
+        if (sent.every((s) => isSchemaWrite(s.sql))) return Promise.resolve([]);
+        batches.push(sent);
         return outcome() as Promise<D1Result<T>[]>;
       }
     };

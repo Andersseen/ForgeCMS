@@ -13,6 +13,7 @@ import { matchesWhere, normalizeSort } from './where.js';
 import type { ResolvedIndex } from './schema-generator.js';
 import { resolveCollectionIndexes } from './schema-generator.js';
 import { UniqueConstraintError } from './constraint-error.js';
+import type { SchemaPlan } from './schema-plan.js';
 import { assertValidWriteCondition } from './write-condition.js';
 import {
   AtomicWriteConditionError,
@@ -381,5 +382,14 @@ export class InMemoryDatabaseAdapter implements DatabaseAdapter {
     for (const collection of collections) {
       this.collections.set(collection.slug, collection);
     }
+  }
+
+  /**
+   * Always an empty plan (spec 070): this adapter persists nothing, so a stored schema cannot drift
+   * from the definitions. It proves nothing about SQL backends' upgrade behaviour.
+   */
+  planSchema(collections: CollectionDefinition[]): Promise<SchemaPlan> {
+    void collections;
+    return Promise.resolve({ changes: [], blocking: false });
   }
 }

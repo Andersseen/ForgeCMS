@@ -1,11 +1,73 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-28 (auth abuse bounds, spec 069 — roadmap 0.6 complete).**
+> **Last updated: 2026-09-28 (schema drift detection, spec 070 — roadmap 0.7 M01).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Schema drift detection and upgrade planning — M01 (spec 070, 2026-09-28)
+
+Roadmap 0.7, first packet. See
+[docs/specs/070-schema-drift-detection-and-upgrade-planning.md](specs/070-schema-drift-detection-and-upgrade-planning.md)
+and the consumer guide [SCHEMA-UPGRADES.md](SCHEMA-UPGRADES.md).
+
+- **Reproduced first** (on-disk libSQL, v1 → v2 through a new adapter): pre-M01 `syncSchema()` resolved
+  for these changes and left the old schema in place:
+  - a removed field;
+  - `text` → `number`;
+  - `drafts`/`upload` enabled (no `_status`/`_storageKey`: `generateAddColumnSql` only walked fields);
+  - `index` → `unique` (index stayed non-unique) and `unique` → `index` (stayed unique);
+  - a removed index;
+  - a compound unique `(a,b)` → `(a,c)` (both enforced);
+  - `localized` on;
+  - relation `many` on;
+  - a new required field on a table with rows.
+
+  A new unique index over duplicate rows failed with a raw `CREATE UNIQUE INDEX` driver error.
+
+- **Now:**
+  - `syncSchema()` plans before it touches anything. SQLite metadata is read with
+    `pragma_table_info`/`pragma_index_list`/`pragma_index_info` using bound names, then compared with
+    the one desired model (`desiredTableSchema`, which the DDL also uses) and a per-table semantic
+    baseline in the new internal table `_forge_schema`.
+  - Changes are classified `safe-additive` / `manual-migration` / `unsupported` / `informational` in a
+    deterministic `SchemaPlan`. Types compare by SQLite affinity; indexes by ordered columns and
+    uniqueness.
+  - Aggregate probes (row/NULL/draft counts, duplicate groups excluding NULLs) decide data-dependent
+    cases.
+  - Blocking drift → `SchemaDriftError` (`code: 'SCHEMA_DRIFT'`, `.plan`) with **nothing executed**.
+    Otherwise all safe DDL plus the baseline upserts run as **one** transaction (libSQL
+    `batch('write')`, D1 `batch()`).
+  - `ForgeCmsRuntime.planSchema()` covers collections, `_global_*`, `_versions_*`,
+    `_forge_storage_intents` and, through the new optional `AuthAdapter.planSchema()`,
+    `_forge_bootstrap`/`_forge_api_keys`. `runtime.syncSchema()` refuses before any area syncs.
+  - New optional `DatabaseAdapter.planSchema()`: libSQL and D1 implement it; InMemory returns an
+    empty plan. `runtime.planSchema()` refuses an adapter without it.
+  - Spec 062's duplicate-version message is kept.
+  - Review found that generated index names can collide across tables: SQLite index names are
+    database-wide, and `IF NOT EXISTS` skipped the second index silently. A collision is now
+    `unsupported`.
+  - Renames are never inferred; no DROP, retype, rebuild or backfill; no `NODE_ENV` or `force`.
+- **Evidence:** `runSchemaDriftContractTests` (26 scenarios) passes on on-disk libSQL and on the real
+  local D1 binding. Also: `schema-plan.test.ts` (kind matrix, affinity, formatter) and
+  `runtime/src/schema-drift.test.ts` (cross-area plan-before-mutation, internal tables, uninspectable
+  adapter). The D1 unit mocks answer the new PRAGMA reads.
+- **First upgrade of an existing database:** no baseline exists. Physical checks all run; semantic
+  changes made _before_ the upgrade (localized, cardinality, kind within TEXT, required, defaults)
+  cannot be detected and are reported as `baseline-recorded`. After a hand migration of a semantic
+  change, `DELETE FROM "_forge_schema" WHERE "id" = '<table>'` re-baselines that table.
+- **Operational:** a deployed D1 whose schema drifted over time (e.g. removed fields) now **refuses to
+  start** instead of silently serving. Run `runtime.planSchema()` against the `apps/www` and
+  `apps/demo-aesthetics` production databases before deploying. Remote D1 (whose authorizer must allow
+  `pragma_*()` table-valued functions and `sqlite_master` reads, proven on local workerd only) and
+  Turso were not exercised.
+- **Recorded limits:** tables of removed collections are not reported; validation-only options (select
+  `options`, min/max) are not tracked; the runtime plans once and each area's sync plans again (extra
+  reads at startup).
+- **Suggested next step:** M02 — minimal reviewed migration execution (identity/checksum/history,
+  exclusive execution, failure/retry, explicit operator-driven destructive steps). Not started.
 
 ## Auth abuse bounds and certification — H04, roadmap 0.6 complete (spec 069, 2026-09-28)
 
@@ -52,8 +114,7 @@ The last 0.6 packet. See
 - **Roadmap 0.6 is complete** (status table in
   [0.6-auth-data-integrity.md](roadmap/v1/0.6-auth-data-integrity.md)). Version retention without
   cleanup and inert `versions.autosave` are current semantics, with post-1.0 follow-ups.
-- **Suggested next step:** roadmap 0.7 / M01 — schema drift detection and classification of supported
-  vs destructive schema changes. Not started.
+- **Next step (done since):** roadmap 0.7 / M01 — spec 070 above.
 
 ## Write access consistency (spec 068, 2026-09-28)
 
