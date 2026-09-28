@@ -282,6 +282,114 @@ test('signup is opt-in, cannot select a role, and never elevates past the second
   await logout(page);
 });
 
+// Spec 069 (H04): public signup is a public endpoint, so an attacker talks HTTP, not the UI. An admin
+// exists by now (bootstrapped above) — so this is the escalation case, not the legitimate first-admin
+// bootstrap, which is the only way a signup becomes admin.
+test('H04: a signup smuggling role/roles/_sessionVersion/passwordHash becomes a plain viewer', async ({
+  request
+}) => {
+  const email = `mallory-${Date.now()}@tiny.e2e.test`;
+  const signup = await request.post('/api/auth/signup', {
+    data: {
+      email,
+      password: 'mallory-password-123',
+      role: 'admin',
+      roles: ['admin'],
+      _sessionVersion: 999,
+      passwordHash: 'If6Zrfe0K5ZTX4epnsGKhynqsYCtSnGguaNkxiFer_SRG6SLXF5NOPToEpHbPR5J',
+      id: 'chosen-id'
+    },
+    headers: { 'content-type': 'application/json' }
+  });
+  expect(signup.status()).toBe(201);
+  const created = (await signup.json()) as { data: { user: Record<string, unknown> } };
+  expect(created.data.user['role']).toBe('viewer');
+  expect(created.data.user['id']).not.toBe('chosen-id');
+  for (const field of ['roles', 'passwordHash', '_sessionVersion']) {
+    expect(created.data.user).not.toHaveProperty(field);
+  }
+
+  // The session the cookie carries is live (so `_sessionVersion` was not taken from the body) and is
+  // a viewer's: user management stays out of reach.
+  const me = await request.get('/api/auth/me');
+  expect(((await me.json()) as { data: { role: string } }).data.role).toBe('viewer');
+  const users = await request.get('/api/auth/users');
+  expect(users.status()).toBe(403);
+
+  // The submitted password — not the smuggled hash — is the account's password.
+  const login = await request.post('/api/auth/login', {
+    data: { email, password: 'mallory-password-123' },
+    headers: { 'content-type': 'application/json' }
+  });
+  expect(login.status()).toBe(200);
+});
+
+test('H04: auth bodies are bounded and login failures do not reveal accounts', async ({
+  request
+}) => {
+  const oversized = await request.post('/api/auth/login', {
+    data: JSON.stringify({ email: ADMIN_EMAIL, password: 'x'.repeat(20_000) }),
+    headers: { 'content-type': 'application/json' }
+  });
+  expect(oversized.status()).toBe(413);
+  expect(await oversized.json()).toEqual({
+    error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body is too large' }
+  });
+
+  const malformed = await request.post('/api/auth/login', {
+    data: '{not json',
+    headers: { 'content-type': 'application/json' }
+  });
+  expect(malformed.status()).toBe(400);
+  expect(((await malformed.json()) as { error: { code: string } }).error.code).toBe(
+    'INVALID_INPUT'
+  );
+
+  const attempt = async (email: string) => {
+    const response = await request.post('/api/auth/login', {
+      data: { email, password: 'definitely-wrong-password' },
+      headers: { 'content-type': 'application/json' }
+    });
+    return { status: response.status(), body: await response.text() };
+  };
+  const unknown = await attempt('nobody@tiny.e2e.test');
+  expect(unknown).toEqual(await attempt(ADMIN_EMAIL));
+  expect(unknown.status).toBe(401);
+});
+
+test('H04: admin user routes authenticate before reading a bounded body; logout is CSRF-checked', async ({
+  page,
+  request
+}) => {
+  const anonymous = await request.post('/api/auth/users', {
+    data: JSON.stringify({ email: 'x@tiny.e2e.test', password: 'y'.repeat(20_000) }),
+    headers: { 'content-type': 'application/json' }
+  });
+  expect(anonymous.status()).toBe(401);
+
+  // The first admin was demoted by the last-admin test above; the second admin is the admin now.
+  await loginAs(page, SECOND_ADMIN_EMAIL, SECOND_ADMIN_PASSWORD);
+  const oversized = await page.request.post('/api/auth/users', {
+    data: JSON.stringify({ email: 'x@tiny.e2e.test', password: 'y'.repeat(20_000) }),
+    headers: { 'content-type': 'application/json', ...SAME_ORIGIN_HEADERS }
+  });
+  expect(oversized.status()).toBe(413);
+
+  const tooLong = await page.request.post('/api/auth/users', {
+    data: { email: `long-${Date.now()}@tiny.e2e.test`, password: 'z'.repeat(1025) },
+    headers: { 'content-type': 'application/json', ...SAME_ORIGIN_HEADERS }
+  });
+  expect(tooLong.status()).toBe(400);
+
+  const forgedLogout = await page.request.post('/api/auth/logout', {
+    headers: { origin: 'https://evil.example' }
+  });
+  expect(forgedLogout.status()).toBe(403);
+  // Still signed in: the forged logout changed nothing.
+  expect((await page.request.get('/api/auth/me')).status()).toBe(200);
+  await logout(page);
+});
+
 // The HTTP contract of `GET /api/v1/:collection`, asserted purely at the wire — it knows nothing
 // about which transport wrapper serves the route, so it must pass unchanged across a transport swap.
 test('list API contract: query, pagination, filter, sort, depth, errors and read access are preserved', async ({

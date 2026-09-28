@@ -88,7 +88,8 @@ export function getServerRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<Serve
 
 async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>> {
   const database = env?.DB ? new D1DatabaseAdapter() : new InMemoryDatabaseAdapter();
-  const auth = new UsersCollectionAuthAdapter({ devMode: !env?.AUTH_SECRET }).init({
+  // Explicit dev mode (never inferred from a missing secret): `true` only under the dev server.
+  const auth = new UsersCollectionAuthAdapter({ devMode: import.meta.dev === true }).init({
     ...env,
     userDatabase: database
   });
@@ -248,8 +249,9 @@ const database = new D1DatabaseAdapter(); // .init(env) happens inside runtime.i
 ```
 
 Config: a D1 binding (`DB` in `wrangler.toml`), optionally an R2 binding (`BUCKET`) if you add
-media, and `AUTH_SECRET` in production (development falls back to a built-in dev secret via
-`devMode: true`). See [Deployment](/docs/deployment).
+media, and `AUTH_SECRET` (at least 32 bytes) in every build; only the dev server, through an explicit
+`devMode: true`, falls back to Forge's public dev secret. See [Deployment](/docs/deployment) and
+[Browser auth](/docs/browser-auth#production-configuration-and-abuse-limits).
 
 **Portable** (no Cloudflare account, no binding of any kind):
 

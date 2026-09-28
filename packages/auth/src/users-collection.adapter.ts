@@ -20,7 +20,13 @@ import type {
   PublicSignupInput
 } from './index.js';
 import { ForgeAuthError, UserMutationError } from './index.js';
-import { extractToken, issueToken, looksLikeSignedToken, validateSession } from './token-signer.js';
+import {
+  extractToken,
+  issueToken,
+  looksLikeSignedToken,
+  resolveSigningSecret,
+  validateSession
+} from './token-signer.js';
 import type { UserRole } from './roles.js';
 import { hasAnyRole } from './roles.js';
 
@@ -29,12 +35,28 @@ export interface UsersCollectionAuthEnv {
   userDatabase?: DatabaseAdapter;
 }
 
+/**
+ * Password length rules (spec 069). Length is the JavaScript string length (UTF-16 code units) for both
+ * bounds, on every path: create, signup, password change and login. A password is never truncated.
+ */
 export interface PasswordPolicy {
-  /** Defaults to 8. */
+  /** Defaults to 8. An integer ≥ 1. */
   minLength?: number;
+  /**
+   * Defaults to 1024 — far above any password-manager output or passphrase. An integer between
+   * `minLength` and 4096. Bounds the input of every PBKDF2 operation: longer passwords are refused
+   * before hashing, and a longer login password fails as invalid credentials before any lookup.
+   * Lowering it below a stored password locks that user out until `updateUser` sets a new one.
+   */
+  maxLength?: number;
 }
 
 export interface UsersCollectionAuthAdapterOptions {
+  /**
+   * Explicit local-development opt-in: without `AUTH_SECRET`, sign sessions with Forge's built-in,
+   * publicly known dev secret, and accept a secret shorter than 32 bytes. Never derive it from a
+   * missing secret (`devMode: !env.AUTH_SECRET` turns a forgotten production secret into a public one).
+   */
   devMode?: boolean;
   passwordPolicy?: PasswordPolicy;
   /** Defaults to `'users'` — must match the slug passed to `defineUsersCollection()`/`withAuthFields()`. */
@@ -56,8 +78,20 @@ interface NewAccount {
 }
 
 const DEFAULT_COLLECTION = 'users';
-const DEV_SECRET = 'forgecms-dev-only-signing-secret-do-not-use-in-real-deployments';
 const DEFAULT_MIN_PASSWORD_LENGTH = 8;
+const DEFAULT_MAX_PASSWORD_LENGTH = 1024;
+/** No configuration may lift the password bound above this (spec 069). */
+const PASSWORD_LENGTH_CEILING = 4096;
+/** RFC 5321's limit on a forward path. A longer address can never be delivered to. */
+const MAX_EMAIL_LENGTH = 254;
+/** Names travel inside every session token, so they are bounded to keep tokens bounded (spec 069). */
+const MAX_NAME_LENGTH = 256;
+/**
+ * A real PBKDF2 hash, in the stored format, of a random password that was discarded (spec 069). `login`
+ * verifies against it when no account (or no stored hash) matches, so an unknown email performs the same
+ * single verification as a wrong password instead of returning before any password work.
+ */
+const DUMMY_PASSWORD_HASH = 'If6Zrfe0K5ZTX4epnsGKhynqsYCtSnGguaNkxiFer_SRG6SLXF5NOPToEpHbPR5J';
 const BOOTSTRAP_COLLECTION = '_forge_bootstrap';
 /**
  * The last-admin invariant as a storage-level precondition (spec 059): a row currently in the admin set
@@ -158,12 +192,36 @@ function normalizeEmail(email: string): string {
 }
 
 function isValidEmail(email: string): boolean {
-  return EMAIL_PATTERN.test(email);
+  return email.length <= MAX_EMAIL_LENGTH && EMAIL_PATTERN.test(email);
 }
 
-function meetsPasswordPolicy(password: string, policy: PasswordPolicy | undefined): boolean {
-  const minLength = policy?.minLength ?? DEFAULT_MIN_PASSWORD_LENGTH;
-  return password.length >= minLength;
+function isValidName(name: string | undefined): boolean {
+  return name === undefined || name.length <= MAX_NAME_LENGTH;
+}
+
+interface PasswordLimits {
+  min: number;
+  max: number;
+}
+
+/** Validates a configured policy once, at construction, so a bad policy never reaches a request. */
+function resolvePasswordLimits(policy: PasswordPolicy | undefined): PasswordLimits {
+  const min = policy?.minLength ?? DEFAULT_MIN_PASSWORD_LENGTH;
+  const max = policy?.maxLength ?? Math.max(DEFAULT_MAX_PASSWORD_LENGTH, min);
+  if (!Number.isInteger(min) || min < 1) {
+    throw new Error('UsersCollectionAuthAdapter: passwordPolicy.minLength must be an integer ≥ 1.');
+  }
+  if (!Number.isInteger(max) || max < min || max > PASSWORD_LENGTH_CEILING) {
+    throw new Error(
+      `UsersCollectionAuthAdapter: passwordPolicy.maxLength must be an integer between minLength ` +
+        `(${min}) and ${PASSWORD_LENGTH_CEILING}.`
+    );
+  }
+  return { min, max };
+}
+
+function meetsPasswordPolicy(password: string, limits: PasswordLimits): boolean {
+  return password.length >= limits.min && password.length <= limits.max;
 }
 
 /**
@@ -197,26 +255,20 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
   private db?: DatabaseAdapter;
   private collection: string;
   private readonly devMode: boolean;
-  private readonly passwordPolicy?: PasswordPolicy;
+  private readonly passwordLimits: PasswordLimits;
 
   constructor(options: UsersCollectionAuthAdapterOptions = {}) {
     this.devMode = options.devMode ?? false;
-    if (options.passwordPolicy !== undefined) this.passwordPolicy = options.passwordPolicy;
+    this.passwordLimits = resolvePasswordLimits(options.passwordPolicy);
     this.collection = options.collection ?? DEFAULT_COLLECTION;
   }
 
   init(env?: UsersCollectionAuthEnv): this {
-    if (env?.AUTH_SECRET) {
-      this.secret = env.AUTH_SECRET;
-    } else if (this.devMode) {
-      this.secret = DEV_SECRET;
-    } else {
-      throw new Error(
-        'UsersCollectionAuthAdapter requires AUTH_SECRET to be set. ' +
-          'In development, pass { devMode: true } to the constructor to use the built-in dev secret. ' +
-          'In production, set AUTH_SECRET as an environment variable or secret.'
-      );
-    }
+    this.secret = resolveSigningSecret(
+      'UsersCollectionAuthAdapter',
+      env?.AUTH_SECRET,
+      this.devMode
+    );
 
     if (env?.userDatabase !== undefined) {
       // The last-admin invariant (spec 059) and first-admin provisioning (spec 060) are decided by the
@@ -430,20 +482,32 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     return user;
   }
 
+  /**
+   * Every failure is the same `'invalid-credentials'` (spec 069). A password over the policy maximum is
+   * refused before any lookup or hashing — whether the account exists plays no part. Otherwise exactly one
+   * PBKDF2 verification runs, against the stored hash or, when no account (or no hash) matches, against a
+   * fixed dummy hash, so an unknown email does not skip the password work a wrong password pays. That is
+   * not a constant-time guarantee across database adapters; throttling stays the host's job.
+   */
   async login(email: string, password: string): Promise<AuthActionResult> {
+    if (password.length > this.passwordLimits.max) {
+      return { ok: false, reason: 'invalid-credentials' };
+    }
     const db = this.getDb();
     const records = await db.findMany({
       collection: this.collection,
       where: { email: normalizeEmail(email) }
     });
     const record = records[0];
-    if (!record) return { ok: false, reason: 'invalid-credentials' };
+    const storedHash =
+      typeof record?.passwordHash === 'string' && record.passwordHash.length > 0
+        ? record.passwordHash
+        : undefined;
 
-    const storedHash = record.passwordHash as string | undefined;
-    if (!storedHash) return { ok: false, reason: 'invalid-credentials' };
-
-    const valid = await verifyPassword(password, storedHash);
-    if (!valid) return { ok: false, reason: 'invalid-credentials' };
+    const valid = await verifyPassword(password, storedHash ?? DUMMY_PASSWORD_HASH);
+    if (!record || storedHash === undefined || !valid) {
+      return { ok: false, reason: 'invalid-credentials' };
+    }
 
     const user = sanitizeUser(record);
     const token = await issueToken(this.getSecret(), user, sessionVersionOf(record));
@@ -470,7 +534,8 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
   async createUser(input: CreateUserInput): Promise<AuthActionResult> {
     const email = normalizeEmail(input.email);
     if (!isValidEmail(email)) return { ok: false, reason: 'invalid-email' };
-    if (!meetsPasswordPolicy(input.password, this.passwordPolicy)) {
+    if (!isValidName(input.name)) return { ok: false, reason: 'invalid-name' };
+    if (!meetsPasswordPolicy(input.password, this.passwordLimits)) {
       return { ok: false, reason: 'weak-password' };
     }
 
@@ -499,7 +564,8 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
   async signup(input: PublicSignupInput): Promise<AuthActionResult> {
     const email = normalizeEmail(input.email);
     if (!isValidEmail(email)) return { ok: false, reason: 'invalid-email' };
-    if (!meetsPasswordPolicy(input.password, this.passwordPolicy)) {
+    if (!isValidName(input.name)) return { ok: false, reason: 'invalid-name' };
+    if (!meetsPasswordPolicy(input.password, this.passwordLimits)) {
       return { ok: false, reason: 'weak-password' };
     }
 
@@ -530,7 +596,8 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
 
   /**
    * Updates a user. Rejects (via {@link UserMutationError}) rather than writing when the change would:
-   * - set a password shorter than the configured policy, or
+   * - set an invalid email or a name over 256 characters (spec 069),
+   * - set a password outside the configured policy (shorter than `minLength` or longer than `maxLength`), or
    * - remove the last remaining admin's admin role.
    *
    * The second check, together with {@link deleteUser}'s, is the whole last-admin invariant: a users
@@ -559,7 +626,14 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     const existing = await db.findById(this.collection, id);
     if (!existing) return null;
 
-    if (input.password !== undefined && !meetsPasswordPolicy(input.password, this.passwordPolicy)) {
+    // All input checks run before any hashing or write (spec 069).
+    if (input.email !== undefined && !isValidEmail(normalizeEmail(input.email))) {
+      throw new UserMutationError('Invalid email address', 'invalid-email');
+    }
+    if (!isValidName(input.name)) {
+      throw new UserMutationError('Invalid name', 'invalid-name');
+    }
+    if (input.password !== undefined && !meetsPasswordPolicy(input.password, this.passwordLimits)) {
       throw new UserMutationError('Password does not meet requirements', 'weak-password');
     }
 

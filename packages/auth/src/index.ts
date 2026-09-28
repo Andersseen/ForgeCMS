@@ -5,7 +5,12 @@ export type { ExternalAuthConfig } from './external.adapter.js';
 export { SignedTokenAuthAdapter, DEMO_CREDENTIALS } from './signed-token.adapter.js';
 export type { SignedTokenEnv } from './signed-token.adapter.js';
 export { UsersCollectionAuthAdapter } from './users-collection.adapter.js';
-export type { UsersCollectionAuthEnv, CreateUserInput } from './users-collection.adapter.js';
+export type {
+  UsersCollectionAuthEnv,
+  UsersCollectionAuthAdapterOptions,
+  PasswordPolicy,
+  CreateUserInput
+} from './users-collection.adapter.js';
 export { ApiKeyAuthAdapter } from './api-key.adapter.js';
 export type {
   ApiKeyAuthEnv,
@@ -47,14 +52,23 @@ export class ForgeAuthError extends Error {
   }
 }
 
-/** Why `UsersCollectionAuthAdapter.updateUser`/`deleteUser` rejected a change (spec 054, `'referenced'`: spec 065). */
-export type UserMutationFailureReason = 'last-admin' | 'weak-password' | 'referenced';
+/**
+ * Why `UsersCollectionAuthAdapter.updateUser`/`deleteUser` rejected a change (spec 054; `'referenced'`:
+ * spec 065; `'invalid-email'`/`'invalid-name'`: spec 069).
+ */
+export type UserMutationFailureReason =
+  | 'last-admin'
+  | 'weak-password'
+  | 'referenced'
+  | 'invalid-email'
+  | 'invalid-name';
 
 /**
  * Thrown by `UsersCollectionAuthAdapter.updateUser`/`deleteUser` instead of writing when the change
- * would leave the installation with zero admins (`'last-admin'`), set a password shorter than the
- * configured policy (`'weak-password'`), or delete a user that content or a global still references
- * (`'referenced'`, spec 065). A host route maps `reason` to a status (`409`/`400`).
+ * would leave the installation with zero admins (`'last-admin'`), set a password outside the configured
+ * policy (`'weak-password'`), set an invalid email or an over-long name (`'invalid-email'`,
+ * `'invalid-name'`), or delete a user that content or a global still references (`'referenced'`, spec
+ * 065). A host route maps `reason` to a status (`409` for `last-admin`/`referenced`, otherwise `400`).
  */
 export class UserMutationError extends Error {
   constructor(
@@ -93,7 +107,9 @@ export type AuthFailureReason =
   | 'invalid-credentials'
   | 'email-in-use'
   | 'weak-password'
-  | 'invalid-email';
+  | 'invalid-email'
+  /** A `name` over 256 characters (spec 069) — names are carried in every session token. */
+  | 'invalid-name';
 
 export type AuthActionResult<TUser extends AuthUser = AuthUser> =
   | { ok: true; token: string; user: TUser }

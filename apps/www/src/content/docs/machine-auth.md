@@ -45,6 +45,10 @@ const { apiKey, secret } = await apiKeyAuth.createApiKey({
 // returned by createApiKey/listApiKeys/getApiKey again; only `apiKey` (safe metadata) is.
 ```
 
+A key longer than Forge ever issues (more than 128 characters after `<prefix>_`) is refused before
+any database lookup or hashing. Login/signup throttling never applies to API-key requests; rate-limit
+machine traffic at your platform or proxy.
+
 A request authenticates the same way whether it carries a human token or an API key — `auth` (the
 `CompositeAuthAdapter`) tries each configured strategy in order and returns the first one that
 recognizes the credential:

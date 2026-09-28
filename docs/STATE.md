@@ -1,11 +1,59 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-28 (write access consistency, spec 068).**
+> **Last updated: 2026-09-28 (auth abuse bounds, spec 069 — roadmap 0.6 complete).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Auth abuse bounds and certification — H04, roadmap 0.6 complete (spec 069, 2026-09-28)
+
+The last 0.6 packet. See
+[docs/specs/069-auth-abuse-bounds-and-certification.md](specs/069-auth-abuse-bounds-and-certification.md).
+
+- **Reproduced first** (probe on the unfixed code):
+  - login read a 5 MiB body to the end;
+  - a JSON `null` auth body was a `500`;
+  - a 1,000,000-character password reached PBKDF2 on login and signup;
+  - an unknown email ran 0 PBKDF2 derivations, a wrong password 1;
+  - there was no throttle contract;
+  - **the apps' `devMode: !env?.AUTH_SECRET` let a production deploy without a secret accept an admin
+    token forged with the public dev secret**, and `AUTH_SECRET=x` was accepted;
+  - a 10 MB token reached HMAC and a 5 MB API-key id reached the database;
+  - an unexpected login error's message (with the password in it) was logged;
+  - the `/api/auth/users*` routes buffered a body before checking admin.
+- **Now:**
+  - login/signup bodies are stream-capped at 8 KiB (`readBoundedJsonObject`, `413 PAYLOAD_TOO_LARGE`);
+  - `PasswordPolicy.maxLength` (default 1024, ≤ 4096) is checked before PBKDF2 on every path;
+  - emails (254), names (256, new `invalid-name`), Forge tokens (8192) and API keys are bounded;
+  - login always runs exactly one verification (a dummy hash for unknown accounts);
+  - `AuthHandlerOptions.throttle` (`AuthAttemptThrottle`) is the host's login/signup limiter hook
+    (`429 RATE_LIMITED`, validated `Retry-After`, fails closed);
+  - `AUTH_SECRET` must be ≥ 32 bytes outside `devMode`; the apps use `devMode: import.meta.dev === true`;
+  - auth logs carry `{ operation, error: <class> }` only (`AuthResolutionError` behind content routes);
+  - admin user routes authenticate first, then read a bounded body; tiny-project's bootstrap route too.
+- **Evidence:**
+  - `packages/auth/src/auth-bounds.test.ts` (32) and `packages/runtime/src/auth-abuse.test.ts` (23);
+  - the Angular client keeps 413/429 code and status;
+  - workerd: Miniflare's Rate Limiting binding wired to the hook (`auth-throttle.test.ts`) — the remote
+    Cloudflare service was not exercised;
+  - tiny-project E2E: signup escalation after bootstrap, 413/400/parity, bounded admin routes, CSRF on
+    logout.
+- **Recorded, not changed:**
+  - PBKDF2 stays at 100,000 iterations (below OWASP's 600,000; CPU cost on Workers). A versioned hash
+    format is a post-1.0 follow-up. Local workerd does not cap iterations.
+  - Nitro 2's Cloudflare entries buffer request bodies before routes run, so on the Pages apps
+    Cloudflare's request limit is the outer bound.
+  - h3 1.15's Node body stream cannot be cancelled safely; the apps use `toCancellableWebRequest`.
+  - Signup's `409` still reveals a registered email (product contract).
+- **Operational:** a deploy whose `AUTH_SECRET` is missing or shorter than 32 bytes no longer starts —
+  check `apps/www` and `apps/demo-aesthetics` production secrets before deploying.
+- **Roadmap 0.6 is complete** (status table in
+  [0.6-auth-data-integrity.md](roadmap/v1/0.6-auth-data-integrity.md)). Version retention without
+  cleanup and inert `versions.autosave` are current semantics, with post-1.0 follow-ups.
+- **Suggested next step:** roadmap 0.7 / M01 — schema drift detection and classification of supported
+  vs destructive schema changes. Not started.
 
 ## Write access consistency (spec 068, 2026-09-28)
 
@@ -1637,10 +1685,10 @@ passwordHash`~~ — **fixed 2026-07-22, spec 018.** `@forge-cms/auth` now export
 
 ## What's next
 
-**Next bounded step (recommended after spec 068, 2026-09-28): H04, the last open 0.6 packet.** Auth
-abuse limits and certification at the host boundary: login/signup throttling guidance and hooks,
-lockout semantics, token/cookie hardening checks, with conservative defaults and no rate-limiter
-framework. D03 is done except retention cleanup, which needs a product decision.
+**Next bounded step (recommended after spec 069, 2026-09-28): roadmap 0.7 / M01** — schema drift
+detection and classification of supported vs destructive schema changes. Roadmap 0.6 is complete (spec
+069 closed H04). Version-retention cleanup, working `versions.autosave` and a versioned password-hash
+format are post-1.0 product follow-ups.
 
 Work is planned in [ROADMAP.md](ROADMAP.md), which sequences the remaining gaps by cost-of-delay.
 Each numbered item there gets its own spec in `docs/specs/` when picked up, per [SDD.md](SDD.md).

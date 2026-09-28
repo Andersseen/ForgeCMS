@@ -49,15 +49,31 @@ export function getServerRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<Serve
   return runtimePromise;
 }
 
-/** Builds an unseeded runtime. Exported for tests, which seed (or not) as each case needs. */
-export function createRuntime(env?: ServerEnv): ForgeCmsRuntime<ServerEnv> {
+/**
+ * Development mode is an explicit decision (spec 069), never "the secret is missing": Nitro replaces
+ * `import.meta.dev` with `true` only under the Analog dev server (`pnpm dev`) and with `false` in every
+ * build — deployed, or previewed with `wrangler pages dev`. A build without `AUTH_SECRET` (at least 32
+ * bytes) therefore refuses to start instead of signing sessions with Forge's public dev secret.
+ */
+const AUTH_DEV_MODE = import.meta.dev === true;
+
+/**
+ * Builds an unseeded runtime. Exported for tests, which seed (or not) as each case needs — and which,
+ * running outside Nitro, pass `{ devMode: true }` explicitly.
+ */
+export function createRuntime(
+  env?: ServerEnv,
+  options: { devMode?: boolean } = {}
+): ForgeCmsRuntime<ServerEnv> {
   const database = env?.DB ? new D1DatabaseAdapter() : new InMemoryDatabaseAdapter();
   // `publicUrlBase` is the path `routes/api/media/[...key].get.ts` serves. It is the adapter's
   // default too, but stating it here keeps the two ends of that contract in one place.
   const storage = env?.BUCKET
     ? new R2StorageAdapter({ publicUrlBase: '/api/media' })
     : new InMemoryStorageAdapter();
-  const auth = new UsersCollectionAuthAdapter({ devMode: !env?.AUTH_SECRET }).init({
+  const auth = new UsersCollectionAuthAdapter({
+    devMode: options.devMode ?? AUTH_DEV_MODE
+  }).init({
     ...env,
     userDatabase: database
   });

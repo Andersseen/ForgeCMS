@@ -8,6 +8,12 @@ import { base64UrlEncode } from './token-signer.js';
 const DEFAULT_PREFIX = 'forge';
 const COLLECTION_SLUG = '_forge_api_keys';
 const SECRET_BYTES = 32;
+/**
+ * Longest `<recordId>_<secret>` part accepted after the prefix (spec 069). An issued key has a 36-character
+ * UUID, `_` and a 43-character secret; anything much longer is not ours and is refused before any
+ * database lookup or hashing.
+ */
+const MAX_KEY_BODY_LENGTH = 128;
 /** Conservative default: `lastUsedAt` is only rewritten once per window, not on every request. */
 const DEFAULT_LAST_USED_THROTTLE_MS = 5 * 60 * 1000;
 
@@ -240,6 +246,7 @@ export class ApiKeyAuthAdapter implements AuthAdapter {
   private parseToken(token: string): { id: string; secret: string } | null {
     const marker = `${this.prefix}_`;
     if (!token.startsWith(marker)) return null;
+    if (token.length > marker.length + MAX_KEY_BODY_LENGTH) return null;
     const rest = token.slice(marker.length);
     const separatorIndex = rest.indexOf('_');
     if (separatorIndex <= 0) return null;

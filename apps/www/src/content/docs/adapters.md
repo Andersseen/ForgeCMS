@@ -156,7 +156,10 @@ const auth = new UsersCollectionAuthAdapter().init({ ...env, userDatabase: datab
 ```
 
 Users live in a normal collection (`users` by default) with PBKDF2-hashed passwords and an
-admin/editor/viewer role. `AUTH_SECRET` from the env signs the tokens.
+admin/editor/viewer role. `AUTH_SECRET` from the env (at least 32 bytes) signs the tokens; without it,
+`init()` throws unless you pass an explicit `{ devMode: true }` for local development. Passwords are
+bounded by `passwordPolicy` (8–1024 characters by default); see
+[Browser auth](/docs/browser-auth#production-configuration-and-abuse-limits).
 
 **Wrap the collection with `withAuthFields()`** so schema generation covers the columns the adapter
 writes:

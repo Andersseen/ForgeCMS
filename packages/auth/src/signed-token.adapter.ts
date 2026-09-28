@@ -1,20 +1,31 @@
 import type { AuthActionResult, AuthAdapter, AuthSession, AuthUser } from './index.js';
 import { ForgeAuthError } from './index.js';
-import { extractToken, issueToken, looksLikeSignedToken, validateSession } from './token-signer.js';
+import {
+  extractToken,
+  issueToken,
+  looksLikeSignedToken,
+  resolveSigningSecret,
+  validateSession
+} from './token-signer.js';
 
 export interface SignedTokenEnv {
   AUTH_SECRET?: string;
 }
 
 export interface SignedTokenAdapterOptions {
+  /**
+   * Explicit local-development opt-in: without `AUTH_SECRET`, sign with Forge's built-in, publicly known
+   * dev secret, and accept a secret shorter than 32 bytes. Never derive it from a missing secret.
+   */
   devMode?: boolean;
 }
 
 /** Demo credentials published on the login page — intentional for a public demo. */
 export const DEMO_CREDENTIALS = { email: 'demo@forgecms.dev', password: 'forgecms-demo' } as const;
 
-const DEV_SECRET = 'forgecms-dev-only-signing-secret-do-not-use-in-real-deployments';
 const DEMO_PASSWORD_HASH = 'aa4621ba371597dfbbdb49da1b6fc6e963c614581701f16a28803ad4b05ee70d';
+/** Same default ceiling as `UsersCollectionAuthAdapter` (spec 069): longer input is never hashed. */
+const MAX_PASSWORD_LENGTH = 1024;
 
 async function sha256Hex(input: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
@@ -33,21 +44,8 @@ export class SignedTokenAuthAdapter implements AuthAdapter {
   }
 
   init(env?: SignedTokenEnv): this {
-    if (env?.AUTH_SECRET) {
-      this.secret = env.AUTH_SECRET;
-      return this;
-    }
-
-    if (this.devMode) {
-      this.secret = DEV_SECRET;
-      return this;
-    }
-
-    throw new Error(
-      'SignedTokenAuthAdapter requires AUTH_SECRET to be set. ' +
-        'In development, pass { devMode: true } to the constructor to use the built-in dev secret. ' +
-        'In production, set AUTH_SECRET as an environment variable or secret.'
-    );
+    this.secret = resolveSigningSecret('SignedTokenAuthAdapter', env?.AUTH_SECRET, this.devMode);
+    return this;
   }
 
   private getSecret(): string {
@@ -83,7 +81,10 @@ export class SignedTokenAuthAdapter implements AuthAdapter {
   }
 
   async login(email: string, password: string): Promise<AuthActionResult> {
-    if (email !== DEMO_CREDENTIALS.email) return { ok: false, reason: 'invalid-credentials' };
+    // The single demo account is published, so skipping the hash for another email discloses nothing.
+    if (email !== DEMO_CREDENTIALS.email || password.length > MAX_PASSWORD_LENGTH) {
+      return { ok: false, reason: 'invalid-credentials' };
+    }
     const hash = await sha256Hex(password);
     if (hash !== DEMO_PASSWORD_HASH) return { ok: false, reason: 'invalid-credentials' };
 

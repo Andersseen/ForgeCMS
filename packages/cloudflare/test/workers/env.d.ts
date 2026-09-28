@@ -9,6 +9,8 @@ declare global {
     interface Env {
       DB: D1Database;
       BUCKET: R2Bucket;
+      AUTH_CLIENT_LIMITER: RateLimit;
+      AUTH_ACCOUNT_LIMITER: RateLimit;
     }
 
     interface GlobalProps {

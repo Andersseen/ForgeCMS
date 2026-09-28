@@ -206,7 +206,24 @@ order, falling through to the next only on an _expected_ rejection (`ForgeAuthEr
 thrown error (a DB outage, a misconfigured child adapter) propagates immediately rather than being
 reinterpreted as "unauthenticated". The HTTP layer (`handlers.ts`) follows the same rule at its own
 `auth.requireAuth()` call sites, which is what keeps a database failure a `500` rather than a
-misleading `401`.
+misleading `401`. Since spec 069 that propagated error is an `AuthResolutionError` carrying only the
+original error's class name, so the `500` log can never quote a credential.
+
+**Auth abuse bounds (spec 069).** The limits are split by who owns the input:
+
+- `@forge-cms/auth` bounds its **own formats and credential operations**. `PasswordPolicy`
+  (`minLength`/`maxLength`, default 8–1024) is checked before any PBKDF2. Forge signed tokens
+  (≤ 8192 characters) and API keys (≤ 128 characters after the prefix) are refused before decode, HMAC,
+  hash or lookup. Signing secrets go through `resolveSigningSecret`: explicit `devMode`, otherwise at
+  least 32 bytes. `login` always performs exactly one verification (a dummy hash when no account
+  matches). Third-party token formats are not bounded.
+- `@forge-cms/runtime` bounds the **HTTP transport**. `readBoundedJsonObject` stream-caps the
+  login/signup body (8 KiB, `413 PAYLOAD_TOO_LARGE`). `AuthHandlerOptions.throttle`
+  (`AuthAttemptThrottle`) is the one host hook for login/signup limiting (`429 RATE_LIMITED`). It lives
+  in the runtime because it needs the `Request` and is invoked by the handlers, and it keeps the graph
+  `auth → core/db`, never `auth → runtime`. Forge stores no rate-limit state; platform wiring
+  (Cloudflare Rate Limiting binding, WAF rule, proxy, external service) is host code, documented in
+  browser-auth.
 
 ### StorageAdapter (`@forge-cms/storage`)
 

@@ -57,6 +57,14 @@
 > **2026-09-28 update:** [spec 068](specs/068-write-access-consistency.md) closes that fix. Write
 > responses follow the caller's read access (`{ id }` when unreadable), and query-returning
 > update/delete rules are enforced inside the write itself. Next: H04.
+>
+> **2026-09-28 update:** [spec 069](specs/069-auth-abuse-bounds-and-certification.md) completes H04 and
+> with it **roadmap 0.6**. Auth bodies are stream-capped (`413`), passwords, emails, names, Forge tokens
+> and API keys are bounded before any expensive work, unknown-email login verifies like a wrong
+> password, hosts get one login/signup throttle hook (`429`), and production refuses a missing or short
+> `AUTH_SECRET` instead of falling back to the public dev secret. Version retention remains
+> "kept indefinitely" with no cleanup, and `versions.autosave` stays accepted-but-inert: both are
+> post-1.0 product follow-ups, not 0.6 features. Next: roadmap 0.7 / M01.
 
 ## Product direction
 

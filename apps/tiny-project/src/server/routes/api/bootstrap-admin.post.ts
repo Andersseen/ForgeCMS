@@ -1,13 +1,8 @@
-import {
-  defineEventHandler,
-  readBody,
-  createError,
-  setResponseHeader,
-  setResponseStatus
-} from 'h3';
+import { defineEventHandler, createError, setResponseHeader, setResponseStatus } from 'h3';
 import type { UsersCollectionAuthAdapter } from '@forge-cms/auth';
 import { buildSessionCookie } from '@forge-cms/auth';
 import { getServerRuntime } from '../../api/runtime';
+import { optionalString, readJsonBody } from '../../api/auth-request';
 
 /**
  * POST /api/bootstrap-admin — app-local, not a new Forge capability. Demonstrates the documented
@@ -27,21 +22,20 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'Already initialized' });
   }
 
-  let body: { email?: string; password?: string; name?: string };
-  try {
-    body = await readBody(event);
-  } catch {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid JSON body' });
-  }
+  // Bounded like login/signup (spec 069) — this route is public until the first admin exists.
+  const body = await readJsonBody(event);
+  const email = optionalString(body, 'email');
+  const password = optionalString(body, 'password');
+  const name = optionalString(body, 'name');
 
-  if (!body.email || !body.password) {
+  if (!email || !password) {
     throw createError({ statusCode: 400, statusMessage: 'Missing email or password' });
   }
 
   const created = await auth.createUser({
-    email: body.email,
-    password: body.password,
-    ...(body.name !== undefined && { name: body.name })
+    email,
+    password,
+    ...(name !== undefined && { name })
     // No `role`: the adapter always bootstraps the first-ever user to admin (spec 053).
   });
 
@@ -49,7 +43,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: created.reason });
   }
 
-  const login = await auth.login(body.email, body.password);
+  const login = await auth.login(email, password);
   if (login.ok) {
     setResponseHeader(
       event,

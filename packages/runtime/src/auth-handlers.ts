@@ -4,7 +4,8 @@ import type { AuthFailureReason } from '@forge-cms/auth';
 import { ForgeAuthError, buildLogoutCookie, buildSessionCookie } from '@forge-cms/auth';
 import type { AnyForgeCmsRuntime } from './runtime.js';
 import { assertCsrfSafe } from './csrf.js';
-import { InvalidInputError, isForgeError, toApiErrorBody } from './errors.js';
+import { readBoundedJsonObject, resolveMaxBodyBytes } from './body.js';
+import { RateLimitedError, isForgeError, toApiErrorBody } from './errors.js';
 
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -17,12 +18,26 @@ function errorResponse(code: string, message: string, status: number): Response 
   return jsonResponse({ error: { code, message } }, status);
 }
 
-function toErrorResponse(err: unknown): Response {
+type AuthOperation = 'login' | 'signup' | 'logout' | 'me';
+
+/**
+ * Expected failures (typed `ForgeError`s: bad JSON, 413, 429, CSRF, …) are responses, never log lines.
+ * An unexpected one is logged as metadata only — the operation and the error's class name — because an
+ * adapter's, driver's or host throttle's error message can quote whatever it was handed: a password,
+ * a token, a cookie, the request body (spec 069).
+ */
+function toErrorResponse(err: unknown, operation: AuthOperation): Response {
   if (isForgeError(err)) {
-    const body = toApiErrorBody(err);
-    return jsonResponse(body, err.status);
+    const response = jsonResponse(toApiErrorBody(err), err.status);
+    if (err instanceof RateLimitedError && err.retryAfterSeconds !== undefined) {
+      response.headers.set('retry-after', String(err.retryAfterSeconds));
+    }
+    return response;
   }
-  getLogger().error('Unexpected error in auth handler', err);
+  getLogger().error('Unexpected error in auth handler', {
+    operation,
+    error: err instanceof Error ? err.name : typeof err
+  });
   return errorResponse('INTERNAL_ERROR', 'An unexpected error occurred', 500);
 }
 
@@ -42,21 +57,84 @@ export function authFailureResponse(reason: AuthFailureReason): Response {
       return errorResponse('INVALID_INPUT', 'Password does not meet requirements', 400);
     case 'email-in-use':
       return errorResponse('UNIQUE_CONSTRAINT', 'Email is already in use', 409);
+    case 'invalid-name':
+      return errorResponse('INVALID_INPUT', 'Invalid name', 400);
   }
 }
 
-async function readJsonBody(request: Request): Promise<Record<string, unknown>> {
-  try {
-    return (await request.json()) as Record<string, unknown>;
-  } catch {
-    throw new InvalidInputError('Invalid JSON body');
-  }
+/** One login or signup attempt, as handed to the host's {@link AuthAttemptThrottle} (spec 069). */
+export interface AuthAttempt {
+  action: 'login' | 'signup';
+  /**
+   * The submitted email, trimmed and lower-cased — the same canonical form the users adapter looks up.
+   * It is what was *submitted*: it says nothing about whether such an account exists.
+   */
+  identifier: string;
+  /** The original request, for host policy (a client address, a tenant header, …). Its body is consumed. */
+  request: Request;
 }
+
+export type AuthAttemptDecision =
+  | { allowed: true }
+  | {
+      allowed: false;
+      /** Seconds until a retry may succeed. Emitted as `Retry-After` when a finite number > 0. */
+      retryAfterSeconds?: number;
+    };
+
+/**
+ * A host-provided limiter for login/signup (spec 069). Forge calls it exactly once per well-formed
+ * attempt — after the bounded body is parsed and before any credential lookup or password hashing —
+ * with the same arguments whether or not the account exists. Forge keeps no counters: the host decides
+ * the key(s) (identifier, client, tenant, a combination) and where the state lives (a Cloudflare Rate
+ * Limiting binding, a proxy, an external service). A rejection is `429 RATE_LIMITED`; a throw or any
+ * result other than `{ allowed: true | false }` fails closed as `500`.
+ */
+export type AuthAttemptThrottle = (
+  attempt: AuthAttempt
+) => AuthAttemptDecision | Promise<AuthAttemptDecision>;
 
 export interface AuthHandlerOptions<TEnv = unknown> {
   runtime: AnyForgeCmsRuntime<TEnv>;
   /** Omit the cookie's `Secure` attribute — only for local `http://` development. Defaults to `true`. */
   cookie?: { secure?: boolean };
+  /**
+   * Login/signup only: the host's attempt limiter. Omitted, nothing is throttled (unchanged behaviour).
+   * Ignored by `handleLogout`/`handleMe`.
+   */
+  throttle?: AuthAttemptThrottle;
+  /**
+   * Login/signup only: the largest accepted JSON body, in bytes. Defaults to
+   * `DEFAULT_AUTH_MAX_BODY_BYTES` (8 KiB); raise it only with `passwordPolicy.maxLength`. An integer
+   * from 1 to 1 MiB; anything else makes the handler throw (a configuration error, not a response).
+   */
+  maxBodyBytes?: number;
+}
+
+/** `Retry-After` must be a positive whole number of seconds; clamp absurd values to one day. */
+const MAX_RETRY_AFTER_SECONDS = 24 * 60 * 60;
+
+async function enforceThrottle(
+  throttle: AuthAttemptThrottle | undefined,
+  attempt: AuthAttempt
+): Promise<void> {
+  if (!throttle) return;
+  const decision = (await throttle(attempt)) as Partial<AuthAttemptDecision> | null | undefined;
+  if (decision?.allowed === true) return;
+  if (decision?.allowed !== false) {
+    throw new Error('The auth throttle returned neither { allowed: true } nor { allowed: false }');
+  }
+  const retry = 'retryAfterSeconds' in decision ? decision.retryAfterSeconds : undefined;
+  const retryAfter =
+    typeof retry === 'number' && Number.isFinite(retry) && retry > 0
+      ? Math.min(Math.ceil(retry), MAX_RETRY_AFTER_SECONDS)
+      : undefined;
+  throw new RateLimitedError(retryAfter);
+}
+
+/** The canonical identifier handed to the throttle — the users adapter's own email normalisation. */
+function canonicalIdentifier(email: string): string {
+  return email.trim().toLowerCase();
 }
 
 export interface SignupHandlerOptions<TEnv = unknown> extends AuthHandlerOptions<TEnv> {
@@ -68,6 +146,8 @@ export interface SignupHandlerOptions<TEnv = unknown> extends AuthHandlerOptions
  * `POST` `{ email, password }` → `{ data: { user, token } }` (unchanged shape — Bearer-compatible)
  * plus a `Set-Cookie` that starts a browser session. `404` if the configured `AuthAdapter` doesn't
  * implement `login`.
+ *
+ * Order (spec 069): bounded body (`413`/`400`) → `options.throttle` (`429`) → `auth.login` → response.
  */
 export async function handleLogin<TEnv = unknown>(
   context: ApiContext<TEnv>,
@@ -78,14 +158,21 @@ export async function handleLogin<TEnv = unknown>(
     return errorResponse('NOT_FOUND', 'Login is not supported by the configured auth adapter', 404);
   }
 
+  // A bad `maxBodyBytes` is a host configuration error: thrown as is, never mapped to a response.
+  const maxBytes = resolveMaxBodyBytes(options.maxBodyBytes);
   try {
-    const body = await readJsonBody(context.request);
+    const body = await readBoundedJsonObject(context.request, { maxBytes });
     const email = typeof body['email'] === 'string' ? body['email'] : undefined;
     const password = typeof body['password'] === 'string' ? body['password'] : undefined;
     if (!email || !password) {
       return errorResponse('INVALID_INPUT', 'Missing email or password', 400);
     }
 
+    await enforceThrottle(options.throttle, {
+      action: 'login',
+      identifier: canonicalIdentifier(email),
+      request: context.request
+    });
     const result = await auth.login(email, password);
     if (!result.ok) return authFailureResponse(result.reason);
 
@@ -96,7 +183,7 @@ export async function handleLogin<TEnv = unknown>(
     );
     return response;
   } catch (err) {
-    return toErrorResponse(err);
+    return toErrorResponse(err, 'login');
   }
 }
 
@@ -104,7 +191,9 @@ export async function handleLogin<TEnv = unknown>(
  * `POST` `{ email, password, name? }` → `{ data: { user, token } }` + `Set-Cookie`. Any other body
  * field (e.g. a `role`) is never read — role escalation through this endpoint is structurally
  * impossible, not merely hidden. `404` when `options.enabled` is `false` or the adapter doesn't
- * implement `signup`.
+ * implement `signup` — decided before the body is read or the throttle is called.
+ *
+ * Order (spec 069): bounded body (`413`/`400`) → `options.throttle` (`429`) → `auth.signup` → response.
  */
 export async function handleSignup<TEnv = unknown>(
   context: ApiContext<TEnv>,
@@ -123,8 +212,10 @@ export async function handleSignup<TEnv = unknown>(
     );
   }
 
+  // A bad `maxBodyBytes` is a host configuration error: thrown as is, never mapped to a response.
+  const maxBytes = resolveMaxBodyBytes(options.maxBodyBytes);
   try {
-    const body = await readJsonBody(context.request);
+    const body = await readBoundedJsonObject(context.request, { maxBytes });
     const email = typeof body['email'] === 'string' ? body['email'] : undefined;
     const password = typeof body['password'] === 'string' ? body['password'] : undefined;
     const name = typeof body['name'] === 'string' ? body['name'] : undefined;
@@ -132,6 +223,11 @@ export async function handleSignup<TEnv = unknown>(
       return errorResponse('INVALID_INPUT', 'Missing email or password', 400);
     }
 
+    await enforceThrottle(options.throttle, {
+      action: 'signup',
+      identifier: canonicalIdentifier(email),
+      request: context.request
+    });
     const result = await auth.signup({ email, password, ...(name !== undefined && { name }) });
     if (!result.ok) return authFailureResponse(result.reason);
 
@@ -142,7 +238,7 @@ export async function handleSignup<TEnv = unknown>(
     );
     return response;
   } catch (err) {
-    return toErrorResponse(err);
+    return toErrorResponse(err, 'signup');
   }
 }
 
@@ -158,7 +254,7 @@ export async function handleLogout<TEnv = unknown>(
   try {
     assertCsrfSafe(context.request);
   } catch (err) {
-    return toErrorResponse(err);
+    return toErrorResponse(err, 'logout');
   }
 
   const response = new Response(null, { status: 204 });
@@ -181,6 +277,6 @@ export async function handleMe<TEnv = unknown>(
     if (err instanceof ForgeAuthError) {
       return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
     }
-    return toErrorResponse(err);
+    return toErrorResponse(err, 'me');
   }
 }
