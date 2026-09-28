@@ -1,5 +1,167 @@
 # @forge-cms/db
 
+## 0.6.0
+
+### Minor Changes
+
+- 31bae06: Atomic write batches (spec 060): an ordered list of database writes that all commit or none do — and
+  first-admin provisioning now uses it, so a failed first-user creation can no longer burn the bootstrap
+  claim.
+
+  **Breaking for custom `DatabaseAdapter` implementations.** `DatabaseAdapter` gains one required member,
+  `atomicWrite(operations)`, plus the exported types `AtomicWriteOperation` and `AtomicWriteResult`, the
+  error `AtomicWriteConditionError` (`isAtomicWriteConditionError`), and the constant
+  `ATOMIC_WRITE_MAX_OPERATIONS` (25). A batch is declarative, data-only and database-only — not a callback
+  transaction, and never spanning object storage. Operations mirror the existing methods one to one:
+  `{ type: 'create' | 'update' | 'delete' | 'updateIf' | 'deleteIf', collection, … }`. They run in order
+  (later ones see earlier ones), results come back in the same order, and any failure rolls everything
+  back: a unique violation rejects with `UniqueConstraintError` (its `collection` names the conflicting
+  table), a plain `update` of a missing row rejects with `AtomicWriteConditionError`, and `updateIf` /
+  `deleteIf` (which reuse spec 059's `WriteCondition` unchanged) report `applied: false` — a valid result —
+  unless `requireApplied: true`, which fails the whole batch. Invalid input (too many operations, a
+  malformed operation, on SQL adapters an unknown column or unregistered collection) rejects before
+  anything is written. `InMemoryDatabaseAdapter` stages the batch and publishes it in one synchronous turn;
+  `LibSqlDatabaseAdapter` runs one `client.batch(statements, 'write')`; `D1DatabaseAdapter` runs one D1
+  `batch()`. Retry: `UniqueConstraintError`/`AtomicWriteConditionError` mean "known rolled back"; a network
+  failure after the request left the process is outcome-unknown, so don't blindly retry — supply your own
+  unique keys (on the SQL adapters, ids too) so a retry is recognisable. There is no exactly-once promise.
+
+  If you implement `DatabaseAdapter` yourself, add `atomicWrite` (it must be genuinely atomic; a loop of
+  independent writes is not an implementation — `UsersCollectionAuthAdapter` refuses an adapter without it),
+  reuse the exported `assertValidAtomicWrite`, `toAtomicWriteError`, `atomicWriteMustApply` (which
+  operations must be followed by the guard statement) and `ATOMIC_WRITE_REQUIRE_APPLIED_SQL` helpers if you
+  are SQLite-based, and run the new `runDatabaseAdapterAtomicWriteContractTests` from
+  `@forge-cms/testing/contracts`. Also fixed: `InMemoryDatabaseAdapter.update()` no longer rewrites a row's
+  primary key when `data` contains an `id` (the SQL adapters always ignored it).
+
+  `@forge-cms/auth`: `UsersCollectionAuthAdapter` provisions the first administrator with **one**
+  `atomicWrite` — the `_forge_bootstrap` claim and the admin user commit together or not at all. Before,
+  the claim committed first and the user second, so a failure of the second write (a database error, or
+  two simultaneous submissions of the same first signup) left the claim consumed with no administrator, and
+  every later signup became `viewer`. Concurrent first signups still yield exactly one admin. `init()` now
+  also requires `userDatabase.atomicWrite` and throws an explicit error without it. The claim row is
+  unchanged, so existing databases work as-is. **A database whose claim was already burned this way**
+  (claim present, no admin) is deliberately not auto-repaired — public signup stays `viewer`, because
+  "claim present, no admin" is indistinguishable from an intentionally emptied admin set. Recover from
+  trusted server code with `auth.createUser({ email, password, role: 'admin' })` or
+  `auth.updateUser(existingUserId, { role: 'admin' })`; neither touches the claim. Not covered: the generic
+  content CRUD routes on the users collection do not go through `UsersCollectionAuthAdapter`.
+
+  `@forge-cms/testing`: adds `runDatabaseAdapterAtomicWriteContractTests` and
+  `runFirstAdminBootstrapContractTests` (barrier-held concurrent first signups on independent adapters, the
+  failed-first-creation regression with fault injection, and the burned-claim compatibility cases);
+  `createWriteGate` now also holds `create` and `atomicWrite`.
+
+- 664ad5b: Conditional writes (spec 059): the last-admin invariant is now decided by the database inside one
+  write, closing the concurrency gap spec 058 could only mitigate.
+
+  **Breaking for custom `DatabaseAdapter` implementations.** `DatabaseAdapter` gains two required
+  members, `updateIf(collection, id, data, condition)` and `deleteIf(collection, id, condition)`, plus the
+  exported types `WriteCondition`, `ConditionalUpdateResult` and `ConditionalDeleteResult`. Each applies a
+  write only if `condition` holds, with the check and the write as one atomic step against every other
+  writer; a missing row or an unmet condition returns `{ applied: false }` (not an error), and failures
+  reject — they are never reported as "not applied". `WriteCondition` has two optional clauses:
+  `targetMatches` (per-row compare-and-set) and `keepAtLeast: { where, others }` (the target may leave the
+  set matching `where` only while at least `others` other rows stay in it). If you implement
+  `DatabaseAdapter` yourself, add both methods (a single SQL statement such as
+  `UPDATE … WHERE id = ? AND <condition> RETURNING *` is what the built-in SQL adapters use; see
+  `@forge-cms/db`'s `LibSqlDatabaseAdapter`) and run the new
+  `runDatabaseAdapterConditionalWriteContractTests` from `@forge-cms/testing/contracts`.
+  `InMemoryDatabaseAdapter`, `LibSqlDatabaseAdapter` and `D1DatabaseAdapter` implement it; the two SQL
+  adapters use one guarded statement, so it holds across independent Workers/processes. `InMemory` is
+  atomic within one adapter instance only.
+
+  `@forge-cms/auth`: `UsersCollectionAuthAdapter.updateUser`/`deleteUser` no longer read an admin count,
+  write, re-check and compensate. Demoting or deleting an admin is one guarded conditional write, so two
+  concurrent last-admin mutations can no longer leave a users collection with zero admins; exactly one of
+  two conflicting mutations succeeds and the other is refused with `UserMutationError` (`'last-admin'`).
+  The guard is scoped to the configured users collection. An update that cannot remove admin privilege is
+  still an ordinary update. `init()` now throws an explicit error if `userDatabase` does not implement
+  `updateIf`/`deleteIf`, rather than failing at the first demotion. Unchanged: first-admin bootstrap,
+  sessions, `_sessionVersion`, API keys and logout. Not covered: the generic content CRUD routes on the
+  users collection do not go through `UsersCollectionAuthAdapter` and are not protected by this guard.
+
+  `@forge-cms/testing`: adds `runDatabaseAdapterConditionalWriteContractTests`,
+  `runLastAdminConcurrencyContractTests` and `createWriteGate` — a barrier that holds every party's write
+  until all have reached it, so a check-then-write race is forced open deterministically instead of hoped
+  for.
+
+- 2f25944: Globals and localization now behave as documented (spec 066, roadmap D04 part 1).
+  - **Global access queries are enforced.** An `access.read`/`access.update` rule that returns a query
+    (e.g. `{ region: 'eu' }`) used to be treated as "allowed". Now a read of a row the query does not
+    match returns `null` (HTTP `404`, as for an unconfigured global). An update needs the stored row to
+    match (`403`), and such a rule can no longer authorize the first write, because there is no row to
+    match yet.
+  - **Global writes after the first are partial**, like a collection `update()`:
+    - omitted fields keep their stored values;
+    - `defaultValue`s and the draft status apply only to the first write (before, a write without
+      `_status` put a published global back to draft, and defaulted fields were reset);
+    - validation runs on the merged document, so a required field no longer has to be re-sent;
+    - `beforeValidate` hooks receive `previousData`;
+    - `slug` fields with `autoGenerate` are generated.
+  - **Simultaneous first writes to a global:** exactly one commits. The other gets `409
+CONCURRENT_MODIFICATION` instead of an internal unique-constraint error that named the
+    `_global_<slug>` table.
+  - **Localized globals.** `defineGlobal({ locales: [...] })`, plus `locale` on
+    `getGlobalDocument`/`updateGlobalDocument` and `?locale=` on the global HTTP routes. Writing one
+    locale keeps the others. Two simultaneous per-locale edits (each written with `locale`) cannot silently drop one: the
+    second gets a `409`. An undeclared locale is a `400`.
+  - **Localization works on libSQL and D1.** A `localized` field's per-locale map was bound as a plain
+    column value, so every write failed on SQL adapters. It is now stored as JSON in a TEXT column (new
+    `encodeFieldValue`/`decodeFieldValue` in `@forge-cms/db`, used by both SQL adapters).
+  - **Refused at startup** instead of accepted and broken:
+    - a localized field with no `locales` declared;
+    - a localized field of a kind other than `text`/`textarea`;
+    - a localized field nested in `group`/`array`/`blocks`;
+    - `access.create`/`access.delete` or delete hooks on a global.
+  - `InMemoryDatabaseAdapter` (and the D1 unit-test mock) now reject a second row with an existing `id`
+    as a unique conflict, as libSQL and D1 always did.
+  - `@forge-cms/testing/contracts`: `runGlobalLifecycleContractTests` and `globalLifecycleGlobals`, a
+    two-writer contract (run on InMemory, on-disk libSQL and local D1). The DatabaseAdapter contract adds
+    a localized round-trip and a duplicate-id case.
+
+- 3703fb7: Relation lifecycle is now atomic and race-safe (spec 064).
+  - **`atomicWrite` gains `assertCount`** (`@forge-cms/db`, InMemory, libSQL, D1): a read-only
+    precondition `{ type: 'assertCount', collection, where?, equals }` that fails the whole batch with
+    `AtomicWriteConditionError` unless exactly `equals` rows match at that point of the batch. It is the
+    cross-collection guard spec 060 left open. `equals` must be a non-negative integer (`RangeError`).
+  - **Deletes commit their whole relation graph in one batch.** `runtime.delete()` plans every cascade,
+    set-null and restrict consequence with reads only. It then runs all before-hooks and validation, and
+    commits the set-null updates, the cascaded deletes, the root delete and "no reference remains"
+    assertions in one `atomicWrite`. A late hook, validation or database failure no longer leaves earlier
+    cascade steps committed. A reference created concurrently makes the delete fail with `409
+CONCURRENT_MODIFICATION`, and so does a dependent edited since it was planned. Restrict is judged
+    against the final state: a referrer deleted in the same plan does not block. A plan needing more than
+    25 operations is refused before any hook or write; it is never chunked.
+  - **Writes validate relation targets.** `create`/`update`/`updateGlobal` refuse a relation or upload
+    value naming a missing document (`400 INVALID_INPUT`, one `count` per target collection). They also
+    carry an `assertCount` in the same batch as the write, and as the version snapshot on a versioned
+    collection. A target deleted concurrently is a `409`. Updates validate only the relation values they
+    change.
+  - **Upload fields restrict**, and **a global's relation/upload fields restrict**, deletion of their
+    target.
+  - **Breaking — unsupported reference shapes are refused at startup.** The `ForgeCmsRuntime` constructor
+    throws for any of these:
+    - a `relation`/`upload` inside `group`/`array`/`blocks`;
+    - a localized `relation`/`upload` (which could never be written);
+    - a relation to an unregistered collection;
+    - a global relation with `onDelete` other than `restrict`;
+    - `cascade`/`set-null` onto an auth-managed collection.
+      Migration: lift the reference to a top-level field, or keep the id in a `text`/`json` field as an
+      explicit unchecked reference. Persisted data is never touched.
+  - `ConcurrentModificationError` accepts an optional `message`. `validateRelationSchema` is exported.
+    `handleCascadeDelete`/`handleSetNullOnDelete`/`checkDeleteRestrictions` are deprecated (not atomic;
+    no longer used by `runtime.delete()`). `findOrphanedDocuments` also reports `upload` fields.
+  - `@forge-cms/testing/contracts`: new `assertCount` cases in the atomic-write contract (it now also
+    uses an `atomic_refs` table) and a new `runRelationLifecycleContractTests` two-writer suite
+    (`createBatchHold`, `relationLifecycleCollections`).
+
+### Patch Changes
+
+- Updated dependencies [2f25944]
+- Updated dependencies [b2c32c3]
+  - @forge-cms/core@0.6.0
+
 ## 0.5.0
 
 ### Patch Changes
