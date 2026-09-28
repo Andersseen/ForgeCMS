@@ -1,7 +1,56 @@
 import type { AuthSession, AuthUser } from './index.js';
 import { parseCookieToken } from './cookie.js';
+import { SESSION_TTL_SECONDS } from './session-lifetime.js';
 
-const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const TOKEN_TTL_MS = SESSION_TTL_SECONDS * 1000;
+
+/**
+ * The longest signed token Forge accepts (spec 069). Checked before any split, base64 decode or HMAC,
+ * so an oversized credential fails for the cost of a length comparison. A token Forge issues carries
+ * `sub`, `email` (≤ 254 characters), `name` (≤ 256), role(s), `sv` and `exp`: a few KB at most, and a
+ * browser cookie cannot hold more than ~4 KB anyway. Applies only to Forge's own token format, never to
+ * a third-party adapter's.
+ */
+export const MAX_SIGNED_TOKEN_LENGTH = 8192;
+
+/**
+ * Minimum production signing-secret size (spec 069): 32 bytes of UTF-8, the HMAC-SHA256 output size —
+ * RFC 2104 recommends a key no shorter than the hash output.
+ */
+export const MIN_SIGNING_SECRET_BYTES = 32;
+
+/** Publicly known, so it may only ever be used under an explicit `devMode: true`. */
+const DEV_SIGNING_SECRET = 'forgecms-dev-only-signing-secret-do-not-use-in-real-deployments';
+
+/**
+ * The signing secret an adapter uses (spec 069). Development mode is an explicit decision of the host —
+ * `devMode: true` — and never follows from a missing secret: without `devMode` a missing secret, or one
+ * shorter than {@link MIN_SIGNING_SECRET_BYTES}, fails configuration. The error never contains the secret.
+ * Under `devMode` any provided secret is used as is, and none falls back to the public dev secret.
+ */
+export function resolveSigningSecret(
+  adapterName: string,
+  secret: string | undefined,
+  devMode: boolean
+): string {
+  if (secret) {
+    if (devMode || new TextEncoder().encode(secret).byteLength >= MIN_SIGNING_SECRET_BYTES) {
+      return secret;
+    }
+    throw new Error(
+      `${adapterName}: AUTH_SECRET is too short. A production signing secret must be at least ` +
+        `${MIN_SIGNING_SECRET_BYTES} bytes (UTF-8); generate one with \`openssl rand -base64 48\`. ` +
+        'Rotating it invalidates every issued session.'
+    );
+  }
+  if (devMode) return DEV_SIGNING_SECRET;
+  throw new Error(
+    `${adapterName} requires AUTH_SECRET to be set. ` +
+      'For local development only, pass { devMode: true } to the constructor to use the built-in, ' +
+      'publicly known dev secret; a missing secret never enables it. ' +
+      'In production, set AUTH_SECRET (at least 32 bytes) as an environment variable or secret.'
+  );
+}
 
 interface TokenPayload {
   sub: string;
@@ -56,6 +105,7 @@ function getKey(secret: string): Promise<CryptoKey> {
  * contains a `.`).
  */
 export function looksLikeSignedToken(token: string): boolean {
+  if (token.length > MAX_SIGNED_TOKEN_LENGTH) return false;
   const parts = token.split('.');
   return parts.length === 2 && parts.every((part) => part.length > 0);
 }
@@ -106,7 +156,7 @@ export async function issueToken(
 }
 
 export async function validateSession(secret: string, token: string): Promise<AuthSession | null> {
-  if (!token) return null;
+  if (!token || token.length > MAX_SIGNED_TOKEN_LENGTH) return null;
   const parts = token.split('.');
   if (parts.length !== 2) return null;
   const [payloadPart, signaturePart] = parts as [string, string];

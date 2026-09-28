@@ -281,6 +281,21 @@ function parseOffset(url: URL): number | undefined {
 
 // --- auth ------------------------------------------------------------------------------------
 
+/**
+ * What an unexpected `requireAuth` failure becomes before it reaches the `500` log (spec 069): an auth
+ * adapter's (or its driver's) error message can quote the credential it was handed — a Bearer token, a
+ * cookie, an API key — so only the original error's class name survives. It is still a `500`, never a
+ * misleading `401`.
+ */
+class AuthResolutionError extends Error {
+  constructor(cause: unknown) {
+    super(
+      `Authentication failed unexpectedly (${cause instanceof Error ? cause.name : typeof cause})`
+    );
+    this.name = 'AuthResolutionError';
+  }
+}
+
 type AuthorizationResult =
   | { success: true; user: AuthUser }
   | { success: false; response: Response };
@@ -301,7 +316,7 @@ async function authorize<TEnv>(
     if (err instanceof ForgeAuthError) {
       return { success: false, response: errorResponse('UNAUTHORIZED', 'Unauthorized', 401) };
     }
-    throw err;
+    throw new AuthResolutionError(err);
   }
 
   if (allowedRoles !== undefined && !hasAnyRole(user, allowedRoles)) {
@@ -321,7 +336,7 @@ export async function resolveOptionalUser<TEnv>(
     // Same rule as `authorize`: no credential, or one the adapter rejects, means anonymous. An
     // unexpected internal error must still propagate rather than be silently treated as "no user".
     if (err instanceof ForgeAuthError) return null;
-    throw err;
+    throw new AuthResolutionError(err);
   }
 }
 

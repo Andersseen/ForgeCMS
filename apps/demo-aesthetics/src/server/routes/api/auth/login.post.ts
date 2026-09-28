@@ -1,7 +1,8 @@
-import { defineEventHandler, toWebRequest } from 'h3';
+import { defineEventHandler } from 'h3';
 import type { ApiContext } from '@forge-cms/api';
 import { handleLogin } from '@forge-cms/runtime';
 import { getServerRuntime } from '../../../api/runtime';
+import { toCancellableWebRequest } from '../../../api/auth-request';
 
 /**
  * POST /api/auth/login
@@ -13,7 +14,7 @@ import { getServerRuntime } from '../../../api/runtime';
 export default defineEventHandler(async (event) => {
   const runtime = await getServerRuntime(event.context.cloudflare?.env);
   const context: ApiContext = {
-    request: toWebRequest(event),
+    request: toCancellableWebRequest(event),
     env: event.context.cloudflare?.env
   };
   return handleLogin(context, { runtime, cookie: { secure: !!event.context.cloudflare?.env } });

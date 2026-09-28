@@ -36,9 +36,18 @@ export {
   handleMe,
   authFailureResponse,
   type AuthHandlerOptions,
-  type SignupHandlerOptions
+  type SignupHandlerOptions,
+  type AuthAttempt,
+  type AuthAttemptDecision,
+  type AuthAttemptThrottle
 } from './auth-handlers.js';
 export { assertCsrfSafe } from './csrf.js';
+// Bounded JSON bodies for auth routes (spec 069)
+export {
+  readBoundedJsonObject,
+  DEFAULT_AUTH_MAX_BODY_BYTES,
+  type ReadBoundedJsonOptions
+} from './body.js';
 
 // Field defaults and auto-slugs (spec 040)
 export { applyFieldDefaults, applyAutoSlugs } from './defaults.js';
@@ -125,6 +134,8 @@ export {
   UniqueConstraintError,
   AuthManagedCollectionError,
   ConcurrentModificationError,
+  PayloadTooLargeError,
+  RateLimitedError,
   isForgeError,
   toApiErrorBody,
   type ForgeErrorCode,

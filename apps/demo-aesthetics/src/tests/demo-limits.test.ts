@@ -105,7 +105,7 @@ describe('content-model guardrails', () => {
   let cms: ForgeCmsRuntime<ServerEnv>;
 
   beforeEach(async () => {
-    cms = createRuntime();
+    cms = createRuntime(undefined, { devMode: true });
     await cms.syncSchema();
     await seedContent(cms);
   });

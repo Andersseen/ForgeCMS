@@ -21,7 +21,7 @@ const AS_VISITOR = { overrideAccess: false, user: null } as const;
 let cms: ForgeCmsRuntime<ServerEnv>;
 
 beforeEach(async () => {
-  cms = createRuntime();
+  cms = createRuntime(undefined, { devMode: true });
   await cms.syncSchema();
   await seedContent(cms);
 });

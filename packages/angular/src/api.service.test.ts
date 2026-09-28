@@ -260,6 +260,29 @@ describe('CmsApiService — auth actions', () => {
     expect(err.status).toBe(409);
   });
 
+  it('login/signup keep the 413 PAYLOAD_TOO_LARGE and 429 RATE_LIMITED codes and statuses (spec 069)', async () => {
+    const api = createService();
+    const cases = [
+      { status: 413, code: 'PAYLOAD_TOO_LARGE', message: 'Request body is too large' },
+      { status: 429, code: 'RATE_LIMITED', message: 'Too many authentication attempts' }
+    ];
+    for (const { status, code, message } of cases) {
+      respond = () => jsonResponse({ error: { code, message } }, status);
+      for (const call of [
+        () => api.login('a@b.com', 'longenough'),
+        () => api.signup({ email: 'a@b.com', password: 'longenough' })
+      ]) {
+        const err = await call().catch((e) => e);
+        expect(err).toBeInstanceOf(ApiAuthActionError);
+        expect(err.code).toBe(code);
+        expect(err.status).toBe(status);
+        expect(err.message).toBe(message);
+        expect(String(err)).not.toContain('[object Object]');
+      }
+    }
+    expect(api.unauthorized()).toBe(0);
+  });
+
   it('bumps the unauthorized signal once per observed 401 (for ForgeAuthSession)', async () => {
     const api = createService();
     respond = () => jsonResponse({ error: 'Unauthorized' }, 401);

@@ -72,7 +72,10 @@ describe('UsersCollectionAuthAdapter', () => {
   it('init() succeeds with AUTH_SECRET', () => {
     const db = new InMemoryDatabaseAdapter();
     expect(() =>
-      new UsersCollectionAuthAdapter().init({ AUTH_SECRET: 'test-secret', userDatabase: db })
+      new UsersCollectionAuthAdapter().init({
+        AUTH_SECRET: 'test-secret-that-is-at-least-32-bytes-long',
+        userDatabase: db
+      })
     ).not.toThrow();
   });
 

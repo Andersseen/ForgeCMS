@@ -11,6 +11,8 @@ export type ForgeErrorCode =
   | 'UNIQUE_CONSTRAINT'
   | 'AUTH_MANAGED_COLLECTION'
   | 'CONCURRENT_MODIFICATION'
+  | 'PAYLOAD_TOO_LARGE'
+  | 'RATE_LIMITED'
   | 'INTERNAL_ERROR';
 
 export class ForgeError extends Error {
@@ -152,6 +154,31 @@ export class ConcurrentModificationError extends ForgeError {
     );
     this.collection = collection;
     this.id = id;
+  }
+}
+
+/**
+ * A request body over a Forge-owned size bound (spec 069; today: the auth JSON bodies read by
+ * `readBoundedJsonObject`). Says nothing about the body's contents.
+ */
+export class PayloadTooLargeError extends ForgeError {
+  constructor(message = 'Request body is too large') {
+    super(message, 413, 'PAYLOAD_TOO_LARGE');
+  }
+}
+
+/**
+ * The host's auth throttle refused a login/signup attempt (spec 069). The message is fixed and generic:
+ * it never says whether the account exists, which limit fired or how many attempts remain.
+ * `retryAfterSeconds` is already validated (a positive integer) when present; the auth handlers emit it
+ * as `Retry-After`.
+ */
+export class RateLimitedError extends ForgeError {
+  readonly retryAfterSeconds?: number;
+
+  constructor(retryAfterSeconds?: number) {
+    super('Too many authentication attempts', 429, 'RATE_LIMITED');
+    if (retryAfterSeconds !== undefined) this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 

@@ -222,6 +222,14 @@ const siteSettingsGlobal = defineGlobal({
 
 const globals = [siteSettingsGlobal];
 
+/**
+ * Development mode is an explicit decision (spec 069), never "the secret is missing": Nitro replaces
+ * `import.meta.dev` with `true` only under the Analog dev server (`pnpm dev`) and with `false` in every
+ * build — deployed, or previewed with `wrangler pages dev`. A build without `AUTH_SECRET` (at least 32
+ * bytes) therefore refuses to start instead of signing sessions with Forge's public dev secret.
+ */
+const AUTH_DEV_MODE = import.meta.dev === true;
+
 let runtimePromise: Promise<ForgeCmsRuntime<ServerEnv>> | undefined;
 
 /**
@@ -239,7 +247,7 @@ export function getServerRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<Serve
 
 async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>> {
   const database = env?.DB ? new D1DatabaseAdapter() : new InMemoryDatabaseAdapter();
-  const auth = new UsersCollectionAuthAdapter({ devMode: !env?.AUTH_SECRET }).init({
+  const auth = new UsersCollectionAuthAdapter({ devMode: AUTH_DEV_MODE }).init({
     ...env,
     userDatabase: database
   });

@@ -104,8 +104,14 @@ deploy. It needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets.
 pnpm exec wrangler pages secret put AUTH_SECRET --project-name=my-app
 ```
 
-`AUTH_SECRET` signs auth tokens. Set it before you have real users — rotating it invalidates every
-issued token.
+`AUTH_SECRET` signs auth tokens. It must be at least 32 bytes (`openssl rand -base64 48`), and a build
+without it refuses to start rather than falling back to Forge's public development secret — dev mode is
+only ever an explicit `devMode: true` (see [Browser auth](/docs/browser-auth#production-configuration-and-abuse-limits)).
+Set it before you have real users — rotating it invalidates every issued token.
+
+Login and signup throttling belongs to the platform: a WAF rate limiting rule on `/api/auth/login` and
+`/api/auth/signup` for a Pages project, or a Workers Rate Limiting binding passed to `handleLogin`'s
+`throttle` option for a Worker.
 
 ## 7. Verify the deploy
 
@@ -123,7 +129,8 @@ pnpm build
 pnpm exec wrangler pages dev apps/www/dist/analog/public --d1 DB --r2 BUCKET
 ```
 
-That runs the actual production build with local emulations of D1 and R2 — worth doing before
+A production build needs `AUTH_SECRET` here too: put it in a git-ignored `.dev.vars` next to
+`wrangler.toml`. That runs the actual production build with local emulations of D1 and R2 — worth doing before
 shipping, because the Vite dev server uses in-memory adapters and cannot reproduce SQL-level bugs.
 
 ## What's actually verified against real Cloudflare bindings

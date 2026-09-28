@@ -1,7 +1,8 @@
-import { defineEventHandler, toWebRequest } from 'h3';
+import { defineEventHandler } from 'h3';
 import type { ApiContext } from '@forge-cms/api';
 import { handleSignup } from '@forge-cms/runtime';
 import { getServerRuntime } from '../../../api/runtime';
+import { toCancellableWebRequest } from '../../../api/auth-request';
 
 /**
  * POST /api/auth/signup — thin wrapper over `handleSignup`. Disabled (404) unless
@@ -10,7 +11,7 @@ import { getServerRuntime } from '../../../api/runtime';
 export default defineEventHandler(async (event) => {
   const runtime = await getServerRuntime(event.context.cloudflare?.env);
   const context: ApiContext = {
-    request: toWebRequest(event),
+    request: toCancellableWebRequest(event),
     env: event.context.cloudflare?.env
   };
   const enabled =

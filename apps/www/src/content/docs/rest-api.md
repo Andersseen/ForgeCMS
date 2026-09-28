@@ -158,6 +158,8 @@ drafts and field-level read rules resolve as "not logged in".
 | `404` | Unknown collection or id — also an id an access rule hides                                                                                                         |
 | `409` | `UNIQUE_CONSTRAINT`: a unique field/index value (or an `id`) is already taken — `details.fields` names it                                                          |
 | `409` | `CONCURRENT_MODIFICATION`: another write to the same versioned document committed first; nothing was saved — reload and retry                                      |
+| `413` | `PAYLOAD_TOO_LARGE`: a login/signup body over the auth bound (8 KiB by default)                                                                                    |
+| `429` | `RATE_LIMITED`: the host's login/signup throttle refused the attempt; may carry `Retry-After`                                                                      |
 | `500` | Unexpected                                                                                                                                                         |
 
 ## Mounting the handlers

@@ -34,7 +34,11 @@ describe('SignedTokenAuthAdapter', () => {
   });
 
   it('init() succeeds with AUTH_SECRET', () => {
-    expect(() => new SignedTokenAuthAdapter().init({ AUTH_SECRET: 'test-secret' })).not.toThrow();
+    expect(() =>
+      new SignedTokenAuthAdapter().init({
+        AUTH_SECRET: 'test-secret-that-is-at-least-32-bytes-long'
+      })
+    ).not.toThrow();
   });
 
   it('login() succeeds with the published demo credentials', async () => {

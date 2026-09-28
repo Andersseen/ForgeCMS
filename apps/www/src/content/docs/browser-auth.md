@@ -30,8 +30,10 @@ writes — see `UsersCollectionAuthAdapter`'s `UniqueConstraintError` handling.
 import { UsersCollectionAuthAdapter, defineUsersCollection } from '@forge-cms/auth';
 import { handleLogin, handleSignup, handleLogout, handleMe } from '@forge-cms/runtime';
 
-const auth = new UsersCollectionAuthAdapter({ devMode: !env?.AUTH_SECRET }).init({
-  ...env,
+// Development mode is an explicit decision — never "the secret is missing". Nitro replaces
+// `import.meta.dev` with `true` only under the dev server; every build gets `false`.
+const auth = new UsersCollectionAuthAdapter({ devMode: import.meta.dev === true }).init({
+  ...env, // AUTH_SECRET: at least 32 bytes in production
   userDatabase: database
 });
 
@@ -54,6 +56,9 @@ export default defineEventHandler(async (event) => {
   return handleLogin(context, { runtime, cookie: { secure: !!event.context.cloudflare?.env } });
 });
 ```
+
+`handleLogin`/`handleSignup` also accept `throttle` (your login/signup limiter) and `maxBodyBytes` —
+see [Production configuration and abuse limits](#production-configuration-and-abuse-limits).
 
 `handleSignup` additionally takes `enabled: boolean` — public signup is opt-in, off unless a host
 explicitly turns it on:
@@ -89,7 +94,14 @@ own host:
 mutating request, cookie only, cross-site Origin  →  403
 mutating request, cookie only, same-site Origin   →  allowed
 mutating request, Authorization: Bearer present   →  never checked — not forgeable cross-site
+malformed Authorization (Basic …, empty Bearer)   →  still a cookie request — checked
 ```
+
+`Authorization: Bearer` always wins over the cookie, whatever its size: an oversized or invalid Bearer
+token is a `401`, and the cookie is not consulted as a fallback. The check compares `Origin` (or
+`Referer`) with the request's own origin; there is no CSRF token. It covers logout, every collection,
+global and preview mutation, and the first-party `/api/auth/users*` routes. Login and signup are not
+CSRF-checked: they carry their own credentials rather than riding on an ambient one.
 
 ## Public signup and the first-admin bootstrap
 
@@ -148,9 +160,158 @@ type AuthActionResult =
 ```
 
 `handleLogin`/`handleSignup` map each reason to a distinct status — `401` for bad credentials, `400`
-for a malformed email or a password under the policy minimum (8 characters by default, configurable via
-`new UsersCollectionAuthAdapter({ passwordPolicy: { minLength: 12 } })`), `409` for a duplicate email.
-None of it leaks adapter or database internals.
+for a malformed email, a name over 256 characters (`invalid-name`) or a password outside the policy
+(8 to 1024 characters by default, configurable via
+`new UsersCollectionAuthAdapter({ passwordPolicy: { minLength: 12, maxLength: 256 } })`), `409` for a
+duplicate email. None of it leaks adapter or database internals. The full status table is below.
+
+Signup's `409` for a duplicate email tells the caller that the address is registered. That is the
+product contract, not an oversight: signup is opt-in, and a host that cannot accept it should keep
+signup off (or throttle it). Login never reveals it — an unknown email and a wrong password get the same
+`401`, the same body and the same single password verification.
+
+## Production configuration and abuse limits
+
+**Signing secret.** `AUTH_SECRET` must be at least 32 bytes (UTF-8) — `openssl rand -base64 48` gives
+one. Without `devMode: true` a missing or shorter secret makes `init()` throw, and the error never
+contains the secret. `devMode: true` is a local-development opt-in: with no secret it signs with Forge's
+built-in dev secret, which is **public** — anyone can mint an admin session with it. Never compute
+`devMode` from the secret's absence (`devMode: !env.AUTH_SECRET` turns a forgotten production secret
+into that public one). On Analog/Nitro use `import.meta.dev === true`, which is `true` only under the dev
+server and `false` in every build, including a local `wrangler pages dev` preview — give that one a
+`.dev.vars` with `AUTH_SECRET`. Rotating the secret signs everybody out.
+
+**Input bounds** (all refused before any expensive work):
+
+| Input                                  | Bound                                            | Over the bound                            |
+| -------------------------------------- | ------------------------------------------------ | ----------------------------------------- |
+| Login/signup JSON body                 | 8 KiB (`maxBodyBytes`, up to 1 MiB)              | `413 PAYLOAD_TOO_LARGE`                   |
+| Password                               | 8–1024 characters (`passwordPolicy`, max ≤ 4096) | signup/create/update: `400`; login: `401` |
+| Email                                  | 254 characters                                   | `400 invalid-email`                       |
+| Name                                   | 256 characters                                   | `400 invalid-name`                        |
+| Forge session token (Bearer or cookie) | 8192 characters                                  | `401`, no HMAC                            |
+| API key after `<prefix>_`              | 128 characters                                   | `401`, no database lookup                 |
+
+The body bound is enforced on the stream: a missing or wrong `Content-Length` cannot get past it, and
+reading stops as soon as it is crossed. A host that buffers the whole request before Forge sees it —
+Nitro 2's Cloudflare entries do, for example — is bounded by the platform's own request limit first;
+Forge's bound still decides what reaches JSON parsing and password hashing. Password length is the
+JavaScript string length for both bounds; passwords are never truncated. Raise `maxBodyBytes` together
+with `passwordPolicy.maxLength` if you raise the latter. Lowering `maxLength` below a password someone
+already has locks them out until `updateUser(id, { password })` sets a new one. Users created before
+these bounds with a name of thousands of characters get a session token Forge then refuses; shorten the
+name with `updateUser(id, { name })`.
+
+**Login/signup throttling is the host's job**, through one optional hook. Forge keeps no counters:
+
+```ts
+import type { AuthAttemptThrottle } from '@forge-cms/runtime';
+
+// Called once per attempt: after the body is parsed, before any lookup or password hashing,
+// with the same arguments whether or not the account exists.
+type AuthAttemptThrottle = (attempt: {
+  action: 'login' | 'signup';
+  identifier: string; // the submitted email, trimmed + lower-cased
+  request: Request; // for your own keys: a client address, a tenant header…
+}) => Promise<{ allowed: true } | { allowed: false; retryAfterSeconds?: number }>;
+
+return handleLogin(context, { runtime, throttle });
+```
+
+A denial is `429 { "error": { "code": "RATE_LIMITED", "message": "Too many authentication attempts" } }`
+— nothing about the account, the bucket or the remaining budget — plus `Retry-After` when you return a
+finite positive `retryAfterSeconds` (rounded up, capped at one day). A throttle that throws or returns
+anything else fails closed as `500`. Logout, `me` and ordinary authenticated requests (API keys
+included) never call it. You choose the key: the identifier, the client, a tenant, or several
+independent checks combined.
+
+_Choosing keys._ A limit keyed only on the submitted email lets anyone who knows an address keep that
+account throttled — a targeted lockout. Key login on the client **and** the identifier, with the
+identifier bucket more generous than the client one, and key signup on the client (a spammer picks a new
+email every time). Forge passes `request`, so the client key is your choice: a platform header, a proxy
+header you trust, a tenant.
+
+_Cloudflare Workers_ — [Rate Limiting bindings](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/),
+one per limit (`period` is 10 or 60 seconds):
+
+```jsonc
+// wrangler.jsonc
+"ratelimits": [
+  { "name": "AUTH_CLIENT_LIMITER", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
+  { "name": "AUTH_ACCOUNT_LIMITER", "namespace_id": "1002", "simple": { "limit": 30, "period": 60 } }
+]
+```
+
+```ts
+function cloudflareAuthThrottle(env: Env): AuthAttemptThrottle {
+  return async ({ action, identifier, request }) => {
+    const client = request.headers.get('cf-connecting-ip') ?? 'unknown';
+    const checks = [env.AUTH_CLIENT_LIMITER.limit({ key: `${action}:client:${client}` })];
+    if (action === 'login') {
+      checks.push(env.AUTH_ACCOUNT_LIMITER.limit({ key: `login:account:${identifier}` }));
+    }
+    const results = await Promise.all(checks);
+    return results.every((r) => r.success)
+      ? { allowed: true }
+      : { allowed: false, retryAfterSeconds: 60 };
+  };
+}
+
+return handleLogin(context, { runtime, throttle: cloudflareAuthThrottle(env) });
+```
+
+Cloudflare documents these counters as local to each location and eventually consistent — a brake, not
+an exact count — and warns that IP addresses can be shared by many users; a per-client limit that is
+too tight throttles a whole office. Pages Functions do not list this binding; a Pages project can put a
+[WAF rate limiting rule](https://developers.cloudflare.com/waf/rate-limiting-rules/) on
+`/api/auth/login` and `/api/auth/signup` at the edge (per IP on the Free and Pro plans), or route auth
+through a Worker that has the binding.
+
+_Portable hosts_ — a reverse proxy or ingress limit (nginx `limit_req`, a load balancer rule) in front of
+the auth routes, framework middleware, or an external limiter service behind the same hook:
+
+```ts
+const throttle: AuthAttemptThrottle = async ({ action, identifier, request }) => {
+  const client = clientKeyFrom(request); // e.g. the address your trusted proxy forwards
+  const keys = [`${action}:client:${client}`];
+  if (action === 'login') keys.push(`login:account:${identifier}`);
+  const result = await limiterService.consumeAll(keys); // Redis, Upstash, your API…
+  return result.ok ? { allowed: true } : { allowed: false, retryAfterSeconds: result.retryAfter };
+};
+```
+
+Do not rely on an in-process counter in production: it is per instance and forgets on restart.
+
+**Failure statuses** (every body is the `{ "error": { "code", "message" } }` envelope):
+
+| Scenario                                                   | Status | Code                |
+| ---------------------------------------------------------- | -----: | ------------------- |
+| Wrong password or unknown email                            |    401 | `UNAUTHORIZED`      |
+| Malformed JSON, non-object body, missing email/password    |    400 | `INVALID_INPUT`     |
+| Body over the bound                                        |    413 | `PAYLOAD_TOO_LARGE` |
+| Signup: invalid email, name or password outside the policy |    400 | `INVALID_INPUT`     |
+| Signup: email already registered                           |    409 | `UNIQUE_CONSTRAINT` |
+| Throttled login or signup                                  |    429 | `RATE_LIMITED`      |
+| Signup disabled or unsupported                             |    404 | `NOT_FOUND`         |
+| Cross-site cookie mutation (logout included)               |    403 | `FORBIDDEN`         |
+| `me` with no, an invalid or an expired session             |    401 | `UNAUTHORIZED`      |
+| Database, adapter or throttle failure                      |    500 | `INTERNAL_ERROR`    |
+
+**Logs.** Expected failures are never logged. An unexpected one is logged as
+`Unexpected error in auth handler { operation, error }`, where `error` is only the error's class name,
+because an adapter's or driver's message can quote a password, a token or a cookie. The same applies to
+an auth failure behind a content route (`AuthResolutionError`).
+
+**Session cookie.** `forge_session` is `HttpOnly; SameSite=Lax; Path=/; Secure` with `Max-Age` equal to
+the 24-hour token lifetime; logout sends the same attributes with `Max-Age=0`. Only an explicit
+`cookie: { secure: false }` drops `Secure`, for local `http://` development. Cross-site cookies are not
+supported.
+
+**Password hashing.** PBKDF2-HMAC-SHA256, 100,000 iterations, 16-byte salt — about 7 ms of CPU per
+verification (measured in Node 22). That is below OWASP's current 600,000 recommendation; it is kept for 1.0 because every
+login pays it in CPU time (Workers' Free plan allows 10 ms of CPU per request), and raising it needs a
+versioned hash format with rehash-on-login, which is planned after 1.0. Throttling is what bounds
+guessing.
 
 ## Logout
 

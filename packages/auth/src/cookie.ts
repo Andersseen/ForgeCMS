@@ -1,6 +1,8 @@
+import { SESSION_TTL_SECONDS } from './session-lifetime.js';
+
 export const SESSION_COOKIE_NAME = 'forge_session';
 
-const DEFAULT_MAX_AGE_SECONDS = 24 * 60 * 60;
+const DEFAULT_MAX_AGE_SECONDS = SESSION_TTL_SECONDS;
 
 /**
  * Reads the Forge session cookie from a request's `Cookie` header. Used as `extractToken`'s fallback
