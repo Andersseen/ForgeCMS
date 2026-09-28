@@ -13,6 +13,12 @@
 > in the same branch, immediately after — fixed 12 of the 22, and the demo deleted the corresponding
 > workarounds. Fixed items are marked ✅ below with what closed them; the workaround code they
 > describe is gone from the app, so read those entries as history plus a pointer to the fix.
+>
+> **Re-dogfooded 2026-09-28 against ForgeCMS 0.7** ([spec 071](specs/071-0.7-consolidation-and-dogfood-refresh.md)).
+> Several fixes had shipped in the packages while the demo kept its workaround (8, 10, 12, 15). Those
+> workarounds are now gone. The pass found one new item (24), added 23 to the summary table, and found
+> three admin package defects, fixed in the same spec. See [0.7 status](#status-07) for the current
+> table; the per-finding text below stays as originally written, with dated status lines added.
 
 ## Summary
 
@@ -27,30 +33,32 @@ highest-value thing this exercise turned up is not on the roadmap as a numbered 
 that `@forge-cms/angular` cannot express a filtered, sorted, paginated, draft-aware query, so every
 consumer falls back to `fetch`.
 
-| #          | Finding                                                             | Bit us in                 | Roadmap                                   |
-| ---------- | ------------------------------------------------------------------- | ------------------------- | ----------------------------------------- |
-| [15](#f15) | The client SDK cannot filter, sort, limit, paginate or set depth    | every page of the site    | ✅ 041                                    |
-| [17](#f17) | The admin cannot see drafts — the client has no `status`            | the editor screen         | ✅ 041 + 042                              |
-| [9](#f9)   | `depth: 1` does not populate `upload` fields                        | every image on the site   | ✅ 040                                    |
-| [21](#f21) | Uploaded files are stored but never served                          | the media library         | ✅ 040                                    |
-| [8](#f8)   | The Local API returns `Record<string, unknown>` — inference stops   | every server route        | ✅ 047 (package; this app not migrated)   |
-| [5](#f5)   | A route's `allowedRoles` pre-empts the collection's own access rule | the public booking form   | ⚠️ documented                             |
-| [19](#f19) | Hooks cannot tell a trusted server call from a public request       | the seed, silently        | ✅ 040                                    |
-| [4](#f4)   | No globals                                                          | site settings             | 023                                       |
-| [10](#f10) | No `findBySlug`; no "relation contains id" filter                   | every `/:slug` page       | ✅ 050 (package; demo route not migrated) |
-| [7](#f7)   | `richtext` has no editor and no renderer                            | journal + treatment copy  | ✅ 042 (editor)                           |
-| [16](#f16) | `blocks` rows are untyped at the render site                        | the home page             | 038                                       |
-| [1](#f1)   | Field options that nothing reads (`autoGenerate`, `defaultValue`)   | 5 collections             | ✅ 040                                    |
-| [18](#f18) | No upload method in the client SDK                                  | the media library         | ✅ 041                                    |
-| [6](#f6)   | No email adapter, so a booking notifies nobody                      | the booking hook          | 029                                       |
-| [11](#f11) | No h3/Nitro helpers — auth routes are copy-paste                    | 6 route files             | 037                                       |
-| [13](#f13) | The Angular linker plugin must be copied into every app             | app setup                 | ✅ 055                                    |
-| [12](#f12) | The auth-token localStorage key is not exported                     | app setup                 | ✅ 054 (client is cookie-only now)        |
-| [2](#f2)   | No SSR story for a content site                                     | the whole premise         | 036/037                                   |
-| [3](#f3)   | No money or timezone-aware date handling                            | prices, appointment times | new                                       |
-| [14](#f14) | `R2StorageAdapter` hardcodes the `BUCKET` binding name              | runtime wiring            | ✅ 040                                    |
-| [20](#f20) | The admin sidebar's nav items are hardcoded                         | admin routing             | ✅ 042                                    |
-| [22](#f22) | Adapters disagree about `created_at`/`updated_at`                   | sorting by creation date  | ✅ 040                                    |
+| #          | Finding                                                             | Bit us in                 | Roadmap                               |
+| ---------- | ------------------------------------------------------------------- | ------------------------- | ------------------------------------- |
+| [15](#f15) | The client SDK cannot filter, sort, limit, paginate or set depth    | every page of the site    | ✅ 041                                |
+| [17](#f17) | The admin cannot see drafts — the client has no `status`            | the editor screen         | ✅ 041 + 042                          |
+| [9](#f9)   | `depth: 1` does not populate `upload` fields                        | every image on the site   | ✅ 040                                |
+| [21](#f21) | Uploaded files are stored but never served                          | the media library         | ✅ 040                                |
+| [8](#f8)   | The Local API returns `Record<string, unknown>` — inference stops   | every server route        | ✅ 047; demo migrated 071             |
+| [5](#f5)   | A route's `allowedRoles` pre-empts the collection's own access rule | the public booking form   | ⚠️ documented                         |
+| [19](#f19) | Hooks cannot tell a trusted server call from a public request       | the seed, silently        | ✅ 040                                |
+| [4](#f4)   | No globals                                                          | site settings             | ✅ 066 (package); demo retained → M02 |
+| [10](#f10) | No `findBySlug`; no "relation contains id" filter                   | every `/:slug` page       | ✅ 050; demo migrated 071             |
+| [7](#f7)   | `richtext` has no editor and no renderer                            | journal + treatment copy  | ✅ 042 (editor)                       |
+| [16](#f16) | `blocks` rows are untyped at the render site                        | the home page             | 038                                   |
+| [1](#f1)   | Field options that nothing reads (`autoGenerate`, `defaultValue`)   | 5 collections             | ✅ 040                                |
+| [18](#f18) | No upload method in the client SDK                                  | the media library         | ✅ 041                                |
+| [6](#f6)   | No email adapter, so a booking notifies nobody                      | the booking hook          | 029                                   |
+| [11](#f11) | No h3/Nitro helpers — auth routes are copy-paste                    | 6 route files             | 037                                   |
+| [13](#f13) | The Angular linker plugin must be copied into every app             | app setup                 | ✅ 055                                |
+| [12](#f12) | The auth-token localStorage key is not exported                     | app setup                 | ✅ 054; demo migrated 071             |
+| [2](#f2)   | No SSR story for a content site                                     | the whole premise         | 036/037                               |
+| [3](#f3)   | No money or timezone-aware date handling                            | prices, appointment times | new                                   |
+| [14](#f14) | `R2StorageAdapter` hardcodes the `BUCKET` binding name              | runtime wiring            | ✅ 040                                |
+| [20](#f20) | The admin sidebar's nav items are hardcoded                         | admin routing             | ✅ 042                                |
+| [22](#f22) | Adapters disagree about `created_at`/`updated_at`                   | sorting by creation date  | ✅ 040                                |
+| [23](#f23) | A hook cannot query the CMS                                         | the demo's limit hooks    | open                                  |
+| [24](#f24) | `date` is typed `Date` but travels as a string                      | journal, promotions, form | open → 0.8 C02                        |
 
 ---
 
@@ -74,6 +82,12 @@ also no signal/`resource()` surface, so every page hand-rolls loading/error stat
 - **Fixed (spec 041).** `QueryOptions` on `getDocuments`/`listDocuments`/`getDocument`, pagination
   metadata, `uploadFile`, `collectionResource`/`documentResource`, and — the quiet one — reads now
   send the auth token, which they never did. The demo deleted `admin-api.service.ts` entirely.
+- **Status 2026-09-28 (spec 071):** the public site still uses `/api/site/*` rather than the SDK,
+  and that is now a **decision, not a workaround**. Each page needs several collections. The server
+  composes them on the Local API as an anonymous visitor, so the browser makes one request and gets a
+  small view model. The stale "the SDK cannot filter" comments are gone. The admin now uses the
+  package's own content routes (`forgeAdminContentRoutes()`), so its last hand-written list page is
+  gone too.
 
 <a id="f17"></a>
 
@@ -132,6 +146,17 @@ its own `shared/site-content.ts`/`mappers.ts` hand-written types remain as they 
 _cost_ is unchanged in this app specifically, but the _capability_ that removes it for any new
 consumer now exists. See [docs/specs/047-typed-local-api.md](specs/047-typed-local-api.md).
 
+**Status 2026-09-28 (spec 071): migrated.** The demo's runtime is `ForgeCmsRuntime<ServerEnv,
+DemoCollections>`, the seed and every site route compile against the content model, and `mappers.ts`
+takes `CollectionDocument<typeof services>` etc. `shared/site-content.ts` stays hand-written on
+purpose: it is the browser's view model (richtext flattened, relations resolved, internal fields
+left out), not a copy of the documents. **Remaining limits:** a populated relation/upload is still
+typed as its id, `date` is typed `Date` for writes and reads (finding 24), and browser-side types
+from the schema are roadmap 0.8 (C02). Typing also caught one app bug: writing
+`withAuthFields(defineCollection({ … }))` inline widens the users slug to `string`, which let the
+typed registry accept any collection name. Defining the collection first keeps the literal (as the
+docs already show).
+
 <a id="f5"></a>
 
 ### 5. The transport gate runs before the collection's access rule
@@ -184,6 +209,15 @@ Site settings are a collection expected to hold exactly one row. Nothing enforce
 has to decide between create and update by looking for an id
 ([`settings.page.ts`](../apps/demo-aesthetics/src/app/pages/admin/settings.page.ts)). **Fix:** roadmap 023.
 
+**Status 2026-09-28 (spec 071): fixed in the package, deliberately retained in the demo.** Globals
+exist (`defineGlobal`, `getGlobalDocument`/`updateGlobalDocument`, `GET/PUT /api/v1/globals/:slug`;
+certified by spec 066). The deployed demo, however, has a persistent D1 whose `site_settings` table
+holds the settings editors have changed. A global is stored in a new `_global_site_settings` table.
+Schema sync would create it safely (M01 classifies it as additive), but **empty**, so the site would
+lose its phone, address and hours until someone re-entered them. Copying the row is a data migration,
+and reviewed migrations are roadmap 0.7 M02. The demo keeps the collection until then. Reads now use
+`findOne`; nothing still prevents a second row.
+
 <a id="f10"></a>
 
 ### 10. No slug lookup, and no way to query a relation list
@@ -205,6 +239,13 @@ database-side filter on every adapter. **The demo app's route file itself was de
 touched** — spec 050 was scoped to the core query layer only, not to migrating existing consumer
 code; `services/[slug].get.ts` still uses its original workaround, and updating it to use the new
 primitives is a follow-up, not part of this fix.
+
+**Status 2026-09-28 (spec 071): migrated.** `server/api/service-detail.ts` uses `findOne` by slug and
+`where: { active: true, specialties: { containsValue: id } }`, so the database does the filtering.
+`content-model.test.ts` proves the result equals the old load-everything filter, and that unknown and
+draft slugs return `null` (a 404). The journal, home and settings routes use `findOne` too. The
+staff query now passes `depth: 1`: the page always rendered specialist photos, but without
+population they were ids, so no photo ever showed.
 
 <a id="f7"></a>
 
@@ -306,6 +347,14 @@ every request and the browser session lives in `ForgeAuthSession` (signals, no s
 magic string to export: the question this finding raised (a bearer-token key shared between two
 files) does not apply to the cookie-based session at all.
 
+**Correction 2026-09-28 (spec 071):** the paragraph above was wrong about this app. `auth-token.ts`
+still existed. `login.page.ts` stored the login token in `localStorage`, and `provideForgeCms({ authToken })`
+sent it as a Bearer on every request. Because `handleLogout` can only clear the cookie (bearer tokens
+are stateless, spec 053), **"Log out" left the admin signed in** through the stored token, and
+`/admin` had no guard. Now `auth-token.ts` is deleted and the login page uses `ForgeAuthSession`
+(cookie only). `/admin` is guarded by `forgeAuthGuard({ signInPath: '/login' })`, and an E2E test
+proves that after logout `/api/auth/me` is 401 and `/admin` redirects to sign-in.
+
 <a id="f2"></a>
 
 ### 2. No SSR story
@@ -337,6 +386,8 @@ state) and 037.
 
 `R2StorageAdapter.init` reads `env.BUCKET` and throws otherwise, so a project with two buckets — or
 one called `MEDIA` — cannot use it. `D1DatabaseAdapter` has the same shape for `DB`. **Fixed (spec 040):** exactly that, plus `publicUrlBase`, and the same for `D1DatabaseAdapter`.
+**2026-09-28:** the demo's `runtime.ts` comment still called the name "fixed by the adapter"; it now
+says the app keeps `DB`/`BUCKET` because the deployed Pages project is bound under those names.
 
 <a id="f20"></a>
 
@@ -379,6 +430,47 @@ case-insensitive, another divergence found while building the relation picker.
 
 ---
 
+<a id="f24"></a>
+
+### 24. `date` is typed `Date` but travels as a string (found 2026-09-28, spec 071)
+
+Typing the demo's runtime (finding 8) exposed a mismatch the untyped API hid:
+
+- `defineField.date()` infers `Date`, so a typed `create`/`update` rejects the ISO strings that the
+  validator accepts and that every HTTP client sends;
+- the SQL adapters (libSQL, D1) return a `Date` on read (`fromDbValue`), while the in-memory adapter
+  returns whatever was written — usually a string;
+- the demo's mappers used `str(record.publishedAt)`. Against D1, that turned every journal date and
+  promotion end date into `''`. Local development (in-memory) looked fine.
+
+**Workaround (marked `FINDING 24`):** the mappers convert `Date | string` with `isoDate()`. The seed
+writes through the untyped runtime view, and the booking route casts the visitor's zone-less value.
+**Fix:** a wire-type decision for dates (input `Date | string`, one read representation across
+adapters). That belongs to roadmap 0.8 C02 (schema-aware wire types). It changes public types and
+adapter output, so it was recorded rather than patched in a consolidation pass.
+
+<a id="status-07"></a>
+
+## 0.7 status (2026-09-28, spec 071)
+
+| #   | Original finding                    | Package fix | Demo status                                                                                    | Remaining limit                                     |
+| --- | ----------------------------------- | ----------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| 4   | No globals                          | 023 / 066   | **Retained**: persistent D1 row would need a data migration                                    | Wait for M02, then migrate to `defineGlobal`        |
+| 8   | Local API untyped                   | 047         | **Migrated**: typed runtime, typed mapper inputs                                               | Populated relations typed as ids; browser types C02 |
+| 10  | No slug lookup / relation filter    | 050         | **Migrated**: `findOne` + `containsValue`, regression tests                                    | —                                                   |
+| 12  | Auth token in `localStorage`        | 054         | **Migrated**: cookie session, guard; fixed a logout that kept you in                           | —                                                   |
+| 14  | Fixed binding names                 | 040         | **Comment only**: names kept for the deployed bindings                                         | —                                                   |
+| 15  | SDK cannot query                    | 041         | **Rationale rewritten**: `/api/site/*` kept as the recommended design; admin on package routes | —                                                   |
+| 23  | Hooks cannot query the CMS          | —           | Workaround kept (`runtime-ref.ts`)                                                             | Needs an operation handle in hook args              |
+| 24  | `date` typed `Date`, sent as string | —           | Workaround kept (`isoDate`, one cast)                                                          | 0.8 C02                                             |
+
+Admin package defects found by moving the demo onto `forgeAdminContentRoutes()` and fixed in spec 071
+(patch changeset):
+
+- the list never requested `depth: 1`, so relation and upload cells were truncated ids;
+- wide lists widened the whole page on phones (the rows' `sr-only` labels escaped the scroller);
+- the sidebar and theme toggles, and every boolean switch, had no accessible name.
+
 ## What worked well (worth protecting)
 
 - **The Local API is the real thing.** Composing five collections into one payload in
@@ -407,18 +499,19 @@ Specs 040, 041 and 042 landed in this branch straight after the demo, closing 12
 | 054  | 12                                                   | Client is cookie-only now (`credentials: 'include'`) — no `localStorage` auth-token question left to answer.    |
 | 055  | 13                                                   | `@forge-cms/admin/vite` exports the linker plugin; both `apps/www` and this app dropped their local copy.       |
 
-**Still open, in the order they should be taken:**
+**Still open, in the order they should be taken** (updated 2026-09-28, spec 071 — globals, query
+completeness, typed Local API and the linker plugin have shipped and are no longer listed):
 
-1. **036's other half — SSR** (finding 2). The Local API makes ForgeCMS ideally placed for it and the
-   demo still ships as an SPA.
-2. **038 typed `blocks` rows** (finding 16 only — finding 8 shipped at the package level via spec 047,
-   see the table above). Every `blocks` row is still `Record<string, unknown>` at the render site.
-3. **023 globals** (finding 4) is still open. **026 query completeness** (finding 10) shipped at the
-   package level via spec 050 — `findOne`/`containsValue` now exist — but the demo's route file
-   itself still uses its original workaround; migrating it is a follow-up, not done here.
-4. **029 email** (finding 6). A booking form that notifies nobody is not finished.
-5. **037 framework integration** (findings 11, 13) — the route files and the Angular linker plugin
-   are still copied per app.
-6. **A richtext renderer** (rest of finding 7) and **currency/timezone types** (finding 3).
-7. **The `allowedRoles` precedence** (finding 5) — correct today, but implicit enough to be worth a
+1. **SSR** (finding 2) — roadmap 0.9. The Local API makes ForgeCMS ideally placed for it and the demo
+   still ships as an SPA.
+2. **Schema-aware wire types** — roadmap 0.8 C02: `date` representation (finding 24), populated
+   relation types (rest of finding 8), and typed `blocks` rows (finding 16).
+3. **Reviewed migrations** — roadmap 0.7 M02. It unblocks moving the demo's settings to a real global
+   (finding 4).
+4. **Email** (finding 6). A booking form that notifies nobody is not finished. Post-1.0 per the
+   roadmap, but it is the gap every content site hits first.
+5. **Hook access to the CMS** (finding 23) — pass the operation context into hook args.
+6. **Framework route integration** (finding 11) — the route files are still copied per app.
+7. **A richtext renderer** (rest of finding 7) and **currency/timezone types** (finding 3).
+8. **The `allowedRoles` precedence** (finding 5) — correct today, but implicit enough to be worth a
    spec of its own.

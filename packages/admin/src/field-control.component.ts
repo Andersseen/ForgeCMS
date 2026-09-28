@@ -204,8 +204,10 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
               />
             }
             @case ('boolean') {
+              <!-- Named explicitly: the label's htmlFor does not reach Volt's inner switch button. -->
               <volt-switch
                 [id]="path()"
+                [ariaLabel]="f.label"
                 [checked]="isLocalized() ? localeBooleanValue() : booleanValue()"
                 (checkedChange)="isLocalized() ? emitLocaleValue($event) : valueChange.emit($event)"
               />

@@ -4,7 +4,6 @@
  * cache, and the ceilings and floors the content model enforces.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { ForgeCmsRuntime } from '@forge-cms/runtime';
 import {
   MAX_DOCUMENTS,
   MIN_DOCUMENTS,
@@ -13,7 +12,7 @@ import {
   resetThrottle,
   throttleWrite
 } from '../server/api/demo-limits';
-import { createRuntime, type ServerEnv } from '../server/api/runtime';
+import { createRuntime, type DemoRuntime } from '../server/api/runtime';
 import { seedContent } from '../server/api/seed';
 
 describe('write throttle', () => {
@@ -102,7 +101,7 @@ describe('read cache', () => {
 });
 
 describe('content-model guardrails', () => {
-  let cms: ForgeCmsRuntime<ServerEnv>;
+  let cms: DemoRuntime;
 
   beforeEach(async () => {
     cms = createRuntime(undefined, { devMode: true });
@@ -121,7 +120,7 @@ describe('content-model guardrails', () => {
         data: {
           name: `Visitor ${i}`,
           email: `visitor${i}@example.com`,
-          preferredDate: new Date().toISOString()
+          preferredDate: new Date()
         }
       });
     }

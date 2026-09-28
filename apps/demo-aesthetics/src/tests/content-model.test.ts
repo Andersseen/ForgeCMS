@@ -5,12 +5,13 @@
  * rule): Nitro bundles **everything** under `src/server/**` into the worker, so a `*.test.ts` there
  * pulls `vitest` into the server bundle and the API crashes on the first request.
  */
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { AccessDeniedError, NotFoundError, ValidationFailedError } from '@forge-cms/runtime';
-import type { ForgeCmsRuntime } from '@forge-cms/runtime';
 import type { CmsUser } from '@forge-cms/core';
-import { createRuntime, type ServerEnv } from '../server/api/runtime';
+import { createRuntime, type DemoRuntime } from '../server/api/runtime';
 import { seedContent } from '../server/api/seed';
+import { loadServiceDetail } from '../server/api/service-detail';
+import { toPostSummary } from '../server/api/mappers';
 
 const STAFF: CmsUser = { id: 'staff-1', email: 'frontdesk@lumea.clinic', role: 'editor' };
 const CLIENT: CmsUser = { id: 'client-1', email: 'lucia@example.com', role: 'viewer' };
@@ -18,7 +19,7 @@ const CLIENT: CmsUser = { id: 'client-1', email: 'lucia@example.com', role: 'vie
 /** How the public site reads: as nobody, with access control on. */
 const AS_VISITOR = { overrideAccess: false, user: null } as const;
 
-let cms: ForgeCmsRuntime<ServerEnv>;
+let cms: DemoRuntime;
 
 beforeEach(async () => {
   cms = createRuntime(undefined, { devMode: true });
@@ -104,7 +105,7 @@ describe('bookings access control', () => {
       data: {
         name: 'Nora P.',
         email: 'Nora@Example.com  ',
-        preferredDate: new Date().toISOString()
+        preferredDate: new Date()
       }
     });
 
@@ -122,7 +123,7 @@ describe('bookings access control', () => {
       data: {
         name: 'Optimistic visitor',
         email: 'optimist@example.com',
-        preferredDate: new Date().toISOString(),
+        preferredDate: new Date(),
         // `status` is staff-write-only, so the hook — not the body — decides.
         source: 'crafted'
       }
@@ -140,7 +141,7 @@ describe('bookings access control', () => {
         data: {
           name: 'Sneaky visitor',
           email: 'sneaky@example.com',
-          preferredDate: new Date().toISOString(),
+          preferredDate: new Date(),
           status: 'confirmed'
         }
       })
@@ -255,7 +256,7 @@ describe('hooks and trusted server calls (finding 19, fixed by spec 040)', () =>
       data: {
         name: 'Front desk phone booking',
         email: 'phone@example.com',
-        preferredDate: new Date().toISOString(),
+        preferredDate: new Date(),
         status: 'confirmed'
       }
     });
@@ -270,7 +271,7 @@ describe('hooks and trusted server calls (finding 19, fixed by spec 040)', () =>
       data: {
         name: 'Walk-in',
         email: 'walkin@example.com',
-        preferredDate: new Date().toISOString()
+        preferredDate: new Date()
       }
     });
 
@@ -300,7 +301,7 @@ describe('slugs and defaults come from the schema (finding 1, fixed by spec 040)
       data: {
         name: 'Default check',
         email: 'defaults@example.com',
-        preferredDate: new Date().toISOString()
+        preferredDate: new Date()
       }
     });
 
@@ -318,7 +319,86 @@ describe('uploads are populated by depth (finding 9, fixed by spec 040)', () => 
       ...AS_VISITOR
     });
 
-    const image = docs[0]?.image as Record<string, unknown>;
+    // The typed Local API still types a relation/upload as its id, populated or not (see finding 8's
+    // remaining limit), so a populated value needs one explicit widening.
+    const image = docs[0]?.image as unknown as Record<string, unknown>;
     expect(image.url).toBe('/images/signature-facial.svg');
+  });
+});
+
+describe('service detail reads (finding 10, migrated to findOne + containsValue)', () => {
+  it('finds specialists in the database exactly as the old load-everything filter did', async () => {
+    const detail = await loadServiceDetail(cms, 'signature-hydraglow-facial');
+    expect(detail).not.toBeNull();
+    const serviceId = detail!.service.id;
+
+    // The replaced workaround: load the whole active team, keep whoever lists this service.
+    const team = await cms.find({
+      collection: 'staff',
+      where: { active: true },
+      limit: 100,
+      ...AS_VISITOR
+    });
+    const expected = team.docs
+      .filter(
+        (member) => Array.isArray(member.specialties) && member.specialties.includes(serviceId)
+      )
+      .map((member) => member.id)
+      .sort();
+
+    expect(expected.length).toBeGreaterThan(0);
+    expect(detail!.specialists.map((member) => member.id).sort()).toEqual(expected);
+    // Populated: specialties are names and the photo is a media reference, not ids.
+    expect(detail!.specialists.every((member) => member.photo?.url.startsWith('/'))).toBe(true);
+  });
+
+  it('lists up to three siblings from the same category, never the service itself', async () => {
+    const detail = await loadServiceDetail(cms, 'signature-hydraglow-facial');
+    const { relatedServices, service } = detail!;
+
+    expect(relatedServices.length).toBeGreaterThan(0);
+    expect(relatedServices.length).toBeLessThanOrEqual(3);
+    expect(relatedServices.some((related) => related.id === service.id)).toBe(false);
+    expect(relatedServices.every((related) => related.category?.id === service.category?.id)).toBe(
+      true
+    );
+  });
+
+  it('is null for an unknown slug and for a draft, so the route answers 404', async () => {
+    expect(await loadServiceDetail(cms, 'no-such-treatment')).toBeNull();
+    // The seeded draft exists for server code but not for a visitor.
+    expect(
+      await cms.findOne({ collection: 'services', where: { slug: 'bridal-glow-programme' } })
+    ).not.toBeNull();
+    expect(await loadServiceDetail(cms, 'bridal-glow-programme')).toBeNull();
+  });
+});
+
+describe('the typed Local API (finding 8, spec 047)', () => {
+  it('infers documents from the registry instead of Record<string, unknown>', async () => {
+    const service = await cms.findOne({ collection: 'services', where: { slug: 'x' } });
+    expectTypeOf(service).toMatchTypeOf<{ name: string; price: number; id: string } | null>();
+
+    // Compile-time only: never called, so the invalid queries are checked by `tsc`, not executed.
+    const rejectedAtCompileTime = (): void => {
+      // @ts-expect-error — not a collection in this app's registry.
+      void cms.find({ collection: 'not-a-collection' });
+      // @ts-expect-error — not a field of `services`.
+      void cms.find({ collection: 'services', where: { priceInCents: 100 } });
+    };
+    expect(rejectedAtCompileTime).toBeTypeOf('function');
+  });
+
+  it('maps a SQL-style Date read to the same ISO string as a string read (finding 24)', async () => {
+    const post = await cms.findOne({
+      collection: 'posts',
+      where: { title: 'The only two products your morning routine actually needs' }
+    });
+    expect(post).not.toBeNull();
+    const asString = toPostSummary(post!);
+    const asDate = toPostSummary({ ...post!, publishedAt: new Date(asString.publishedAt) });
+
+    expect(asString.publishedAt).not.toBe('');
+    expect(asDate.publishedAt).toBe(new Date(asString.publishedAt).toISOString());
   });
 });

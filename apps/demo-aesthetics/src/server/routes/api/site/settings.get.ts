@@ -3,17 +3,19 @@ import { toSiteSettings } from '../../../api/mappers';
 import type { SiteSettings } from '../../../../shared/site-content';
 
 /**
- * The site-wide settings "global". It is a normal collection expected to hold one row, so this
- * endpoint picks `docs[0]` and hopes nobody created a second one (finding 4).
+ * The site-wide settings, read from a collection that holds one row.
+ *
+ * FINDING 4, now a deliberate retention: ForgeCMS has globals (roadmap 023, spec 066), but the
+ * deployed demo's D1 keeps the clinic's edited settings in the `site_settings` table. A global lives
+ * in its own `_global_site_settings` table, which schema sync would create *empty* — moving the row
+ * across is a data migration, and reviewed migrations are roadmap 0.7 M02. Until then the demo keeps
+ * this shape; `findOne` at least makes "the one row" explicit.
  */
 export default definePublicSiteRoute(async (runtime): Promise<SiteSettings | null> => {
-  const found = await runtime.find({
+  const record = await runtime.findOne({
     collection: 'site_settings',
-    limit: 1,
     overrideAccess: false,
     user: null
   });
-
-  const [record] = found.docs;
   return record ? toSiteSettings(record) : null;
 });

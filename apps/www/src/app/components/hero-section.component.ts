@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { VoltBadge, VoltButton } from '@voltui/components';
-import { exampleCode } from '../landing-data';
+import { CURRENT_FORGE_VERSION } from '../forge-release';
+import { exampleCode, installCommand } from '../landing-data';
 import { DemoDialogService } from './demo-dialog.service';
 
 @Component({
@@ -14,15 +15,16 @@ import { DemoDialogService } from './demo-dialog.service';
       class="mx-auto grid w-full max-w-7xl gap-12 px-6 pb-20 pt-12 md:px-8 lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:pb-28 lg:pt-20"
     >
       <div>
-        <volt-badge variant="secondary">TypeScript-first Angular CMS</volt-badge>
+        <volt-badge variant="secondary">Experimental · pre-1.0 · v{{ version }}</volt-badge>
         <h1
           class="mt-6 max-w-4xl text-5xl font-semibold leading-[0.95] tracking-normal text-foreground md:text-7xl"
         >
           A headless CMS built for Angular and Analog.
         </h1>
         <p class="mt-7 max-w-2xl text-lg leading-8 text-muted-foreground md:text-xl">
-          ForgeCMS pairs an embeddable admin with a typed runtime, Cloudflare-first adapters, and a
-          portable core for small teams that want the CMS to fit their Angular app.
+          A code-first CMS inspired by Payload's architecture. Collections are TypeScript, server
+          code calls a Local API with no internal HTTP, and the admin is Angular components you
+          mount in your own app. Runs on Cloudflare D1 and R2, or on libSQL anywhere else.
         </p>
 
         <div class="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -33,6 +35,10 @@ import { DemoDialogService } from './demo-dialog.service';
             <volt-button variant="outline" size="lg">GitHub</volt-button>
           </a>
         </div>
+        <pre
+          class="mt-6 max-w-2xl overflow-x-auto rounded-md border border-border bg-muted px-4 py-3 text-xs leading-6 text-foreground"
+          aria-label="Install command"
+        ><code>{{ installCommand }}</code></pre>
         <button
           type="button"
           class="mt-4 text-sm font-medium text-muted-foreground underline underline-offset-4 transition hover:text-foreground"
@@ -82,12 +88,12 @@ import { DemoDialogService } from './demo-dialog.service';
         ><code>{{ exampleCode }}</code></pre>
         <div class="mt-4 grid gap-3 sm:grid-cols-3">
           <div class="rounded-md border border-border bg-background p-3">
-            <p class="text-xs text-muted-foreground">Runtime</p>
-            <p class="mt-1 font-semibold">Analog.js</p>
+            <p class="text-xs text-muted-foreground">Runs on</p>
+            <p class="mt-1 font-semibold">D1 · libSQL</p>
           </div>
           <div class="rounded-md border border-border bg-background p-3">
-            <p class="text-xs text-muted-foreground">Language</p>
-            <p class="mt-1 font-semibold">TypeScript</p>
+            <p class="text-xs text-muted-foreground">Built for</p>
+            <p class="mt-1 font-semibold">Angular · Analog</p>
           </div>
           <div class="rounded-md border border-border bg-background p-3">
             <p class="text-xs text-muted-foreground">License</p>
@@ -101,4 +107,6 @@ import { DemoDialogService } from './demo-dialog.service';
 export class HeroSectionComponent {
   protected readonly demo = inject(DemoDialogService);
   protected readonly exampleCode = exampleCode;
+  protected readonly installCommand = installCommand;
+  protected readonly version = CURRENT_FORGE_VERSION;
 }

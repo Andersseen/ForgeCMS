@@ -87,127 +87,133 @@ export interface StatusChangeRequest {
         }
       </forge-empty-state>
     } @else {
-      <volt-table>
-        <volt-table-header>
-          <volt-table-row>
-            <volt-table-head>{{ titleLabel() }}</volt-table-head>
-            @if (showStatus()) {
-              <volt-table-head>Status</volt-table-head>
-            }
-            @for (field of columns(); track field.name) {
-              <volt-table-head>
-                @if (sortable()) {
-                  <button
-                    type="button"
-                    class="inline-flex items-center gap-1 hover:text-foreground"
-                    (click)="toggleSort(field.name)"
-                  >
-                    {{ field.label }}
-                    <span class="text-xs text-muted-foreground">{{
-                      sortIndicator(field.name)
-                    }}</span>
-                  </button>
-                } @else {
-                  {{ field.label }}
-                }
-              </volt-table-head>
-            }
-            <volt-table-head class="text-right">Actions</volt-table-head>
-          </volt-table-row>
-        </volt-table-header>
-        <volt-table-body>
-          @for (doc of documents(); track doc['id']) {
+      <!-- Wide collections scroll inside the list, never the whole page. "relative" keeps the
+           rows' absolutely positioned sr-only labels inside the scroller too. -->
+      <div class="relative w-full overflow-x-auto">
+        <volt-table>
+          <volt-table-header>
             <volt-table-row>
-              <volt-table-cell>
-                @if (collection().useAsTitle; as titleField) {
-                  <span class="block truncate">{{ documentLabel(doc, titleField) }}</span>
-                  <span class="block font-mono text-xs text-muted-foreground">
-                    {{ shortId(asString(doc['id'])) }}
-                  </span>
-                } @else {
-                  <span class="font-mono text-xs text-muted-foreground">
-                    {{ shortId(asString(doc['id'])) }}
-                  </span>
-                }
-              </volt-table-cell>
-
+              <volt-table-head>{{ titleLabel() }}</volt-table-head>
               @if (showStatus()) {
-                <volt-table-cell>
-                  @if (isPublished(doc)) {
-                    <volt-badge variant="secondary">Published</volt-badge>
-                  } @else {
-                    <volt-badge variant="outline">Draft</volt-badge>
-                  }
-                </volt-table-cell>
+                <volt-table-head>Status</volt-table-head>
               }
-
               @for (field of columns(); track field.name) {
-                @let cell = cellFor(field, doc);
+                <volt-table-head>
+                  @if (sortable()) {
+                    <button
+                      type="button"
+                      class="inline-flex items-center gap-1 hover:text-foreground"
+                      (click)="toggleSort(field.name)"
+                    >
+                      {{ field.label }}
+                      <span class="text-xs text-muted-foreground">{{
+                        sortIndicator(field.name)
+                      }}</span>
+                    </button>
+                  } @else {
+                    {{ field.label }}
+                  }
+                </volt-table-head>
+              }
+              <volt-table-head class="text-right">Actions</volt-table-head>
+            </volt-table-row>
+          </volt-table-header>
+          <volt-table-body>
+            @for (doc of documents(); track doc['id']) {
+              <volt-table-row>
                 <volt-table-cell>
-                  @switch (cell.kind) {
-                    @case ('image') {
-                      <span class="flex items-center gap-2">
-                        <img
-                          [src]="cell.url"
-                          [alt]="cell.text"
-                          class="h-8 w-8 rounded object-cover"
-                        />
-                        <span class="truncate text-xs text-muted-foreground">{{ cell.text }}</span>
-                      </span>
-                    }
-                    @case ('count') {
-                      <span class="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                        {{ cell.text }}
-                      </span>
-                    }
-                    @case ('muted') {
-                      <span class="text-muted-foreground">{{ cell.text }}</span>
-                    }
-                    @default {
-                      {{ cell.text }}
-                    }
+                  @if (collection().useAsTitle; as titleField) {
+                    <span class="block truncate">{{ documentLabel(doc, titleField) }}</span>
+                    <span class="block font-mono text-xs text-muted-foreground">
+                      {{ shortId(asString(doc['id'])) }}
+                    </span>
+                  } @else {
+                    <span class="font-mono text-xs text-muted-foreground">
+                      {{ shortId(asString(doc['id'])) }}
+                    </span>
                   }
                 </volt-table-cell>
-              }
 
-              <volt-table-cell class="text-right">
-                @if (!readOnly()) {
-                  <div class="flex items-center justify-end gap-1">
-                    @if (showStatus()) {
+                @if (showStatus()) {
+                  <volt-table-cell>
+                    @if (isPublished(doc)) {
+                      <volt-badge variant="secondary">Published</volt-badge>
+                    } @else {
+                      <volt-badge variant="outline">Draft</volt-badge>
+                    }
+                  </volt-table-cell>
+                }
+
+                @for (field of columns(); track field.name) {
+                  @let cell = cellFor(field, doc);
+                  <volt-table-cell>
+                    @switch (cell.kind) {
+                      @case ('image') {
+                        <span class="flex items-center gap-2">
+                          <img
+                            [src]="cell.url"
+                            [alt]="cell.text"
+                            class="h-8 w-8 rounded object-cover"
+                          />
+                          <span class="truncate text-xs text-muted-foreground">{{
+                            cell.text
+                          }}</span>
+                        </span>
+                      }
+                      @case ('count') {
+                        <span class="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                          {{ cell.text }}
+                        </span>
+                      }
+                      @case ('muted') {
+                        <span class="text-muted-foreground">{{ cell.text }}</span>
+                      }
+                      @default {
+                        {{ cell.text }}
+                      }
+                    }
+                  </volt-table-cell>
+                }
+
+                <volt-table-cell class="text-right">
+                  @if (!readOnly()) {
+                    <div class="flex items-center justify-end gap-1">
+                      @if (showStatus()) {
+                        <volt-button
+                          variant="ghost"
+                          size="sm"
+                          class="h-7 text-xs"
+                          (click)="toggleStatus(doc)"
+                        >
+                          {{ isPublished(doc) ? 'Unpublish' : 'Publish' }}
+                        </volt-button>
+                      }
                       <volt-button
                         variant="ghost"
-                        size="sm"
-                        class="h-7 text-xs"
-                        (click)="toggleStatus(doc)"
+                        size="icon"
+                        class="h-7 w-7"
+                        (click)="edit.emit(doc)"
                       >
-                        {{ isPublished(doc) ? 'Unpublish' : 'Publish' }}
+                        <lmn-pencil [size]="14" />
+                        <span class="sr-only">Edit</span>
                       </volt-button>
-                    }
-                    <volt-button
-                      variant="ghost"
-                      size="icon"
-                      class="h-7 w-7"
-                      (click)="edit.emit(doc)"
-                    >
-                      <lmn-pencil [size]="14" />
-                      <span class="sr-only">Edit</span>
-                    </volt-button>
-                    <volt-button
-                      variant="ghost"
-                      size="icon"
-                      class="h-7 w-7"
-                      (click)="delete.emit(doc)"
-                    >
-                      <lmn-trash [size]="14" />
-                      <span class="sr-only">Delete</span>
-                    </volt-button>
-                  </div>
-                }
-              </volt-table-cell>
-            </volt-table-row>
-          }
-        </volt-table-body>
-      </volt-table>
+                      <volt-button
+                        variant="ghost"
+                        size="icon"
+                        class="h-7 w-7"
+                        (click)="delete.emit(doc)"
+                      >
+                        <lmn-trash [size]="14" />
+                        <span class="sr-only">Delete</span>
+                      </volt-button>
+                    </div>
+                  }
+                </volt-table-cell>
+              </volt-table-row>
+            }
+          </volt-table-body>
+        </volt-table>
+      </div>
 
       @if (meta(); as pagination) {
         @if (pagination.totalPages > 1) {

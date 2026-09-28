@@ -78,8 +78,11 @@ Two rules that are not optional on Workers:
 2. **Make seeding idempotent.** Workers cold-start repeatedly; a seed that does not check first
    duplicates rows on every cold start.
 
-No migration step is needed: `syncSchema()` creates missing tables and adds new columns on the first
-request. It is additive only — it never drops or retypes a column.
+On a fresh D1 database no migration step is needed: `syncSchema()` creates every table on the first
+request. On a database that already has rows, it applies only safe additive changes and (from the first
+release after `0.7.0`) refuses drift that needs a data migration. The runtime then fails to start instead of serving a half-matching
+schema. Check a deployed database with `runtime.planSchema()` before you deploy a schema change. See
+[Schema upgrades](/docs/schema-upgrades).
 
 ## 5. Deploy
 

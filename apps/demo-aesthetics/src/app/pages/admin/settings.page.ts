@@ -12,9 +12,11 @@ import { VoltButton } from '@voltui/components';
 /**
  * Site settings, edited as a single document.
  *
- * FINDING 4 in practice: because ForgeCMS has no globals, this page has to find the one
- * `site_settings` row, remember its id, and decide between create and update itself. A `global`
- * would make this `runtime.updateGlobal('site_settings', value)` with no id and no ambiguity.
+ * FINDING 4, retained on purpose: settings are a one-row `site_settings` collection, so this page
+ * finds the row, remembers its id and decides between create and update itself. ForgeCMS has globals
+ * (`PUT /api/v1/globals/:slug`, no id, no ambiguity), but the deployed demo's D1 keeps the edited
+ * settings in this collection, and moving them is a data migration — roadmap 0.7 M02. See
+ * `server/routes/api/site/settings.get.ts`.
  */
 @Component({
   selector: 'lumea-admin-settings',

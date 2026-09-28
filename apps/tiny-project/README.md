@@ -36,3 +36,44 @@ pnpm e2e:tiny-project          # full browser golden path (Playwright)
 Both run the identical domain: schema sync, first-admin bootstrap, login, a second user, the full
 post lifecycle (create/draft-hidden/publish/edit/delete), the author relation, and a role boundary
 (editor may write, only admin may delete).
+
+## What it proves today
+
+- **Workspace packages consumed like published ones:** only `@forge-cms/*` entry points and public
+  subpaths, no deep imports. `pnpm release:verify` repeats the check against the packed tarballs.
+- **D1 and libSQL:** the same domain on both profiles (above).
+- **Auth:** first-admin bootstrap, cookie sessions, signup opt-in, CSRF, last-admin and H04 bounds
+  (`e2e/golden-path.spec.ts`).
+- **Admin:** `@forge-cms/admin`'s auth, content and users routes, with no host CRUD pages.
+- **Relations:** `post.author -> users`, populated with `depth=1` according to the caller's access.
+- **Strata read controllers:** `GET /api/v1/:collection` and `GET /api/v1/:collection/:id`.
+
+## Strata (experimental integration)
+
+ForgeCMS does not depend on Strata; this app does, from npm (`@strata-sc/core` and
+`@strata-sc/analog` 0.1.0), as an external consumer. Strata owns transport; Forge owns CMS behaviour.
+
+```
+GET /api/v1/:collection      → CollectionsController.list → handleList
+GET /api/v1/:collection/:id  → CollectionsController.read → handleRead
+POST/PUT/DELETE, auth, bootstrap → H3 file routes (unchanged)
+```
+
+`src/server/strata/collections.controller.ts` only adapts the request. `createForgeReadContext`
+(`forge-read-context.ts`) is **read-only and bodyless** on purpose: Strata 0.1.0's
+`StrataAnalogRequest` exposes no Web `Request`, so there is no body, no `AbortSignal` and no real
+origin for CSRF. It throws for any method other than GET/HEAD. Mutations move only once Strata exposes
+the canonical request.
+
+Evidence:
+
+- `read-parity.test.ts` mounts the former H3 read handlers and the Strata plugin on two h3 apps. It
+  sends identical requests (anonymous, Bearer, cookie, bad token, drafts, depth, missing id, unknown
+  collection, auth-only collection, bad query) and asserts identical status, headers and body.
+- `strata-registration.test.ts` checks that only the two GET routes are registered and that no
+  file-system GET route competes with them.
+- The e2e "read API contract" test runs against the real dev server.
+- Strata code ships only in the Nitro worker chunk, never in `dist/client` or `dist/ssr`.
+
+Strata Server Components are **not** used here: that package is unpublished and targets a newer
+Angular/Analog/Vite than this repository.

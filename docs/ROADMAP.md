@@ -1,9 +1,15 @@
 # ROADMAP — A small, dependable ForgeCMS 1.0
 
-> Baseline verified **2026-09-07**: current `main` **`28ff76c`**; latest public GitHub release
-> [v0.4.0](https://github.com/Andersseen/ForgeCMS/releases/tag/v0.4.0) (2026-09-03);
-> all ten public package manifests **0.4.0**. Latest completed spec: **056**.
-> Status: **proposed delivery plan; not implementation or publication authorization**.
+> **Current status (2026-09-28, spec 071):** npm family **`0.7.0`**, which contains specs through 069 —
+> **roadmap 0.6 complete**. **Roadmap 0.7 in progress:** M01 (drift detection, spec 070) is merged on
+> `main` but **not yet published**; M02 (reviewed migrations) is next; M03 (backup/restore) is pending.
+> Release numbers in the table below are **product checkpoints, not npm versions**: npm `0.7.0` does
+> not mean roadmap 0.7 is done. The pending M01 changeset is `minor`, so the open Version Packages PR
+> would publish it as npm `0.8.0`. Whether to ship it as `0.7.1` instead is a maintainer decision
+> recorded in STATE.md.
+>
+> Original baseline (2026-09-07): `main` `28ff76c`, GitHub release v0.4.0, manifests 0.4.0, latest
+> spec 056. Status: **proposed delivery plan; not implementation or publication authorization**.
 > [STATE.md](STATE.md) records implementation. [ROADMAP-LEGACY.md](ROADMAP-LEGACY.md) preserves history.
 >
 > **2026-09-18 update:** spec 058 (Foundation Hardening) implemented most of packets A01–A04 (versions,
@@ -65,6 +71,15 @@
 > `AUTH_SECRET` instead of falling back to the public dev secret. Version retention remains
 > "kept indefinitely" with no cleanup, and `versions.autosave` stays accepted-but-inert: both are
 > post-1.0 product follow-ups, not 0.6 features. Next: roadmap 0.7 / M01.
+>
+> **2026-09-28 update:** [spec 070](specs/070-schema-drift-detection-and-upgrade-planning.md) completes
+> **M01**: `syncSchema()` plans before it writes, applies only safe additive changes and refuses drift
+> with a typed `SchemaDriftError`; `runtime.planSchema()` is read-only. Next: M02.
+>
+> **2026-09-28 update:** [spec 071](specs/071-0.7-consolidation-and-dogfood-refresh.md) is a
+> consolidation pass between M01 and M02, **not a packet**: release/version truth, website and docs
+> refresh, the demo re-dogfooded against 0.7, three admin package fixes found by that, and Strata
+> single-document reads in tiny-project. Sequencing is unchanged; **M02 remains the next step.**
 
 ## Product direction
 

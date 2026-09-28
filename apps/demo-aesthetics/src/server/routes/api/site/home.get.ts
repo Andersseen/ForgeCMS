@@ -19,8 +19,8 @@ import type { HomePayload } from '../../../../shared/site-content';
 export default definePublicSiteRoute(async (runtime): Promise<HomePayload> => {
   const asVisitor = { overrideAccess: false, user: null } as const;
 
-  const [pages, services, testimonials, promotions, settings] = await Promise.all([
-    runtime.find({ collection: 'pages', where: { slug: 'home' }, limit: 1, ...asVisitor }),
+  const [page, services, testimonials, promotions, siteSettings] = await Promise.all([
+    runtime.findOne({ collection: 'pages', where: { slug: 'home' }, ...asVisitor }),
     runtime.find({
       collection: 'services',
       where: { featured: true },
@@ -33,12 +33,11 @@ export default definePublicSiteRoute(async (runtime): Promise<HomePayload> => {
     runtime.find({ collection: 'testimonials', limit: 6, depth: 1, ...asVisitor }),
     // The access rule on `promotions` already limits anonymous callers to `active: true` ones.
     runtime.find({ collection: 'promotions', limit: 1, ...asVisitor }),
-    runtime.find({ collection: 'site_settings', limit: 1, ...asVisitor })
+    // A one-row collection rather than a global — see `settings.get.ts` for why (finding 4).
+    runtime.findOne({ collection: 'site_settings', ...asVisitor })
   ]);
 
-  const [page] = pages.docs;
   const [promotion] = promotions.docs;
-  const [siteSettings] = settings.docs;
 
   return {
     page: page ? toPageContent(page) : null,

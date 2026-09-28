@@ -173,6 +173,7 @@ interface BreadcrumbItem {
               variant="ghost"
               size="icon"
               class="h-8 w-8"
+              aria-label="Toggle sidebar"
               (click)="sidebarService.toggleCollapse()"
             >
               <lmn-bars-3 [size]="16" />
@@ -196,20 +197,22 @@ interface BreadcrumbItem {
             </div>
           </div>
           <div class="flex items-center gap-2 ml-auto">
+            <!-- Named by visually hidden text: the pinned Volt 1.0.x keeps an aria-label on the
+                 <volt-button> host, where it names nothing. -->
             <volt-button
               variant="ghost"
               size="icon"
               class="h-8 w-8"
               (click)="themeService.toggle()"
-              [attr.aria-label]="
-                themeService.isDark() ? 'Switch to light mode' : 'Switch to dark mode'
-              "
             >
               @if (themeService.isDark()) {
                 <lmn-sun [size]="16" />
               } @else {
                 <lmn-moon [size]="16" />
               }
+              <span class="sr-only">{{
+                themeService.isDark() ? 'Switch to light mode' : 'Switch to dark mode'
+              }}</span>
             </volt-button>
             @if (session.authenticated()) {
               <volt-button variant="ghost" size="sm" (click)="logout()">Log out</volt-button>

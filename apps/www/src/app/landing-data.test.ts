@@ -1,9 +1,41 @@
 import { describe, expect, it } from 'vitest';
-import { features, packages } from './landing-data';
+import { CURRENT_FORGE_VERSION, FORGE_PACKAGES } from './forge-release';
+import { ROADMAP_MILESTONES, features, packages } from './landing-data';
 
 describe('landing content', () => {
-  it('presents the official app essentials', () => {
-    expect(features.length).toBeGreaterThan(0);
-    expect(packages).toContainEqual({ name: 'core', version: '0.4.0' });
+  it('derives every package card from the one current version', () => {
+    expect(CURRENT_FORGE_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(packages.map((pkg) => pkg.name)).toEqual(FORGE_PACKAGES.map((pkg) => pkg.name));
+    expect(new Set(packages.map((pkg) => pkg.version))).toEqual(new Set([CURRENT_FORGE_VERSION]));
+  });
+
+  it('lists all ten public packages', () => {
+    expect(packages.map((pkg) => pkg.name)).toEqual([
+      'core',
+      'db',
+      'auth',
+      'storage',
+      'api',
+      'runtime',
+      'cloudflare',
+      'angular',
+      'admin',
+      'testing'
+    ]);
+  });
+
+  it('describes capabilities, not a future', () => {
+    const copy = JSON.stringify(features);
+    expect(copy).not.toMatch(/future|0\.4\./i);
+    expect(copy).not.toMatch(/production[- ]ready|payload replacement|1\.0 stable/i);
+  });
+
+  it('shows 0.7 as in progress with M01 done and M02 next, never as complete', () => {
+    const upgrades = ROADMAP_MILESTONES.find((milestone) => milestone.version === '0.7');
+    expect(upgrades?.status).toBe('in-progress');
+    expect(upgrades?.steps?.map((step) => step.status)).toEqual(['complete', 'next', 'pending']);
+    expect(ROADMAP_MILESTONES.find((milestone) => milestone.version === '0.6')?.status).toBe(
+      'complete'
+    );
   });
 });

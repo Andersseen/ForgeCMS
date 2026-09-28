@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { useOwnThrottleBucket } from './visitor';
+
+useOwnThrottleBucket('admin-dashboard');
 
 const DEMO_EMAIL = 'demo@lumea.clinic';
 const DEMO_PASSWORD = 'lumea-demo';

@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+  viewChild
+} from '@angular/core';
+import type { ElementRef } from '@angular/core';
 import { VoltBadge, VoltButton } from '@voltui/components';
 import {
   DEMO_ADMIN_URL,
@@ -25,6 +34,7 @@ type Audience = 'editor' | 'developer';
   standalone: true,
   imports: [VoltButton, VoltBadge],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '(document:keydown.escape)': 'dialog.close()' },
   template: `
     @if (dialog.isOpen()) {
       <div
@@ -32,10 +42,12 @@ type Audience = 'editor' | 'developer';
         (click)="dialog.close()"
       >
         <div
+          #panel
           role="dialog"
           aria-modal="true"
           aria-labelledby="demo-dialog-title"
-          class="w-full max-w-2xl rounded-xl border border-border bg-background shadow-2xl"
+          tabindex="-1"
+          class="w-full max-w-2xl rounded-xl border border-border bg-background shadow-2xl outline-none"
           (click)="$event.stopPropagation()"
         >
           <header class="flex items-start justify-between gap-4 border-b border-border p-6">
@@ -131,11 +143,11 @@ type Audience = 'editor' | 'developer';
                 <ul class="mt-2 space-y-1 font-mono text-xs leading-6">
                   <li>apps/demo-aesthetics/src/server/api/collections.ts</li>
                   <li>apps/demo-aesthetics/src/server/routes/api/site/home.get.ts</li>
-                  <li>apps/demo-aesthetics/src/tests/content-model.test.ts</li>
+                  <li>apps/demo-aesthetics/src/server/api/service-detail.ts</li>
                 </ul>
                 <p class="mt-3 text-xs text-muted-foreground">
-                  docs/DEMO-FINDINGS.md is the honest counterpart: everything this CMS could not do
-                  when the demo was built, and what has been fixed since.
+                  docs/DEMO-FINDINGS.md is the honest counterpart: what this CMS could not do when
+                  the demo was built, what has been fixed since, and what is still open.
                 </p>
               </div>
             }
@@ -156,6 +168,12 @@ type Audience = 'editor' | 'developer';
 })
 export class DemoDialogComponent {
   protected readonly dialog = inject(DemoDialogService);
+  private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
+
+  constructor() {
+    // Move focus into the dialog when it opens, so keyboard and screen-reader users land in it.
+    effect(() => this.panel()?.nativeElement.focus());
+  }
 
   protected readonly audience = signal<Audience>('editor');
   protected readonly steps = computed(() =>

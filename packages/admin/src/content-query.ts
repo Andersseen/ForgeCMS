@@ -35,11 +35,18 @@ export interface WorkspaceQueryState {
   hasDrafts: boolean;
 }
 
-/** Builds the `listDocuments` query from a workspace's query-state signals. */
+/**
+ * Builds the `listDocuments` query from a workspace's query-state signals.
+ *
+ * Always `depth: 1`: the list renders relation and upload cells from the populated document (a
+ * title, a thumbnail — `toCellView`). Without it every such cell was a truncated id, which spec 042
+ * had fixed on the app-local list that spec 052's reusable workspace replaced.
+ */
 export function buildListQuery(state: WorkspaceQueryState): QueryOptions {
   const term = state.search.trim();
   return {
     page: state.page,
+    depth: 1,
     ...(state.sort !== null && { sort: state.sort.field, order: state.sort.order }),
     ...(state.hasDrafts && { status: state.status }),
     ...(term !== '' &&

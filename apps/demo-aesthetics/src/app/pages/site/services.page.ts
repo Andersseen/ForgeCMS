@@ -72,9 +72,10 @@ export class ServicesPage {
   protected readonly activeCategory = signal<string | null>(null);
 
   /**
-   * Filtering happens client-side over the whole (small) menu. A larger catalogue would want
-   * `?where[category]=…` per click, which the API supports — but `CmsApiService` cannot express it
-   * and a purpose-built endpoint would need a parameter per filter (finding 15).
+   * Filtering happens client-side over the whole menu, which arrives in one composed payload anyway:
+   * a clinic has a dozen treatments, so a request per category click would cost more than it saves.
+   * A large catalogue would filter on the server — `CmsApiService.listDocuments(…, { where })` or a
+   * `category` parameter on `/api/site/services` can both express it (spec 041).
    */
   protected readonly visibleServices = computed(() => {
     const services = this.state.data()?.services ?? [];

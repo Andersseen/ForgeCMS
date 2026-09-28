@@ -57,12 +57,18 @@ const created = await runtime.create({
 });
 
 const { docs } = await runtime.find({ collection: 'notes' });
-await runtime.delete({ collection: 'notes', id: String(created.id) });
+const note = await runtime.findOne({ collection: 'notes', where: { title: 'Hello ForgeCMS' } });
+await runtime.delete({ collection: 'notes', id: created.id });
 ```
 
-`runtime.syncSchema()` is additive: it creates missing tables and adds missing columns, but it does
-not drop, rename, retype, or backfill existing data. For framework HTTP integration, build an
-`ApiContext` and call the handlers exported by `@forge-cms/runtime`.
+`runtime.syncSchema()` creates missing tables and applies safe additive changes. It never drops,
+renames, retypes or backfills data, and from the first release after `0.7.0` it refuses changes
+that would need a data migration; see [Schema upgrades](/docs/schema-upgrades) for what happens when
+you change a collection that already has rows. For framework HTTP integration, build an `ApiContext`
+and call the handlers exported by `@forge-cms/runtime`.
+
+Next, mount the admin and the Angular client: the [Small project guide](/docs/small-project-guide)
+does both, with users and cookie sessions.
 
 ## Running the repository demo
 

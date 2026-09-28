@@ -7,16 +7,13 @@ import type { PostDetail } from '../../../../../shared/site-content';
 export default definePublicSiteRoute(async (runtime, event): Promise<PostDetail> => {
   const slug = getRouterParam(event, 'slug') ?? '';
 
-  const found = await runtime.find({
+  const record = await runtime.findOne({
     collection: 'posts',
     where: { slug },
-    limit: 1,
     depth: 1,
     overrideAccess: false,
     user: null
   });
-
-  const [record] = found.docs;
   if (!record) {
     throw createError({ statusCode: 404, statusMessage: 'Post not found' });
   }

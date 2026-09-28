@@ -48,7 +48,7 @@ describe('findSearchableField', () => {
 });
 
 describe('buildListQuery', () => {
-  it('always sends the page, nothing else by default', () => {
+  it('always sends the page and depth 1 (relation/upload cells need the populated document)', () => {
     expect(
       buildListQuery({
         page: 1,
@@ -58,7 +58,7 @@ describe('buildListQuery', () => {
         searchField: null,
         hasDrafts: false
       })
-    ).toEqual({ page: 1 });
+    ).toEqual({ page: 1, depth: 1 });
   });
 
   it('sends sort/order and status only for a drafts-enabled collection', () => {
@@ -71,7 +71,7 @@ describe('buildListQuery', () => {
         searchField: null,
         hasDrafts: true
       })
-    ).toEqual({ page: 2, sort: 'title', order: 'asc', status: 'draft' });
+    ).toEqual({ page: 2, depth: 1, sort: 'title', order: 'asc', status: 'draft' });
   });
 
   it('ignores status for a non-drafts collection even when set', () => {
@@ -96,7 +96,7 @@ describe('buildListQuery', () => {
         searchField: 'title',
         hasDrafts: false
       })
-    ).toEqual({ page: 1, where: { title: { contains: 'hello' } } });
+    ).toEqual({ page: 1, depth: 1, where: { title: { contains: 'hello' } } });
 
     expect(
       buildListQuery({

@@ -381,12 +381,14 @@ export const pages = defineCollection({
   }
 });
 
-// --- The "global" that isn't -----------------------------------------------------------------------
+// --- The "global" that isn't (yet) ------------------------------------------------------------------
 
 /**
- * FINDING 4: ForgeCMS has no globals (roadmap 023), so site-wide settings are a collection that is
- * expected to hold exactly one row. Nothing enforces that — `POST /api/v1/site_settings` will
- * happily create a second one, and every read has to pick `docs[0]`.
+ * FINDING 4: site-wide settings are a collection expected to hold exactly one row. ForgeCMS has had
+ * globals since this was written (spec 066), and a new app should use `defineGlobal`. This one keeps
+ * the collection because the deployed demo's D1 already stores the edited settings here; a global is
+ * a separate table that would start empty, and copying the row across is a data migration — roadmap
+ * 0.7 M02. Nothing stops a second row, so every read uses `findOne`.
  */
 export const siteSettings = defineCollection({
   slug: 'site_settings',
@@ -429,18 +431,23 @@ export const siteSettings = defineCollection({
 
 // --- Auth ------------------------------------------------------------------------------------------
 
-export const users = withAuthFields(
-  defineCollection({
-    slug: 'users',
-    fields: {
-      email: defineField.email({ required: true }),
-      name: defineField.text(),
-      role: defineField.select({ options: ['admin', 'editor', 'viewer'] }),
-      jobTitle: defineField.text(),
-      status: defineField.select({ options: ['active', 'inactive'], defaultValue: 'active' })
-    }
-  })
-);
+const staffAccounts = defineCollection({
+  slug: 'users',
+  fields: {
+    email: defineField.email({ required: true }),
+    name: defineField.text(),
+    role: defineField.select({ options: ['admin', 'editor', 'viewer'] }),
+    jobTitle: defineField.text(),
+    status: defineField.select({ options: ['active', 'inactive'], defaultValue: 'active' })
+  }
+});
+
+/**
+ * Defined first and wrapped second, as the docs show: written inline
+ * (`withAuthFields(defineCollection({ … }))`) TypeScript widens the slug to `string`, and one
+ * `string` slug makes the whole typed registry accept any collection name.
+ */
+export const users = withAuthFields(staffAccounts);
 
 /**
  * Every collection carries the demo's limits — a ceiling that prunes oldest-first and a floor that
@@ -460,3 +467,6 @@ export const collections = [
   siteSettings,
   users
 ].map(withDemoGuards);
+
+/** The typed registry: `ForgeCmsRuntime<ServerEnv, DemoCollections>` infers slugs and documents. */
+export type DemoCollections = typeof collections;

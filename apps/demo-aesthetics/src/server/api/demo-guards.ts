@@ -105,7 +105,13 @@ function guardsFor(slug: string): CollectionHooks {
   return hooks;
 }
 
-/** Wraps a collection with the demo's limits. Applied to every collection in `collections.ts`. */
-export function withDemoGuards(collection: CollectionDefinition): CollectionDefinition {
+/**
+ * Wraps a collection with the demo's limits. Applied to every collection in `collections.ts`.
+ * Generic so the registry keeps each collection's literal slug and fields — that is what types the
+ * Local API (spec 047) for every route in this app.
+ */
+export function withDemoGuards<TCollection extends CollectionDefinition>(
+  collection: TCollection
+): TCollection {
   return { ...collection, hooks: mergeHooks(collection.hooks, guardsFor(collection.slug)) };
 }

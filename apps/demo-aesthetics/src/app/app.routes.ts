@@ -1,5 +1,13 @@
 import type { Routes } from '@angular/router';
-import { forgeAdminAnalyticsRoutes } from '@forge-cms/admin';
+import {
+  ForgeUsersWorkspaceComponent,
+  forgeAdminAnalyticsRoutes,
+  forgeAdminContentRoutes
+} from '@forge-cms/admin';
+import { forgeAuthGuard } from '@forge-cms/angular';
+
+/** The clinic keeps its branded `/login` (it prints the demo accounts), so the guards point there. */
+const SIGN_IN_PATH = '/login';
 
 export const routes: Routes = [
   {
@@ -49,10 +57,9 @@ export const routes: Routes = [
     data: {
       config: {
         title: 'Lumea Aesthetics',
-        // This app predates `forgeAdminAuthRoutes()`'s `/admin/login` convention (spec 054) — its own
-        // top-level `/login` route stays as-is (see spec 054's non-goals), so the shared layout needs
-        // to be told where "Log in"/post-logout actually go instead of assuming the new default.
-        signInPath: '/login',
+        // The branded `/login` stays top-level, so the shared layout is told where "Log in" and
+        // post-logout go instead of assuming `forgeAdminAuthRoutes()`'s `/admin/login`.
+        signInPath: SIGN_IN_PATH,
         nav: [
           {
             label: 'Clinic',
@@ -102,22 +109,18 @@ export const routes: Routes = [
         ]
       }
     },
+    // Guarded as a whole: an anonymous visitor is sent to `/login?returnUrl=…` before any admin
+    // request is made. UX only — every write is still decided by the server's access rules.
+    canActivate: [forgeAuthGuard({ signInPath: SIGN_IN_PATH })],
     children: [
       {
         path: '',
         loadComponent: () =>
           import('./pages/admin/dashboard.page').then((m) => m.AdminDashboardPage)
       },
-      {
-        path: 'collections',
-        loadComponent: () =>
-          import('./pages/admin/collections.page').then((m) => m.AdminCollectionsPage)
-      },
-      {
-        path: 'collections/:slug',
-        loadComponent: () =>
-          import('./pages/admin/collection-detail.page').then((m) => m.AdminCollectionDetailPage)
-      },
+      // The collections index, list (drafts, publish-from-row, sort, pagination) and document editor
+      // come from the package (spec 052); the clinic only supplies the sidebar that links into them.
+      ...forgeAdminContentRoutes(),
       {
         path: 'media',
         loadComponent: () => import('./pages/admin/media.page').then((m) => m.AdminMediaPage)
@@ -126,7 +129,8 @@ export const routes: Routes = [
       ...forgeAdminAnalyticsRoutes(),
       {
         path: 'users',
-        loadComponent: () => import('./pages/admin/users.page').then((m) => m.AdminUsersPage)
+        component: ForgeUsersWorkspaceComponent,
+        canActivate: [forgeAuthGuard({ signInPath: SIGN_IN_PATH, roles: ['admin'] })]
       },
       {
         path: 'api',

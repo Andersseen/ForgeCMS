@@ -175,71 +175,73 @@ function emptyForm(): UserFormValue {
         <forge-error-state title="Unable to load users" [message]="error()" (retry)="load()" />
       } @else {
         <volt-card class="overflow-hidden">
-          <volt-table aria-label="Users">
-            <volt-table-header>
-              <volt-table-row>
-                <volt-table-head>Name</volt-table-head>
-                <volt-table-head>Email</volt-table-head>
-                <volt-table-head>Role</volt-table-head>
-                <volt-table-head class="text-right">Actions</volt-table-head>
-              </volt-table-row>
-            </volt-table-header>
-            <volt-table-body>
-              @for (user of users(); track user.id) {
+          <div class="relative w-full overflow-x-auto">
+            <volt-table aria-label="Users">
+              <volt-table-header>
                 <volt-table-row>
-                  <volt-table-cell>
-                    <div class="flex items-center gap-3">
-                      <lmn-users [size]="16" class="text-muted-foreground" />
-                      <span class="font-medium">
-                        {{ user.name || 'Unknown' }}
-                        @if (isSelf(user)) {
-                          <span class="text-xs text-muted-foreground">(you)</span>
-                        }
-                      </span>
-                    </div>
-                  </volt-table-cell>
-                  <volt-table-cell>{{ user.email }}</volt-table-cell>
-                  <volt-table-cell>
-                    <span
-                      class="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium"
-                    >
-                      {{ user.role || 'viewer' }}
-                    </span>
-                  </volt-table-cell>
-                  <volt-table-cell class="text-right">
-                    <div class="flex items-center justify-end gap-1">
-                      <volt-button
-                        variant="ghost"
-                        size="icon"
-                        class="h-7 w-7"
-                        (click)="startEdit(user)"
-                      >
-                        <lmn-pencil [size]="14" />
-                        <span class="sr-only">Edit {{ user.name || user.email }}</span>
-                      </volt-button>
-                      <volt-button
-                        variant="ghost"
-                        size="icon"
-                        class="h-7 w-7"
-                        [disabled]="isSoleAdmin(user)"
-                        [title]="isSoleAdmin(user) ? 'The only admin can\\'t be deleted' : ''"
-                        (click)="requestDelete(user)"
-                      >
-                        <lmn-trash [size]="14" />
-                        <span class="sr-only">
-                          {{
-                            isSoleAdmin(user)
-                              ? 'Cannot delete the only admin'
-                              : 'Delete ' + (user.name || user.email)
-                          }}
-                        </span>
-                      </volt-button>
-                    </div>
-                  </volt-table-cell>
+                  <volt-table-head>Name</volt-table-head>
+                  <volt-table-head>Email</volt-table-head>
+                  <volt-table-head>Role</volt-table-head>
+                  <volt-table-head class="text-right">Actions</volt-table-head>
                 </volt-table-row>
-              }
-            </volt-table-body>
-          </volt-table>
+              </volt-table-header>
+              <volt-table-body>
+                @for (user of users(); track user.id) {
+                  <volt-table-row>
+                    <volt-table-cell>
+                      <div class="flex items-center gap-3">
+                        <lmn-users [size]="16" class="text-muted-foreground" />
+                        <span class="font-medium">
+                          {{ user.name || 'Unknown' }}
+                          @if (isSelf(user)) {
+                            <span class="text-xs text-muted-foreground">(you)</span>
+                          }
+                        </span>
+                      </div>
+                    </volt-table-cell>
+                    <volt-table-cell>{{ user.email }}</volt-table-cell>
+                    <volt-table-cell>
+                      <span
+                        class="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium"
+                      >
+                        {{ user.role || 'viewer' }}
+                      </span>
+                    </volt-table-cell>
+                    <volt-table-cell class="text-right">
+                      <div class="flex items-center justify-end gap-1">
+                        <volt-button
+                          variant="ghost"
+                          size="icon"
+                          class="h-7 w-7"
+                          (click)="startEdit(user)"
+                        >
+                          <lmn-pencil [size]="14" />
+                          <span class="sr-only">Edit {{ user.name || user.email }}</span>
+                        </volt-button>
+                        <volt-button
+                          variant="ghost"
+                          size="icon"
+                          class="h-7 w-7"
+                          [disabled]="isSoleAdmin(user)"
+                          [title]="isSoleAdmin(user) ? 'The only admin can\\'t be deleted' : ''"
+                          (click)="requestDelete(user)"
+                        >
+                          <lmn-trash [size]="14" />
+                          <span class="sr-only">
+                            {{
+                              isSoleAdmin(user)
+                                ? 'Cannot delete the only admin'
+                                : 'Delete ' + (user.name || user.email)
+                            }}
+                          </span>
+                        </volt-button>
+                      </div>
+                    </volt-table-cell>
+                  </volt-table-row>
+                }
+              </volt-table-body>
+            </volt-table>
+          </div>
         </volt-card>
       }
     </div>

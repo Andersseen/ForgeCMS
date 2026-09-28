@@ -24,7 +24,7 @@ import { DemoDialogService } from './demo-dialog.service';
             <span>ForgeCMS</span>
           </a>
           <p class="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-            A small, typed CMS foundation for Angular applications, built as focused packages.
+            A code-first, experimental CMS for Angular and Analog, released as focused packages.
           </p>
         </div>
 
@@ -39,6 +39,13 @@ import { DemoDialogService } from './demo-dialog.service';
             rel="noreferrer"
             target="_blank"
             >GitHub</a
+          >
+          <a
+            class="transition hover:text-foreground"
+            href="https://www.npmjs.com/org/forge-cms"
+            rel="noreferrer"
+            target="_blank"
+            >npm</a
           >
         </nav>
       </div>

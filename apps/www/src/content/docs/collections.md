@@ -76,9 +76,12 @@ documents flowing all the way to the client without codegen is still on the road
 3. creates any declared indexes with `CREATE [UNIQUE] INDEX IF NOT EXISTS` (`generateIndexSql`) — see
    [Indexes](#indexes) below.
 
-**Migrations are additive only.** Columns are never dropped or retyped, so renaming a field means
-adding a new column, and removing one leaves the old column in place. That is a deliberate
-constraint — it keeps schema sync safe to run on every cold start — but plan around it. Composite
+**Schema sync never destroys data.** Columns are never dropped or retyped, so renaming a field means
+adding a new column, and removing one leaves the old column in place. From the first release after
+`0.7.0`, sync goes further: a change that would need a data migration (a removed or renamed field, a
+type change, a new required field on a table with rows) stops startup with a `SchemaDriftError`
+instead of being half-applied. There is no migration runner yet. See
+[Schema upgrades](/docs/schema-upgrades). Composite
 fields (`group`, `array`, `blocks`) are stored as JSON in a `TEXT` column, which is why you cannot
 query inside them yet.
 
