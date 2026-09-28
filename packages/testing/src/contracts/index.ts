@@ -65,3 +65,10 @@ export {
   type GlobalLifecycleHarnessFactory,
   type GlobalLifecycleRuntime
 } from './global-lifecycle.js';
+export {
+  localeMergeCollections,
+  runLocaleMergeContractTests,
+  type LocaleMergeHarness,
+  type LocaleMergeHarnessFactory,
+  type LocaleMergeRuntime
+} from './locale-merge.js';

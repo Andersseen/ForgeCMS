@@ -48,6 +48,11 @@
 > Localization gains globals support and works on libSQL/D1, where every localized write used to fail.
 > Unsupported localization and global options are refused at startup. Remaining D04 work: the
 > DB ↔ object-storage lifecycle and the collection locale-merge race.
+>
+> **2026-09-28 update:** [spec 067](specs/067-storage-lifecycle-durable-intents.md) completes D04.
+> Durable storage intents plus `reconcileStorage()` make upload/delete crash-safe without a DB/R2
+> transaction. `handleFile` enforces the owning document's read access. Collection locale merges are
+> CAS-guarded. Next: the cross-cutting write-response/update-access consistency fix, then H04.
 
 ## Product direction
 

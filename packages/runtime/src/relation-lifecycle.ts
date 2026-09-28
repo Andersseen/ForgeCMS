@@ -386,7 +386,8 @@ const MAX = ATOMIC_WRITE_MAX_OPERATIONS;
 function tooLarge(root: { slug: string; id: string }): InvalidInputError {
   return new InvalidInputError(
     `Cannot delete document '${root.id}' from '${root.slug}': together with its cascade deletes, ` +
-      `set-null updates, version snapshots and reference checks it needs more than ${MAX} database ` +
+      `set-null updates, version snapshots, storage-cleanup records and reference checks it needs more ` +
+      `than ${MAX} database ` +
       `operations, the most ForgeCMS commits atomically in one operation. Nothing was changed. Delete or ` +
       `detach the dependent documents in smaller steps first.`
   );
@@ -533,8 +534,11 @@ export async function planRelationDelete(
     noReferenceAssertions(ctx, target, [...ids])
   );
 
+  // One storage-cleanup intent per deleted upload document joins the batch (spec 067).
+  const storageIntents = [...deletes.values()].filter((d) => d.collection.upload === true).length;
   const operations =
     deletes.size +
+    storageIntents +
     setNulls.reduce((sum, s) => sum + (versionsEnabled(s.collection) ? 2 : 1), 0) +
     assertions.length;
   if (operations > MAX) throw tooLarge(rootRef);

@@ -16,6 +16,12 @@ import {
 } from './relation-lifecycle.js';
 import * as operations from './operations.js';
 import { validateLocalizationSchema } from './localization.js';
+import {
+  hasUploadCollections,
+  reconcileStorage,
+  storageIntentsDefinition
+} from './storage-intents.js';
+import type { ReconcileStorageOptions, ReconcileStorageReport } from './storage-intents.js';
 import type {
   CountArgs,
   CreateArgs,
@@ -143,6 +149,10 @@ export class ForgeCmsRuntime<
   async syncSchema(): Promise<void> {
     await this.adapters.database.syncSchema(this.config.collections);
     await this.adapters.auth.syncSchema?.();
+    // Durable storage-cleanup intents (spec 067), only where uploads exist.
+    if (hasUploadCollections(this.config.collections)) {
+      await this.adapters.database.syncSchema([storageIntentsDefinition()]);
+    }
 
     for (const global of this.config.globals ?? []) {
       await this.adapters.database.syncSchema([
@@ -322,6 +332,17 @@ export class ForgeCmsRuntime<
 
   createVersion(args: CreateVersionArgs): Promise<Version> {
     return versionOps.createVersion(this, args);
+  }
+
+  // --- Storage ----------------------------------------------------------------------------
+
+  /**
+   * Deletes the stored objects that crashed or failed uploads and deletes left owned by no document, as
+   * recorded by their durable storage intents (spec 067). Safe to run repeatedly and concurrently; run it
+   * from a scheduled job or an operator script. See `reconcileStorage` for the exact guarantees.
+   */
+  reconcileStorage(options?: ReconcileStorageOptions): Promise<ReconcileStorageReport> {
+    return reconcileStorage(this, options);
   }
 
   // --- Preview ----------------------------------------------------------------------------

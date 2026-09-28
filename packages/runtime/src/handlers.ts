@@ -311,7 +311,7 @@ async function authorize<TEnv>(
   return { success: true, user };
 }
 
-async function resolveOptionalUser<TEnv>(
+export async function resolveOptionalUser<TEnv>(
   context: ApiContext<TEnv>,
   runtime: ForgeCmsRuntime<TEnv>
 ): Promise<AuthUser | null> {
@@ -459,12 +459,16 @@ export async function handleRead<TEnv = unknown>(
   }
 }
 
-async function buildMultipartBody<TEnv>(
+/**
+ * Parses a multipart create: the `file` part (checked against the handler's size/type limits) and every
+ * other string part that names a declared field. Storing the object is the Local API's job
+ * (`operations.uploadFile`), so its durable lifecycle lives in one place (spec 067).
+ */
+async function parseMultipartBody<TEnv>(
   context: ApiContext<TEnv>,
-  runtime: ForgeCmsRuntime<TEnv>,
   collection: CollectionDefinition,
   uploadConfig?: { maxFileSize?: number; mimeTypes?: string[] }
-): Promise<{ data: Record<string, unknown>; storageKey: string }> {
+): Promise<{ file: File; fields: Record<string, unknown> }> {
   const formData = await context.request.formData();
   const file = formData.get('file');
   if (!(file instanceof File)) {
@@ -485,32 +489,13 @@ async function buildMultipartBody<TEnv>(
     }
   }
 
-  const key = `${collection.slug}/${crypto.randomUUID()}-${file.name}`;
-
-  await runtime.adapters.storage.put({ key, body: file, contentType: file.type });
-
-  const url = await runtime.adapters.storage.getPublicUrl(key);
-
-  // The generated key travels separately from `data` (spec 063 §5): it is Forge-owned metadata, not
-  // caller content, and only `createUpload` may persist it.
-  const data: Record<string, unknown> = {};
-  const derived: Record<string, unknown> = {
-    filename: file.name,
-    url,
-    contentType: file.type,
-    filesize: file.size
-  };
-  for (const [name, value] of Object.entries(derived)) {
-    if (collection.fields[name]) data[name] = value;
-  }
-
+  const fields: Record<string, unknown> = {};
   formData.forEach((value, name) => {
     if (name !== 'file' && typeof value === 'string' && collection.fields[name]) {
-      data[name] = value;
+      fields[name] = value;
     }
   });
-
-  return { data, storageKey: key };
+  return { file, fields };
 }
 
 async function readJsonBody(request: Request): Promise<Record<string, unknown>> {
@@ -537,45 +522,25 @@ export async function handleCreate<TEnv = unknown>(
     assertNotAuthManaged(options.runtime, collectionSlug);
 
     const contentType = context.request.headers.get('content-type') ?? '';
-    let data: Record<string, unknown>;
-    let storageKey: string | undefined;
+    const locale = parseLocale(new URL(context.request.url));
+    const createArgs = {
+      collection: collectionSlug,
+      user,
+      overrideAccess: false,
+      ...(locale !== undefined && { locale })
+    };
 
+    let doc: Record<string, unknown>;
     if (collection.upload === true && contentType.includes('multipart/form-data')) {
-      const result = await buildMultipartBody(context, options.runtime, collection, options.upload);
-      data = result.data;
-      storageKey = result.storageKey;
+      const { file, fields } = await parseMultipartBody(context, collection, options.upload);
+      doc = await operations.uploadFile(options.runtime, { ...createArgs, data: fields }, file);
     } else {
-      data = await readJsonBody(context.request);
+      doc = await options.runtime.create({
+        ...createArgs,
+        data: await readJsonBody(context.request)
+      });
     }
-
-    try {
-      const locale = parseLocale(new URL(context.request.url));
-      const createArgs = {
-        collection: collectionSlug,
-        data,
-        user,
-        overrideAccess: false,
-        ...(locale !== undefined && { locale })
-      };
-      const doc =
-        storageKey !== undefined
-          ? await operations.createUpload(options.runtime, createArgs, storageKey)
-          : await options.runtime.create(createArgs);
-
-      return jsonResponse({ data: doc }, 201);
-    } catch (createErr) {
-      if (storageKey) {
-        try {
-          await options.runtime.adapters.storage.delete(storageKey);
-        } catch (cleanupErr) {
-          getLogger().error(
-            `Failed to clean up storage object '${storageKey}' after document creation failure`,
-            cleanupErr
-          );
-        }
-      }
-      throw createErr;
-    }
+    return jsonResponse({ data: doc }, 201);
   } catch (err) {
     return toErrorResponse(err, user);
   }

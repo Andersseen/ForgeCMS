@@ -15,6 +15,7 @@ import {
   ValidationFailedError
 } from './errors.js';
 import { documentMatches, resolveAccess } from './access.js';
+import { afterStamp } from './concurrency.js';
 import { applyAutoSlugs, applyFieldDefaults } from './defaults.js';
 import type { AccessDecision } from './access.js';
 import { statusConstraint } from './read-policy.js';
@@ -94,20 +95,6 @@ export function validateGlobalSchema(globals: readonly GlobalDefinition[]): stri
 /** The collection-shaped view of a global the shared pipeline stages (hooks, validation, locales) take. */
 function proxyOf(global: GlobalDefinition): CollectionDefinition {
   return { ...global, upload: false };
-}
-
-/**
- * A compare-and-set on `updated_at` is only as fine as the millisecond the adapters stamp. Before a CAS
- * write, wait until the clock has passed the stamp that was read, so this write's own stamp is strictly
- * later: a concurrent CAS writer that read the same row then cannot match it (found in review — two
- * writes inside one millisecond would otherwise both pass). Bounded: at most a few milliseconds.
- */
-async function afterStamp(stamp: unknown): Promise<void> {
-  const seen = typeof stamp === 'string' ? Date.parse(stamp) : NaN;
-  if (Number.isNaN(seen)) return;
-  for (let i = 0; i < 20 && Date.now() <= seen; i++) {
-    await new Promise((resolve) => setTimeout(resolve, 1));
-  }
 }
 
 function assertKnownLocale(global: GlobalDefinition, locale: string | undefined): void {

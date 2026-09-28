@@ -6,6 +6,7 @@ import type { DatabaseAdapter, DatabaseRecord } from '@forge-cms/db';
 import { InMemoryAuthAdapter } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import { ForgeCmsRuntime } from './runtime.js';
+import { recordUploadIntent } from './storage-intents.js';
 import { createUpload } from './operations.js';
 import { InvalidInputError } from './errors.js';
 
@@ -466,7 +467,10 @@ describe.each(backends)('%s', (_name, makeDatabase) => {
       const doc = await createUpload(
         ctx.runtime,
         { collection: 'media', data: { filename: 'a.pdf', alt: 'one' } },
-        'media/a.pdf'
+        {
+          storageKey: 'media/a.pdf',
+          intentId: await recordUploadIntent(ctx.runtime.adapters.database, 'media', 'media/a.pdf')
+        }
       );
       return { ...ctx, doc };
     }

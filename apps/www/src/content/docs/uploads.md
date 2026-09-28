@@ -68,7 +68,19 @@ export default defineEventHandler(async (event) => {
 ```
 
 Without this, every uploaded image on a deployment with a private bucket or the in-memory adapter is
-a broken link. `handleFile` takes an optional `cacheControl` and returns `404` for a missing key.
+a broken link.
+
+**`handleFile` applies your collection's read access.** It serves a key only as the file of the
+upload document that owns it, meaning the document whose `_storageKey` is that key:
+
+- **Who can read.** The caller (resolved from the session cookie or token, like any API request)
+  must be able to read that document: collection and row access, and draft visibility.
+- **Not found.** A key no document owns, or one whose document the caller cannot read, is the same
+  `404`.
+- **Caching.** Anonymous hits get `cacheControl` (default `public, max-age=60`). Authenticated hits
+  are always `private, no-store`, so a shared cache never hands one user's file to another.
+- **Older uploads.** Uploads recorded before `_storageKey` existed have no owner and return `404`
+  here. Backfill their `_storageKey` (the part of `url` after your media route) to serve them again.
 
 If your bucket **is** public (an R2 custom domain, a CDN), point the adapter at it instead and skip
 the route:
@@ -76,6 +88,32 @@ the route:
 ```ts
 new R2StorageAdapter({ publicUrlBase: 'https://cdn.example.com' });
 ```
+
+## When storage and the database disagree
+
+A database transaction cannot include your bucket. So Forge writes a **storage intent** row, in the
+database, whenever an object could end up owned by no document:
+
+- **Upload.** The intent is written before the object is stored, and removed in the same batch that
+  creates the document.
+- **Delete.** The intent is written in the same batch that deletes the document, and removed once the
+  object is gone.
+
+A crash, or a failed cleanup at either step, leaves the intent behind instead of an unrecorded
+orphan. Work them off with:
+
+```ts
+const report = await runtime.reconcileStorage(); // { deleted, kept, pending, failed }
+```
+
+- **Where to run it.** From a scheduled job (a Cloudflare Cron Trigger) or an operator script. It is
+  safe to run repeatedly and from several places at once.
+- **Grace period.** Upload intents younger than `uploadGraceMs` (default one hour) are left alone,
+  because their upload may still be committing.
+- **What it never does.** It never deletes an object a document owns. A failed delete keeps its
+  intent for the next run.
+- **Residual.** A process that dies in the middle of reconciliation can leak that one object; it
+  cannot break a document.
 
 ## 4. Reference the file from other collections
 
@@ -116,7 +154,7 @@ const doc = await cms.uploadFile('media', file, { alt: 'Treatment room' });
 Know these before building on it:
 
 - **Deleting a document deletes exactly the object in its `_storageKey`**, after the database
-  delete succeeds. A document without one (created from JSON, or recorded before storage keys existed)
+  delete succeeds. If that fails, a storage intent records it for `reconcileStorage()`. A document without one (created from JSON, or recorded before storage keys existed)
   deletes no object, and Forge logs a warning. Before spec 063, Forge guessed the key from `url`.
   `url` is an editable field, so that guess could point at somebody else's file, and it was removed.
   Clean up objects from such older records by hand.
@@ -125,5 +163,5 @@ Know these before building on it:
 - **No image resizing, thumbnails or variants.** What you upload is what you serve.
 - **No presigned/direct-to-storage uploads** — bytes go through your server, which matters for large
   files on a Worker.
-- **No referential integrity.** Deleting a media document leaves `upload` fields pointing at a dead
-  id.
+- **Upload references restrict.** Deleting a media document that an `upload` field still references
+  is refused (spec 064).

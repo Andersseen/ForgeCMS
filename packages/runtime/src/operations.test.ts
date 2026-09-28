@@ -6,6 +6,7 @@ import type { DatabaseAdapter } from '@forge-cms/db';
 import { InMemoryAuthAdapter } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import { ForgeCmsRuntime } from './runtime.js';
+import { recordUploadIntent } from './storage-intents.js';
 import { createUpload } from './operations.js';
 import {
   AccessDeniedError,
@@ -996,7 +997,10 @@ describe('Local API delete cleans up upload storage objects (spec 051)', () => {
           contentType: 'text/plain'
         }
       },
-      'media/hello.txt'
+      {
+        storageKey: 'media/hello.txt',
+        intentId: await recordUploadIntent(runtime.adapters.database, 'media', 'media/hello.txt')
+      }
     );
 
     expect(await storage.get('media/hello.txt')).not.toBeNull();
@@ -1059,7 +1063,14 @@ describe('Local API delete cleans up upload storage objects (spec 051)', () => {
     const doc = await createUpload(
       runtime,
       { collection: 'guarded_media', data: { filename: 'keep.txt', url: '/api/media/keep.txt' } },
-      'guarded/keep.txt'
+      {
+        storageKey: 'guarded/keep.txt',
+        intentId: await recordUploadIntent(
+          runtime.adapters.database,
+          'guarded_media',
+          'guarded/keep.txt'
+        )
+      }
     );
 
     await expect(

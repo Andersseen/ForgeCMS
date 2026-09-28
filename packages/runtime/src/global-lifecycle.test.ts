@@ -1,13 +1,15 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { defineCollection, defineField, defineGlobal } from '@forge-cms/core';
-import type { GlobalDefinition } from '@forge-cms/core';
+import type { CollectionDefinition, GlobalDefinition } from '@forge-cms/core';
 import { InMemoryDatabaseAdapter, LibSqlDatabaseAdapter } from '@forge-cms/db';
 import type { DatabaseAdapter } from '@forge-cms/db';
 import { InMemoryAuthAdapter } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import {
   globalLifecycleGlobals,
-  runGlobalLifecycleContractTests
+  localeMergeCollections,
+  runGlobalLifecycleContractTests,
+  runLocaleMergeContractTests
 } from '@forge-cms/testing/contracts';
 import { ForgeCmsRuntime } from './runtime.js';
 import { handleGlobalRead, handleGlobalUpdate } from './handlers.js';
@@ -27,9 +29,13 @@ const tempDir = await (async () => {
   };
 })();
 
-function runtimeOver(database: DatabaseAdapter, globals: GlobalDefinition[]): ForgeCmsRuntime {
+function runtimeOver(
+  database: DatabaseAdapter,
+  globals: GlobalDefinition[],
+  collections: CollectionDefinition[] = []
+): ForgeCmsRuntime {
   const runtime = new ForgeCmsRuntime({
-    collections: [],
+    collections,
     globals,
     adapters: { database, auth: new InMemoryAuthAdapter(), storage: new InMemoryStorageAdapter() }
   });
@@ -341,6 +347,47 @@ describe('LibSqlDatabaseAdapter — independent clients on one database file', (
       contenders.push(runtime);
     }
     const raw = runtimeOver(new LibSqlDatabaseAdapter(url).init(), globalLifecycleGlobals(prefix));
+    await raw.syncSchema();
+    return { contenders, database: raw.adapters.database };
+  });
+});
+
+// --- collection locale merges (spec 067) ---------------------------------------------------------------
+
+describe('InMemoryDatabaseAdapter — collection locale merges', () => {
+  runLocaleMergeContractTests(async ({ prefix, parties, gate }) => {
+    const shared = new InMemoryDatabaseAdapter();
+    const contenders = [];
+    for (let i = 0; i < parties; i++) {
+      const runtime = runtimeOver(gate.wrap(shared), [], localeMergeCollections(prefix));
+      await runtime.syncSchema();
+      contenders.push(runtime);
+    }
+    return { contenders, database: shared };
+  });
+});
+
+describe('LibSqlDatabaseAdapter — collection locale merges, independent clients', () => {
+  const directory = tempDir.make();
+  afterAll(() => tempDir.remove(directory));
+
+  runLocaleMergeContractTests(async ({ prefix, parties, gate }) => {
+    const url = `file:${directory}/${prefix}.db`;
+    const contenders = [];
+    for (let i = 0; i < parties; i++) {
+      const runtime = runtimeOver(
+        gate.wrap(new LibSqlDatabaseAdapter(url).init()),
+        [],
+        localeMergeCollections(prefix)
+      );
+      await runtime.syncSchema();
+      contenders.push(runtime);
+    }
+    const raw = runtimeOver(
+      new LibSqlDatabaseAdapter(url).init(),
+      [],
+      localeMergeCollections(prefix)
+    );
     await raw.syncSchema();
     return { contenders, database: raw.adapters.database };
   });

@@ -1,11 +1,54 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-27 (global lifecycle + localization — D04 part 1, spec 066).**
+> **Last updated: 2026-09-28 (upload storage lifecycle — D04 complete, spec 067).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Upload storage lifecycle — D04 complete (spec 067, 2026-09-28)
+
+Roadmap 0.6 D04 part 2 (and D01's DB + object-storage rows). See
+[docs/specs/067-storage-lifecycle-durable-intents.md](specs/067-storage-lifecycle-durable-intents.md).
+
+- **Reproduced first** (probes on the unfixed code):
+  - a failed upload create whose cleanup failed left an unrecorded orphan object;
+  - a delete whose object delete failed left `docs 0, objects 1` and one log line;
+  - `handleFile` gave an anonymous caller `200 secret-bytes` for an owner-only **draft**, and served
+    keys no document owns;
+  - two libSQL clients editing different locales of a collection document both succeeded and lost
+    one.
+- **Now:**
+  - **Durable storage intents** (`_forge_storage_intents`):
+    - written before an upload's object is stored, and removed in the same batch that creates its
+      document;
+    - written in the same batch as an upload document's delete, and removed after the object delete;
+    - `runtime.reconcileStorage()` works leftovers off: claim-first, never deletes an owned object,
+      upload grace period (1 hour), concurrent-safe;
+    - upload cleanup only deletes an object while its intent still exists, so a committed document
+      never loses its object;
+    - deletion intents count against the 25-operation batch cap.
+  - **`handleFile` applies the owning document's read access** (by `_storageKey`, through
+    `findByID`). Everything else is `404`. Authenticated hits are `private, no-store`, and a 500 no
+    longer echoes the storage error message.
+  - **Collection locale merges** are CAS-guarded (`updated_at` + `afterStamp`, shared with spec 066).
+  - Cleanup logs carry the key and error message only.
+- **Evidence:**
+  - `packages/runtime/src/storage-lifecycle.test.ts` (14 tests, including on-disk libSQL);
+  - `runLocaleMergeContractTests` (plain + versioned) on InMemory, libSQL and D1;
+  - real D1 + R2 in workerd: R2 failure after a D1 delete, and after a failed create, both
+    reconciled; `handleFile` access;
+  - a **browser upload E2E** (`apps/demo-aesthetics/e2e/media-upload.spec.ts`).
+- **Migration:** upload rows from before spec 063 (no `_storageKey`) are no longer served by
+  `handleFile`. Backfill `_storageKey` from the `url` key.
+- **D04 is complete** (specs 066 + 067). Residuals, by design:
+  - a reconciler dying between claim and delete leaks one object;
+  - clock skew between processes for the `updated_at` CAS;
+  - the browser journey against the certified R2 profile is left to R01 by the roadmap.
+
+  Cross-cutting, open (from spec 066's review): write responses ignore read access, and the
+  update-access query is checked before the write rather than inside it (collections and globals).
 
 ## Global lifecycle and localization — D04 part 1 (spec 066, 2026-09-27)
 
@@ -1570,12 +1613,12 @@ passwordHash`~~ — **fixed 2026-07-22, spec 018.** `@forge-cms/auth` now export
 
 ## What's next
 
-**Next bounded step (recommended after spec 066, 2026-09-27): finish D04.** Globals and localization
-are certified (spec 066). What remains is the DB ↔ object-storage lifecycle: DB failure after the
-object is stored, and object-deletion failure after the DB change, with the documented
-cleanup/recovery outcome and no secret logs. It extends the existing workerd R2 fault suite. Fold in
-the small collection locale-merge race (the same CAS as spec 066's global fix). After D04: H04
-(host-level auth limits). D03 is done except retention cleanup, which needs a product decision.
+**Next bounded step (recommended after spec 067, 2026-09-28): the cross-cutting access consistency
+fix both D04 reviews recorded.** Make a write's response honour the caller's read access, and move a
+query-returning update rule's check into the write itself (`updateIf` `targetMatches`), for collections
+and globals alike. It is small, security-relevant, and touches only the paths D04 just certified. Then
+H04 (host-level auth limits), the last open 0.6 packet. D03 is done except retention cleanup, which
+needs a product decision.
 
 Work is planned in [ROADMAP.md](ROADMAP.md), which sequences the remaining gaps by cost-of-delay.
 Each numbered item there gets its own spec in `docs/specs/` when picked up, per [SDD.md](SDD.md).

@@ -7,7 +7,9 @@ import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import { ForgeCmsRuntime } from '@forge-cms/runtime';
 import {
   globalLifecycleGlobals,
-  runGlobalLifecycleContractTests
+  localeMergeCollections,
+  runGlobalLifecycleContractTests,
+  runLocaleMergeContractTests
 } from '@forge-cms/testing/contracts';
 import { D1DatabaseAdapter } from '../../src/d1.adapter.js';
 
@@ -84,5 +86,23 @@ describe('D1DatabaseAdapter — real local D1 binding: localized fields (spec 06
       await runtime.findByID({ collection: 'loc_pages', id: page.id as string, locale: 'es' })
       // `summary` has no Spanish value: it falls back to the first locale.
     ).toMatchObject({ title: 'Hola', summary: 'Short', views: 3 });
+  });
+});
+
+describe('D1DatabaseAdapter — real local D1 binding: collection locale merges (spec 067)', () => {
+  runLocaleMergeContractTests(async ({ prefix, parties, gate }) => {
+    const contenders = [];
+    for (let i = 0; i < parties; i++) {
+      const runtime = runtimeOver(
+        gate.wrap(new D1DatabaseAdapter().init(env)),
+        [],
+        localeMergeCollections(prefix)
+      );
+      await runtime.syncSchema();
+      contenders.push(runtime);
+    }
+    const raw = runtimeOver(new D1DatabaseAdapter().init(env), [], localeMergeCollections(prefix));
+    await raw.syncSchema();
+    return { contenders, database: raw.adapters.database };
   });
 });
