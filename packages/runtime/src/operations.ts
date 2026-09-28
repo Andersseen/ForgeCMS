@@ -412,8 +412,8 @@ async function commitUpdate(
     collection.slug,
     id,
     `Document '${id}' in '${collection.slug}' was changed by another request while this update was in ` +
-      `progress (another locale was edited, or a reference this update re-sends was cleared); nothing ` +
-      `was written. Reload it and try again.`
+      `progress (it no longer matches the caller's update access, another locale was edited, or a ` +
+      `reference this update re-sends was cleared); nothing was written. Reload it and try again.`
   );
 }
 
@@ -881,8 +881,7 @@ async function createDocument(
     overrideAccess
   });
 
-  const [doc] = await prepareForRead(ctx, collection, [record], args);
-  const result = doc ?? record;
+  const result = await writeResult(ctx, collection, record, args);
 
   await runAfterOperationHooks(collection, { operation: 'create', user, overrideAccess, result });
   return result;
@@ -909,6 +908,8 @@ interface PreparedUpdate {
   versioned: boolean;
   latestVersion: number;
   versionLabel: string | undefined;
+  /** The caller's update-access query, re-checked inside the write itself (spec 068). */
+  accessWhere: DatabaseWhere | undefined;
 }
 
 /**
@@ -1052,7 +1053,8 @@ async function prepareUpdate(
     data,
     versioned,
     latestVersion,
-    versionLabel: args.versionLabel
+    versionLabel: args.versionLabel,
+    accessWhere: decision.where
   };
 }
 
@@ -1073,8 +1075,7 @@ async function finalizeUpdate(
     overrideAccess
   });
 
-  const [doc] = await prepareForRead(ctx, collection, [record], prepared.args);
-  const result = doc ?? record;
+  const result = await writeResult(ctx, collection, record, prepared.args);
 
   await runAfterOperationHooks(collection, { operation: 'update', user, overrideAccess, result });
   return result;
@@ -1106,10 +1107,61 @@ async function updateDocument(
   // another locale: it commits only while the row is still the one it merged from (spec 067).
   const localeGuard = localeMergeGuard(prepared);
   if (localeGuard) await afterStamp(prepared.existing.updated_at);
-  const guard =
-    echoGuard && localeGuard ? { and: [echoGuard, localeGuard] } : (echoGuard ?? localeGuard);
+  // A query-returning update rule is a row-level grant: the row must still match it when the write
+  // commits, not only when it was read (spec 068).
+  const guard = allOf([echoGuard, localeGuard, prepared.accessWhere]);
   const record = await commitUpdate(ctx, prepared, assertions, guard);
   return finalizeUpdate(ctx, prepared, record);
+}
+
+/**
+ * What a write returns (spec 068). A trusted write (or a caller who may read the result) gets the
+ * document through the normal read preparation (field access, locale, population, afterRead hooks). An
+ * access-checked caller whose *read* access does not reach the written document — the collection's read
+ * rule denies it, its query does not match, or it is a draft they could not read — gets only its `id`:
+ * being allowed to write a document is not permission to read it back.
+ */
+async function writeResult(
+  ctx: OperationContext,
+  collection: CollectionDefinition,
+  record: DatabaseRecord,
+  args: BaseOperationArgs & { locale?: string; depth?: 0 | 1 }
+): Promise<DatabaseRecord> {
+  if (args.overrideAccess === false && !(await canRead(collection, record, args.user ?? null))) {
+    return { id: record.id };
+  }
+  const [doc] = await prepareForRead(ctx, collection, [record], args);
+  return doc ?? record;
+}
+
+/** The single-document read gate `findByID` applies, as a yes/no for an already-loaded row. */
+async function canRead(
+  collection: CollectionDefinition,
+  record: DatabaseRecord,
+  user: CmsUser | null
+): Promise<boolean> {
+  let decision: Awaited<ReturnType<typeof checkAccess>>;
+  try {
+    // Exactly `findByID`'s arguments — no `doc`, so a read rule answers the same here as there.
+    decision = await checkAccess(collection, 'read', {
+      user,
+      overrideAccess: false,
+      id: record.id as string
+    });
+  } catch (err) {
+    if (err instanceof AccessDeniedError) return false;
+    throw err;
+  }
+  if (decision.where && !documentMatches(record, decision.where)) return false;
+  const status = statusConstraint(collection, undefined, user, false, 'all');
+  return !status || documentMatches(record, status);
+}
+
+/** The conjunction of the defined conditions, or `undefined` when there are none. */
+function allOf(conditions: (DatabaseWhere | undefined)[]): DatabaseWhere | undefined {
+  const defined = conditions.filter((c): c is DatabaseWhere => c !== undefined);
+  if (defined.length === 0) return undefined;
+  return defined.length === 1 ? defined[0] : { and: defined };
 }
 
 /** `updated_at` compare-and-set for an update that merged a `locale` into stored per-locale maps. */
@@ -1279,7 +1331,7 @@ export async function deleteDocument(
     targetGuards.length === 0 &&
     storageCleanups.length === 0
   ) {
-    await ctx.adapters.database.delete(args.collection, args.id);
+    await deleteRoot(ctx, collection, args.id, decision.where);
   } else {
     ({ updatedRecords, intentIds } = await commitRelationDelete(
       ctx,
@@ -1287,7 +1339,8 @@ export async function deleteDocument(
       dependents,
       updates,
       [...targetGuards, ...plan.assertions],
-      storageCleanups.map((cleanup) => cleanup.operation)
+      storageCleanups.map((cleanup) => cleanup.operation),
+      decision.where
     ));
   }
 
@@ -1312,13 +1365,45 @@ export async function deleteDocument(
   }
 
   await runAfterDeleteHooks(collection, { user, overrideAccess, id: args.id, doc: existing });
+  // A trusted delete keeps returning the stored row; an access-checked one returns only what the caller
+  // may read of it (spec 068) — before, it returned the raw row, read-denied fields included.
+  const result =
+    args.overrideAccess === false ? await writeResult(ctx, collection, existing, args) : existing;
   await runAfterOperationHooks(collection, {
     operation: 'delete',
     user,
     overrideAccess,
-    result: existing
+    result
   });
-  return existing;
+  return result;
+}
+
+/**
+ * The plain single-document delete. With a query-returning delete rule the row must still match it at
+ * the delete (spec 068): a row gone meanwhile is a `404`, one moved out of the caller's scope a `409`.
+ */
+async function deleteRoot(
+  ctx: OperationContext,
+  collection: CollectionDefinition,
+  id: string,
+  accessWhere: DatabaseWhere | undefined
+): Promise<void> {
+  if (accessWhere === undefined) {
+    await ctx.adapters.database.delete(collection.slug, id);
+    return;
+  }
+  const result = await ctx.adapters.database.deleteIf(collection.slug, id, {
+    targetMatches: accessWhere
+  });
+  if (result.applied) return;
+  if (!(await ctx.adapters.database.findById(collection.slug, id)))
+    throw notFound(collection.slug, id);
+  throw new ConcurrentModificationError(
+    collection.slug,
+    id,
+    `Document '${id}' in '${collection.slug}' was changed by another request so that it no longer ` +
+      `matches the caller's delete access; nothing was deleted. Reload it and try again.`
+  );
 }
 
 /** A cascaded document's before-phase: the same hooks its own delete runs (trusted, spec 058 §5). */
@@ -1379,7 +1464,8 @@ async function commitRelationDelete(
   dependents: PlannedDelete[],
   updates: PreparedUpdate[],
   assertions: AtomicWriteOperation[],
-  intents: AtomicWriteOperation[] = []
+  intents: AtomicWriteOperation[] = [],
+  rootWhere?: DatabaseWhere
 ): Promise<{ updatedRecords: DatabaseRecord[]; intentIds: string[] }> {
   const operations: AtomicWriteOperation[] = [];
   const updateAt: number[] = [];
@@ -1408,7 +1494,18 @@ async function commitRelationDelete(
       requireApplied: true
     });
   }
-  operations.push({ type: 'delete', collection: root.collection.slug, id: root.id });
+  // The caller's delete-access query must still hold when the batch commits (spec 068).
+  operations.push(
+    rootWhere === undefined
+      ? { type: 'delete', collection: root.collection.slug, id: root.id }
+      : {
+          type: 'deleteIf',
+          collection: root.collection.slug,
+          id: root.id,
+          condition: { targetMatches: rootWhere },
+          requireApplied: true
+        }
+  );
   const intentsAt = operations.length;
   operations.push(...intents);
   operations.push(...assertions);
@@ -1517,6 +1614,12 @@ export async function preview(ctx: OperationContext, args: PreviewArgs): Promise
       'all'
     );
     if (draftStatus && !documentMatches(existing, draftStatus)) {
+      throw notFound(args.collection, args.id);
+    }
+
+    // Preview returns the stored document merged with the changes, so the caller must also be able to
+    // *read* it, exactly as `findByID` would allow (spec 068 review): update access alone is not a read.
+    if (args.overrideAccess === false && !(await canRead(collection, existing, user))) {
       throw notFound(args.collection, args.id);
     }
 

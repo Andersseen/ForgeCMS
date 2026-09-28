@@ -1,11 +1,35 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-28 (upload storage lifecycle — D04 complete, spec 067).**
+> **Last updated: 2026-09-28 (write access consistency, spec 068).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Write access consistency (spec 068, 2026-09-28)
+
+Closes the two cross-cutting items the spec 066/067 reviews recorded. See
+[docs/specs/068-write-access-consistency.md](specs/068-write-access-consistency.md).
+
+- **Reproduced first** (probes on the unfixed code):
+  - an update response returned a document the caller's read rule hid;
+  - an access-checked `delete()` returned the raw row, `read: () => false` fields included;
+  - a global update returned a global its read query hid;
+  - on libSQL with a held write, an update and a delete granted by `{ region: 'eu' }` both applied
+    after another writer had moved the row to `us`.
+- **Now:**
+  - Access-checked writes (collections and globals) return the read-prepared document, or only
+    `{ id }` when the caller could not read it (rule, query or draft).
+  - A query-returning update/delete rule is ANDed into the write's own condition: plain, versioned
+    and cascading writes, and global updates. A row moved out of scope in between is a `409` with
+    nothing written.
+  - Trusted results and the HTTP envelope are unchanged.
+- **Evidence:**
+  - `packages/runtime/src/write-access.test.ts`;
+  - `runWriteAccessContractTests` (with the new `createWriteHold`) on InMemory, on-disk libSQL and
+    local D1.
+  - Two draft tests now read back as an authenticated caller.
 
 ## Upload storage lifecycle — D04 complete (spec 067, 2026-09-28)
 
@@ -1613,12 +1637,10 @@ passwordHash`~~ — **fixed 2026-07-22, spec 018.** `@forge-cms/auth` now export
 
 ## What's next
 
-**Next bounded step (recommended after spec 067, 2026-09-28): the cross-cutting access consistency
-fix both D04 reviews recorded.** Make a write's response honour the caller's read access, and move a
-query-returning update rule's check into the write itself (`updateIf` `targetMatches`), for collections
-and globals alike. It is small, security-relevant, and touches only the paths D04 just certified. Then
-H04 (host-level auth limits), the last open 0.6 packet. D03 is done except retention cleanup, which
-needs a product decision.
+**Next bounded step (recommended after spec 068, 2026-09-28): H04, the last open 0.6 packet.** Auth
+abuse limits and certification at the host boundary: login/signup throttling guidance and hooks,
+lockout semantics, token/cookie hardening checks, with conservative defaults and no rate-limiter
+framework. D03 is done except retention cleanup, which needs a product decision.
 
 Work is planned in [ROADMAP.md](ROADMAP.md), which sequences the remaining gaps by cost-of-delay.
 Each numbered item there gets its own spec in `docs/specs/` when picked up, per [SDD.md](SDD.md).

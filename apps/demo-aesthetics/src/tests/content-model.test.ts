@@ -108,9 +108,11 @@ describe('bookings access control', () => {
       }
     });
 
-    expect(booking.id).toBeDefined();
+    // A visitor may create a booking but not read one back (spec 068): the response is its id only.
+    expect(booking).toEqual({ id: expect.any(String) });
+    const stored = await cms.findByID({ collection: 'bookings', id: booking.id as string });
     // beforeValidate normalises the address the visitor typed.
-    expect(booking.email).toBe('nora@example.com');
+    expect(stored.email).toBe('nora@example.com');
   });
 
   it('forces a public create to land as pending, whatever the body says', async () => {
@@ -126,7 +128,8 @@ describe('bookings access control', () => {
       }
     });
 
-    expect(booking.status).toBe('pending');
+    const stored = await cms.findByID({ collection: 'bookings', id: booking.id as string });
+    expect(stored.status).toBe('pending');
   });
 
   it('rejects a public create that tries to set a staff-only field', async () => {
@@ -271,7 +274,8 @@ describe('hooks and trusted server calls (finding 19, fixed by spec 040)', () =>
       }
     });
 
-    expect(fromTheStreet.status).toBe('pending');
+    const stored = await cms.findByID({ collection: 'bookings', id: fromTheStreet.id as string });
+    expect(stored.status).toBe('pending');
   });
 });
 

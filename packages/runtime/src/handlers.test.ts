@@ -1116,7 +1116,14 @@ describe('CRUD Handlers', () => {
       const body = await response.json();
 
       expect(response.status).toBe(201);
-      expect(body.data._status).toBe('draft');
+      // An anonymous caller may not read a draft back (spec 068), so the response is its id only; the
+      // stored document is the draft.
+      expect(body.data).toEqual({ id: expect.any(String) });
+      const stored = await draftsRuntime.adapters.database.findById(
+        'posts',
+        body.data.id as string
+      );
+      expect(stored?._status).toBe('draft');
     });
 
     it('honors an explicit published status on create', async () => {

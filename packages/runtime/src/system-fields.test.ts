@@ -233,17 +233,20 @@ describe.each(backends)('%s', (_name, makeDatabase) => {
     it('creates a draft and publishes it, untrusted and trusted', async () => {
       const { runtime } = await setup();
       for (const overrideAccess of [false, true]) {
+        // Authenticated: an anonymous caller may not read a draft back (spec 068).
         const draft = await runtime.create({
           collection: 'drafted',
           data: { title: 'Draft', _status: 'draft' } as Data,
-          overrideAccess
+          overrideAccess,
+          user: { id: 'editor-1', role: 'editor' }
         });
         expect(draft._status).toBe('draft');
         const published = await runtime.update({
           collection: 'drafted',
           id: draft.id as string,
           data: { _status: 'published' } as Data,
-          overrideAccess
+          overrideAccess,
+          user: { id: 'editor-1', role: 'editor' }
         });
         expect(published._status).toBe('published');
       }

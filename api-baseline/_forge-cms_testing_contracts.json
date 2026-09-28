@@ -33,10 +33,15 @@
   "VersionHistoryHarnessFactory",
   "VersionHistoryRuntime",
   "VersionHistoryVersion",
+  "WriteAccessHarness",
+  "WriteAccessHarnessFactory",
+  "WriteAccessRuntime",
   "WriteGate",
+  "WriteHold",
   "authManagedDeleteSchema",
   "createBatchHold",
   "createWriteGate",
+  "createWriteHold",
   "globalLifecycleGlobals",
   "localeMergeCollections",
   "relationLifecycleCollections",
@@ -54,5 +59,7 @@
   "runLocaleMergeContractTests",
   "runRelationLifecycleContractTests",
   "runStorageAdapterContractTests",
-  "runVersionHistoryContractTests"
+  "runVersionHistoryContractTests",
+  "runWriteAccessContractTests",
+  "writeAccessSchema"
 ]

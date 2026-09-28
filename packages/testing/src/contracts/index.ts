@@ -72,3 +72,12 @@ export {
   type LocaleMergeHarnessFactory,
   type LocaleMergeRuntime
 } from './locale-merge.js';
+export {
+  createWriteHold,
+  runWriteAccessContractTests,
+  writeAccessSchema,
+  type WriteAccessHarness,
+  type WriteAccessHarnessFactory,
+  type WriteAccessRuntime,
+  type WriteHold
+} from './write-access.js';

@@ -51,7 +51,12 @@ What the runtime does with that constraint:
 
 - **on reads** it is AND-merged into the query — including the `totalDocs` count, so pagination
   never advertises documents you cannot see;
-- **on update and delete** it is checked against the stored document;
+- **on update and delete** it is checked against the stored document, and checked again inside the
+  write itself. If another request moves the document out of your scope in between, the write is
+  refused with `409` and nothing changes. This applies to globals' `update` rule too;
+- **what a write returns** follows your _read_ rule. A create, update or delete whose result you may
+  not read (the read rule denies it, its query does not match, or it is a draft you cannot see)
+  returns only `{ id }`, so being allowed to write is never permission to read back;
 - **a single read that the constraint excludes returns `404`, not `403`** — a 403 would confirm the
   document exists, which leaks ids.
 

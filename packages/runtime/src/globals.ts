@@ -1,6 +1,6 @@
 import { validateCollection } from '@forge-cms/core';
 import type { CmsUser, CollectionDefinition, GlobalDefinition } from '@forge-cms/core';
-import type { AtomicWriteOperation, DatabaseRecord } from '@forge-cms/db';
+import type { AtomicWriteOperation, DatabaseRecord, DatabaseWhere } from '@forge-cms/db';
 import {
   isAtomicWriteConditionError,
   isUniqueConstraintError as isDbUniqueConstraintError
@@ -399,6 +399,7 @@ export async function updateGlobal(
     data,
     existing,
     compareAndSet: mergesLocales,
+    accessWhere: decision.where,
     assertions: targets.size > 0 ? targetAssertions(targets) : []
   });
 
@@ -412,7 +413,9 @@ export async function updateGlobal(
     overrideAccess
   });
 
-  const doc = await prepareGlobalForRead(ctx, global, record, args);
+  // Being allowed to write the global is not permission to read it back (spec 068).
+  const readable = args.overrideAccess !== false || (await canReadGlobal(global, record, user));
+  const doc = readable ? await prepareGlobalForRead(ctx, global, record, args) : { id: GLOBAL_ID };
   const result = doc ?? record;
 
   await runAfterOperationHooks(collectionProxy, {
@@ -422,6 +425,24 @@ export async function updateGlobal(
     result
   });
   return result;
+}
+
+/** The read gate `getGlobal` applies, as a yes/no for the row just written. */
+async function canReadGlobal(
+  global: GlobalDefinition,
+  record: DatabaseRecord,
+  user: CmsUser | null
+): Promise<boolean> {
+  let decision: AccessDecision;
+  try {
+    decision = await checkGlobalAccess(global, 'read', { user, overrideAccess: false });
+  } catch (err) {
+    if (err instanceof AccessDeniedError) return false;
+    throw err;
+  }
+  if (decision.where && !documentMatches(record, decision.where)) return false;
+  const status = statusConstraint(proxyOf(global), undefined, user, false, 'all');
+  return !status || documentMatches(record, status);
 }
 
 /**
@@ -438,6 +459,8 @@ async function writeGlobal(
     data: Record<string, unknown>;
     existing: DatabaseRecord | null;
     compareAndSet: boolean;
+    /** The caller's update-access query: the row must still match it when the write commits (spec 068). */
+    accessWhere: DatabaseWhere | undefined;
     assertions: AtomicWriteOperation[];
   }
 ): Promise<DatabaseRecord> {
@@ -447,15 +470,26 @@ async function writeGlobal(
   const concurrent = (message: string) =>
     new ConcurrentModificationError(global.slug, GLOBAL_ID, message);
 
+  const conditions = [
+    ...(input.compareAndSet && existing ? [{ updated_at: existing.updated_at }] : []),
+    ...(input.accessWhere !== undefined ? [input.accessWhere] : [])
+  ];
+  const condition: DatabaseWhere | undefined =
+    conditions.length === 0
+      ? undefined
+      : conditions.length === 1
+        ? conditions[0]
+        : { and: conditions };
+
   const write: AtomicWriteOperation = !existing
     ? { type: 'create', collection: table, data: { ...data, id: GLOBAL_ID } }
-    : input.compareAndSet
+    : condition !== undefined
       ? {
           type: 'updateIf',
           collection: table,
           id: GLOBAL_ID,
           data,
-          condition: { targetMatches: { updated_at: existing.updated_at } },
+          condition: { targetMatches: condition },
           requireApplied: true
         }
       : { type: 'update', collection: table, id: GLOBAL_ID, data };
@@ -483,8 +517,9 @@ async function writeGlobal(
     }
     if (isAtomicWriteConditionError(err)) {
       throw concurrent(
-        `Global '${global.slug}' was changed, or a document this write references was deleted, by ` +
-          `another request while it was in progress; nothing was written. Reload and try again.`
+        `Global '${global.slug}' was changed by another request while this write was in progress (another ` +
+          `locale was edited, it no longer matches the caller's update access, or a document it references ` +
+          `was deleted); nothing was written. Reload and try again.`
       );
     }
     throw err;

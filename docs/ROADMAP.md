@@ -53,6 +53,10 @@
 > Durable storage intents plus `reconcileStorage()` make upload/delete crash-safe without a DB/R2
 > transaction. `handleFile` enforces the owning document's read access. Collection locale merges are
 > CAS-guarded. Next: the cross-cutting write-response/update-access consistency fix, then H04.
+>
+> **2026-09-28 update:** [spec 068](specs/068-write-access-consistency.md) closes that fix. Write
+> responses follow the caller's read access (`{ id }` when unreadable), and query-returning
+> update/delete rules are enforced inside the write itself. Next: H04.
 
 ## Product direction
 
