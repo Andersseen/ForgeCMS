@@ -219,7 +219,9 @@ describe('pre-fix reproductions (spec 064)', () => {
 describe('startup validation of reference shapes', () => {
   const managedAuth = () =>
     Object.assign(new InMemoryAuthAdapter(), {
-      managesCollection: (slug: string) => slug === 'members'
+      managesCollection: (slug: string) => slug === 'members',
+      // Claims to enforce the user-delete guard (spec 065); a stub that did not is refused at startup.
+      setManagedDeleteGuard: () => true
     });
   const members = defineCollection({ slug: 'members', fields: { email: defineField.email() } });
 
@@ -1281,7 +1283,9 @@ describe('matrix cells and failure injection (spec 064 review)', () => {
 
   it('auth-managed referrers: restrict blocks, set-null is refused; writes to an auth-managed target are checked', async () => {
     const auth = Object.assign(new InMemoryAuthAdapter(), {
-      managesCollection: (slug: string) => slug === 'members'
+      managesCollection: (slug: string) => slug === 'members',
+      // Claims to enforce the user-delete guard (spec 065); a stub that did not is refused at startup.
+      setManagedDeleteGuard: () => true
     });
     const { runtime, database, exists } = await setup(
       [

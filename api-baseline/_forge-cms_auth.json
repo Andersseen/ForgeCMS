@@ -19,6 +19,7 @@
   "ExternalAuthConfig",
   "ForgeAuthError",
   "InMemoryAuthAdapter",
+  "ManagedDeleteGuard",
   "PublicSignupInput",
   "SESSION_COOKIE_NAME",
   "SessionCookieOptions",

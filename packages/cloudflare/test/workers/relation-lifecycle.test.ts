@@ -2,11 +2,17 @@ import { env } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
 import { defineCollection, defineField } from '@forge-cms/core';
 import type { CollectionDefinition } from '@forge-cms/core';
-import { InMemoryAuthAdapter } from '@forge-cms/auth';
+import {
+  InMemoryAuthAdapter,
+  UsersCollectionAuthAdapter,
+  defineUsersCollection
+} from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import { ForgeCmsRuntime } from '@forge-cms/runtime';
 import {
+  authManagedDeleteSchema,
   relationLifecycleCollections,
+  runAuthManagedDeleteContractTests,
   runRelationLifecycleContractTests
 } from '@forge-cms/testing/contracts';
 import { D1DatabaseAdapter } from '../../src/d1.adapter.js';
@@ -105,5 +111,43 @@ describe('D1DatabaseAdapter — real local D1 binding: large relation writes sta
     await expect(
       runtime.create({ collection: 'rlb_posts', data: { tags: [...ids, 'ghost'] } })
     ).rejects.toThrow(/'ghost'/);
+  });
+});
+
+// Spec 065: the auth adapter's own user delete against content/global references, each contender a
+// runtime + `UsersCollectionAuthAdapter` sharing its own `D1DatabaseAdapter` on the one binding.
+describe('D1DatabaseAdapter — real local D1 binding: auth-managed user deletion respects relations', () => {
+  function contender(database: D1DatabaseAdapter, prefix: string) {
+    const schema = authManagedDeleteSchema(prefix);
+    const users = new UsersCollectionAuthAdapter({
+      devMode: true,
+      collection: schema.members
+    }).init({
+      userDatabase: database
+    });
+    const collections: CollectionDefinition[] = [
+      defineUsersCollection({ slug: schema.members }),
+      ...schema.collections
+    ];
+    const runtime = new ForgeCmsRuntime({
+      env,
+      collections,
+      globals: schema.globals,
+      adapters: { database, auth: users, storage: new InMemoryStorageAdapter() }
+    });
+    runtime.init();
+    return { runtime, users };
+  }
+
+  runAuthManagedDeleteContractTests(async ({ prefix, parties, gate }) => {
+    const contenders = [];
+    for (let i = 0; i < parties; i++) {
+      const c = contender(gate.wrap(new D1DatabaseAdapter().init(env), i), prefix);
+      await c.runtime.syncSchema();
+      contenders.push(c);
+    }
+    const raw = contender(new D1DatabaseAdapter().init(env), prefix);
+    await raw.runtime.syncSchema();
+    return { contenders, database: raw.runtime.adapters.database };
   });
 });

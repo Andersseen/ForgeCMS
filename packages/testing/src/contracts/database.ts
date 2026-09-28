@@ -37,6 +37,34 @@ export function runDatabaseAdapterContractTests(createAdapter: () => ContractDat
       expect(typeof adapter.name).toBe('string');
     });
 
+    it('round-trips a localized field as its per-locale map (spec 066)', async () => {
+      const pages = defineCollection({
+        slug: 'contract_localized_pages',
+        locales: ['en', 'es'],
+        fields: {
+          title: defineField.text({ localized: true }),
+          summary: defineField.textarea({ localized: true }),
+          views: defineField.number()
+        }
+      });
+      await adapter.syncSchema([pages]);
+      const created = await adapter.create('contract_localized_pages', {
+        title: { en: 'Hi' },
+        summary: { en: 'Short' },
+        views: 3
+      });
+      await adapter.update('contract_localized_pages', created.id as string, {
+        title: { en: 'Hi', es: 'Hola' }
+      });
+      expect(
+        await adapter.findById('contract_localized_pages', created.id as string)
+      ).toMatchObject({
+        title: { en: 'Hi', es: 'Hola' },
+        summary: { en: 'Short' },
+        views: 3
+      });
+    });
+
     it('creates a record with auto-generated id', async () => {
       const data = { title: 'Hello' };
       const result = await adapter.create('posts', data);
@@ -325,6 +353,12 @@ export function runDatabaseAdapterConstraintContractTests(
     beforeEach(async () => {
       adapter = createAdapter();
       await adapter.syncSchema([widgets]);
+    });
+
+    it('rejects a second row with an existing id as a unique conflict (spec 066)', async () => {
+      const row = { id: 'w-fixed', slug: 'one', project: 'p1', locale: 'en', namespace: '' };
+      await adapter.create('widgets', row);
+      await expectUniqueConflict(adapter.create('widgets', { ...row, slug: 'two', project: 'p2' }));
     });
 
     it('rejects a duplicate single-field unique value on create', async () => {

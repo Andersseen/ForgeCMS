@@ -1,4 +1,4 @@
-import type { CollectionDefinition } from '@forge-cms/core';
+import type { AnyField, CollectionDefinition, FieldMap } from '@forge-cms/core';
 
 /**
  * Localization utilities for handling localized fields and locale resolution.
@@ -213,4 +213,70 @@ export function storeLocalizedDocument(
   }
 
   return stored;
+}
+
+/** The field kinds whose per-locale values ForgeCMS validates and stores (spec 066). */
+const LOCALIZABLE_KINDS: ReadonlySet<string> = new Set(['text', 'textarea']);
+
+/**
+ * The `localized` configurations no read or write can honour (spec 066), found at startup so they are
+ * refused instead of accepted and silently broken. One message per problem; empty = supported.
+ *
+ * - a localized field on a collection/global without `locales`: nothing can address a locale;
+ * - a localized field of a kind other than `text`/`textarea`: core validation only understands
+ *   per-locale strings, so such a field could never be written (a number, boolean, select…) or its
+ *   per-locale values would go unvalidated (a slug or email format);
+ * - a localized field inside a `group`/`array`/`blocks`: locale storage only addresses top-level fields.
+ *
+ * Localized `relation`/`upload` fields are left to spec 064's relation validation, which refuses them.
+ */
+export function validateLocalizationSchema(
+  owners: readonly { label: string; fields: CollectionDefinition['fields']; locales?: string[] }[]
+): string[] {
+  const errors: string[] = [];
+  for (const owner of owners) {
+    const hasLocales = owner.locales !== undefined && owner.locales.length > 0;
+    for (const [name, field] of Object.entries(owner.fields)) {
+      for (const path of nestedLocalized(field, name)) {
+        errors.push(
+          `${owner.label}: field '${path}' is localized inside a ${field.kind} field. Locale storage only ` +
+            `addresses top-level fields, so it could never hold one value per locale (spec 066). Localize ` +
+            `a top-level field instead.`
+        );
+      }
+      if (!isLocalizedField(field) || field.kind === 'relation' || field.kind === 'upload')
+        continue;
+      if (!LOCALIZABLE_KINDS.has(field.kind)) {
+        errors.push(
+          `${owner.label}: field '${name}' is a localized ${field.kind} field. Only text and textarea ` +
+            `fields can be localized: per-locale values of other kinds are not validated, and most could ` +
+            `never be written (spec 066).`
+        );
+      } else if (!hasLocales) {
+        errors.push(
+          `${owner.label}: field '${name}' is localized but no locales are declared, so no read or write ` +
+            `could address a locale (spec 066). Add \`locales: [...]\`, or drop \`localized\`.`
+        );
+      }
+    }
+  }
+  return errors;
+}
+
+function nestedLocalized(field: AnyField, path: string): string[] {
+  const maps =
+    field.kind === 'group' || field.kind === 'array'
+      ? [field.options.fields]
+      : field.kind === 'blocks'
+        ? field.options.blocks.map((block) => block.fields as FieldMap)
+        : [];
+  const found: string[] = [];
+  for (const fields of maps) {
+    for (const [name, inner] of Object.entries(fields)) {
+      const innerPath = `${path}.${name}`;
+      if (isLocalizedField(inner)) found.push(innerPath);
+      found.push(...nestedLocalized(inner, innerPath));
+    }
+  }
+  return found;
 }

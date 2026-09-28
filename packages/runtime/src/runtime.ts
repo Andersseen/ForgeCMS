@@ -9,8 +9,19 @@ import type {
 } from '@forge-cms/core';
 import type { DatabaseRecord } from '@forge-cms/db';
 import type { OperationContext } from './context.js';
-import { validateRelationSchema } from './relation-lifecycle.js';
+import {
+  isReferenced,
+  noReferenceAssertions,
+  validateRelationSchema
+} from './relation-lifecycle.js';
 import * as operations from './operations.js';
+import { validateLocalizationSchema } from './localization.js';
+import {
+  hasUploadCollections,
+  reconcileStorage,
+  storageIntentsDefinition
+} from './storage-intents.js';
+import type { ReconcileStorageOptions, ReconcileStorageReport } from './storage-intents.js';
 import type {
   CountArgs,
   CreateArgs,
@@ -73,8 +84,56 @@ export class ForgeCmsRuntime<
     if (relationErrors.length > 0) {
       throw new Error(`Unsupported relation configuration:\n${relationErrors.join('\n')}`);
     }
+    // Global options that could never apply are refused too, instead of silently ignored (spec 066).
+    const globalErrors = [
+      ...globalOps.validateGlobalSchema(config.globals ?? []),
+      ...validateLocalizationSchema([
+        ...config.collections.map((c) => ({
+          label: `Collection '${c.slug}'`,
+          fields: c.fields,
+          ...(c.locales !== undefined && { locales: c.locales })
+        })),
+        ...(config.globals ?? []).map((g) => ({
+          label: `Global '${g.slug}'`,
+          fields: g.fields,
+          ...(g.locales !== undefined && { locales: g.locales })
+        }))
+      ])
+    ];
+    if (globalErrors.length > 0) {
+      throw new Error(`Unsupported global/localization configuration:\n${globalErrors.join('\n')}`);
+    }
     this.config = config;
     this.adapters = config.adapters;
+    this.wireManagedDeleteGuards();
+  }
+
+  /**
+   * Hands every auth-managed collection's relation guard to the auth adapter (spec 065), so its own
+   * user delete commits "nothing references this document" in the same batch — no setup code needed.
+   * An adapter that manages a referenced collection but cannot enforce the guard is refused here: it
+   * would otherwise delete documents that content still references.
+   */
+  private wireManagedDeleteGuards(): void {
+    const auth = this.adapters.auth;
+    for (const { slug } of this.config.collections) {
+      if (auth.managesCollection?.(slug) !== true) continue;
+      const referenced = isReferenced(this, slug);
+      const enforced =
+        auth.setManagedDeleteGuard?.(slug, {
+          database: this.adapters.database,
+          assertions: (id) => noReferenceAssertions(this, slug, [id])
+        }) === true;
+      if (referenced && !enforced) {
+        throw new Error(
+          `Unsupported relation configuration: collection '${slug}' is managed by the auth adapter ` +
+            `'${auth.name}' and referenced by relation/upload fields, but that adapter cannot enforce ` +
+            `those references when it deletes a document (it does not implement setManagedDeleteGuard, ` +
+            `spec 065), so a deletion could leave them dangling. Use an adapter that supports it (e.g. ` +
+            `UsersCollectionAuthAdapter), or store the id in a text field as an explicit unchecked reference.`
+        );
+      }
+    }
   }
 
   /** Initialise all adapters with the runtime environment */
@@ -90,6 +149,10 @@ export class ForgeCmsRuntime<
   async syncSchema(): Promise<void> {
     await this.adapters.database.syncSchema(this.config.collections);
     await this.adapters.auth.syncSchema?.();
+    // Durable storage-cleanup intents (spec 067), only where uploads exist.
+    if (hasUploadCollections(this.config.collections)) {
+      await this.adapters.database.syncSchema([storageIntentsDefinition()]);
+    }
 
     for (const global of this.config.globals ?? []) {
       await this.adapters.database.syncSchema([
@@ -269,6 +332,17 @@ export class ForgeCmsRuntime<
 
   createVersion(args: CreateVersionArgs): Promise<Version> {
     return versionOps.createVersion(this, args);
+  }
+
+  // --- Storage ----------------------------------------------------------------------------
+
+  /**
+   * Deletes the stored objects that crashed or failed uploads and deletes left owned by no document, as
+   * recorded by their durable storage intents (spec 067). Safe to run repeatedly and concurrently; run it
+   * from a scheduled job or an operator script. See `reconcileStorage` for the exact guarantees.
+   */
+  reconcileStorage(options?: ReconcileStorageOptions): Promise<ReconcileStorageReport> {
+    return reconcileStorage(this, options);
   }
 
   // --- Preview ----------------------------------------------------------------------------

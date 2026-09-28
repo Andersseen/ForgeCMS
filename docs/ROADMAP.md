@@ -37,6 +37,26 @@
 > Unsupported reference shapes (nested, localized, unregistered target) are refused at startup. One cell
 > stays open: a user deleted through the auth adapter can leave content relations to it dangling — see
 > the spec's matrix.
+>
+> **2026-09-27 update:** [spec 065](specs/065-auth-managed-delete-relation-integrity.md) closes that
+> cell. `ForgeCmsRuntime` hands the auth adapter the same "no reference remains" guards, and
+> `UsersCollectionAuthAdapter.deleteUser` commits them with its last-admin guard in one batch, so a
+> referenced user is refused (restrict only). **D02 is complete.** Next bounded step: D04.
+>
+> **2026-09-27 update:** [spec 066](specs/066-global-lifecycle-and-localization.md) is D04 part 1.
+> Globals enforce access queries, take partial writes and survive a simultaneous first write.
+> Localization gains globals support and works on libSQL/D1, where every localized write used to fail.
+> Unsupported localization and global options are refused at startup. Remaining D04 work: the
+> DB ↔ object-storage lifecycle and the collection locale-merge race.
+>
+> **2026-09-28 update:** [spec 067](specs/067-storage-lifecycle-durable-intents.md) completes D04.
+> Durable storage intents plus `reconcileStorage()` make upload/delete crash-safe without a DB/R2
+> transaction. `handleFile` enforces the owning document's read access. Collection locale merges are
+> CAS-guarded. Next: the cross-cutting write-response/update-access consistency fix, then H04.
+>
+> **2026-09-28 update:** [spec 068](specs/068-write-access-consistency.md) closes that fix. Write
+> responses follow the caller's read access (`{ id }` when unreadable), and query-returning
+> update/delete rules are enforced inside the write itself. Next: H04.
 
 ## Product direction
 

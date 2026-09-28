@@ -465,6 +465,12 @@ export interface GlobalDefinition<
   access?: CollectionAccess;
   /** Adds a system `_status: 'draft' | 'published'` field; unpublished globals are hidden from public reads. */
   drafts?: boolean;
+  /**
+   * Supported locales (spec 066). Fields marked `localized: true` store one value per locale; a read or
+   * write with `locale` addresses one of them, and writing one locale keeps the others. The first entry
+   * is the fallback locale. Required when any field of the global is `localized`.
+   */
+  locales?: string[];
 }
 
 export type GlobalData<TGlobal extends GlobalDefinition> = InferFields<TGlobal['fields']>;

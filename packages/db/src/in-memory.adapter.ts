@@ -171,6 +171,11 @@ export class InMemoryDatabaseAdapter implements DatabaseAdapter {
       created_at: data.created_at ?? now,
       updated_at: now
     };
+    // `id` is the primary key on the SQL adapters: a second row with the same id is a unique conflict
+    // there, and must be here too (spec 066 — a global's simultaneous first writes rely on it).
+    if (records.some((r) => r.id === recordWithId.id)) {
+      throw new UniqueConstraintError(collection, ['id']);
+    }
     this.assertNoUniqueConflict(collection, records, recordWithId, undefined);
     records.push(recordWithId);
     return recordWithId;

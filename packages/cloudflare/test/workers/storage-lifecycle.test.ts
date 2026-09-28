@@ -6,6 +6,7 @@ import {
   ForgeCmsRuntime,
   handleCreate,
   handleDelete,
+  handleFile,
   handleUpdate,
   InvalidInputError
 } from '@forge-cms/runtime';
@@ -51,7 +52,8 @@ describe('upload storage lifecycle on real D1 + R2 (specs 051, 063)', () => {
     // ForgeCmsRuntime.init() initialises every adapter from `config.env` — initialising `database`/
     // `storage` separately beforehand would just get overwritten.
     runtime.init();
-    await database.syncSchema([media, notes]);
+    // Through the runtime, so Forge's own tables (spec 067's storage intents) exist too.
+    await runtime.syncSchema();
     return { runtime, database, storage };
   }
 
@@ -166,5 +168,98 @@ describe('upload storage lifecycle on real D1 + R2 (specs 051, 063)', () => {
     expect(updated.title).toBe('after');
     expect(row?.created_at).toBe(doc.created_at);
     expect(row?.updated_at).not.toBe(doc.updated_at);
+  });
+
+  // --- spec 067: durable storage intents and access-checked reads on real D1 + R2 -------------------
+
+  const intentsOf = (database: D1DatabaseAdapter) =>
+    database.findMany({ collection: '_forge_storage_intents' });
+
+  it('spec 067: an R2 delete failing after the D1 delete leaves a D1 intent; reconcileStorage finishes it', async () => {
+    const { runtime, database, storage } = await buildRuntime();
+    const doc = await upload(runtime, 'orphan.txt');
+    const key = (await database.findById('lifecycle_media', doc.id))?._storageKey as string;
+
+    const original = storage.delete.bind(storage);
+    storage.delete = async () => {
+      throw new Error('R2 unavailable');
+    };
+    await runtime.delete({ collection: 'lifecycle_media', id: doc.id });
+    expect(await storage.get(key)).not.toBeNull();
+    expect(await intentsOf(database)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ key, reason: 'delete' })])
+    );
+
+    storage.delete = original;
+    const report = await runtime.reconcileStorage();
+    expect(report.deleted).toContain(key);
+    expect(await storage.get(key)).toBeNull();
+    expect((await intentsOf(database)).filter((intent) => intent.key === key)).toEqual([]);
+  });
+
+  it('spec 067: a failed create whose R2 cleanup fails leaves a D1 intent; reconcileStorage deletes the object', async () => {
+    const { runtime, database, storage } = await buildRuntime();
+    const original = storage.delete.bind(storage);
+    storage.delete = async () => {
+      throw new Error('R2 unavailable');
+    };
+    // A validation failure after the object is in R2: `filename` is required, and a hook removes it.
+    const strict = new ForgeCmsRuntime({
+      collections: [
+        {
+          ...media,
+          hooks: { beforeValidate: [({ data }) => ({ ...data, filename: undefined })] }
+        }
+      ],
+      adapters: { database, auth: runtime.adapters.auth, storage },
+      env
+    });
+    strict.init();
+    await strict.syncSchema();
+    const form2 = new FormData();
+    form2.set('file', new File(['x'], 'rejected.txt', { type: 'text/plain' }));
+    const rejected = await handleCreate(
+      {
+        request: new Request('https://forge.test/api/v1/lifecycle_media', {
+          method: 'POST',
+          body: form2,
+          headers
+        }),
+        env,
+        params: { collection: 'lifecycle_media' }
+      },
+      { runtime: strict }
+    );
+    expect(rejected.status).toBe(400);
+    const pending = (await intentsOf(database)).filter(
+      // The cleanup claimed the upload intent, R2 refused the delete, so a `delete` intent was put back.
+      (intent) => intent.reason === 'delete' && String(intent.key).endsWith('-rejected.txt')
+    );
+    expect(pending).toHaveLength(1);
+    const key = pending[0]?.key as string;
+    expect(await storage.get(key)).not.toBeNull();
+
+    storage.delete = original;
+    const report = await strict.reconcileStorage();
+    expect(report.deleted).toContain(key);
+    expect(await storage.get(key)).toBeNull();
+  });
+
+  it('spec 067: handleFile serves an R2 object only through a readable owning document', async () => {
+    const { runtime, database, storage } = await buildRuntime();
+    const doc = await upload(runtime, 'served.txt');
+    const key = (await database.findById('lifecycle_media', doc.id))?._storageKey as string;
+    const read = (fileKey: string) =>
+      handleFile(
+        { request: new Request('https://forge.test/'), params: { key: fileKey }, env },
+        { runtime }
+      );
+
+    const served = await read(key);
+    expect(served.status).toBe(200);
+    expect(await served.text()).toBe('contents of served.txt');
+
+    await storage.put({ key: 'lifecycle_media/stray.txt', body: new TextEncoder().encode('x') });
+    expect((await read('lifecycle_media/stray.txt')).status).toBe(404);
   });
 });

@@ -1,3 +1,4 @@
+import type { AtomicWriteOperation, DatabaseAdapter } from '@forge-cms/db';
 export { InMemoryAuthAdapter } from './in-memory.adapter.js';
 export { ExternalAuthAdapter } from './external.adapter.js';
 export type { ExternalAuthConfig } from './external.adapter.js';
@@ -46,13 +47,14 @@ export class ForgeAuthError extends Error {
   }
 }
 
-/** Why `UsersCollectionAuthAdapter.updateUser`/`deleteUser` rejected a change (spec 054). */
-export type UserMutationFailureReason = 'last-admin' | 'weak-password';
+/** Why `UsersCollectionAuthAdapter.updateUser`/`deleteUser` rejected a change (spec 054, `'referenced'`: spec 065). */
+export type UserMutationFailureReason = 'last-admin' | 'weak-password' | 'referenced';
 
 /**
  * Thrown by `UsersCollectionAuthAdapter.updateUser`/`deleteUser` instead of writing when the change
- * would leave the installation with zero admins (`'last-admin'`) or set a password shorter than the
- * configured policy (`'weak-password'`). A host route maps `reason` to a status (`409`/`400`).
+ * would leave the installation with zero admins (`'last-admin'`), set a password shorter than the
+ * configured policy (`'weak-password'`), or delete a user that content or a global still references
+ * (`'referenced'`, spec 065). A host route maps `reason` to a status (`409`/`400`).
  */
 export class UserMutationError extends Error {
   constructor(
@@ -141,4 +143,32 @@ export interface AuthAdapter<TUser extends AuthUser = AuthUser> {
    * `false`. Fully optional and backward compatible.
    */
   managesCollection?(slug: string): boolean;
+  /**
+   * Optional (spec 065), **infrastructure wiring — application code does not call it.** `ForgeCmsRuntime`
+   * calls it once per registered collection this adapter {@link managesCollection manages}, handing over
+   * the relation integrity that deleting one of its documents must respect: the adapter must commit
+   * `guard.assertions(id)` in the **same** `atomicWrite` as its own delete of `id`, so a document that
+   * content or a global still references is never deleted, even by a racing writer.
+   *
+   * Returns `true` only if the adapter will enforce the guard for `collection`. An adapter that manages a
+   * collection some content references but omits this (or returns `false`) makes the runtime refuse to
+   * start — it would otherwise leave that reference unprotected. Adapters that manage no collection
+   * simply omit it. Fully optional and backward compatible.
+   */
+  setManagedDeleteGuard?(collection: string, guard: ManagedDeleteGuard): boolean;
+}
+
+/**
+ * What must hold, atomically, for deleting a document of an auth-managed collection (spec 065). Pure data
+ * from `@forge-cms/runtime`, which alone knows the content schema: auth never learns which fields
+ * reference it, and never depends on the runtime.
+ */
+export interface ManagedDeleteGuard {
+  /** The database the assertions address (the content database). The adapter's own must be this one. */
+  readonly database: DatabaseAdapter;
+  /**
+   * Read-only `assertCount` preconditions for deleting `id`: every one of them must pass inside the
+   * delete's batch. An empty list means nothing references the collection.
+   */
+  assertions(id: string): readonly AtomicWriteOperation[];
 }

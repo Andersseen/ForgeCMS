@@ -56,6 +56,7 @@ import {
 import type { RestorableVersion, RestoreVersionArgs } from './versions.js';
 import {
   isLocalizedCollection,
+  isLocalizedField,
   storeLocalizedDocument,
   resolveLocalizedDocument
 } from './localization.js';
@@ -68,6 +69,14 @@ import {
   verifyTargetsExist
 } from './relation-lifecycle.js';
 import type { PlannedDelete, PlannedSetNull } from './relation-lifecycle.js';
+import { afterStamp } from './concurrency.js';
+import {
+  claimUploadIntent,
+  deletionIntent,
+  finishDeletion,
+  recordUploadIntent,
+  settleFailedUpload
+} from './storage-intents.js';
 
 /** A page of documents plus everything a paginator needs. */
 export interface PaginatedDocs<TDoc = DatabaseRecord> {
@@ -402,9 +411,9 @@ async function commitUpdate(
   throw new ConcurrentModificationError(
     collection.slug,
     id,
-    `A reference this update re-sends on document '${id}' in '${collection.slug}' was cleared by ` +
-      `another request (its target was deleted) while this one was in progress; nothing was written. ` +
-      `Reload it and try again.`
+    `Document '${id}' in '${collection.slug}' was changed by another request while this update was in ` +
+      `progress (it no longer matches the caller's update access, another locale was edited, or a ` +
+      `reference this update re-sends was cleared); nothing was written. Reload it and try again.`
   );
 }
 
@@ -712,19 +721,64 @@ export async function create(ctx: OperationContext, args: CreateArgs): Promise<D
 export async function createUpload(
   ctx: OperationContext,
   args: CreateArgs,
-  storageKey: string
+  upload: { storageKey: string; intentId: string }
 ): Promise<DatabaseRecord> {
   const collection = getCollectionOrThrow(ctx, args.collection);
   if (collection.upload !== true) {
     throw new Error(`Collection '${args.collection}' is not upload-enabled`);
   }
-  return createDocument(ctx, args, storageKey);
+  return createDocument(ctx, args, upload);
+}
+
+/**
+ * The whole upload create (spec 067) — **package-private**, called by `handleCreate` for a multipart
+ * body: records a durable storage intent, stores the object under a Forge-generated key, then creates
+ * the document with the key and the intent claim in one batch. Any failure after the intent exists
+ * settles it: the object is deleted only while the intent is still there (the document never
+ * committed); otherwise the intent stays for `reconcileStorage()`. The file's `filename`, `url`,
+ * `contentType` and `filesize` fill whichever of those fields the collection declares, under `args.data`.
+ */
+export async function uploadFile(
+  ctx: OperationContext,
+  args: CreateArgs,
+  file: File
+): Promise<DatabaseRecord> {
+  const collection = getCollectionOrThrow(ctx, args.collection);
+  if (collection.upload !== true) {
+    throw new Error(`Collection '${args.collection}' is not upload-enabled`);
+  }
+  assertNotAuthManaged(ctx, args.collection);
+
+  const storageKey = `${collection.slug}/${crypto.randomUUID()}-${file.name}`;
+  const intentId = await recordUploadIntent(ctx.adapters.database, collection.slug, storageKey);
+  try {
+    await ctx.adapters.storage.put({ key: storageKey, body: file, contentType: file.type });
+    const url = await ctx.adapters.storage.getPublicUrl(storageKey);
+    const derived: Record<string, unknown> = {
+      filename: file.name,
+      url,
+      contentType: file.type,
+      filesize: file.size
+    };
+    const data: Record<string, unknown> = {};
+    for (const [name, value] of Object.entries(derived)) {
+      if (collection.fields[name]) data[name] = value;
+    }
+    return await createDocument(
+      ctx,
+      { ...args, data: { ...data, ...args.data } },
+      { storageKey, intentId }
+    );
+  } catch (err) {
+    await settleFailedUpload(ctx, intentId, storageKey);
+    throw err;
+  }
 }
 
 async function createDocument(
   ctx: OperationContext,
   args: CreateArgs,
-  storageKey: string | undefined
+  upload: { storageKey: string; intentId: string } | undefined
 ): Promise<DatabaseRecord> {
   const collection = getCollectionOrThrow(ctx, args.collection);
   assertNotAuthManaged(ctx, args.collection);
@@ -801,9 +855,12 @@ async function createDocument(
 
   // Every relation target this document names must exist, now and when it commits (spec 064 §4).
   const assertions = await relationTargetGuards(ctx, collection, data, undefined, explicitId);
+  // An upload's storage intent is removed in the same batch that creates its owner (spec 067), so the
+  // intent exists exactly as long as the object is owned by nothing.
+  if (upload) assertions.push(claimUploadIntent(upload.intentId));
 
   // Forge-owned metadata joins the content only here, at the persistence boundary (spec 063 §4/§5).
-  const row = storageKey !== undefined ? { ...data, _storageKey: storageKey } : data;
+  const row = upload !== undefined ? { ...data, _storageKey: upload.storageKey } : data;
 
   // A versioned document and its version 1 commit together or not at all (spec 062 §2).
   const record = versionsEnabled(collection)
@@ -824,8 +881,7 @@ async function createDocument(
     overrideAccess
   });
 
-  const [doc] = await prepareForRead(ctx, collection, [record], args);
-  const result = doc ?? record;
+  const result = await writeResult(ctx, collection, record, args);
 
   await runAfterOperationHooks(collection, { operation: 'create', user, overrideAccess, result });
   return result;
@@ -852,6 +908,8 @@ interface PreparedUpdate {
   versioned: boolean;
   latestVersion: number;
   versionLabel: string | undefined;
+  /** The caller's update-access query, re-checked inside the write itself (spec 068). */
+  accessWhere: DatabaseWhere | undefined;
 }
 
 /**
@@ -995,7 +1053,8 @@ async function prepareUpdate(
     data,
     versioned,
     latestVersion,
-    versionLabel: args.versionLabel
+    versionLabel: args.versionLabel,
+    accessWhere: decision.where
   };
 }
 
@@ -1016,8 +1075,7 @@ async function finalizeUpdate(
     overrideAccess
   });
 
-  const [doc] = await prepareForRead(ctx, collection, [record], prepared.args);
-  const result = doc ?? record;
+  const result = await writeResult(ctx, collection, record, prepared.args);
 
   await runAfterOperationHooks(collection, { operation: 'update', user, overrideAccess, result });
   return result;
@@ -1045,8 +1103,77 @@ async function updateDocument(
     prepared.data,
     prepared.existing
   );
-  const record = await commitUpdate(ctx, prepared, assertions, echoGuard);
+  // A locale write merged into the stored per-locale maps must not overwrite a concurrent edit of
+  // another locale: it commits only while the row is still the one it merged from (spec 067).
+  const localeGuard = localeMergeGuard(prepared);
+  if (localeGuard) await afterStamp(prepared.existing.updated_at);
+  // A query-returning update rule is a row-level grant: the row must still match it when the write
+  // commits, not only when it was read (spec 068).
+  const guard = allOf([echoGuard, localeGuard, prepared.accessWhere]);
+  const record = await commitUpdate(ctx, prepared, assertions, guard);
   return finalizeUpdate(ctx, prepared, record);
+}
+
+/**
+ * What a write returns (spec 068). A trusted write (or a caller who may read the result) gets the
+ * document through the normal read preparation (field access, locale, population, afterRead hooks). An
+ * access-checked caller whose *read* access does not reach the written document — the collection's read
+ * rule denies it, its query does not match, or it is a draft they could not read — gets only its `id`:
+ * being allowed to write a document is not permission to read it back.
+ */
+async function writeResult(
+  ctx: OperationContext,
+  collection: CollectionDefinition,
+  record: DatabaseRecord,
+  args: BaseOperationArgs & { locale?: string; depth?: 0 | 1 }
+): Promise<DatabaseRecord> {
+  if (args.overrideAccess === false && !(await canRead(collection, record, args.user ?? null))) {
+    return { id: record.id };
+  }
+  const [doc] = await prepareForRead(ctx, collection, [record], args);
+  return doc ?? record;
+}
+
+/** The single-document read gate `findByID` applies, as a yes/no for an already-loaded row. */
+async function canRead(
+  collection: CollectionDefinition,
+  record: DatabaseRecord,
+  user: CmsUser | null
+): Promise<boolean> {
+  let decision: Awaited<ReturnType<typeof checkAccess>>;
+  try {
+    // Exactly `findByID`'s arguments — no `doc`, so a read rule answers the same here as there.
+    decision = await checkAccess(collection, 'read', {
+      user,
+      overrideAccess: false,
+      id: record.id as string
+    });
+  } catch (err) {
+    if (err instanceof AccessDeniedError) return false;
+    throw err;
+  }
+  if (decision.where && !documentMatches(record, decision.where)) return false;
+  const status = statusConstraint(collection, undefined, user, false, 'all');
+  return !status || documentMatches(record, status);
+}
+
+/** The conjunction of the defined conditions, or `undefined` when there are none. */
+function allOf(conditions: (DatabaseWhere | undefined)[]): DatabaseWhere | undefined {
+  const defined = conditions.filter((c): c is DatabaseWhere => c !== undefined);
+  if (defined.length === 0) return undefined;
+  return defined.length === 1 ? defined[0] : { and: defined };
+}
+
+/** `updated_at` compare-and-set for an update that merged a `locale` into stored per-locale maps. */
+function localeMergeGuard(prepared: PreparedUpdate): DatabaseWhere | undefined {
+  const { collection, args, data, existing } = prepared;
+  if (args.locale === undefined || !isLocalizedCollection(collection)) return undefined;
+  if (typeof existing.updated_at !== 'string') return undefined;
+  const merges = Object.keys(data).some((name) => {
+    const field = collection.fields[name];
+    return field !== undefined && isLocalizedField(field);
+  });
+  return merges ? { updated_at: existing.updated_at } : undefined;
 }
 
 /**
@@ -1111,31 +1238,11 @@ function unchangedSince(doc: DatabaseRecord): WriteCondition {
     : {};
 }
 
-/** Storage cleanup for a committed upload-document delete: best-effort, logged, never atomic (spec 063 §6). */
-async function cleanUpStorage(
-  ctx: OperationContext,
-  collection: CollectionDefinition,
-  doc: DatabaseRecord
-): Promise<void> {
-  if (collection.upload !== true) return;
-  const storageKey = ownedStorageKey(doc);
-  if (storageKey === null) {
-    getLogger().warn?.(
-      `Upload document '${collection.slug}/${String(doc.id)}' has no Forge-recorded storage key; no ` +
-        `storage object was deleted (spec 063 §6)`
-    );
-    return;
-  }
-  try {
-    await ctx.adapters.storage.delete(storageKey);
-  } catch (cleanupErr) {
-    // The document is already gone; failing the whole operation over cleanup would be worse than a
-    // best-effort delete that gets logged and left for manual follow-up.
-    getLogger().error(
-      `Failed to clean up storage object '${storageKey}' after document deletion`,
-      cleanupErr
-    );
-  }
+function warnNoStorageKey(collection: CollectionDefinition, doc: DatabaseRecord): void {
+  getLogger().warn?.(
+    `Upload document '${collection.slug}/${String(doc.id)}' has no Forge-recorded storage key; no ` +
+      `storage object will be deleted (spec 063 §6)`
+  );
 }
 
 /**
@@ -1207,29 +1314,41 @@ export async function deleteDocument(
     );
   }
 
+  // Each deleted upload document's object gets a durable deletion intent in the same batch (spec 067).
+  const storageCleanups = plan.deletes.flatMap(({ collection: target, doc }) => {
+    const key = target.upload === true ? ownedStorageKey(doc) : null;
+    if (target.upload === true && key === null) warnNoStorageKey(target, doc);
+    return key === null ? [] : [{ key, operation: deletionIntent(target.slug, key) }];
+  });
+
   // 3. Commit — one batch, or the plain single delete when nothing else is involved.
   let updatedRecords: DatabaseRecord[] = [];
+  let intentIds: string[] = [];
   if (
     dependents.length === 0 &&
     updates.length === 0 &&
     plan.assertions.length === 0 &&
-    targetGuards.length === 0
+    targetGuards.length === 0 &&
+    storageCleanups.length === 0
   ) {
-    await ctx.adapters.database.delete(args.collection, args.id);
+    await deleteRoot(ctx, collection, args.id, decision.where);
   } else {
-    updatedRecords = await commitRelationDelete(
+    ({ updatedRecords, intentIds } = await commitRelationDelete(
       ctx,
       { collection, id: args.id },
       dependents,
       updates,
-      [...targetGuards, ...plan.assertions]
-    );
+      [...targetGuards, ...plan.assertions],
+      storageCleanups.map((cleanup) => cleanup.operation),
+      decision.where
+    ));
   }
 
   // 4. Finalize — storage first (so a slow or failing hook cannot skip it), then after-hooks,
-  // dependents first and the root last, as before spec 064.
-  for (const { collection: target, doc } of plan.deletes) {
-    await cleanUpStorage(ctx, target, doc);
+  // dependents first and the root last, as before spec 064. A failed object delete keeps its intent.
+  for (const [index, { key }] of storageCleanups.entries()) {
+    const intentId = intentIds[index];
+    if (intentId !== undefined) await finishDeletion(ctx, intentId, key);
   }
   for (const { collection: target, doc } of [...dependents].reverse()) {
     const hookArgs = { user, overrideAccess: true, id: doc.id as string, doc };
@@ -1246,13 +1365,45 @@ export async function deleteDocument(
   }
 
   await runAfterDeleteHooks(collection, { user, overrideAccess, id: args.id, doc: existing });
+  // A trusted delete keeps returning the stored row; an access-checked one returns only what the caller
+  // may read of it (spec 068) — before, it returned the raw row, read-denied fields included.
+  const result =
+    args.overrideAccess === false ? await writeResult(ctx, collection, existing, args) : existing;
   await runAfterOperationHooks(collection, {
     operation: 'delete',
     user,
     overrideAccess,
-    result: existing
+    result
   });
-  return existing;
+  return result;
+}
+
+/**
+ * The plain single-document delete. With a query-returning delete rule the row must still match it at
+ * the delete (spec 068): a row gone meanwhile is a `404`, one moved out of the caller's scope a `409`.
+ */
+async function deleteRoot(
+  ctx: OperationContext,
+  collection: CollectionDefinition,
+  id: string,
+  accessWhere: DatabaseWhere | undefined
+): Promise<void> {
+  if (accessWhere === undefined) {
+    await ctx.adapters.database.delete(collection.slug, id);
+    return;
+  }
+  const result = await ctx.adapters.database.deleteIf(collection.slug, id, {
+    targetMatches: accessWhere
+  });
+  if (result.applied) return;
+  if (!(await ctx.adapters.database.findById(collection.slug, id)))
+    throw notFound(collection.slug, id);
+  throw new ConcurrentModificationError(
+    collection.slug,
+    id,
+    `Document '${id}' in '${collection.slug}' was changed by another request so that it no longer ` +
+      `matches the caller's delete access; nothing was deleted. Reload it and try again.`
+  );
 }
 
 /** A cascaded document's before-phase: the same hooks its own delete runs (trusted, spec 058 §5). */
@@ -1312,8 +1463,10 @@ async function commitRelationDelete(
   root: { collection: CollectionDefinition; id: string },
   dependents: PlannedDelete[],
   updates: PreparedUpdate[],
-  assertions: AtomicWriteOperation[]
-): Promise<DatabaseRecord[]> {
+  assertions: AtomicWriteOperation[],
+  intents: AtomicWriteOperation[] = [],
+  rootWhere?: DatabaseWhere
+): Promise<{ updatedRecords: DatabaseRecord[]; intentIds: string[] }> {
   const operations: AtomicWriteOperation[] = [];
   const updateAt: number[] = [];
   for (const prepared of updates) {
@@ -1341,7 +1494,20 @@ async function commitRelationDelete(
       requireApplied: true
     });
   }
-  operations.push({ type: 'delete', collection: root.collection.slug, id: root.id });
+  // The caller's delete-access query must still hold when the batch commits (spec 068).
+  operations.push(
+    rootWhere === undefined
+      ? { type: 'delete', collection: root.collection.slug, id: root.id }
+      : {
+          type: 'deleteIf',
+          collection: root.collection.slug,
+          id: root.id,
+          condition: { targetMatches: rootWhere },
+          requireApplied: true
+        }
+  );
+  const intentsAt = operations.length;
+  operations.push(...intents);
   operations.push(...assertions);
   // Hook-written relation values of set-null dependents can add target checks after planning counted
   // the batch; still refuse rather than chunk (spec 064 §5). Before-hooks have run by now; nothing is written.
@@ -1373,13 +1539,19 @@ async function commitRelationDelete(
     throw err;
   }
 
-  return updateAt.map((at) => {
+  const updatedRecords = updateAt.map((at) => {
     const result = results[at];
     if (result && (result.type === 'update' || (result.type === 'updateIf' && result.applied))) {
       return result.record;
     }
     throw new Error('atomicWrite returned no record for a set-null update');
   });
+  const intentIds = intents.map((_, offset) => {
+    const result = results[intentsAt + offset];
+    if (result?.type !== 'create') throw new Error('atomicWrite returned no storage intent');
+    return result.record.id as string;
+  });
+  return { updatedRecords, intentIds };
 }
 
 export interface PreviewArgs extends BaseOperationArgs {
@@ -1442,6 +1614,12 @@ export async function preview(ctx: OperationContext, args: PreviewArgs): Promise
       'all'
     );
     if (draftStatus && !documentMatches(existing, draftStatus)) {
+      throw notFound(args.collection, args.id);
+    }
+
+    // Preview returns the stored document merged with the changes, so the caller must also be able to
+    // *read* it, exactly as `findByID` would allow (spec 068 review): update access alone is not a read.
+    if (args.overrideAccess === false && !(await canRead(collection, existing, user))) {
       throw notFound(args.collection, args.id);
     }
 

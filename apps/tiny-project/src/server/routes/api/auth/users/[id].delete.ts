@@ -2,7 +2,7 @@ import { defineEventHandler, getRouterParam, createError } from 'h3';
 import { UserMutationError } from '@forge-cms/auth';
 import { requireAdminAuth } from '../../../../api/auth-request';
 
-/** DELETE /api/auth/users/:id — deletes a user. Rejects (409) deleting the sole remaining admin. */
+/** DELETE /api/auth/users/:id — deletes a user. Rejects (409) deleting the sole remaining admin, or a user that content still references (spec 065). */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id');
   if (!id) {

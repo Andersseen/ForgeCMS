@@ -47,3 +47,37 @@ export {
   type RelationLifecycleHarnessFactory,
   type RelationLifecycleRuntime
 } from './relation-lifecycle.js';
+export {
+  authManagedDeleteSchema,
+  runAuthManagedDeleteContractTests,
+  type AuthManagedDeleteContender,
+  type AuthManagedDeleteDatabase,
+  type AuthManagedDeleteHarness,
+  type AuthManagedDeleteHarnessFactory,
+  type AuthManagedDeleteRuntime,
+  type AuthManagedDeleteUsers
+} from './auth-managed-delete.js';
+export {
+  globalLifecycleGlobals,
+  runGlobalLifecycleContractTests,
+  type GlobalLifecycleDatabase,
+  type GlobalLifecycleHarness,
+  type GlobalLifecycleHarnessFactory,
+  type GlobalLifecycleRuntime
+} from './global-lifecycle.js';
+export {
+  localeMergeCollections,
+  runLocaleMergeContractTests,
+  type LocaleMergeHarness,
+  type LocaleMergeHarnessFactory,
+  type LocaleMergeRuntime
+} from './locale-merge.js';
+export {
+  createWriteHold,
+  runWriteAccessContractTests,
+  writeAccessSchema,
+  type WriteAccessHarness,
+  type WriteAccessHarnessFactory,
+  type WriteAccessRuntime,
+  type WriteHold
+} from './write-access.js';

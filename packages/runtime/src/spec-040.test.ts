@@ -232,6 +232,11 @@ describe('handleFile serves stored bytes (finding 21)', () => {
       body: new TextEncoder().encode('<svg />'),
       contentType: 'image/svg+xml'
     });
+    // Spec 067: a file is served only through the upload document that owns it.
+    await runtime.adapters.database.create('media', {
+      filename: 'logo.svg',
+      _storageKey: 'media/logo.svg'
+    });
   });
 
   it('returns the object with its content type', async () => {

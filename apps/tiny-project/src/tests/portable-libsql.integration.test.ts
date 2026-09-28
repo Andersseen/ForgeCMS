@@ -162,8 +162,10 @@ describe('portable libSQL profile — full small-project server lifecycle', () =
     ).rejects.toMatchObject(managed);
     expect(await database.count('users', { role: 'admin' })).toBe(adminsBefore);
 
-    // Only one admin exists, so the canonical path refuses the same deletion for its own reason.
-    await expect(auth.deleteUser(admin.user.id)).rejects.toMatchObject({ reason: 'last-admin' });
+    // The canonical path refuses the same deletion for its own reasons: this sole admin also authored
+    // the posts above, and a still-referenced user is reported first (spec 065).
+    await expect(auth.deleteUser(admin.user.id)).rejects.toMatchObject({ reason: 'referenced' });
+    expect(await database.count('users', { role: 'admin' })).toBe(adminsBefore);
 
     await expect(
       auth.updateUser(admin.user.id, { password: 'rotated-password-1' })

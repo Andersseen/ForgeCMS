@@ -20,6 +20,13 @@ export {
 
 // Serving stored files (spec 040)
 export { handleFile, type FileHandlerOptions } from './files.js';
+// Durable storage-cleanup intents and their reconciliation (spec 067)
+export {
+  reconcileStorage,
+  DEFAULT_UPLOAD_GRACE_MS,
+  type ReconcileStorageOptions,
+  type ReconcileStorageReport
+} from './storage-intents.js';
 
 // Browser auth foundation: login/signup/logout/me handlers + CSRF (spec 053)
 export {
