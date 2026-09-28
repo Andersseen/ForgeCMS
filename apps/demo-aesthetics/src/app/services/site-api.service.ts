@@ -17,10 +17,12 @@ interface Envelope<T> {
 /**
  * The public site's data layer.
  *
- * `CmsApiService` from `@forge-cms/angular` is not used here: it can only fetch a whole collection
- * (`getDocuments(collection)` takes no filter, sort, limit or depth — finding 15), and the site
- * needs composed, access-filtered payloads. Those are built server-side on the Local API and
- * fetched with plain `fetch` from here.
+ * `CmsApiService` can express every query this site makes (filters, sort, limit, depth, status —
+ * spec 041), and the admin uses it. The public pages deliberately don't: each one needs several
+ * collections at once, so a server endpoint composes them on the Local API (`/api/site/*`) and the
+ * browser makes one request per page. The composition runs as an anonymous visitor, so access and
+ * draft rules apply exactly as over HTTP, and the response is a small view model rather than raw CMS
+ * documents (internal fields never leave the server).
  */
 @Injectable({ providedIn: 'root' })
 export class SiteApiService {

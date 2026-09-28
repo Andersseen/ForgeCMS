@@ -44,33 +44,38 @@ hop between your Analog route and your content.
 
 - **Schema DSL and validation** — 15 field kinds including `group`, `array` and `blocks` (the
   page-builder primitive), validated at runtime on every write.
-- **A Local API** — `find`, `findByID`, `create`, `update`, `delete`, `count` on the runtime object,
-  running the full pipeline (access control, hooks, drafts, relation population, validation).
-- **A REST API** — CRUD with filtering, sorting, pagination, relation population and draft
-  visibility, in a stable envelope.
+- **A typed Local API** — `find`, `findOne`, `findByID`, `create`, `update`, `delete`, `count` on
+  the runtime object, running the full pipeline (access control, hooks, drafts, relation population,
+  validation) and inferring documents from your collection definitions.
+- **A REST API** — CRUD with filtering (including nested `and`/`or`), multi-field sorting,
+  pagination, relation population and draft visibility, in a stable envelope.
 - **Access control as functions** — a rule can return `true`/`false` or a **query** that narrows
   which documents the operation may touch (row-level rules like "authors edit only their own posts").
 - **A full hook pipeline** — nine collection stages plus per-field hooks.
-- **Real auth** — users stored in your database with PBKDF2 hashing, signed tokens, and
-  admin/editor/viewer roles.
+- **Real auth** — users stored in your database with PBKDF2 hashing, cookie sessions with CSRF
+  protection, scoped API keys, and admin/editor/viewer roles.
+- **Content lifecycle** — drafts, document versions with restore, live preview, globals,
+  localization and relation integrity rules on delete.
 - **Uploads** — `multipart/form-data` creates through a `StorageAdapter`, with a file-serving handler.
 - **Adapters** — in-memory, LibSQL/Turso and Cloudflare D1 for the database; in-memory and R2 for
   storage; all held to a shared contract test suite.
-- **An Angular client and admin UI** — `CmsApiService` plus signal-based resources, and importable
-  admin components (list, schema-driven form, relation/upload/richtext pickers).
+- **An Angular client and admin UI** — `CmsApiService` plus signal-based resources, a cookie session
+  and route guard, and an admin you mount under your own routes (content, users, sign-in).
 
 ## What is experimental
 
 Be honest with yourself about this list before adopting it for something that matters:
 
-- **Pre-1.0 release line.** `0.4.x` is installable and smoke-tested through a small-project
-  consumer, but API stability is not guaranteed before `1.0`.
-- **Schema sync is additive.** It creates tables and adds columns, but it does not drop, rename,
-  retype, or backfill data.
-- **Query gaps** — one sort field, no `OR`, no querying inside composite JSON values, and relation
-  population is one level deep (`depth: 1`).
+- **Pre-1.0 release line.** The packages (currently `0.7.0` on npm) are installable and exercised by
+  real consumer apps, but API stability is not guaranteed before `1.0`.
+- **Schema upgrades are detect-and-refuse, not migrate.** Schema sync applies safe additive changes
+  and refuses drift that needs a data migration; there is no migration runner yet. See
+  [Schema upgrades](/docs/schema-upgrades).
+- **Relation population is one level deep** (`depth: 1`), and composite JSON values cannot be queried
+  inside.
 - **No SSR-safe client fetch.** The Angular client is browser-first; a content site that needs SSR
   has to call the Local API from a server route instead (which is the better pattern anyway).
+- **Storage is R2 or in-memory.** An S3-compatible adapter is planned, not shipped.
 - **No email adapter, plugin system, or CLI.**
 
 ## How the pieces fit
@@ -91,6 +96,7 @@ packages talk to the outside world. Read [Core concepts](/docs/concepts) for the
 - [Core concepts](/docs/concepts) — the mental model, in one page.
 - [Collections](/docs/collections) and [Fields](/docs/fields) — the modelling reference.
 - [Local API](/docs/local-api) — the way to use ForgeCMS from server code.
+- [Schema upgrades](/docs/schema-upgrades) — what happens when you change a collection.
 
 The repository also keeps a maintainer-facing record: `docs/STATE.md` (what is implemented, package
 by package), `docs/ARCHITECTURE.md`, and `docs/specs/` (one spec per feature, with the reasoning

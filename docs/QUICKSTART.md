@@ -134,7 +134,7 @@ via Web `Request`, and Cloudflare Workers can all call the same handlers.
 registered collections and globals.
 
 For the built-in SQLite-style adapters (libSQL, D1), it **plans before it changes anything**
-(spec 070):
+(spec 070 — on `main`; npm `0.7.0` predates it and only creates tables and adds columns):
 
 - A fresh database: every table and index is created.
 - New optional fields, new collections and new indexes: applied automatically, in one transaction.

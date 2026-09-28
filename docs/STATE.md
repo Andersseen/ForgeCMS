@@ -1,11 +1,64 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-28 (schema drift detection, spec 070 — roadmap 0.7 M01).**
+> **Last updated: 2026-09-28 (0.7 consolidation and dogfood refresh, spec 071).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## 0.7 consolidation and dogfood refresh (spec 071, 2026-09-28)
+
+A checkpoint between M01 and M02, not a roadmap packet. See
+[docs/specs/071-0.7-consolidation-and-dogfood-refresh.md](specs/071-0.7-consolidation-and-dogfood-refresh.md).
+
+- **Release truth (verified from manifests, tags, npm and GitHub):**
+  - npm family is **`0.7.0`**, which contains specs through **069** (roadmap 0.6 complete);
+  - **M01 (spec 070) is on `main` but unpublished**. Its pending changeset is `minor`, so open PR #54
+    ("Version Packages") would publish it as **`0.8.0`**, the number the brief reserves for Angular DX.
+    **Maintainer decision:** ship as `0.7.1` (downgrade that changeset to `patch`), or accept `0.8.0` and
+    re-letter the proposed roadmap minors. Spec 071 changes neither;
+  - the `v0.7.0` GitHub release tag points at `2ec5208` (the M01 merge), not at the published source
+    (`7248ec8`). The release job tags the `main` HEAD it runs on; `v0.6.0` has the same offset.
+- **Current:** roadmap 0.6 complete; roadmap 0.7 in progress (M01 done on `main`, **M02 next**, M03
+  pending). README, `docs/README.md`, the ROADMAP header, the 0.7 brief, QUICKSTART and the website
+  say this. The website's package cards derive from one constant
+  (`apps/www/src/app/forge-release.ts`).
+- **Website:** new positioning, a "What works today" section, a Local API explainer, ten package
+  cards, and a roadmap checkpoint list. New `/docs/schema-upgrades`. The intro, quickstart,
+  deployment and concepts pages no longer say "additive only / no migration step" or list shipped
+  query gaps. The demo dialog closes on Escape and takes focus.
+- **Demo re-dogfooded** (details in [DEMO-FINDINGS](DEMO-FINDINGS.md#status-07)):
+  - migrated: typed Local API (8), `findOne` + `containsValue` (10), and the cookie session + guard (12);
+  - the bearer token in `localStorage` had kept staff signed in after "Log out";
+  - package content/users routes replace three app-local admin pages;
+  - rationale rewritten: `/api/site/*` kept on purpose (15);
+  - comment only: binding names (14);
+  - retained until M02: `site_settings` as a collection, because the persistent D1 row needs a data
+    migration (4);
+  - new finding 24: `date` is typed `Date` but travels as a string, and against D1 the demo showed
+    blank journal dates;
+  - also fixed: specialist photos never rendered; the browser cached `/api/site/*` for 60 s, so an
+    editor's reload after Publish showed stale content.
+- **Generic defects fixed (`@forge-cms/admin`, patch changeset):**
+  - the workspace list requests `depth: 1`, so relation and upload cells are no longer ids;
+  - wide lists and the users table scroll in place instead of widening the page on phones;
+  - the sidebar and theme toggles and boolean switches have accessible names.
+- **Strata:** tiny-project serves `GET /api/v1/:collection` **and** `GET /api/v1/:collection/:id`
+  through `CollectionsController`. The context comes from `createForgeReadContext`, which is
+  read-only and throws on non-GET/HEAD.
+  - Mutations stay H3.
+  - `read-parity.test.ts` (9 tests, 15 request comparisons) compares the former H3 handlers and the Strata plugin on two h3
+    apps: status, headers and body.
+  - Strata is only in the Nitro worker chunk.
+  - No `packages/*` depends on Strata, and Server Components are not consumed (see the ARCHITECTURE
+    note and the future slice).
+- **Operational (found, not changed): both deployed apps answer 500 on every API route.** The Pages
+  projects `forge-cms` and `forge-cms-demo` have **no secrets**. Since spec 069 a build without
+  `AUTH_SECRET` (≥ 32 bytes) refuses to start, which fits. Schema drift (070) may also apply once the
+  secret is set. **Action:** set `AUTH_SECRET` on both projects, then run `planSchema()` against both
+  D1 databases. Worker logs were not read.
+- **Next:** roadmap 0.7 **M02** — minimal reviewed migration execution. Not started.
 
 ## Schema drift detection and upgrade planning — M01 (spec 070, 2026-09-28)
 
@@ -1746,10 +1799,11 @@ passwordHash`~~ — **fixed 2026-07-22, spec 018.** `@forge-cms/auth` now export
 
 ## What's next
 
-**Next bounded step (recommended after spec 069, 2026-09-28): roadmap 0.7 / M01** — schema drift
-detection and classification of supported vs destructive schema changes. Roadmap 0.6 is complete (spec
-069 closed H04). Version-retention cleanup, working `versions.autosave` and a versioned password-hash
-format are post-1.0 product follow-ups.
+**Next bounded step (after spec 071, 2026-09-28): roadmap 0.7 / M02** — minimal reviewed migration
+execution. M01 is done (spec 070); spec 071 was a consolidation pass. Before merging anything else,
+resolve the release-number question and the missing production `AUTH_SECRET` (see spec 071's entry
+above). Version-retention cleanup, working `versions.autosave` and a versioned password-hash format
+are post-1.0 product follow-ups.
 
 Work is planned in [ROADMAP.md](ROADMAP.md), which sequences the remaining gaps by cost-of-delay.
 Each numbered item there gets its own spec in `docs/specs/` when picked up, per [SDD.md](SDD.md).
@@ -1811,11 +1865,20 @@ real auth adapter.
 
 ## Versioning
 
-The public `@forge-cms/*` package family is currently at **`0.4.0`** on npm (a fixed version group —
-every public package bumps together, see `.changeset/config.json`). Earlier docs/specs referencing
-`0.0.1` as "the first release" or "in progress" describe the state at the time they were written, not
-today — the family has published automatically on every merge to `main` since spec 045 and has moved
-through `0.0.1` → `0.0.2` → `0.1.x` → `0.2.0` → `0.3.0` → `0.4.0` since. API stability is still not
-guaranteed before `1.0`. Do not read a stale `0.0.1`/`0.0.2` mention elsewhere in this file (or in
-`README.md`/`CHANGELOG.md`) as current — this section is the source of truth for "what version is
-actually published right now."
+The public `@forge-cms/*` package family is currently at **`0.7.0`** on npm (a fixed version group —
+every public package bumps together, see `.changeset/config.json`). It has moved through `0.0.1` →
+`0.0.2` → `0.1.x` → `0.2.0` → `0.3.0` → `0.4.0` → `0.5.0` → `0.6.0` → `0.7.0`, publishing
+automatically when the Changesets "Version Packages" PR merges. API stability is still not guaranteed
+before `1.0`.
+
+- npm `0.7.0` contains everything through spec 069 (roadmap 0.6 complete).
+- `main` also has spec 070 (roadmap 0.7 M01), unpublished; spec 071's branch adds an admin patch. The pending
+  changesets are one `minor` and one `patch`, so the next Version Packages PR is `0.8.0` unless the
+  maintainer changes the M01 changeset (see spec 071's entry above).
+- **Roadmap checkpoints are not npm versions.** "0.7" in ROADMAP.md is the upgrade-safety checkpoint,
+  still in progress; npm `0.7.0` is a package release.
+- Git tags `vX.Y.Z` mark the GitHub release job's run on `main`, which can be later than the published
+  source (per-package `@forge-cms/<name>@X.Y.Z` tags point at the Version Packages merge).
+
+Do not read a stale `0.0.x`/`0.4.x` mention elsewhere in this file as current: dated entries describe
+their own day.

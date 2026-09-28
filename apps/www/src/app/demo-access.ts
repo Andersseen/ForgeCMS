@@ -79,11 +79,11 @@ export const DEVELOPER_STEPS: DemoStep[] = [
   {
     title: 'The admin is a package, not app code',
     detail:
-      '@forge-cms/admin ships the layout, the list and the schema-driven form; the app supplies routes, a sidebar config and about 300 lines of glue.'
+      '@forge-cms/admin ships the layout, sign-in session, collection list, document editor and staff accounts. The app mounts its routes and keeps only clinic-specific pages (dashboard, media, settings).'
   },
   {
     title: 'Run the tests to see the rules',
     detail:
-      'pnpm test:demo — 22 tests drive the content model through the Local API: who can read a booking, what a draft is invisible to, what a hook rewrites.'
+      'pnpm test:demo drives the content model through the typed Local API: who can read a booking, what a draft is invisible to, what a hook rewrites, how a treatment page finds its specialists.'
   }
 ];

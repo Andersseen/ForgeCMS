@@ -1,4 +1,7 @@
 import { expect, test } from '@playwright/test';
+import { useOwnThrottleBucket } from './visitor';
+
+useOwnThrottleBucket('signup');
 
 /**
  * `apps/demo-aesthetics` has no signup UI (spec 054 non-goals — this app doesn't dogfood the reusable

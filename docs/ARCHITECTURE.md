@@ -40,6 +40,24 @@ Rules encoded in this graph:
 - Apps consume packages; packages never import from apps.
 - **No import cycles** — enforced by ESLint (`import/no-cycle`).
 
+### ForgeCMS and Strata (current state, spec 071)
+
+- **No `packages/*` manifest depends on Strata**, and none may without a spec.
+- `apps/tiny-project` installs the published `@strata-sc/core`/`@strata-sc/analog` (0.1.0) as an
+  external consumer. Its `CollectionsController` serves `GET /api/v1/:collection` and
+  `GET /api/v1/:collection/:id` by delegating to `handleList`/`handleRead`.
+- **Strata owns server transport and lifecycle; Forge owns CMS behaviour** (access, drafts, queries,
+  envelopes). The controller adapts the request and nothing else.
+- Only bodyless reads move. `StrataAnalogRequest` exposes no Web `Request` (no body, no
+  `AbortSignal`, synthetic origin), so mutations, auth and uploads stay on H3. The app-local
+  `createForgeReadContext` throws for any method other than GET/HEAD.
+- **Strata Server Components are not consumed.** `@strata-sc/server-components` is private and
+  unpublished, and it targets Angular 22 / Analog 2.7 / Vite 8. The candidate first slice, once it is
+  published with a compatible peer range, an accepted navigation contract and Cloudflare
+  qualification: `demo-aesthetics` `/journal/:slug` as a `PostDetails` server component reading
+  posts, author and media through the Local API, with a small interactive Angular island. Documented
+  only; no code exists.
+
 ## Request lifecycle (the core data flow)
 
 ```

@@ -1,11 +1,23 @@
 /**
- * `DatabaseRecord` → the typed payloads in `src/shared/site-content.ts`.
+ * Typed CMS documents → the public view models in `src/shared/site-content.ts`.
  *
- * Every function here is boilerplate the CMS could generate: the collection definition already
- * knows each field's type, but `find`/`findByID` hand back `Record<string, unknown>` (see finding 8).
- * Keeping the casting in one file at least stops it leaking into the pages.
+ * The inputs are the Local API's inferred documents (`CollectionDocument<typeof services>`, spec 047),
+ * so renaming or retyping a field in `collections.ts` breaks this file at compile time. The outputs are
+ * deliberately *not* those documents: the browser gets a smaller, stable shape — richtext flattened to
+ * paragraphs (finding 7), relations that may or may not be populated collapsed to one shape, internal
+ * fields left out, and sensible fallbacks for optional values. The loose-value helpers below are only
+ * for values the schema types loosely: populated relations and composite JSON.
  */
-import type { DatabaseRecord } from '@forge-cms/db';
+import type { CollectionDocument } from '@forge-cms/core';
+import type {
+  pages,
+  posts,
+  promotions,
+  services,
+  siteSettings,
+  staff,
+  testimonials
+} from './collections';
 import type {
   CategoryRef,
   MediaRef,
@@ -30,6 +42,16 @@ type Rec = Record<string, unknown>;
 
 function str(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
+}
+
+/**
+ * A `date` field as an ISO string. The SQL adapters (libSQL, D1) return `Date` objects on read while
+ * the in-memory adapter returns what was written (finding 24). `str()` alone would turn every
+ * production date into `''`.
+ */
+function isoDate(value: unknown): string {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? '' : value.toISOString();
+  return str(value);
 }
 
 function num(value: unknown): number | null {
@@ -89,7 +111,7 @@ export function toCategory(value: unknown): CategoryRef | null {
   };
 }
 
-export function toServiceSummary(record: DatabaseRecord): ServiceSummary {
+export function toServiceSummary(record: CollectionDocument<typeof services>): ServiceSummary {
   return {
     id: str(record.id),
     name: str(record.name),
@@ -104,7 +126,7 @@ export function toServiceSummary(record: DatabaseRecord): ServiceSummary {
   };
 }
 
-export function toServiceDetail(record: DatabaseRecord): ServiceDetail {
+export function toServiceDetail(record: CollectionDocument<typeof services>): ServiceDetail {
   const aftercare = obj(record.aftercare);
   return {
     ...toServiceSummary(record),
@@ -127,7 +149,7 @@ export function toServiceDetail(record: DatabaseRecord): ServiceDetail {
   };
 }
 
-export function toTeamMember(record: DatabaseRecord): TeamMember {
+export function toTeamMember(record: CollectionDocument<typeof staff>): TeamMember {
   const socials = obj(record.socials);
   const specialties = Array.isArray(record.specialties) ? record.specialties : [];
   return {
@@ -149,7 +171,7 @@ export function toTeamMember(record: DatabaseRecord): TeamMember {
   };
 }
 
-export function toTestimonial(record: DatabaseRecord): Testimonial {
+export function toTestimonial(record: CollectionDocument<typeof testimonials>): Testimonial {
   return {
     id: str(record.id),
     author: str(record.author),
@@ -159,36 +181,36 @@ export function toTestimonial(record: DatabaseRecord): Testimonial {
   };
 }
 
-export function toPromotion(record: DatabaseRecord): Promotion {
+export function toPromotion(record: CollectionDocument<typeof promotions>): Promotion {
   return {
     id: str(record.id),
     title: str(record.title),
     description: str(record.description),
     discountPercent: num(record.discountPercent),
     code: str(record.code),
-    validUntil: str(record.validUntil)
+    validUntil: isoDate(record.validUntil)
   };
 }
 
-export function toPostSummary(record: DatabaseRecord): PostSummary {
+export function toPostSummary(record: CollectionDocument<typeof posts>): PostSummary {
   return {
     id: str(record.id),
     title: str(record.title),
     slug: str(record.slug),
     excerpt: str(record.excerpt),
     topic: str(record.topic),
-    publishedAt: str(record.publishedAt),
+    publishedAt: isoDate(record.publishedAt),
     readingMinutes: num(record.readingMinutes) ?? 1,
     coverImage: toMedia(record.coverImage),
     authorName: str(obj(record.author)?.name)
   };
 }
 
-export function toPostDetail(record: DatabaseRecord): PostDetail {
+export function toPostDetail(record: CollectionDocument<typeof posts>): PostDetail {
   return { ...toPostSummary(record), body: toParagraphs(record.body) };
 }
 
-export function toPageContent(record: DatabaseRecord): PageContent {
+export function toPageContent(record: CollectionDocument<typeof pages>): PageContent {
   const seo = obj(record.seo);
   const sections = Array.isArray(record.sections) ? record.sections : [];
   return {
@@ -204,7 +226,7 @@ export function toPageContent(record: DatabaseRecord): PageContent {
   };
 }
 
-export function toSiteSettings(record: DatabaseRecord): SiteSettings {
+export function toSiteSettings(record: CollectionDocument<typeof siteSettings>): SiteSettings {
   const address = obj(record.address);
   const socials = obj(record.socials);
   return {

@@ -38,7 +38,7 @@ const runtime = new ForgeCmsRuntime({
 });
 
 runtime.init(); // hands `env` to each adapter
-await runtime.syncSchema(); // creates tables, adds new columns
+await runtime.syncSchema(); // creates tables, applies safe additive changes, refuses drift
 ```
 
 `ForgeCmsRuntime` is the CMS instance. It owns nothing but the config and the adapters — all the

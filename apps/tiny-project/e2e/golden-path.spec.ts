@@ -392,7 +392,7 @@ test('H04: admin user routes authenticate before reading a bounded body; logout 
 
 // The HTTP contract of `GET /api/v1/:collection`, asserted purely at the wire — it knows nothing
 // about which transport wrapper serves the route, so it must pass unchanged across a transport swap.
-test('list API contract: query, pagination, filter, sort, depth, errors and read access are preserved', async ({
+test('read API contract (list + single document, both served by Strata): query, pagination, filter, sort, depth, errors and read access are preserved', async ({
   page,
   request
 }) => {
@@ -470,6 +470,35 @@ test('list API contract: query, pagination, filter, sort, depth, errors and read
   const authenticatedUsers = await page.request.get('/api/v1/users');
   expect(authenticatedUsers.status()).toBe(200);
   expect(anonymousUsers.status()).not.toBe(200);
+
+  // Single document (`GET /api/v1/:collection/:id`, a Strata controller since spec 071).
+  const draftDoc = filtered.data[0];
+  expect(draftDoc).toBeDefined();
+  const draftId = draftDoc?.id ?? '';
+  const one = await page.request.get(`/api/v1/posts/${draftId}?status=all&depth=1`);
+  expect(one.status()).toBe(200);
+  const oneBody = (await one.json()) as { data: { id: string; author: { id: string } } };
+  expect(Object.keys(oneBody)).toEqual(['data']);
+  expect(oneBody.data.id).toBe(draftId);
+  expect(oneBody.data.author).toMatchObject({ id: authorId });
+  // The draft is invisible to an anonymous caller, and missing ids/collections are the usual 404s.
+  expect((await request.get(`/api/v1/posts/${draftId}`)).status()).toBe(404);
+  expect((await page.request.get('/api/v1/posts/does-not-exist')).status()).toBe(404);
+  const unknownOne = await page.request.get(`/api/v1/does-not-exist/${draftId}`);
+  expect(await unknownOne.json()).toEqual({
+    error: { code: 'NOT_FOUND', message: "Collection 'does-not-exist' not found" }
+  });
+  // Mutations on the same URL are still the H3 file routes, CSRF and all.
+  const renamed = await page.request.put(`/api/v1/posts/${draftId}`, {
+    data: { title: `List Contract A renamed ${stamp}` },
+    headers: { 'content-type': 'application/json', ...SAME_ORIGIN_HEADERS }
+  });
+  expect(renamed.status()).toBe(200);
+  const forged = await page.request.put(`/api/v1/posts/${draftId}`, {
+    data: { title: 'forged' },
+    headers: { 'content-type': 'application/json', origin: 'https://evil.example' }
+  });
+  expect(forged.status()).toBe(403);
 
   await logout(page);
 });

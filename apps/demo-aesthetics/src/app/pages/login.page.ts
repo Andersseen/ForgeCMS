@@ -1,8 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
-import { CmsApiService } from '@forge-cms/angular';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ForgeAuthSession } from '@forge-cms/angular';
 import { VoltButton, VoltCard, VoltError, VoltInput, VoltLabel } from '@voltui/components';
-import { AUTH_TOKEN_KEY } from '../auth-token';
 
 const DEMO_EMAIL = 'demo@lumea.clinic';
 const DEMO_PASSWORD = 'lumea-demo';
@@ -42,6 +41,7 @@ const DEMO_PASSWORD = 'lumea-demo';
             <volt-input
               id="email"
               type="email"
+              autocomplete="email"
               [value]="email()"
               (valueChange)="email.set($event)"
             />
@@ -51,17 +51,18 @@ const DEMO_PASSWORD = 'lumea-demo';
             <volt-input
               id="password"
               type="password"
+              autocomplete="current-password"
               [value]="password()"
               (valueChange)="password.set($event)"
             />
           </div>
 
-          @if (error(); as message) {
-            <volt-error>{{ message }}</volt-error>
+          @if (session.error(); as error) {
+            <volt-error role="alert">{{ error.message }}</volt-error>
           }
 
-          <volt-button type="submit" class="w-full" [disabled]="loading()">
-            {{ loading() ? 'Signing in…' : 'Sign in' }}
+          <volt-button type="submit" class="w-full" [disabled]="session.loading()">
+            {{ session.loading() ? 'Signing in…' : 'Sign in' }}
           </volt-button>
         </form>
 
@@ -75,31 +76,30 @@ const DEMO_PASSWORD = 'lumea-demo';
     </div>
   `
 })
+/**
+ * The clinic's own sign-in screen. It stays app-local rather than `forgeAdminAuthRoutes()` because a
+ * public demo has to print its accounts next to the form; the session itself is the package's
+ * cookie-based `ForgeAuthSession` (spec 054) — nothing is written to `localStorage`.
+ */
 export class LoginPage {
-  private readonly api = inject(CmsApiService);
+  protected readonly session = inject(ForgeAuthSession);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   protected readonly demoEmail = DEMO_EMAIL;
   protected readonly demoPassword = DEMO_PASSWORD;
 
   protected readonly email = signal(DEMO_EMAIL);
   protected readonly password = signal(DEMO_PASSWORD);
-  protected readonly loading = signal(false);
-  protected readonly error = signal<string | null>(null);
 
   protected async submit(event: Event): Promise<void> {
     event.preventDefault();
-    this.loading.set(true);
-    this.error.set(null);
+    await this.session.login(this.email(), this.password());
+    if (!this.session.authenticated()) return;
 
-    try {
-      const { token } = await this.api.login(this.email(), this.password());
-      localStorage.setItem(AUTH_TOKEN_KEY, token);
-      await this.router.navigate(['/admin']);
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Login failed');
-    } finally {
-      this.loading.set(false);
-    }
+    // `forgeAuthGuard` sends visitors here with `?returnUrl=`; only follow it inside the admin.
+    const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+    const inAdmin = returnUrl === '/admin' || returnUrl?.startsWith('/admin/') === true;
+    await this.router.navigateByUrl(inAdmin && returnUrl ? returnUrl : '/admin');
   }
 }

@@ -6,6 +6,7 @@
  * would — which is also how spec 019 intends server-side code to talk to the CMS.
  */
 import type { ForgeCmsRuntime } from '@forge-cms/runtime';
+import type { DemoCollections } from './collections';
 import type { UsersCollectionAuthAdapter } from '@forge-cms/auth';
 import type { RichTextContent } from '@forge-cms/core';
 
@@ -24,6 +25,13 @@ function daysFromNow(days: number, hour = 10): string {
   return date.toISOString();
 }
 
+/**
+ * FINDING 24: the seed writes dates as ISO strings — what the validator and the HTTP API accept — but
+ * the typed Local API types a `date` field as `Date` on writes. Until wire types land (roadmap 0.8,
+ * C02) the seed writes through the untyped view of the runtime, taken once in `seedContent`.
+ */
+type SeedRuntime = ForgeCmsRuntime;
+
 interface SeedIds {
   categories: Record<string, string>;
   services: Record<string, string>;
@@ -31,7 +39,10 @@ interface SeedIds {
   media: Record<string, string>;
 }
 
-export async function seedContent(runtime: ForgeCmsRuntime): Promise<void> {
+export async function seedContent(
+  typedRuntime: ForgeCmsRuntime<unknown, DemoCollections>
+): Promise<void> {
+  const runtime = typedRuntime as unknown as SeedRuntime;
   const auth = runtime.adapters.auth as UsersCollectionAuthAdapter;
 
   await auth.createUser({
@@ -61,7 +72,7 @@ export async function seedContent(runtime: ForgeCmsRuntime): Promise<void> {
   await seedSettings(runtime);
 }
 
-async function seedMedia(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<void> {
+async function seedMedia(runtime: SeedRuntime, ids: SeedIds): Promise<void> {
   const files = [
     { key: 'facial', filename: 'signature-facial.svg', alt: 'A facial treatment in progress' },
     { key: 'laser', filename: 'laser.svg', alt: 'Laser handpiece on a treatment couch' },
@@ -92,7 +103,7 @@ async function seedMedia(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<void> 
   }
 }
 
-async function seedCategories(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<void> {
+async function seedCategories(runtime: SeedRuntime, ids: SeedIds): Promise<void> {
   const categories = [
     {
       key: 'facials',
@@ -139,7 +150,7 @@ async function seedCategories(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<v
   }
 }
 
-async function seedServices(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<void> {
+async function seedServices(runtime: SeedRuntime, ids: SeedIds): Promise<void> {
   const services = [
     {
       key: 'hydraglow',
@@ -379,7 +390,7 @@ async function seedServices(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<voi
   });
 }
 
-async function seedStaff(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<void> {
+async function seedStaff(runtime: SeedRuntime, ids: SeedIds): Promise<void> {
   const team = [
     {
       key: 'elena',
@@ -440,7 +451,7 @@ async function seedStaff(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<void> 
   }
 }
 
-async function seedTestimonials(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<void> {
+async function seedTestimonials(runtime: SeedRuntime, ids: SeedIds): Promise<void> {
   const testimonials = [
     {
       author: 'Marta L.',
@@ -493,7 +504,7 @@ async function seedTestimonials(runtime: ForgeCmsRuntime, ids: SeedIds): Promise
   }
 }
 
-async function seedPromotions(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<void> {
+async function seedPromotions(runtime: SeedRuntime, ids: SeedIds): Promise<void> {
   await runtime.create({
     collection: 'promotions',
     data: {
@@ -522,7 +533,7 @@ async function seedPromotions(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<v
   });
 }
 
-async function seedPosts(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<void> {
+async function seedPosts(runtime: SeedRuntime, ids: SeedIds): Promise<void> {
   await runtime.create({
     collection: 'posts',
     data: {
@@ -573,7 +584,7 @@ async function seedPosts(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<void> 
   });
 }
 
-async function seedBookings(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<void> {
+async function seedBookings(runtime: SeedRuntime, ids: SeedIds): Promise<void> {
   await runtime.create({
     collection: 'bookings',
     data: {
@@ -604,7 +615,7 @@ async function seedBookings(runtime: ForgeCmsRuntime, ids: SeedIds): Promise<voi
   });
 }
 
-async function seedPages(runtime: ForgeCmsRuntime): Promise<void> {
+async function seedPages(runtime: SeedRuntime): Promise<void> {
   await runtime.create({
     collection: 'pages',
     data: {
@@ -668,7 +679,7 @@ async function seedPages(runtime: ForgeCmsRuntime): Promise<void> {
   });
 }
 
-async function seedSettings(runtime: ForgeCmsRuntime): Promise<void> {
+async function seedSettings(runtime: SeedRuntime): Promise<void> {
   await runtime.create({
     collection: 'site_settings',
     data: {

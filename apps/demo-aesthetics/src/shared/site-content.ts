@@ -1,10 +1,11 @@
 /**
- * The shapes `/api/site/*` returns.
+ * The shapes `/api/site/*` returns — the public site's view models, not CMS documents.
  *
- * FINDING 8: these are written by hand. `CollectionData<typeof services>` already infers the record
- * type from the collection definition, but the Local API returns `DatabaseRecord`
- * (`Record<string, unknown>`), so the inference stops at the server boundary and every payload has
- * to be re-declared and cast. Roadmap 038 is exactly this gap.
+ * The server side is typed from the schema (the Local API infers documents since spec 047, see
+ * `server/api/mappers.ts`). These stay hand-written on purpose: they are the contract with the
+ * browser, which must not import server collection definitions, and they differ from the documents
+ * (richtext flattened, relations resolved, internal fields left out). Generating browser types from
+ * the schema is roadmap 0.8 (C02).
  */
 
 export interface MediaRef {
