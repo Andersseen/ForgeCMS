@@ -33,32 +33,32 @@ highest-value thing this exercise turned up is not on the roadmap as a numbered 
 that `@forge-cms/angular` cannot express a filtered, sorted, paginated, draft-aware query, so every
 consumer falls back to `fetch`.
 
-| #          | Finding                                                             | Bit us in                 | Roadmap                               |
-| ---------- | ------------------------------------------------------------------- | ------------------------- | ------------------------------------- |
-| [15](#f15) | The client SDK cannot filter, sort, limit, paginate or set depth    | every page of the site    | ✅ 041                                |
-| [17](#f17) | The admin cannot see drafts — the client has no `status`            | the editor screen         | ✅ 041 + 042                          |
-| [9](#f9)   | `depth: 1` does not populate `upload` fields                        | every image on the site   | ✅ 040                                |
-| [21](#f21) | Uploaded files are stored but never served                          | the media library         | ✅ 040                                |
-| [8](#f8)   | The Local API returns `Record<string, unknown>` — inference stops   | every server route        | ✅ 047; demo migrated 071             |
-| [5](#f5)   | A route's `allowedRoles` pre-empts the collection's own access rule | the public booking form   | ⚠️ documented                         |
-| [19](#f19) | Hooks cannot tell a trusted server call from a public request       | the seed, silently        | ✅ 040                                |
-| [4](#f4)   | No globals                                                          | site settings             | ✅ 066 (package); demo retained → M02 |
-| [10](#f10) | No `findBySlug`; no "relation contains id" filter                   | every `/:slug` page       | ✅ 050; demo migrated 071             |
-| [7](#f7)   | `richtext` has no editor and no renderer                            | journal + treatment copy  | ✅ 042 (editor)                       |
-| [16](#f16) | `blocks` rows are untyped at the render site                        | the home page             | 038                                   |
-| [1](#f1)   | Field options that nothing reads (`autoGenerate`, `defaultValue`)   | 5 collections             | ✅ 040                                |
-| [18](#f18) | No upload method in the client SDK                                  | the media library         | ✅ 041                                |
-| [6](#f6)   | No email adapter, so a booking notifies nobody                      | the booking hook          | 029                                   |
-| [11](#f11) | No h3/Nitro helpers — auth routes are copy-paste                    | 6 route files             | 037                                   |
-| [13](#f13) | The Angular linker plugin must be copied into every app             | app setup                 | ✅ 055                                |
-| [12](#f12) | The auth-token localStorage key is not exported                     | app setup                 | ✅ 054; demo migrated 071             |
-| [2](#f2)   | No SSR story for a content site                                     | the whole premise         | 036/037                               |
-| [3](#f3)   | No money or timezone-aware date handling                            | prices, appointment times | new                                   |
-| [14](#f14) | `R2StorageAdapter` hardcodes the `BUCKET` binding name              | runtime wiring            | ✅ 040                                |
-| [20](#f20) | The admin sidebar's nav items are hardcoded                         | admin routing             | ✅ 042                                |
-| [22](#f22) | Adapters disagree about `created_at`/`updated_at`                   | sorting by creation date  | ✅ 040                                |
-| [23](#f23) | A hook cannot query the CMS                                         | the demo's limit hooks    | open                                  |
-| [24](#f24) | `date` is typed `Date` but travels as a string                      | journal, promotions, form | open → 0.8 C02                        |
+| #          | Finding                                                             | Bit us in                 | Roadmap                                                        |
+| ---------- | ------------------------------------------------------------------- | ------------------------- | -------------------------------------------------------------- |
+| [15](#f15) | The client SDK cannot filter, sort, limit, paginate or set depth    | every page of the site    | ✅ 041                                                         |
+| [17](#f17) | The admin cannot see drafts — the client has no `status`            | the editor screen         | ✅ 041 + 042                                                   |
+| [9](#f9)   | `depth: 1` does not populate `upload` fields                        | every image on the site   | ✅ 040                                                         |
+| [21](#f21) | Uploaded files are stored but never served                          | the media library         | ✅ 040                                                         |
+| [8](#f8)   | The Local API returns `Record<string, unknown>` — inference stops   | every server route        | ✅ 047; demo migrated 071                                      |
+| [5](#f5)   | A route's `allowedRoles` pre-empts the collection's own access rule | the public booking form   | ⚠️ documented                                                  |
+| [19](#f19) | Hooks cannot tell a trusted server call from a public request       | the seed, silently        | ✅ 040                                                         |
+| [4](#f4)   | No globals                                                          | site settings             | ✅ 066 (package); demo retained (M02 exists; prod run pending) |
+| [10](#f10) | No `findBySlug`; no "relation contains id" filter                   | every `/:slug` page       | ✅ 050; demo migrated 071                                      |
+| [7](#f7)   | `richtext` has no editor and no renderer                            | journal + treatment copy  | ✅ 042 (editor)                                                |
+| [16](#f16) | `blocks` rows are untyped at the render site                        | the home page             | 038                                                            |
+| [1](#f1)   | Field options that nothing reads (`autoGenerate`, `defaultValue`)   | 5 collections             | ✅ 040                                                         |
+| [18](#f18) | No upload method in the client SDK                                  | the media library         | ✅ 041                                                         |
+| [6](#f6)   | No email adapter, so a booking notifies nobody                      | the booking hook          | 029                                                            |
+| [11](#f11) | No h3/Nitro helpers — auth routes are copy-paste                    | 6 route files             | 037                                                            |
+| [13](#f13) | The Angular linker plugin must be copied into every app             | app setup                 | ✅ 055                                                         |
+| [12](#f12) | The auth-token localStorage key is not exported                     | app setup                 | ✅ 054; demo migrated 071                                      |
+| [2](#f2)   | No SSR story for a content site                                     | the whole premise         | 036/037                                                        |
+| [3](#f3)   | No money or timezone-aware date handling                            | prices, appointment times | new                                                            |
+| [14](#f14) | `R2StorageAdapter` hardcodes the `BUCKET` binding name              | runtime wiring            | ✅ 040                                                         |
+| [20](#f20) | The admin sidebar's nav items are hardcoded                         | admin routing             | ✅ 042                                                         |
+| [22](#f22) | Adapters disagree about `created_at`/`updated_at`                   | sorting by creation date  | ✅ 040                                                         |
+| [23](#f23) | A hook cannot query the CMS                                         | the demo's limit hooks    | open                                                           |
+| [24](#f24) | `date` is typed `Date` but travels as a string                      | journal, promotions, form | open → 0.8 C02                                                 |
 
 ---
 
@@ -214,8 +214,10 @@ exist (`defineGlobal`, `getGlobalDocument`/`updateGlobalDocument`, `GET/PUT /api
 certified by spec 066). The deployed demo, however, has a persistent D1 whose `site_settings` table
 holds the settings editors have changed. A global is stored in a new `_global_site_settings` table.
 Schema sync would create it safely (M01 classifies it as additive), but **empty**, so the site would
-lose its phone, address and hours until someone re-entered them. Copying the row is a data migration,
-and reviewed migrations are roadmap 0.7 M02. The demo keeps the collection until then. Reads now use
+lose its phone, address and hours until someone re-entered them. Copying the row is a data migration.
+Reviewed migrations exist since spec 072 (M02), but running one against the deployed D1 is a
+production operation that needs a backup first; it has not been done. The demo keeps the collection
+until then. Reads now use
 `findOne`; nothing still prevents a second row.
 
 <a id="f10"></a>
@@ -455,7 +457,7 @@ adapter output, so it was recorded rather than patched in a consolidation pass.
 
 | #   | Original finding                    | Package fix | Demo status                                                                                    | Remaining limit                                     |
 | --- | ----------------------------------- | ----------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| 4   | No globals                          | 023 / 066   | **Retained**: persistent D1 row would need a data migration                                    | Wait for M02, then migrate to `defineGlobal`        |
+| 4   | No globals                          | 023 / 066   | **Retained**: persistent D1 row would need a data migration                                    | Back up, then migrate to `defineGlobal` via M02     |
 | 8   | Local API untyped                   | 047         | **Migrated**: typed runtime, typed mapper inputs                                               | Populated relations typed as ids; browser types C02 |
 | 10  | No slug lookup / relation filter    | 050         | **Migrated**: `findOne` + `containsValue`, regression tests                                    | —                                                   |
 | 12  | Auth token in `localStorage`        | 054         | **Migrated**: cookie session, guard; fixed a logout that kept you in                           | —                                                   |
@@ -506,8 +508,9 @@ completeness, typed Local API and the linker plugin have shipped and are no long
    still ships as an SPA.
 2. **Schema-aware wire types** — roadmap 0.8 C02: `date` representation (finding 24), populated
    relation types (rest of finding 8), and typed `blocks` rows (finding 16).
-3. **Reviewed migrations** — roadmap 0.7 M02. It unblocks moving the demo's settings to a real global
-   (finding 4).
+3. **Moving the demo's settings to a real global** (finding 4). The mechanism exists since M02
+   (spec 072); what remains is a backed-up production run, which pairs naturally with M03's
+   backup/restore rehearsal.
 4. **Email** (finding 6). A booking form that notifies nobody is not finished. Post-1.0 per the
    roadmap, but it is the gap every content site hits first.
 5. **Hook access to the CMS** (finding 23) — pass the operation context into hook args.

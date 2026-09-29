@@ -62,8 +62,8 @@ await runtime.delete({ collection: 'notes', id: created.id });
 ```
 
 `runtime.syncSchema()` creates missing tables and applies safe additive changes. It never drops,
-renames, retypes or backfills data, and from the first release after `0.7.0` it refuses changes
-that would need a data migration; see [Schema upgrades](/docs/schema-upgrades) for what happens when
+renames, retypes or backfills data, and since `0.8.0` it refuses changes that would need a data
+migration (you apply those with a reviewed migration); see [Schema upgrades](/docs/schema-upgrades) for what happens when
 you change a collection that already has rows. For framework HTTP integration, build an `ApiContext`
 and call the handlers exported by `@forge-cms/runtime`.
 

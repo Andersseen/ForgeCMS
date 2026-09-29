@@ -1,13 +1,16 @@
-# Schema upgrades — what `syncSchema()` does and does not do
+# Schema upgrades — `syncSchema()`, drift plans and reviewed migrations
 
 This guide is for anyone who changes a ForgeCMS collection or global definition after data already
-exists: on a local libSQL file, a Turso database or Cloudflare D1. It describes behaviour since
-[spec 070](specs/070-schema-drift-detection-and-upgrade-planning.md) (roadmap 0.7, M01).
+exists: on a local libSQL file, a Turso database or Cloudflare D1. It covers two layers:
 
-ForgeCMS has **no migration runner yet** (that is M02). What it does have is a reliable plan: before
-it touches anything, it compares the schema you declared with the schema actually stored. It applies
-only changes that cannot lose or reinterpret data, and it refuses everything else with a precise
-report.
+- **Drift planning** ([spec 070](specs/070-schema-drift-detection-and-upgrade-planning.md), roadmap
+  0.7 M01, in npm `0.8.0`). Before it touches anything, `syncSchema()` compares the schema you
+  declared with the schema actually stored. It applies only changes that cannot lose or reinterpret
+  data, and refuses everything else with a precise report.
+- **Reviewed migrations** ([spec 072](specs/072-reviewed-migration-execution.md), roadmap 0.7 M02, on
+  `main`, shipping in the next patch release `0.8.1`). They apply the refused changes, as SQL you wrote and
+  reviewed, exactly once, atomically with a durable history. See
+  [Reviewed migrations](#reviewed-migrations) and the [operator guide](#operator-guide).
 
 ## The short version
 
@@ -150,14 +153,206 @@ status.
   informational), and the current configuration becomes the baseline.
 - From then on, semantic changes are detected.
 
-**After migrating a semantic change by hand** (for example, wrapping every `title` into `{"en": …}`),
-tell Forge the data now matches by resetting that table's baseline. The next sync records the new one:
+**After converting a semantic change** (for example, wrapping every `title` into `{"en": …}`), the
+old baseline no longer describes the data. Declare that in the migration itself with
+`resetBaseline: ['posts']` (see [Reviewed migrations](#reviewed-migrations)). The baseline row is
+deleted in the same transaction as the conversion, and the post-flight sync records the new one.
+Physical checks still run.
 
-```sql
-DELETE FROM "_forge_schema" WHERE "id" = 'posts';
+If the data was already converted by hand, record that with a migration that has no SQL:
+
+```ts
+defineMigration({
+  id: '20260929_002_posts_title_baseline',
+  description: 'posts.title was wrapped into {"en": …} by hand; record the new baseline',
+  destructive: false,
+  statements: [],
+  resetBaseline: ['posts']
+});
 ```
 
-This is a deliberate operator action. Physical checks still run after the reset.
+`DELETE FROM "_forge_schema" WHERE "id" = 'posts'` by hand still works, but it is now an emergency
+escape hatch: it leaves no history.
+
+## Reviewed migrations
+
+A reviewed migration is **data, not code**: an id, a description, a `destructive` flag and an ordered
+list of single SQL statements with bound arguments. There is no `up(db)` callback. This lets libSQL
+and D1 run the whole migration as **one transactional batch**, because D1 has no interactive
+transaction.
+
+```ts
+import { defineMigration } from '@forge-cms/db';
+
+// migrations.ts — append-only. Never edit, reorder or remove an entry that ran anywhere.
+export const migrations = [
+  defineMigration({
+    id: '20260929_001_posts_headline_to_title',
+    description: 'Rename posts.headline to title',
+    destructive: true,
+    statements: [{ sql: 'ALTER TABLE "posts" RENAME COLUMN "headline" TO "title"' }]
+  }),
+  defineMigration({
+    id: '20260929_002_notes_summary',
+    description: 'Add notes.summary and backfill it',
+    destructive: false,
+    statements: [
+      { sql: 'ALTER TABLE "notes" ADD COLUMN "summary" TEXT' },
+      { sql: 'UPDATE "notes" SET "summary" = ? WHERE "summary" IS NULL', args: ['(none)'] }
+    ]
+  })
+];
+```
+
+`defineMigration` validates before anything touches the database:
+
+- **The id** uses `A–Z a–z 0–9 . _ -` and is unique in the list.
+- **The description** is required.
+- **`destructive`** is explicit.
+- **Statements:** at most 40, each exactly one SQL statement with positional `?` placeholders matching
+  `args` (strings, finite numbers, booleans, `null`).
+- **Refused statements:**
+  - transaction control, `VACUUM`, `ATTACH` or `DETACH`;
+  - any reference to `_forge_migrations` or `_forge_schema`;
+  - `destructive: false` on a statement that obviously drops, renames or deletes.
+
+Migration definitions are trusted deployment code. Never build one from request data.
+
+### Running them
+
+The one supported entry point is the runtime, from a deployment or maintenance script. **Never from
+application startup**: `init()` and `syncSchema()` never run migrations.
+
+```ts
+import { formatSchemaPlan, isMigrationError } from '@forge-cms/db';
+import { migrations } from './migrations';
+
+const runtime = createRuntime(env).init(); // your usual runtime factory
+
+// 1. Preflight (read-only): what drifted, and which migrations are pending.
+console.log(formatSchemaPlan(await runtime.planSchema()));
+console.table(await runtime.planMigrations(migrations)); // position, id, checksum, destructive, state
+
+// 2. Run. Destructive migrations need explicit approval, after a backup.
+try {
+  const report = await runtime.runMigrations(migrations, { allowDestructive: true });
+  console.table(report.results); // applied | already-applied | reconciled
+  // 3. Post-flight already ran: syncSchema() for the safe remainder, then planSchema().
+  console.log(formatSchemaPlan(report.after)); // never blocking here
+} catch (err) {
+  if (isMigrationError(err)) console.error(err.code, err.migrationId, err.status, err.message);
+  throw err;
+}
+```
+
+`runMigrations` runs these steps in order:
+
+1. Validates every definition.
+2. `before = planSchema()`.
+3. Runs each pending migration as one batch.
+4. Post-flight: `syncSchema()` applies whatever safe additive work remains (e.g. the unique index a
+   migration made possible) and records baselines.
+5. `after = planSchema()` must not block.
+
+`runtime.readMigrationHistory()` returns the ledger: position, id, checksum, status, timestamps,
+attempts and failure code.
+
+### What one migration commits
+
+```text
+one transactional batch (libSQL client.batch(…, 'write'), D1 batch())
+  1. guard: the ledger is exactly the prefix this runner planned against
+  2. claim: INSERT the ledger row (id primary key, unique position), status "running"
+  3. DELETE the resetBaseline rows from _forge_schema (if declared)
+  4. your statements, in order
+  5. mark the row "applied" (finished_at = database clock)
+```
+
+All of it commits or none of it does. A `running` row is never committed.
+
+### The ledger `_forge_migrations`
+
+| Column                     | Meaning                                                                   |
+| -------------------------- | ------------------------------------------------------------------------- |
+| `id` (primary key)         | migration id                                                              |
+| `position` (unique)        | 1 + index in your array; the history is an exact prefix of the array      |
+| `checksum`                 | SHA-256 (lowercase hex) of the canonical definition                       |
+| `status`                   | `applied` or `failed`                                                     |
+| `started_at`/`finished_at` | runner clock at the latest attempt / database clock at commit             |
+| `attempts`, `failure_code` | attempts recorded; error class/code of the last failure (e.g. `D1_ERROR`) |
+
+No SQL text, argument or error message is stored. The ledger is created through the same M01
+planner. Creating it touches nothing else, so it works while your tables are blocked by drift.
+
+**Checksum.** It covers the id, the `destructive` flag, the sorted `resetBaseline`, and every
+statement's SQL byte for byte with type-tagged args (`'1'`, `1` and `true` differ). It excludes the
+description, dates, paths and host names. Reformatting the SQL of a migration that ran is an edit.
+
+### History rules
+
+- The array is **append-only**. Before anything runs, the ledger must be an exact prefix of it.
+- Applied migrations are skipped (`already-applied`).
+- An applied migration whose checksum changed → `MIGRATION_CHECKSUM_MISMATCH`. Write a new migration
+  instead.
+- A missing, reordered or different migration at a recorded position → `MIGRATION_HISTORY_MISMATCH`.
+
+### Concurrency
+
+Two deploy processes can race. The claim is unique by id and by position, inside the same batch as
+the SQL, so the database lets only one of them commit a position:
+
+- Same migration: the winner reports `applied` and the loser `reconciled`. The SQL ran once.
+- Different migrations at the same position: the loser fails closed with
+  `MIGRATION_HISTORY_MISMATCH` and none of its SQL runs.
+
+Proven with independent clients/adapter instances and a deterministic barrier on on-disk libSQL and
+local D1.
+
+## Operator guide
+
+### Fresh install
+
+`await runtime.syncSchema()`. Nothing else.
+
+### Safe additive upgrade
+
+`planSchema()` to look (optional), then `syncSchema()`.
+
+### Blocking upgrade (reviewed migration)
+
+1. Back up the database under your deployment policy. ForgeCMS cannot verify a backup; backup and
+   restore rehearsal is roadmap M03.
+2. Deploy nothing yet. Run `planSchema()` with the **new** configuration and read the blocking changes.
+3. Write the migration and review it. Mark it `destructive: true` if it drops, renames, rewrites or
+   deletes.
+4. From the deploy script: `runMigrations(migrations, { allowDestructive: true })`. Its post-flight
+   runs `syncSchema()` and verifies the plan no longer blocks.
+5. Deploy the application.
+
+### When a migration fails
+
+| Error `code` / `status`                                      | What it means                                                                                                                                 | What to do                                                                                                                                                                     |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `MIGRATION_EXECUTION_FAILED` / `failed`                      | The batch failed and **rolled back**, proven: the attempt is recorded as `failed`, which also blocks a late copy of the batch from committing | Fix the cause (data, missing table). Rerun with `retryFailed: '<id>'` (same definition) or `replaceFailed: '<id>'` (corrected definition)                                      |
+| `MIGRATION_RETRY_REQUIRED` / `failed`                        | A failed attempt is recorded; it is never retried automatically                                                                               | As above                                                                                                                                                                       |
+| `reconciled` result (not an error)                           | The batch's response was lost or another runner won, and the ledger proves it **applied**                                                     | Nothing                                                                                                                                                                        |
+| `MIGRATION_OUTCOME_UNKNOWN` / `unknown`                      | The database could not be reached to prove the outcome. Nothing was retried                                                                   | When reachable, inspect `readMigrationHistory()`, then run again. It skips an applied migration and runs one that never committed; a batch still in flight cannot commit twice |
+| `MIGRATION_POSTFLIGHT_FAILED` / `applied`                    | The migrations **committed** (not rolled back), but the schema still does not match                                                           | Read `err.plan`. Forward-fix with a new migration (e.g. a `resetBaseline`-only one), or restore a backup                                                                       |
+| `MIGRATION_REVIEW_REQUIRED`                                  | A pending migration is destructive; nothing ran                                                                                               | Back up, review, pass `allowDestructive: true`                                                                                                                                 |
+| `MIGRATION_CHECKSUM_MISMATCH` / `MIGRATION_HISTORY_MISMATCH` | Your array does not extend the recorded history; nothing ran                                                                                  | Restore the migration as it ran; put new work in a new migration                                                                                                               |
+
+A recorded failed migration keeps its checksum. A corrected version runs only with `replaceFailed`.
+That is safe because a recorded failure is proven never to have committed.
+
+### A migration committed but was wrong
+
+There are **no down migrations**. Some transformations cannot be reversed. Two options:
+
+- write a **forward-fix** migration, or
+- **restore a backup**.
+
+Deploying the previous application code does **not** roll the database back; it only runs old code
+against new data.
 
 ## Internal tables
 
@@ -168,10 +363,30 @@ Duplicate version identities keep their dedicated report (spec 062). Auth column
 `_sessionVersion`) are part of your users collection (`withAuthFields`). A users table from before
 `_sessionVersion` existed gains it automatically as an optional column.
 
+`_forge_migrations` is owned by the migration runner, not by `runtime.syncSchema()`. The runner
+creates and plans it on every run, and refuses to trust it if its own schema drifted. Migration SQL
+may not reference it or `_forge_schema`.
+
 ## Limits of this version
 
-- No automatic `DROP`, rename, retype, rebuild, conversion or backfill. Those are M02's reviewed
-  migrations.
+- `syncSchema()` never drops, renames, retypes, rebuilds, converts or backfills. Reviewed migrations
+  do, when you write them.
+- No down/rollback migrations, no CLI, no migration file discovery: the array in your code is the
+  history.
+- Migrations run on the runtime's `database` adapter. An auth adapter on a separate database is not
+  migrated.
+- libSQL and D1 only. `InMemoryDatabaseAdapter` and custom adapters without `runMigrations()` report
+  `MIGRATION_UNSUPPORTED`.
+- Evidence is on-disk libSQL and local D1 (workerd). Remote D1 and Turso behave per their documented
+  batch semantics but are not exercised by the test suite.
+- At most 40 statements per migration, 100 args per statement. The runner adds up to 7 statements
+  of its own to each batch.
+- On D1, `runMigrations()` runs inside one Worker invocation. It plans the schema before and after
+  (several reads per table) and sends one batch per migration. On the Workers free plan (50 queries
+  per invocation) run few migrations per invocation. If a limit is hit mid-run, the error is typed
+  (`MIGRATION_OUTCOME_UNKNOWN` or `MIGRATION_POSTFLIGHT_FAILED`) and a rerun continues safely.
+- Each statement is exactly one SQL statement, so `CREATE TRIGGER … BEGIN …; END` cannot be
+  expressed yet.
 - Tables of collections you removed from the config are not reported.
 - Validation-only options (select `options`, `minLength`, access rules, hooks, labels) are not
   tracked. Existing values are not re-validated when they change.

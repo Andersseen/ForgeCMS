@@ -58,7 +58,7 @@ test('the mobile header exposes navigation behind a hamburger', async ({ page })
   await expect(nav.getByRole('link', { name: 'Docs' })).toBeVisible();
 });
 
-test('the schema-upgrades page is in the sidebar and says what is not available yet', async ({
+test('the schema-upgrades page is in the sidebar and states availability and limits honestly', async ({
   page
 }) => {
   await page.goto('/docs/introduction');
@@ -68,6 +68,8 @@ test('the schema-upgrades page is in the sidebar and says what is not available 
   const prose = page.locator('.forge-prose');
   await expect(prose).toContainText('planSchema');
   await expect(prose).toContainText('SchemaDriftError');
-  await expect(prose).toContainText('does not exist yet');
-  await expect(prose).toContainText('first release after');
+  await expect(prose).toContainText('runMigrations');
+  await expect(prose).toContainText('next patch release');
+  await expect(prose).toContainText('No down migrations');
+  await expect(prose).toContainText('never at application startup');
 });

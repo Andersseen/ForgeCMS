@@ -87,3 +87,11 @@ export {
   type SchemaDriftHarness,
   type SchemaDriftPlanLike
 } from './schema-drift.js';
+export {
+  runMigrationContractTests,
+  type MigrationBatchHook,
+  type MigrationContractHarness,
+  type MigrationContractHarnessFactory,
+  type MigrationContractRuntime,
+  type MigrationLike
+} from './migrations.js';

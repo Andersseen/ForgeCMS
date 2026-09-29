@@ -7,11 +7,24 @@ import type {
   CollectionSlug,
   GlobalDefinition
 } from '@forge-cms/core';
-import type { DatabaseRecord, SchemaChange, SchemaPlan } from '@forge-cms/db';
+import type {
+  DatabaseRecord,
+  MigrationDefinition,
+  MigrationRecord,
+  MigrationRunResult,
+  MigrationState,
+  RunMigrationsOptions,
+  SchemaChange,
+  SchemaPlan
+} from '@forge-cms/db';
 import {
+  MigrationError,
   SchemaDriftError,
   formatSchemaPlan,
+  isSchemaDriftError,
   mergeSchemaPlans,
+  planMigrationHistory,
+  prepareMigrations,
   resolveCollectionIndexes
 } from '@forge-cms/db';
 import type { OperationContext } from './context.js';
@@ -58,6 +71,16 @@ import type {
   CreateVersionArgs
 } from './versions.js';
 import type { Version } from '@forge-cms/core';
+
+/** What {@link ForgeCmsRuntime.runMigrations} did (spec 072). */
+export interface MigrationReport {
+  /** The drift plan before any migration ran: what the migrations were meant to resolve. */
+  before: SchemaPlan;
+  /** One entry per migration in the list, in order. */
+  results: MigrationRunResult[];
+  /** The plan after the post-flight `syncSchema()`: never blocking when this resolves. */
+  after: SchemaPlan;
+}
 
 /**
  * The CMS instance: collections bound to adapters, plus the **Local API** — `find`, `findByID`,
@@ -214,6 +237,97 @@ export class ForgeCmsRuntime<
     const auth = await this.adapters.auth.planSchema?.();
     if (auth) plans.push(auth);
     return mergeSchemaPlans(plans);
+  }
+
+  /**
+   * Runs reviewed migrations (spec 072) — the one supported way to apply changes `syncSchema()` refuses.
+   * An explicit deployment/maintenance step: `init()` and `syncSchema()` never call it.
+   *
+   * 1. Validates every definition (no I/O).
+   * 2. Preflight: `before = planSchema()`, the drift the migrations are meant to resolve.
+   * 3. The database adapter runs each pending migration as one transactional batch together with its
+   *    `_forge_migrations` ledger entry (`DatabaseAdapter.runMigrations`).
+   * 4. Post-flight: `syncSchema()` applies the safe remainder and records baselines, then
+   *    `after = planSchema()` must not block.
+   *
+   * Throws `MigrationError`. A post-flight failure (`MIGRATION_POSTFLIGHT_FAILED`) means the migrations
+   * **committed** and were not rolled back: inspect, then forward-fix or restore a backup.
+   */
+  async runMigrations(
+    migrations: readonly MigrationDefinition[],
+    options: RunMigrationsOptions = {}
+  ): Promise<MigrationReport> {
+    await prepareMigrations(migrations);
+    const database = this.adapters.database;
+    if (typeof database.runMigrations !== 'function') throw this.migrationsUnsupported();
+    const before = await this.planSchema();
+    const results = await database.runMigrations(migrations, options);
+
+    const committed = results.filter((r) => r.outcome !== 'already-applied');
+    const postflight = (plan: SchemaPlan | undefined, cause?: unknown) =>
+      new MigrationError(
+        {
+          code: 'MIGRATION_POSTFLIGHT_FAILED',
+          phase: 'postflight',
+          status: committed.length > 0 ? 'applied' : 'not-applied',
+          results,
+          ...(plan !== undefined && { plan }),
+          message:
+            (committed.length > 0
+              ? `${committed.length} migration(s) committed (${committed.map((r) => `"${r.id}"`).join(', ')}) ` +
+                'and were NOT rolled back, but '
+              : 'No migration was pending, and ') +
+            'the schema still does not match this configuration. Inspect the plan, then forward-fix with ' +
+            'a new migration or restore a backup. Deploying older application code does not revert the ' +
+            'database.' +
+            (plan !== undefined ? `\n\n${formatSchemaPlan(plan)}` : '')
+        },
+        cause !== undefined ? { cause } : undefined
+      );
+
+    try {
+      await this.syncSchema();
+    } catch (err) {
+      throw postflight(isSchemaDriftError(err) ? err.plan : undefined, err);
+    }
+    let after: SchemaPlan;
+    try {
+      after = await this.planSchema();
+    } catch (err) {
+      throw postflight(undefined, err);
+    }
+    if (after.blocking) throw postflight(after);
+    return { before, results, after };
+  }
+
+  /**
+   * Read-only preflight (spec 072): validates `migrations` against the `_forge_migrations` ledger and
+   * reports each one as `applied`, `failed` or `pending`. Throws the same history/checksum
+   * `MigrationError`s `runMigrations` would, before anything runs.
+   */
+  async planMigrations(migrations: readonly MigrationDefinition[]): Promise<MigrationState[]> {
+    const prepared = await prepareMigrations(migrations);
+    const history = await this.readMigrationHistory();
+    return planMigrationHistory(history, prepared).states;
+  }
+
+  /** The `_forge_migrations` ledger in position order (spec 072); `[]` when no migration ran. */
+  async readMigrationHistory(): Promise<MigrationRecord[]> {
+    const database = this.adapters.database;
+    if (typeof database.readMigrationHistory !== 'function') throw this.migrationsUnsupported();
+    return database.readMigrationHistory();
+  }
+
+  private migrationsUnsupported(): MigrationError {
+    return new MigrationError({
+      code: 'MIGRATION_UNSUPPORTED',
+      phase: 'preflight',
+      status: 'not-applied',
+      message:
+        `The '${this.adapters.database.name}' database adapter cannot run reviewed migrations: it does ` +
+        'not implement DatabaseAdapter.runMigrations()/readMigrationHistory() (spec 072). Use ' +
+        'LibSqlDatabaseAdapter or D1DatabaseAdapter; InMemoryDatabaseAdapter persists nothing to migrate.'
+    });
   }
 
   /** Every table definition this runtime syncs through its database adapter. */

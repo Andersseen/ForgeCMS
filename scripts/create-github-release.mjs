@@ -1,6 +1,8 @@
 #!/usr/bin/env node
+import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { decideAggregateRelease } from './release-decision.mjs';
 
 const dryRun = process.argv.includes('--dry-run');
 const packageNamePattern = /^@forge-cms\/[a-z0-9-]+$/;
@@ -18,6 +20,32 @@ function readPublicPackages() {
     })
     .filter((pkg) => !pkg.private)
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * The public packages as they were at HEAD's first parent (`HEAD^1`), or `null` when that commit cannot
+ * be read — e.g. a depth-1 checkout. The CI release job checks out with `fetch-depth: 2`.
+ */
+function readFirstParentPackages() {
+  const packages = [];
+  for (const directory of readdirSync('packages')) {
+    const result = spawnSync('git', ['show', `HEAD^1:packages/${directory}/package.json`], {
+      encoding: 'utf8'
+    });
+    if (result.status !== 0) {
+      // A package directory that did not exist at the parent is a new package, not an unreadable parent.
+      const parent = spawnSync('git', ['rev-parse', '--verify', '--quiet', 'HEAD^1'], {
+        encoding: 'utf8'
+      });
+      if (parent.status !== 0) return null;
+      continue;
+    }
+    const packageJson = JSON.parse(result.stdout);
+    if (packageJson.private !== true) {
+      packages.push({ name: packageJson.name, version: packageJson.version });
+    }
+  }
+  return packages;
 }
 
 async function githubFetch(path, options = {}) {
@@ -69,18 +97,14 @@ for (const pkg of packages) {
   }
 }
 
-const versions = new Set(packages.map((pkg) => pkg.version));
-
-if (versions.size !== 1) {
-  const summary = packages.map((pkg) => `${pkg.name}@${pkg.version}`).join(', ');
-  throw new Error(`Expected all public packages to share one fixed version. Found: ${summary}`);
+// Only the commit that introduced this version may carry `vX.Y.Z` (spec 072 §9).
+const decision = decideAggregateRelease({ head: packages, base: readFirstParentPackages() });
+console.log(`Aggregate release decision: ${decision.reason}`);
+if (!decision.create) {
+  process.exit(0);
 }
 
-const version = packages[0]?.version;
-
-if (!version) {
-  throw new Error('Could not determine package version.');
-}
+const version = decision.version;
 
 const tagName = `v${version}`;
 const targetCommitish = process.env.GITHUB_SHA;

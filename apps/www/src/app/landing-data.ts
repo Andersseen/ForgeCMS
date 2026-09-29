@@ -2,7 +2,7 @@ import { CURRENT_FORGE_VERSION, FORGE_PACKAGES } from './forge-release';
 
 /**
  * What already works, in the order a first-time visitor cares about. Nothing here is planned work;
- * one card (schema-drift safety) is on `main` and says it arrives in the next release.
+ * the schema card's reviewed migrations are on `main` and it says they ship in the next patch release.
  */
 export const features = [
   {
@@ -38,7 +38,7 @@ export const features = [
   {
     title: 'Schema-drift safety',
     description:
-      'Schema sync plans before it writes. It applies safe additive changes and refuses drift that needs a migration. Arrives in the release after 0.7.0.'
+      'Schema sync plans before it writes. It applies safe additive changes and refuses drift that needs a migration. Reviewed migrations (next patch release) run once, atomically, with a durable history.'
   },
   {
     title: 'Real consumer fixtures',
@@ -95,8 +95,8 @@ export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
     status: 'in-progress',
     steps: [
       { title: 'Schema drift detection', status: 'complete' },
-      { title: 'Reviewed migrations', status: 'next' },
-      { title: 'Backup and restore', status: 'pending' }
+      { title: 'Reviewed migrations', status: 'complete' },
+      { title: 'Backup and restore', status: 'next' }
     ]
   },
   { version: '0.8', title: 'Angular client and DX', status: 'planned' },

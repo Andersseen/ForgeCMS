@@ -48,6 +48,11 @@ To activate D1 later:
 3. Call `runtime.syncSchema()` on startup. It creates the tables, applies safe additive changes and
    refuses any change that needs a reviewed migration (`SchemaDriftError`, nothing executed; spec
    070). See [docs/SCHEMA-UPGRADES.md](../../docs/SCHEMA-UPGRADES.md).
+4. Apply refused changes with reviewed migrations (spec 072), from a deploy or maintenance script and
+   **never at Worker startup**: `runtime.runMigrations(migrations, options)`. `D1DatabaseAdapter` runs
+   each migration as one D1 `batch()` (a transaction that rolls back entirely on a failing statement),
+   together with its `_forge_migrations` ledger entry. There is no interactive `BEGIN`/`COMMIT`. Back
+   up the database before a destructive migration. The evidence is local D1 (workerd), not remote D1.
 
 ### 2. R2 Storage
 
@@ -81,7 +86,8 @@ bucket_name = "forge-cms-media"
 
 ## Local development
 
-For local development use `LibSqlDatabaseAdapter` from `@forge-cms/db` with a SQLite file. It shares the same schema generator, so migration to D1 is seamless.
+For local development use `LibSqlDatabaseAdapter` from `@forge-cms/db` with a SQLite file. It shares the same schema generator, drift planner and migration engine, so the same reviewed
+migrations run on both.
 
 ## Forge Analytics (experimental)
 

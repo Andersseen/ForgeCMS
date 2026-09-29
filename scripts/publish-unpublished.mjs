@@ -2,6 +2,7 @@
 import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { isAlreadyPublishedError } from './release-decision.mjs';
 
 const dryRun = process.argv.includes('--dry-run');
 const packageNamePattern = /^@forge-cms\/[a-z0-9-]+$/;
@@ -61,11 +62,27 @@ for (const pkg of packages) {
     continue;
   } else {
     console.log(`Publishing ${specifier}`);
-    const publishResult = run(
-      'pnpm',
-      ['--filter', pkg.name, 'publish', '--access', 'public', '--no-git-checks', '--provenance'],
-      { stdio: 'inherit' }
-    );
+    const publishResult = run('pnpm', [
+      '--filter',
+      pkg.name,
+      'publish',
+      '--access',
+      'public',
+      '--no-git-checks',
+      '--provenance'
+    ]);
+    process.stdout.write(publishResult.stdout ?? '');
+    process.stderr.write(publishResult.stderr ?? '');
+    // Right after `changeset publish`, `npm view` can still answer 404 while a second publish is refused
+    // (E409 "previously staged"). That is "already published", not a failure: failing here skipped the
+    // GitHub release step of the 0.6.0 and 0.7.0 runs (spec 072 §9).
+    if (
+      publishResult.status !== 0 &&
+      isAlreadyPublishedError(`${publishResult.stdout}\n${publishResult.stderr}`)
+    ) {
+      console.log(`${specifier} already published (registry had not caught up yet)`);
+      continue;
+    }
     assertOk(publishResult, `publish ${specifier}`);
   }
 }

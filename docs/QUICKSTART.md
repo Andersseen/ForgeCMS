@@ -134,7 +134,7 @@ via Web `Request`, and Cloudflare Workers can all call the same handlers.
 registered collections and globals.
 
 For the built-in SQLite-style adapters (libSQL, D1), it **plans before it changes anything**
-(spec 070 — on `main`; npm `0.7.0` predates it and only creates tables and adds columns):
+(spec 070, since npm `0.8.0`; `0.7.0` and older only create tables and add columns):
 
 - A fresh database: every table and index is created.
 - New optional fields, new collections and new indexes: applied automatically, in one transaction.
@@ -144,9 +144,11 @@ For the built-in SQLite-style adapters (libSQL, D1), it **plans before it change
   new required field on a table with rows, `unique` added over duplicate rows.
 - Renames are never guessed.
 
-`runtime.planSchema()` returns the same plan read-only. It is useful in a deploy check. There is no
-migration runner yet. See [SCHEMA-UPGRADES.md](SCHEMA-UPGRADES.md) for the full classification and
-how to migrate by hand.
+`runtime.planSchema()` returns the same plan read-only. It is useful in a deploy check. The refused
+changes are applied with reviewed migrations: `runtime.runMigrations(migrations)` from a deploy
+script, never at startup (spec 072, on `main`, next patch release). See
+[SCHEMA-UPGRADES.md](SCHEMA-UPGRADES.md) for the full classification, the migration format and the
+operator guide.
 
 ## Angular and admin packages
 

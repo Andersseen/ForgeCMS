@@ -19,6 +19,13 @@ import { toUniqueConstraintError } from './constraint-error.js';
 import type { SchemaPlan } from './schema-plan.js';
 import { planSqliteSchema, syncSqliteSchema } from './sqlite-schema.js';
 import type { SqliteSchemaExecutor } from './sqlite-schema.js';
+import type {
+  MigrationDefinition,
+  MigrationRecord,
+  MigrationRunResult,
+  RunMigrationsOptions
+} from './migrations.js';
+import { readSqliteMigrationHistory, runSqliteMigrations } from './sqlite-migrations.js';
 import { assertValidWriteCondition } from './write-condition.js';
 import {
   ATOMIC_WRITE_REQUIRE_APPLIED_SQL,
@@ -119,6 +126,18 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
 
   planSchema(collections: CollectionDefinition[]): Promise<SchemaPlan> {
     return planSqliteSchema(this.schemaExecutor(), collections);
+  }
+
+  /** Reviewed migrations (spec 072): the shared SQLite engine over this adapter's executor. */
+  runMigrations(
+    migrations: readonly MigrationDefinition[],
+    options?: RunMigrationsOptions
+  ): Promise<MigrationRunResult[]> {
+    return runSqliteMigrations(this.schemaExecutor(), migrations, options);
+  }
+
+  readMigrationHistory(): Promise<MigrationRecord[]> {
+    return readSqliteMigrationHistory(this.schemaExecutor());
   }
 
   /** Schema reads through `execute`, schema writes through libSQL's transactional `batch(…, 'write')`. */
