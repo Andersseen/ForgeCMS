@@ -39,6 +39,7 @@
   "InvalidQueryError",
   "ListVersionsArgs",
   "MAX_LIMIT",
+  "MigrationReport",
   "NotFoundError",
   "OperationContext",
   "PaginatedDocs",

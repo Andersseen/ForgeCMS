@@ -1,12 +1,23 @@
 # ROADMAP — A small, dependable ForgeCMS 1.0
 
-> **Current status (2026-09-28, spec 071):** npm family **`0.7.0`**, which contains specs through 069 —
-> **roadmap 0.6 complete**. **Roadmap 0.7 in progress:** M01 (drift detection, spec 070) is merged on
-> `main` but **not yet published**; M02 (reviewed migrations) is next; M03 (backup/restore) is pending.
-> Release numbers in the table below are **product checkpoints, not npm versions**: npm `0.7.0` does
-> not mean roadmap 0.7 is done. The pending M01 changeset is `minor`, so the open Version Packages PR
-> would publish it as npm `0.8.0`. Whether to ship it as `0.7.1` instead is a maintainer decision
-> recorded in STATE.md.
+> **Current status (2026-09-29, spec 072):** npm family **`0.8.0`**: specs through 071, i.e.
+> **roadmap 0.6 complete** plus M01. **Roadmap 0.7 in progress:** M01 (drift detection, spec 070)
+> shipped in `0.8.0`; M02 (reviewed migrations, spec 072) is done on `main` and ships as `0.8.1`;
+> M03 (backup/restore) is next.
+>
+> **Version policy (maintainer decision, 2026-09-29).** Release numbers in the table below are
+> **product checkpoints, not npm versions**. M01 was published as npm `0.8.0` before the numbering
+> was settled, and npm never reuses a version, so from here on npm minors are one ahead of the
+> roadmap label:
+>
+> | npm        | Roadmap checkpoint                                                |
+> | ---------- | ----------------------------------------------------------------- |
+> | `0.8.x`    | 0.7 upgrade safety (M01 = `0.8.0`; M02, M03 as patches)           |
+> | `0.9.0`    | 0.8 Angular client/DX (its first minor)                           |
+> | `0.10.0` … | 0.9 SSR, then each later checkpoint on the next minor (one ahead) |
+>
+> The remaining upgrade-safety work ships as `patch` changesets. Do not use a `minor` changeset until
+> the Angular DX work starts.
 >
 > Original baseline (2026-09-07): `main` `28ff76c`, GitHub release v0.4.0, manifests 0.4.0, latest
 > spec 056. Status: **proposed delivery plan; not implementation or publication authorization**.
@@ -80,6 +91,14 @@
 > consolidation pass between M01 and M02, **not a packet**: release/version truth, website and docs
 > refresh, the demo re-dogfooded against 0.7, three admin package fixes found by that, and Strata
 > single-document reads in tiny-project. Sequencing is unchanged; **M02 remains the next step.**
+>
+> **2026-09-29 update:** [spec 072](specs/072-reviewed-migration-execution.md) completes **M02**.
+> Reviewed migrations are declarative data (`defineMigration`). Each one commits as one
+> libSQL/D1 transactional batch together with its `_forge_migrations` ledger entry. The ledger
+> enforces checksums and an append-only order. Concurrent runners are safe, known/unknown failure
+> outcomes are distinguished, and `runtime.runMigrations()` runs a `planSchema`/`syncSchema`
+> preflight and post-flight. The same spec fixes aggregate GitHub release tagging (tags only the commit that
+> introduced a version) and records the npm/roadmap offset above. Next: **M03**.
 
 ## Product direction
 

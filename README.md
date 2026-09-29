@@ -19,7 +19,7 @@
 ---
 
 > [!WARNING]
-> ForgeCMS is pre-1.0 (npm `0.7.0`). The fundamentals — schema DSL, Local API, HTTP handlers, access
+> ForgeCMS is pre-1.0 (npm `0.8.0`). The fundamentals — schema DSL, Local API, HTTP handlers, access
 > control, hooks, drafts, versions, globals, live preview, localization, relations, and a reusable
 > Angular admin — are usable and exercised by real consumer apps in this repo, but API stability is
 > not guaranteed before `1.0`. See [docs/STATE.md](docs/STATE.md) for exactly what is implemented and
@@ -109,11 +109,12 @@ Verified from packed npm artifacts (`pnpm release:verify`) and real consumer app
   host app's own routes — not a skeleton, and not a redesign target
 - adapter contract tests through `@forge-cms/testing/contracts`
 
-On `main`, not yet in an npm release: schema drift detection (`runtime.planSchema()`, and a
-`syncSchema()` that refuses unsafe drift instead of half-applying it) — see
-[docs/SCHEMA-UPGRADES.md](docs/SCHEMA-UPGRADES.md).
+Since `0.8.0`: schema drift detection (`runtime.planSchema()`, and a `syncSchema()` that refuses
+unsafe drift instead of half-applying it). On `main`, in the next patch release: reviewed migrations
+(`runtime.runMigrations()`), which apply that drift exactly once, atomically, with a durable history.
+See [docs/SCHEMA-UPGRADES.md](docs/SCHEMA-UPGRADES.md).
 
-Not yet delivered pre-1.0: reviewed migration execution and backup/restore (roadmap 0.7 M02/M03), a
+Not yet delivered pre-1.0: backup/restore rehearsal (roadmap 0.7 M03), a
 portable (S3-compatible) storage adapter, and production SSR for the Angular/Analog client — see
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -126,14 +127,15 @@ source in [`apps/demo-aesthetics`](apps/demo-aesthetics)) and the docs at
 Two separate numbering schemes:
 
 - **npm versions.** The ten public packages are one fixed Changesets group; they always share a
-  version. The current release is **`0.7.0`**, which contains everything through roadmap 0.6 (auth
-  and data integrity).
+  version. The current release is **`0.8.0`**: everything through roadmap 0.6 plus M01 drift
+  detection. **npm `0.8.x` is the roadmap 0.7 (upgrade safety) line**: M02 and M03 ship as `0.8.x`
+  patches.
 - **Roadmap checkpoints** ([docs/ROADMAP.md](docs/ROADMAP.md)) are product guarantees. **0.6 is
-  complete. 0.7 (upgrade safety) is in progress:** M01 drift detection is done on `main`, M02
-  reviewed migrations is next, M03 backup/restore is pending.
+  complete. 0.7 (upgrade safety) is in progress:** M01 drift detection shipped in `0.8.0`, M02
+  reviewed migrations is done on `main`, M03 backup/restore is next.
 
-A package version does not certify a roadmap checkpoint: `0.7.0` on npm does not mean roadmap 0.7 is
-done.
+A package version does not certify a roadmap checkpoint, and since `0.8.0` the numbers are offset by
+one: roadmap 0.8 (Angular client/DX) will publish as npm `0.9.0`.
 
 ## Packages
 
@@ -152,17 +154,17 @@ All public packages are versioned together.
 | [`@forge-cms/admin`](packages/admin)           | Reusable Angular admin components (content, users, auth)            |
 | [`@forge-cms/testing`](packages/testing)       | Adapter contract test suites                                        |
 
-They share one version (currently `0.7.0` on npm); see each package's `CHANGELOG.md` for what
+They share one version (currently `0.8.0` on npm); see each package's `CHANGELOG.md` for what
 changed.
 
 ## Schema Synchronization
 
 `runtime.syncSchema()` creates missing tables and adds missing columns; it never drops, renames,
-retypes or backfills data. In `0.7.0` that is all it does. On `main` (next release) it first **plans**:
-safe additive changes run in one transaction, and anything that needs a data migration throws
-`SchemaDriftError` with nothing executed. `runtime.planSchema()` shows the plan without changing
-anything. There is no migration runner yet (roadmap 0.7 M02). See
-[docs/SCHEMA-UPGRADES.md](docs/SCHEMA-UPGRADES.md).
+retypes or backfills data. Since `0.8.0` it first **plans**: safe additive changes run in one
+transaction, and anything that needs a data migration throws `SchemaDriftError` with nothing
+executed. `runtime.planSchema()` shows the plan without changing anything. The refused changes are
+applied by reviewed migrations, `runtime.runMigrations(migrations)`, run from a deploy script and
+never at startup (on `main`, next patch release). See [docs/SCHEMA-UPGRADES.md](docs/SCHEMA-UPGRADES.md).
 
 ## Strata
 

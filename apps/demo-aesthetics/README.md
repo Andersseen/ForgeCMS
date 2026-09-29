@@ -112,16 +112,17 @@ everything between cold starts.
 - **Safe additive changes** (a new optional field, a new collection, a new index) are applied on the
   next cold start, in one transaction.
 - **Anything else** — a removed or renamed field, a type change, a new required field on a table with
-  rows — makes `syncSchema()` throw `SchemaDriftError` (from the first release after `0.7.0`; M01 is
-  on `main`). The Worker then answers 500 on every API route rather than serving a half-matching
+  rows — makes `syncSchema()` throw `SchemaDriftError` (since `0.8.0`). The Worker then answers 500 on every API route rather than serving a half-matching
   schema. Run `runtime.planSchema()` against the production D1 before deploying such a change; see
   [docs/SCHEMA-UPGRADES.md](../../docs/SCHEMA-UPGRADES.md).
-- There is no migration runner yet. Reviewed migrations are roadmap 0.7 M02.
+- Such a change is applied with a reviewed migration (`runtime.runMigrations()`, spec 072), run from
+  a deploy/maintenance script against a backed-up database, never at Worker startup.
 
 That is also why clinic settings are still a one-row `site_settings` **collection** rather than a
 global (finding 4). A global is a new `_global_site_settings` table: sync would create it safely, but
-empty, while the edited settings stay in the old table. Moving that row is a data migration, which
-belongs to M02, not a code change.
+empty, while the edited settings stay in the old table. Moving that row is a data migration. The
+mechanism exists since spec 072 (M02), but running it against the deployed D1 is a production
+operation that needs a backup first, so it has not been done; backup/restore rehearsal is M03.
 
 The production secret matters too: since spec 069, a build without an `AUTH_SECRET` of at least 32
 bytes refuses to start.

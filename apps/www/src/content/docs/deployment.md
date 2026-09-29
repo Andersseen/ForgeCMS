@@ -79,10 +79,11 @@ Two rules that are not optional on Workers:
    duplicates rows on every cold start.
 
 On a fresh D1 database no migration step is needed: `syncSchema()` creates every table on the first
-request. On a database that already has rows, it applies only safe additive changes and (from the first
-release after `0.7.0`) refuses drift that needs a data migration. The runtime then fails to start instead of serving a half-matching
-schema. Check a deployed database with `runtime.planSchema()` before you deploy a schema change. See
-[Schema upgrades](/docs/schema-upgrades).
+request. On a database that already has rows, it applies only safe additive changes and (since `0.8.0`)
+refuses drift that needs a data migration. The runtime then fails to start instead of serving a
+half-matching schema. Check a deployed database with `runtime.planSchema()` before you deploy a schema
+change. A blocking change is applied with `runtime.runMigrations()` from a deploy script (never at
+Worker startup), after a backup. See [Schema upgrades](/docs/schema-upgrades).
 
 ## 5. Deploy
 

@@ -8,6 +8,10 @@ import type {
   DatabaseRecord,
   DatabaseWhere,
   FindManyOptions,
+  MigrationDefinition,
+  MigrationRecord,
+  MigrationRunResult,
+  RunMigrationsOptions,
   SchemaPlan,
   SqliteSchemaExecutor,
   WriteCondition
@@ -21,6 +25,8 @@ import {
   toAtomicWriteError,
   planSqliteSchema,
   syncSqliteSchema,
+  readSqliteMigrationHistory,
+  runSqliteMigrations,
   toDbValue,
   encodeFieldValue,
   decodeFieldValue,
@@ -94,6 +100,18 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
 
   planSchema(collections: CollectionDefinition[]): Promise<SchemaPlan> {
     return planSqliteSchema(this.schemaExecutor(), collections);
+  }
+
+  /** Reviewed migrations (spec 072): the shared SQLite engine; each migration is one D1 `batch()`. */
+  runMigrations(
+    migrations: readonly MigrationDefinition[],
+    options?: RunMigrationsOptions
+  ): Promise<MigrationRunResult[]> {
+    return runSqliteMigrations(this.schemaExecutor(), migrations, options);
+  }
+
+  readMigrationHistory(): Promise<MigrationRecord[]> {
+    return readSqliteMigrationHistory(this.schemaExecutor());
   }
 
   /** Schema reads through prepared statements, schema writes through D1's transactional `batch()`. */

@@ -15,7 +15,8 @@
 Entry point for agents: [/CLAUDE.md](../CLAUDE.md) (also referenced by [/AGENTS.md](../AGENTS.md)).
 
 The active delivery plan is [ROADMAP.md](ROADMAP.md): bounded product checkpoints (0.5 → 0.12) to
-1.0 — separate from npm versions (the package family is `0.7.0`; roadmap 0.6 is complete and 0.7 is
-in progress), with a [repository assessment](roadmap/v1/AUDIT.md), [execution handbook](roadmap/v1/EXECUTION.md),
+1.0 — separate from npm versions (the package family is `0.8.0`; npm `0.8.x` is the roadmap 0.7
+upgrade-safety line, and roadmap 0.8 will publish as `0.9.0`; roadmap 0.6 is complete and 0.7 is in
+progress), with a [repository assessment](roadmap/v1/AUDIT.md), [execution handbook](roadmap/v1/EXECUTION.md),
 [quality contract](roadmap/v1/QUALITY.md) and individual release briefs. The previous roadmap is
 [archived](ROADMAP-LEGACY.md); historical specs remain the record of earlier implementation decisions.

@@ -5,17 +5,19 @@ group: Client & deploy
 order: 5
 ---
 
-> **Availability.** Drift detection (`planSchema()`, `SchemaDriftError`) is merged on `main` and ships
-> in the first release after `0.7.0`. With `@forge-cms/*@0.7.0`, `syncSchema()` is additive only: it
-> creates tables and adds columns, and it does **not** detect or refuse the changes below.
+> **Availability.** Drift detection (`planSchema()`, `SchemaDriftError`) ships in `@forge-cms/*@0.8.0`.
+> Reviewed migrations (`runtime.runMigrations()`) are merged on `main` and ship in the next patch
+> release, `0.8.1`. With `0.7.0` or older, `syncSchema()` is additive only: it creates tables and adds
+> columns, and it does **not** detect or refuse the changes below.
 
 You change a collection in TypeScript. The database already holds rows written with the old
 definition. What happens on the next start?
 
 **ForgeCMS plans before it writes.** `runtime.syncSchema()` compares the schema you declared with the
 schema actually stored. It applies only changes that cannot lose or reinterpret data. It refuses
-everything else with a precise report and **executes nothing**. It does not run migrations for you.
-Reviewed migration execution is the next roadmap step (0.7, M02) and does not exist yet.
+everything else with a precise report and **executes nothing**. It never runs migrations for you: the
+changes it refuses are applied by [reviewed migrations](#reviewed-migrations) you write and run from
+your deploy script.
 
 ```ts
 await runtime.syncSchema(); // still the only call a fresh or additive setup needs
@@ -52,7 +54,7 @@ try {
 an empty table, `drafts`/`upload` on an empty table, a new non-unique index, and a new unique index
 when the existing data has no duplicates.
 
-**Refused until you migrate the data yourself:**
+**Refused until a reviewed migration converts the data:**
 
 - a removed or **renamed** field (a rename is never guessed; it looks like a removal plus an addition);
 - a changed storage type (`text` → `number`);
@@ -76,11 +78,52 @@ metadata shows (columns, types, indexes), and records the baseline from there. S
 made _before_ that first sync (for example switching `localized` on) cannot be detected after the
 fact.
 
+## Reviewed migrations
+
+A migration is data: an id, a description, an explicit `destructive` flag, and single SQL statements
+with bound arguments. There is no `up(db)` callback. That is what lets libSQL and D1 both run it as
+**one transactional batch** together with its entry in the `_forge_migrations` history table.
+
+```ts
+import { defineMigration, formatSchemaPlan } from '@forge-cms/db';
+
+// Append-only: never edit, reorder or remove a migration that ran anywhere.
+const migrations = [
+  defineMigration({
+    id: '20260929_001_posts_headline_to_title',
+    description: 'Rename posts.headline to title',
+    destructive: true,
+    statements: [{ sql: 'ALTER TABLE "posts" RENAME COLUMN "headline" TO "title"' }]
+  })
+];
+
+// In a deploy/maintenance script, never at application startup:
+console.log(formatSchemaPlan(await runtime.planSchema())); // what drifted
+const report = await runtime.runMigrations(migrations, { allowDestructive: true });
+console.log(report.results, formatSchemaPlan(report.after)); // after never blocks
+```
+
+- **Exactly once.** A migration that already ran is skipped. An edited one fails with
+  `MIGRATION_CHECKSUM_MISMATCH`, and a reordered or removed one with `MIGRATION_HISTORY_MISMATCH`,
+  before anything runs.
+- **Concurrent deploys are safe.** Two runners cannot both run the same position; the database decides.
+- **Failures are honest.** An error means one of:
+  - rolled back, and recorded as failed (rerun only with `retryFailed` or `replaceFailed`);
+  - applied, when the ledger proves it after a lost response;
+  - outcome unknown (never retried automatically).
+- **Destructive migrations** need `allowDestructive: true`. Back up first; ForgeCMS cannot verify
+  backups.
+- **Post-flight.** After the migrations, `syncSchema()` applies the safe remainder and `planSchema()`
+  must no longer block. If it does, the error says the migrations **committed** and were not rolled
+  back.
+- **No down migrations.** A wrong committed migration is fixed forward or by restoring a backup.
+  Deploying old code does not roll the database back.
+
 ## Where this is going
 
-- **Now:** detect drift and refuse it safely (roadmap 0.7, M01).
-- **Next:** reviewed, ordered migrations with applied-history checks (M02).
-- **Then:** tested upgrade and backup/restore rehearsals on D1 and libSQL (M03).
+- **Done:** detect drift and refuse it safely (roadmap 0.7, M01), and reviewed, ordered migrations
+  with a durable history (M02).
+- **Next:** tested upgrade and backup/restore rehearsals on D1 and libSQL (M03).
 
-The full reference, including the complete change matrix, is `docs/SCHEMA-UPGRADES.md` in the
-repository.
+The full reference, with the complete change matrix and the operator guide, is
+`docs/SCHEMA-UPGRADES.md` in the repository.

@@ -1,6 +1,6 @@
 export type { AdapterSet, ForgeCmsConfig } from './config.js';
 export type { OperationContext } from './context.js';
-export { ForgeCmsRuntime } from './runtime.js';
+export { ForgeCmsRuntime, type MigrationReport } from './runtime.js';
 export {
   handleList,
   handleRead,

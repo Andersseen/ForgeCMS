@@ -66,11 +66,12 @@ hop between your Analog route and your content.
 
 Be honest with yourself about this list before adopting it for something that matters:
 
-- **Pre-1.0 release line.** The packages (currently `0.7.0` on npm) are installable and exercised by
+- **Pre-1.0 release line.** The packages (currently `0.8.0` on npm) are installable and exercised by
   real consumer apps, but API stability is not guaranteed before `1.0`.
-- **Schema upgrades are detect-and-refuse, not migrate.** Schema sync applies safe additive changes
-  and refuses drift that needs a data migration; there is no migration runner yet. See
-  [Schema upgrades](/docs/schema-upgrades).
+- **Schema upgrades are explicit.** Schema sync applies safe additive changes and refuses drift that
+  needs a data migration. Reviewed migrations (on `main`, next release) apply those changes from your
+  deploy script, exactly once. There are no down migrations, and backup/restore rehearsal is still
+  ahead. See [Schema upgrades](/docs/schema-upgrades).
 - **Relation population is one level deep** (`depth: 1`), and composite JSON values cannot be queried
   inside.
 - **No SSR-safe client fetch.** The Angular client is browser-first; a content site that needs SSR

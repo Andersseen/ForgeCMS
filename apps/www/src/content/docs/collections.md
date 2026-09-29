@@ -77,10 +77,10 @@ documents flowing all the way to the client without codegen is still on the road
    [Indexes](#indexes) below.
 
 **Schema sync never destroys data.** Columns are never dropped or retyped, so renaming a field means
-adding a new column, and removing one leaves the old column in place. From the first release after
-`0.7.0`, sync goes further: a change that would need a data migration (a removed or renamed field, a
-type change, a new required field on a table with rows) stops startup with a `SchemaDriftError`
-instead of being half-applied. There is no migration runner yet. See
+adding a new column, and removing one leaves the old column in place. Since `0.8.0`, sync goes
+further: a change that would need a data migration (a removed or renamed field, a type change, a new
+required field on a table with rows) stops startup with a `SchemaDriftError` instead of being
+half-applied. You apply it with a reviewed migration (on `main`, next release). See
 [Schema upgrades](/docs/schema-upgrades). Composite
 fields (`group`, `array`, `blocks`) are stored as JSON in a `TEXT` column, which is why you cannot
 query inside them yet.

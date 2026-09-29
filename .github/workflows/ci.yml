@@ -160,8 +160,12 @@ jobs:
       id-token: write
 
     steps:
+      # Depth 2: the GitHub release step compares HEAD's package versions with its first parent's and
+      # tags only the commit that introduced the version (spec 072 §9).
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4

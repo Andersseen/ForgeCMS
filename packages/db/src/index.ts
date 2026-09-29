@@ -71,8 +71,40 @@ export {
   mergeSchemaPlans
 } from './schema-plan.js';
 export { type SqliteSchemaExecutor, planSqliteSchema, syncSqliteSchema } from './sqlite-schema.js';
+export {
+  type MigrationValue,
+  type MigrationStatement,
+  type MigrationDefinition,
+  type MigrationRecord,
+  type MigrationRunResult,
+  type MigrationState,
+  type MigrationErrorCode,
+  type MigrationPhase,
+  type MigrationSafeStatus,
+  type RunMigrationsOptions,
+  type PreparedMigration,
+  type MigrationHistoryPlan,
+  MIGRATION_MAX_STATEMENTS,
+  MigrationError,
+  isMigrationError,
+  defineMigration,
+  migrationChecksum,
+  prepareMigrations,
+  planMigrationHistory
+} from './migrations.js';
+export {
+  MIGRATION_LEDGER_TABLE,
+  runSqliteMigrations,
+  readSqliteMigrationHistory
+} from './sqlite-migrations.js';
 import type { DatabaseWhere, SortInput } from './where.js';
 import type { SchemaPlan } from './schema-plan.js';
+import type {
+  MigrationDefinition,
+  MigrationRecord,
+  MigrationRunResult,
+  RunMigrationsOptions
+} from './migrations.js';
 
 export type DatabaseRecord = Record<string, unknown>;
 
@@ -256,4 +288,16 @@ export interface DatabaseAdapter<TRecord extends DatabaseRecord = DatabaseRecord
    * reporting its schema as compatible.
    */
   planSchema?(collections: CollectionDefinition[]): Promise<SchemaPlan>;
+  /**
+   * Runs reviewed migrations (spec 072): each pending migration commits as one transactional batch
+   * together with its `_forge_migrations` ledger entry. Optional — a durable-upgrade capability, not
+   * every adapter has it; `ForgeCmsRuntime.runMigrations()` (the documented entry point) refuses an
+   * adapter without it. Never called by `syncSchema()` or at startup. Throws `MigrationError`.
+   */
+  runMigrations?(
+    migrations: readonly MigrationDefinition[],
+    options?: RunMigrationsOptions
+  ): Promise<MigrationRunResult[]>;
+  /** The `_forge_migrations` ledger in position order (spec 072); `[]` when none ran. Read-only. */
+  readMigrationHistory?(): Promise<MigrationRecord[]>;
 }

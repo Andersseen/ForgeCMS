@@ -1,11 +1,70 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-28 (0.7 consolidation and dogfood refresh, spec 071).**
+> **Last updated: 2026-09-29 (reviewed migration execution — roadmap 0.7 M02, spec 072).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Reviewed migration execution — M02 (spec 072, 2026-09-29)
+
+Roadmap 0.7, second packet, plus two release-hygiene fixes. See
+[docs/specs/072-reviewed-migration-execution.md](specs/072-reviewed-migration-execution.md) and the
+operator guide in [SCHEMA-UPGRADES.md](SCHEMA-UPGRADES.md#operator-guide).
+
+- **Release truth (2026-09-29).** PR #54 had already merged: npm **`0.8.0`** = specs through 071
+  (M01 included), tagged `v0.8.0` at `47dfae2` (correct commit). npm never reuses a version, so
+  `0.8.0` cannot be Angular DX.
+  - **Maintainer decision:** npm `0.8.x` is the roadmap 0.7 upgrade-safety line (M02/M03 are `patch`),
+    and roadmap 0.8 Angular DX publishes as npm **`0.9.0`**. From here on npm minors are one ahead of
+    roadmap labels (policy table in the ROADMAP header).
+  - `pnpm changeset status` now bumps everything at patch → **`0.8.1`**. PR #56 (Version Packages)
+    updates itself after merge.
+- **Aggregate tag bug, root-caused from the CI log of `7248ec8`.** On the 0.7.0 publish run,
+  `publish-unpublished.mjs` hit registry lag right after `changeset publish` (`npm view` 404, then
+  `E409 previously staged`). The step failed, so `release:github` never ran on the publishing commit.
+  The next unrelated push tagged `v0.7.0` because the script tagged `GITHUB_SHA` with whatever
+  `package.json` said. `v0.6.0` has the same history (PR #43's run failed the same way).
+  - **Fix:** `scripts/release-decision.mjs` (pure, `node --test`, part of `pnpm test`).
+    `create-github-release.mjs` tags only when HEAD's version differs from its first parent's (CI
+    checkout depth 2); an unreadable parent never tags.
+  - `publish-unpublished.mjs` treats E409/E403 "already published" as success.
+  - Replayed on history: `7248ec8` → tag; `2ec5208`/`c1bb75f` → no tag. Historical tags unchanged.
+- **Gap reproduced first:** a v1 `headline` → v2 `title` rename was refused by `syncSchema()`. There
+  was no ledger or runner; the only path was hand SQL plus a hand `DELETE FROM "_forge_schema"`.
+- **Now (`@forge-cms/db`):**
+  - `defineMigration` (declarative statements + bound args, explicit `destructive`, optional
+    `resetBaseline`, validated before I/O) and a SHA-256 checksum (golden-tested).
+  - The `_forge_migrations` ledger. It is created by the M01 planner, so it works while app tables are
+    blocked, and it refuses to trust a drifted ledger.
+  - `runSqliteMigrations`: one transactional batch per migration (prefix guard → unique claim →
+    baseline resets → SQL → `applied`), then a fence and reconcile after a failure.
+  - Optional `DatabaseAdapter.runMigrations?`/`readMigrationHistory?`, implemented by libSQL and D1.
+    InMemory reports `MIGRATION_UNSUPPORTED`.
+- **Now (`@forge-cms/runtime`):** `runMigrations()` (validate → `planSchema` → migrations →
+  post-flight `syncSchema` + `planSchema`; a post-flight failure says "committed, NOT rolled back"),
+  `planMigrations()` and `readMigrationHistory()`. `init()`/`syncSchema()` are unchanged and never
+  migrate.
+- **Evidence:**
+  - `runMigrationContractTests` on on-disk libSQL (13, via the runtime) and local D1 (11). It covers:
+    - seeded rename, required backfill, drafts enable and index → unique;
+    - a localized conversion whose post-flight fails as committed, then is forward-fixed by a
+      baseline-only migration;
+    - duplicate invocation; edited/reordered/removed histories;
+    - divergent and same-migration runners with a deterministic batch barrier;
+    - mid-batch failure → refusal → approved retry;
+    - lost response → `reconciled`; lost request → `failed`.
+  - The engine suite on libSQL (13) adds an unreachable DB (`OUTCOME_UNKNOWN`, then a safe rerun), a
+    late in-flight batch blocked by the fence, `replaceFailed`, the destructive gate and "no args in the
+    ledger", and a replay of the retry/replace ABA race that review found (fixed: `attempts` never
+    decreases). Pure suite (38).
+  - **Not verified:** remote D1 and Turso.
+- **Not done (by design):** no down migrations, no CLI, no automatic startup migration, no remote DB
+  touched, the demo's `site_settings` → global move not run, finding 24 (dates) left for 0.8 C02.
+- **Still external:** both deployed Pages projects need `AUTH_SECRET` (≥ 32 bytes) before they can
+  start (spec 069), then a `planSchema()` against their D1.
+- **Next:** roadmap 0.7 **M03** (upgrade + backup/restore rehearsal). Not started.
 
 ## 0.7 consolidation and dogfood refresh (spec 071, 2026-09-28)
 
@@ -14,10 +73,9 @@ A checkpoint between M01 and M02, not a roadmap packet. See
 
 - **Release truth (verified from manifests, tags, npm and GitHub):**
   - npm family is **`0.7.0`**, which contains specs through **069** (roadmap 0.6 complete);
-  - **M01 (spec 070) is on `main` but unpublished**. Its pending changeset is `minor`, so open PR #54
-    ("Version Packages") would publish it as **`0.8.0`**, the number the brief reserves for Angular DX.
-    **Maintainer decision:** ship as `0.7.1` (downgrade that changeset to `patch`), or accept `0.8.0` and
-    re-letter the proposed roadmap minors. Spec 071 changes neither;
+  - **M01 (spec 070) was on `main` but unpublished**. Its changeset was `minor`, so PR #54 published
+    it as **`0.8.0`** (merged 2026-09-28 19:03 UTC). _Resolved by spec 072: npm `0.8.x` is the
+    upgrade-safety line; Angular DX becomes npm `0.9.0`._
   - the `v0.7.0` GitHub release tag points at `2ec5208` (the M01 merge), not at the published source
     (`7248ec8`). The release job tags the `main` HEAD it runs on; `v0.6.0` has the same offset.
 - **Current:** roadmap 0.6 complete; roadmap 0.7 in progress (M01 done on `main`, **M02 next**, M03
@@ -58,7 +116,7 @@ A checkpoint between M01 and M02, not a roadmap packet. See
   `AUTH_SECRET` (≥ 32 bytes) refuses to start, which fits. Schema drift (070) may also apply once the
   secret is set. **Action:** set `AUTH_SECRET` on both projects, then run `planSchema()` against both
   D1 databases. Worker logs were not read.
-- **Next:** roadmap 0.7 **M02** — minimal reviewed migration execution. Not started.
+- **Next (at the time):** roadmap 0.7 **M02**, since delivered by spec 072.
 
 ## Schema drift detection and upgrade planning — M01 (spec 070, 2026-09-28)
 
@@ -119,8 +177,7 @@ and the consumer guide [SCHEMA-UPGRADES.md](SCHEMA-UPGRADES.md).
 - **Recorded limits:** tables of removed collections are not reported; validation-only options (select
   `options`, min/max) are not tracked; the runtime plans once and each area's sync plans again (extra
   reads at startup).
-- **Suggested next step:** M02 — minimal reviewed migration execution (identity/checksum/history,
-  exclusive execution, failure/retry, explicit operator-driven destructive steps). Not started.
+- **Suggested next step (at the time):** M02, since delivered by spec 072.
 
 ## Auth abuse bounds and certification — H04, roadmap 0.6 complete (spec 069, 2026-09-28)
 
