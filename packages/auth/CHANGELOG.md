@@ -1,5 +1,13 @@
 # @forge-cms/auth
 
+## 0.8.2
+
+### Patch Changes
+
+- Updated dependencies [dc7fd17]
+  - @forge-cms/db@0.8.2
+  - @forge-cms/core@0.8.2
+
 ## 0.8.1
 
 ### Patch Changes

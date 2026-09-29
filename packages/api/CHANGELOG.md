@@ -1,5 +1,11 @@
 # @forge-cms/api
 
+## 0.8.2
+
+### Patch Changes
+
+- @forge-cms/core@0.8.2
+
 ## 0.8.1
 
 ### Patch Changes
