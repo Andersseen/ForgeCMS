@@ -6,17 +6,17 @@ an unqualified promise that line coverage proves correctness.
 
 ## Test responsibilities
 
-| Layer                      | Proves                                                                                   | Existing home / extension point                                          |
-| -------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Unit                       | Validation, defaults, access decisions, query parsing, projection, errors, pure UI state | Colocated `packages/*/src/*.test.ts`                                     |
-| Type                       | Positive inference and expected compile failures; wire types match runtime visibility    | `typed-local-api.test.ts`; add SDK consumer type fixtures                |
-| Adapter contract           | Same supported CRUD/query/constraint/storage/auth semantics                              | `@forge-cms/testing/contracts`; all adapters run matching suites         |
-| Real-backend integration   | SQL, serialization, failure/atomicity and persistence behavior                           | libSQL suites, `packages/cloudflare/test/workers`, tiny-project fixtures |
-| HTTP contract              | Actual handlers: statuses, envelopes, request parsing, cookie/Bearer and projection      | runtime handler/auth integration suites; workerd HTTP fixture            |
-| Component integration      | Observable loading/error/edit/save/focus behavior with Angular rendering                 | Admin/Angular tests; add rendered component fixtures only where useful   |
-| Browser E2E                | Real user journey through actual routes and persistent backend where promised            | Existing www/demo/tiny-project Playwright fixtures                       |
-| Packed production consumer | Published export resolution, strict peers, linker, SSR and hydration                     | Extend `scripts/verify-release.mjs` plus built consumer fixtures         |
-| Upgrade / recovery         | Previous data survives supported schema/software changes and backup restore              | Dedicated seeded D1/libSQL fixtures introduced by M03                    |
+| Layer                      | Proves                                                                                   | Existing home / extension point                                                       |
+| -------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Unit                       | Validation, defaults, access decisions, query parsing, projection, errors, pure UI state | Colocated `packages/*/src/*.test.ts`                                                  |
+| Type                       | Positive inference and expected compile failures; wire types match runtime visibility    | `typed-local-api.test.ts`; add SDK consumer type fixtures                             |
+| Adapter contract           | Same supported CRUD/query/constraint/storage/auth semantics                              | `@forge-cms/testing/contracts`; all adapters run matching suites                      |
+| Real-backend integration   | SQL, serialization, failure/atomicity and persistence behavior                           | libSQL suites, `packages/cloudflare/test/workers`, tiny-project fixtures              |
+| HTTP contract              | Actual handlers: statuses, envelopes, request parsing, cookie/Bearer and projection      | runtime handler/auth integration suites; workerd HTTP fixture                         |
+| Component integration      | Observable loading/error/edit/save/focus behavior with Angular rendering                 | Admin/Angular tests; add rendered component fixtures only where useful                |
+| Browser E2E                | Real user journey through actual routes and persistent backend where promised            | Existing www/demo/tiny-project Playwright fixtures                                    |
+| Packed production consumer | Published export resolution, strict peers, linker, SSR and hydration                     | Extend `scripts/verify-release.mjs` plus built consumer fixtures                      |
+| Upgrade / recovery         | Previous data survives supported schema/software changes and backup restore              | `apps/upgrade-rehearsal` (M03, spec 073): historical fixtures on libSQL + local D1/R2 |
 
 Mocks are useful for fast branch/fault tests. They are insufficient evidence for real SQL, runtime
 bindings, concurrency, cookie behavior, production linking or hydration.
@@ -33,6 +33,7 @@ No changeset is needed for this roadmap's docs-only work; later `packages/*` wor
 | `pnpm test:cloudflare`      | Required for backend/runtime/auth/storage changes and every release candidate       |
 | `pnpm test:libsql`          | Same rule for portable database behavior; not replaced by default `pnpm test`       |
 | `pnpm release:verify`       | Package/manifest/consumer changes and every release candidate                       |
+| `pnpm test:upgrade`         | Every CI run and release candidate (M03): historical upgrades + backup/restore      |
 | `pnpm e2e:www`              | Existing admin/docs integration; required in CI                                     |
 | `pnpm e2e:tiny-project`     | Canonical consumer/admin/auth journey; required in CI                               |
 | `pnpm e2e:demo`             | Dogfooding/public-site integration; required before release and on affected changes |

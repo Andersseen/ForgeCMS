@@ -2,7 +2,7 @@
 import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { decideAggregateRelease } from './release-decision.mjs';
+import { decideAggregateRelease, releaseCommit } from './release-decision.mjs';
 
 const dryRun = process.argv.includes('--dry-run');
 const packageNamePattern = /^@forge-cms\/[a-z0-9-]+$/;
@@ -23,18 +23,19 @@ function readPublicPackages() {
 }
 
 /**
- * The public packages as they were at HEAD's first parent (`HEAD^1`), or `null` when that commit cannot
- * be read — e.g. a depth-1 checkout. The CI release job checks out with `fetch-depth: 2`.
+ * The public packages as they were at the first parent of the commit being released (the triggering
+ * commit, see `releaseCommit`), or `null` when that commit cannot be read — e.g. a depth-1 checkout.
+ * The CI release job checks out with `fetch-depth: 2`.
  */
-function readFirstParentPackages() {
+function readFirstParentPackages(commit) {
   const packages = [];
   for (const directory of readdirSync('packages')) {
-    const result = spawnSync('git', ['show', `HEAD^1:packages/${directory}/package.json`], {
+    const result = spawnSync('git', ['show', `${commit}^1:packages/${directory}/package.json`], {
       encoding: 'utf8'
     });
     if (result.status !== 0) {
       // A package directory that did not exist at the parent is a new package, not an unreadable parent.
-      const parent = spawnSync('git', ['rev-parse', '--verify', '--quiet', 'HEAD^1'], {
+      const parent = spawnSync('git', ['rev-parse', '--verify', '--quiet', `${commit}^1`], {
         encoding: 'utf8'
       });
       if (parent.status !== 0) return null;
@@ -98,7 +99,10 @@ for (const pkg of packages) {
 }
 
 // Only the commit that introduced this version may carry `vX.Y.Z` (spec 072 §9).
-const decision = decideAggregateRelease({ head: packages, base: readFirstParentPackages() });
+const decision = decideAggregateRelease({
+  head: packages,
+  base: readFirstParentPackages(releaseCommit(process.env))
+});
 console.log(`Aggregate release decision: ${decision.reason}`);
 if (!decision.create) {
   process.exit(0);

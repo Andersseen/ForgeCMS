@@ -172,6 +172,9 @@ export async function reconcileStorage(
   const now = (options.now ?? new Date()).getTime();
   const grace = options.uploadGraceMs ?? DEFAULT_UPLOAD_GRACE_MS;
   const report: ReconcileStorageReport = { deleted: [], kept: [], pending: 0, failed: [] };
+  // Without an upload collection there is no intents table (`syncSchema()` only creates it where
+  // uploads exist) and nothing to reconcile. Reading it anyway threw "not registered" (spec 073).
+  if (!hasUploadCollections(ctx.getCollections())) return report;
 
   const intents = await database.findMany({
     collection: STORAGE_INTENTS_COLLECTION,

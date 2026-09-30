@@ -868,6 +868,94 @@ runtime.init();
   run('pnpm', ['exec', 'tsc', '-p', 'tsconfig.json', '--noEmit'], { cwd: dir });
 }
 
+// Spec 073: the upgrade/recovery runbook (docs/BACKUP-RESTORE.md, docs/SCHEMA-UPGRADES.md) may only
+// use exports the packed packages really ship. Compiles that exact surface and runs one reviewed
+// migration on an on-disk libSQL file — the historical-fixture rehearsal itself is
+// `pnpm test:upgrade`, not this check.
+function verifyUpgradeConsumer(tarballs) {
+  const dir = installConsumer('upgrade-consumer', tarballs, ['typescript@5.9.2']);
+
+  const srcDir = join(dir, 'src');
+  run('mkdir', ['-p', srcDir]);
+  writeBaseTsconfig(dir);
+  writeFileSync(
+    join(srcDir, 'index.ts'),
+    `import { defineCollection, defineField } from '@forge-cms/core';
+import {
+  LibSqlDatabaseAdapter,
+  defineMigration,
+  formatSchemaPlan,
+  isMigrationError,
+  isSchemaDriftError
+} from '@forge-cms/db';
+import type { MigrationDefinition, MigrationRecord, SchemaPlan } from '@forge-cms/db';
+import { InMemoryAuthAdapter } from '@forge-cms/auth';
+import { InMemoryStorageAdapter } from '@forge-cms/storage';
+import { ForgeCmsRuntime, handleFile, reconcileStorage } from '@forge-cms/runtime';
+import type { MigrationReport, ReconcileStorageReport } from '@forge-cms/runtime';
+
+const url = 'file:./upgrade-check.db';
+
+function runtimeFor(fields: Parameters<typeof defineCollection>[0]['fields']) {
+  return new ForgeCmsRuntime({
+    collections: [defineCollection({ slug: 'notes', fields })],
+    adapters: {
+      database: new LibSqlDatabaseAdapter(url),
+      auth: new InMemoryAuthAdapter(),
+      storage: new InMemoryStorageAdapter()
+    }
+  }).init();
+}
+
+const v1 = runtimeFor({ headline: defineField.text() });
+await v1.syncSchema();
+await v1.create({ collection: 'notes', data: { headline: 'Hello' } });
+
+const v2 = runtimeFor({ title: defineField.text() });
+const before: SchemaPlan = await v2.planSchema();
+if (!before.blocking) throw new Error('Expected the rename to block the plan');
+console.log(formatSchemaPlan(before));
+try {
+  await v2.syncSchema();
+  throw new Error('syncSchema() must refuse a blocking plan');
+} catch (err) {
+  if (!isSchemaDriftError(err)) throw err;
+}
+
+const migrations: MigrationDefinition[] = [
+  defineMigration({
+    id: '001_notes_headline_to_title',
+    description: 'Rename notes.headline to title',
+    destructive: true,
+    statements: [{ sql: 'ALTER TABLE "notes" RENAME COLUMN "headline" TO "title"' }],
+    resetBaseline: ['notes']
+  })
+];
+console.table(await v2.planMigrations(migrations));
+const report: MigrationReport = await v2.runMigrations(migrations, { allowDestructive: true });
+if (report.after.blocking || report.results[0]?.outcome !== 'applied') {
+  throw new Error('Expected the reviewed migration to apply and leave a clean plan');
+}
+const again: MigrationReport = await v2.runMigrations(migrations, { allowDestructive: true });
+if (again.results[0]?.outcome !== 'already-applied') throw new Error('Expected already-applied');
+const history: MigrationRecord[] = await v2.readMigrationHistory();
+if (history.length !== 1 || history[0]?.status !== 'applied') throw new Error('Unexpected ledger');
+const notes = await v2.find({ collection: 'notes' });
+if (notes.docs[0]?.['title'] !== 'Hello') throw new Error('The renamed value did not survive');
+
+const reconciled: ReconcileStorageReport = await v2.reconcileStorage();
+void reconciled;
+void reconcileStorage;
+void handleFile;
+void isMigrationError;
+console.log('upgrade consumer ok');
+`
+  );
+
+  run('pnpm', ['exec', 'tsc', '-p', 'tsconfig.json'], { cwd: dir });
+  run('node', ['dist/index.js'], { cwd: dir });
+}
+
 function verifyAngularConsumer(tarballs) {
   const dir = installConsumer('angular-consumer', tarballs, [
     '@angular/common@^21.2.10',
@@ -1033,6 +1121,7 @@ try {
 
   verifyRuntimeConsumer(tarballs);
   verifyCloudflareConsumer(tarballs);
+  verifyUpgradeConsumer(tarballs);
   verifyAngularConsumer(tarballs);
 
   console.log('Release verification passed.');

@@ -7,3 +7,6 @@ pnpm-lock.yaml
 
 # Wrangler scratch output
 .wrangler/
+
+# Historical upgrade fixtures are hashed evidence (spec 073): never reformat them.
+apps/upgrade-rehearsal/fixtures/

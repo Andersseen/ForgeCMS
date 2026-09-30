@@ -408,3 +408,19 @@ describe('durable storage intents on on-disk libSQL (spec 067)', () => {
     expect(await intents()).toEqual([]);
   });
 });
+
+describe('reconcileStorage without upload collections (spec 073)', () => {
+  // Found by the M03 packed upgrade consumer: the recovery runbook runs `reconcileStorage()` after every
+  // restore, and it threw "Collection '_forge_storage_intents' not registered" on a site without uploads.
+  it('is a no-op with an empty report on on-disk libSQL', async () => {
+    const url = `file:${(await import(/* @vite-ignore */ 'node:os' as string)).tmpdir()}/forge-no-uploads-${Date.now()}.db`;
+    const notes = defineCollection({ slug: 'notes', fields: { title: defineField.text() } });
+    const { runtime } = await setup([notes], new LibSqlDatabaseAdapter(url).init());
+    expect(await runtime.reconcileStorage()).toEqual({
+      deleted: [],
+      kept: [],
+      pending: 0,
+      failed: []
+    });
+  });
+});

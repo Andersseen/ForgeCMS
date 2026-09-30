@@ -43,3 +43,6 @@ pnpm-debug.log*
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Upgrade rehearsal scratch (timings, temporary environments)
+.rehearsal/

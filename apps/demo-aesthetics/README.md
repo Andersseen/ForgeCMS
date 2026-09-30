@@ -122,7 +122,8 @@ That is also why clinic settings are still a one-row `site_settings` **collectio
 global (finding 4). A global is a new `_global_site_settings` table: sync would create it safely, but
 empty, while the edited settings stay in the old table. Moving that row is a data migration. The
 mechanism exists since spec 072 (M02), but running it against the deployed D1 is a production
-operation that needs a backup first, so it has not been done; backup/restore rehearsal is M03.
+operation that needs a backup first, so it has not been done yet; the backup/restore runbook it needs
+is [docs/BACKUP-RESTORE.md](../../docs/BACKUP-RESTORE.md) (M03, spec 073).
 
 The production secret matters too: since spec 069, a build without an `AUTH_SECRET` of at least 32
 bytes refuses to start.

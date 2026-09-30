@@ -1,0 +1,12 @@
+[mcp_servers.cloudflare-bindings]
+url = "https://bindings.mcp.cloudflare.com/mcp"
+
+[mcp_servers.cloudflare-observability]
+url = "https://observability.mcp.cloudflare.com/mcp"
+
+[mcp_servers.playwright]
+command = "pnpm"
+args = [
+    "dlx",
+    "@playwright/mcp@latest",
+]

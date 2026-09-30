@@ -10,13 +10,14 @@
 | [specs/](specs/)                         | Feature specs (`NNN-slug.md`, from [specs/TEMPLATE.md](specs/TEMPLATE.md)) — also the historical record of what was built and why | Per feature                           |
 | [QUICKSTART.md](QUICKSTART.md)           | How do I try this in 10 minutes?                                                                                                  | When the demo flow changes            |
 | [SCHEMA-UPGRADES.md](SCHEMA-UPGRADES.md) | What happens when I change a collection that already has data?                                                                    | When sync/migration behaviour changes |
+| [BACKUP-RESTORE.md](BACKUP-RESTORE.md)   | How do I back up, restore and recover an installation (libSQL, D1, R2)?                                                           | When the recovery path changes        |
 | [DEMO-FINDINGS.md](DEMO-FINDINGS.md)     | What building a real site on ForgeCMS cost, and what is still open                                                                | After each demo re-dogfood            |
 
 Entry point for agents: [/CLAUDE.md](../CLAUDE.md) (also referenced by [/AGENTS.md](../AGENTS.md)).
 
 The active delivery plan is [ROADMAP.md](ROADMAP.md): bounded product checkpoints (0.5 → 0.12) to
-1.0 — separate from npm versions (the package family is `0.8.0`; npm `0.8.x` is the roadmap 0.7
-upgrade-safety line, and roadmap 0.8 will publish as `0.9.0`; roadmap 0.6 is complete and 0.7 is in
-progress), with a [repository assessment](roadmap/v1/AUDIT.md), [execution handbook](roadmap/v1/EXECUTION.md),
+1.0 — separate from npm versions (the package family is `0.8.2`; npm `0.8.x` is the roadmap 0.7
+upgrade-safety line, and roadmap 0.8 will publish as `0.9.0`; roadmaps 0.6 and 0.7 are complete),
+with a [repository assessment](roadmap/v1/AUDIT.md), [execution handbook](roadmap/v1/EXECUTION.md),
 [quality contract](roadmap/v1/QUALITY.md) and individual release briefs. The previous roadmap is
 [archived](ROADMAP-LEGACY.md); historical specs remain the record of earlier implementation decisions.

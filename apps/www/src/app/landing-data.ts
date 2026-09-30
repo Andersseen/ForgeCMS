@@ -92,14 +92,14 @@ export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
   {
     version: '0.7',
     title: 'Upgrade safety',
-    status: 'in-progress',
+    status: 'complete',
     steps: [
       { title: 'Schema drift detection', status: 'complete' },
       { title: 'Reviewed migrations', status: 'complete' },
-      { title: 'Backup and restore', status: 'next' }
+      { title: 'Upgrade and backup/restore rehearsal', status: 'complete' }
     ]
   },
-  { version: '0.8', title: 'Angular client and DX', status: 'planned' },
+  { version: '0.8', title: 'Angular client and DX', status: 'next' },
   { version: '0.9', title: 'SSR for Analog', status: 'planned' },
   { version: '0.10', title: 'Portable S3 storage', status: 'planned' },
   { version: '0.11', title: 'Admin certification', status: 'planned' },

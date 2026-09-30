@@ -49,6 +49,8 @@
     "test:coverage": "vitest run --coverage",
     "test:cloudflare": "turbo run test:cloudflare --filter=@forge-cms/cloudflare --filter=@forge-cms/tiny-project",
     "test:libsql": "pnpm --filter @forge-cms/tiny-project test:libsql",
+    "test:upgrade": "turbo run test:upgrade --filter=@forge-cms/upgrade-rehearsal",
+    "fixtures:upgrade:generate": "pnpm --filter @forge-cms/upgrade-rehearsal fixtures:generate",
     "test:watch": "turbo run test:watch",
     "test:www": "pnpm --filter @forge-cms/www test",
     "test:playground": "pnpm --filter @forge-cms/playground test",

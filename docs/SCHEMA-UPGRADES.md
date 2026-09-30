@@ -7,10 +7,15 @@ exists: on a local libSQL file, a Turso database or Cloudflare D1. It covers two
   0.7 M01, in npm `0.8.0`). Before it touches anything, `syncSchema()` compares the schema you
   declared with the schema actually stored. It applies only changes that cannot lose or reinterpret
   data, and refuses everything else with a precise report.
-- **Reviewed migrations** ([spec 072](specs/072-reviewed-migration-execution.md), roadmap 0.7 M02, on
-  `main`, shipping in the next patch release `0.8.1`). They apply the refused changes, as SQL you wrote and
-  reviewed, exactly once, atomically with a durable history. See
-  [Reviewed migrations](#reviewed-migrations) and the [operator guide](#operator-guide).
+- **Reviewed migrations** ([spec 072](specs/072-reviewed-migration-execution.md), roadmap 0.7 M02, in
+  npm `0.8.1` and later). They apply the refused changes, as SQL you wrote and reviewed, exactly once,
+  atomically with a durable history. See [Reviewed migrations](#reviewed-migrations) and the
+  [operator guide](#operator-guide).
+
+Both are rehearsed on every CI run against databases written by older releases (`0.4.0`, `0.6.0`,
+`0.8.0`), on libSQL and local D1/R2, followed by a backup and a restore into an empty environment
+(roadmap 0.7 M03, [spec 073](specs/073-historical-upgrade-and-backup-restore-rehearsal.md)). Backups
+and recovery: [BACKUP-RESTORE.md](BACKUP-RESTORE.md).
 
 ## The short version
 
@@ -320,8 +325,8 @@ local D1.
 
 ### Blocking upgrade (reviewed migration)
 
-1. Back up the database under your deployment policy. ForgeCMS cannot verify a backup; backup and
-   restore rehearsal is roadmap M03.
+1. Back up the database **and** the objects its documents reference, with writes stopped
+   ([BACKUP-RESTORE.md](BACKUP-RESTORE.md)).
 2. Deploy nothing yet. Run `planSchema()` with the **new** configuration and read the blocking changes.
 3. Write the migration and review it. Mark it `destructive: true` if it drops, renames, rewrites or
    deletes.
@@ -349,7 +354,8 @@ That is safe because a recorded failure is proven never to have committed.
 There are **no down migrations**. Some transformations cannot be reversed. Two options:
 
 - write a **forward-fix** migration, or
-- **restore a backup**.
+- **restore a backup** ([BACKUP-RESTORE.md](BACKUP-RESTORE.md)); writes made after the backup are
+  lost.
 
 Deploying the previous application code does **not** roll the database back; it only runs old code
 against new data.
@@ -377,7 +383,8 @@ may not reference it or `_forge_schema`.
   migrated.
 - libSQL and D1 only. `InMemoryDatabaseAdapter` and custom adapters without `runMigrations()` report
   `MIGRATION_UNSUPPORTED`.
-- Evidence is on-disk libSQL and local D1 (workerd). Remote D1 and Turso behave per their documented
+- Evidence is on-disk libSQL and local D1 (workerd), including upgrades of databases written by
+  `0.4.0`, `0.6.0` and `0.8.0` (`pnpm test:upgrade`). Remote D1 and Turso behave per their documented
   batch semantics but are not exercised by the test suite.
 - At most 40 statements per migration, 100 args per statement. The runner adds up to 7 statements
   of its own to each batch.

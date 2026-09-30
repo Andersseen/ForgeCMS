@@ -1,0 +1,98 @@
+{
+  "format": 1,
+  "forgeVersion": "0.8.0",
+  "sourceKind": "published-package",
+  "sourceCommit": "47dfae20598eb3ff3c90b36fee9ae7a5c55005c5",
+  "publishedAt": "2026-09-28T19:13:00Z",
+  "provenance": "CI run 36469552403 on 47dfae2 (PR #54, Version Packages): changeset publish. Aggregate tag v0.8.0 points at the same commit.",
+  "packages": {
+    "@forge-cms/core": {
+      "version": "0.8.0",
+      "integrity": "sha512-7UJ+84W40uzcd1wwuvDxLjYGRQ6kPk7h07a4q7TqK57lrW39ZzZ0gumrgTj38RBCIo7JZKydPm4vu9CD92itYg=="
+    },
+    "@forge-cms/db": {
+      "version": "0.8.0",
+      "integrity": "sha512-Ua95btZKbkbxHSgjbMd439jxsfkqr/V/8aqxLOQjQ91e86CTCbsAM7JM8CYLra2RpvNEJs2FCKKmL7HUrgi7+A=="
+    },
+    "@forge-cms/auth": {
+      "version": "0.8.0",
+      "integrity": "sha512-VBbyCtxvFGACHsG6EUm77Oc/okaKxkMrCNkK15TiwNBMu04zI704MkCeMreFftb6InRo++jP0PjiQTyMNihq1g=="
+    },
+    "@forge-cms/storage": {
+      "version": "0.8.0",
+      "integrity": "sha512-A6TM56aUGTjbCiYypmfGkm5g5xadnkxaSSLc6Zq5Y9Hp+z2quVvjdQIyF1fk16tQmW6hl1Inc4TvIb6LoPl+lg=="
+    },
+    "@forge-cms/runtime": {
+      "version": "0.8.0",
+      "integrity": "sha512-nbvquulxFonBxoX0V6YWjMzFu80UQa0FlwhI9XyqRxCIsiY5P6/uXkVpZgvscwvMTJPPMgP4FVX47rhQGW7ATA=="
+    },
+    "@forge-cms/api": {
+      "version": "0.8.0",
+      "integrity": "sha512-zpkzFXlnp7TjaRvAzgt4VZEQ8vhu+J8xZO+dZ4cyp+1uads1EAvLfvXVh/2JxHVHiL+qf+pcfyDuzEJcVfuNqg=="
+    },
+    "@forge-cms/cloudflare": {
+      "version": "0.8.0",
+      "integrity": "sha512-SOmU23fij7nj87xSUDNZf3alKEktKiOu+alGhVWHUEZdIhz5eKe77ffOlm6H8ehM+eF6CbCEsUBcNJ044i6mxg=="
+    }
+  },
+  "resolvedDependencies": {
+    "@libsql/client": "0.17.3",
+    "drizzle-orm": "0.45.2",
+    "miniflare": "4.20260511.0",
+    "workerd": "1.20260511.1"
+  },
+  "schemaProfile": "forge-upgrade-model-v1",
+  "generatedBy": "apps/upgrade-rehearsal/generator/generate.mjs + seed.mjs",
+  "generatedOn": [
+    "libsql",
+    "d1-r2"
+  ],
+  "profilesIdentical": true,
+  "features": {
+    "localized": true,
+    "bootstrapClaim": true,
+    "uploadIntents": true,
+    "fullVersionSnapshots": true,
+    "schemaBaseline": true,
+    "appWrittenObjectWithMetadata": false
+  },
+  "counts": {
+    "_forge_api_keys": 2,
+    "_forge_bootstrap": 1,
+    "_forge_schema": 9,
+    "_forge_storage_intents": 0,
+    "_global_settings": 1,
+    "_versions_posts": 5,
+    "categories": 2,
+    "media": 2,
+    "posts": 2,
+    "users": 2
+  },
+  "testCredentials": {
+    "note": "Fixture-only test credentials. Never used anywhere real.",
+    "admin": {
+      "email": "admin@fixture.test",
+      "password": "fixture-admin-password"
+    },
+    "editor": {
+      "email": "editor@fixture.test",
+      "password": "fixture-editor-password"
+    },
+    "apiKeys": {
+      "active": {
+        "id": "00000000-0000-4000-8000-00000000a001",
+        "token": "forge_00000000-0000-4000-8000-00000000a001_DOPtjGh7oomZ1jmnn_JV_pEVuCCqepSKoE3Anf5JTNw"
+      },
+      "revoked": {
+        "id": "00000000-0000-4000-8000-00000000a002",
+        "token": "forge_00000000-0000-4000-8000-00000000a002_juC5BrIwKUpgHN88t2LPQgUZDEuz3-F8RftQUWdweMk"
+      }
+    }
+  },
+  "files": {
+    "database.sql": "sha256:6a29925578c9a7d65a6fe2b1a5a6837959fd9e65ccdf4d8bab04a5cdc7b05f47",
+    "storage-manifest.json": "sha256:9eafbbf5b80c435cff226547cb3ac3b123dd44495c40912c2dc3fcc9e70494bb",
+    "storage/849edcfe02c8e9d555ceb3acbe37608b6b23e2e313b6483829a11fc8d6a96634.bin": "sha256:823c0b5a492cc56358ed4711ab07711bdbc25ef11f6ac4ea97718113c43020be",
+    "storage/9f98169a7a23baa6b0c983b74212ae4d9d1f4feb11654a3b3d106a7cb79a04f2.bin": "sha256:497790947d4666760ce38f3c00e852c71fdb66cae849bae8e9ede352719e1581"
+  }
+}

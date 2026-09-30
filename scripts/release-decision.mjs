@@ -40,6 +40,20 @@ export function decideAggregateRelease({ head, base }) {
 }
 
 /**
+ * The commit whose release this run decides: the push that triggered it (`GITHUB_SHA`), never `HEAD`.
+ * When the same run also opens or updates a Version Packages PR, `changesets/action` leaves `HEAD` on
+ * its own `changeset-release/main` commit, whose first parent is the triggering commit — comparing
+ * `HEAD^1` then reported "already the version at the first parent" and `v0.8.1` was never tagged
+ * (spec 073). Outside CI there is no `GITHUB_SHA`, and `HEAD` is the only sensible default.
+ *
+ * @param {Record<string, string | undefined>} env
+ */
+export function releaseCommit(env) {
+  const sha = env.GITHUB_SHA?.trim();
+  return sha ? sha : 'HEAD';
+}
+
+/**
  * npm's answers for "that version already exists", including the short window right after
  * `changeset publish` in which `npm view` still says 404 but a second publish is refused (the `v0.7.0`
  * run failed exactly here). Treated as already published, never as a failure.

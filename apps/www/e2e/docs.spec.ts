@@ -69,7 +69,10 @@ test('the schema-upgrades page is in the sidebar and states availability and lim
   await expect(prose).toContainText('planSchema');
   await expect(prose).toContainText('SchemaDriftError');
   await expect(prose).toContainText('runMigrations');
-  await expect(prose).toContainText('next patch release');
+  await expect(prose).toContainText(
+    'reviewed migrations (`runtime.runMigrations()`) from `0.8.1`'.replaceAll('`', '')
+  );
+  await expect(prose).toContainText('backed up and restored into an empty environment');
   await expect(prose).toContainText('No down migrations');
   await expect(prose).toContainText('never at application startup');
 });

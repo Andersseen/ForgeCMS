@@ -25,6 +25,11 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    // Maintainer-only Node scripts that regenerate the historical upgrade fixtures (spec 073).
+    files: ['apps/upgrade-rehearsal/generator/**/*.mjs'],
+    languageOptions: { globals: { ...globals.node } }
+  },
+  {
     files: ['**/*.ts'],
     languageOptions: {
       parser: tseslint.parser,

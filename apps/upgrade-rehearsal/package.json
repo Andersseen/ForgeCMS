@@ -1,0 +1,32 @@
+{
+  "name": "@forge-cms/upgrade-rehearsal",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Roadmap 0.7 M03 release gate: historical-fixture upgrades and backup/restore rehearsals on real libSQL and local D1/R2 (spec 073). Not deployed.",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run test/fixtures.test.ts test/backup.test.ts",
+    "test:upgrade": "vitest run",
+    "fixtures:generate": "node generator/generate.mjs",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf coverage .rehearsal"
+  },
+  "dependencies": {
+    "@forge-cms/auth": "workspace:*",
+    "@forge-cms/cloudflare": "workspace:*",
+    "@forge-cms/core": "workspace:*",
+    "@forge-cms/db": "workspace:*",
+    "@forge-cms/runtime": "workspace:*",
+    "@forge-cms/storage": "workspace:*",
+    "@libsql/client": "0.17.3"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.3",
+    "miniflare": "4.20260511.0",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "4.91.0"
+  }
+}
