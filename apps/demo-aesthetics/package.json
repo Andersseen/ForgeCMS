@@ -30,7 +30,7 @@
     "@forge-cms/db": "workspace:*",
     "@forge-cms/runtime": "workspace:*",
     "@forge-cms/storage": "workspace:*",
-    "@voltui/components": "1.0.1",
+    "@voltui/components": "1.1.0",
     "h3": "1.15.0",
     "lumen-icons": "0.2.0",
     "quartz-headless": "0.2.1",

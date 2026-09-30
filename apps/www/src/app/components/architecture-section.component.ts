@@ -1,65 +1,65 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import {
-  VoltBadge,
-  VoltCard,
-  VoltCardDescription,
-  VoltCardHeader,
-  VoltCardTitle
-} from '@voltui/components';
+import { VoltNativeButton } from '@voltui/components';
+import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
 import { features, localApiCode } from '../landing-data';
 
-/** "What works today": the capabilities that exist, then what the Local API means in practice. */
 @Component({
   selector: 'forge-cms-architecture-section',
   standalone: true,
-  imports: [RouterLink, VoltBadge, VoltCard, VoltCardHeader, VoltCardTitle, VoltCardDescription],
+  imports: [RouterLink, VoltNativeButton, LmnArrowRightIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section id="architecture" class="border-y border-border bg-background/70 py-20">
-      <div class="mx-auto w-full max-w-7xl px-6 md:px-8">
-        <div class="max-w-3xl">
-          <volt-badge variant="outline">What works today</volt-badge>
-          <h2 class="mt-5 text-3xl font-semibold md:text-5xl">
-            A CMS core for Angular teams, already in use.
-          </h2>
-          <p class="mt-5 text-lg leading-8 text-muted-foreground">
-            Everything below exists and runs in the apps in this repository. All of it is in the npm
-            release except schema-drift safety, which ships in the next one. It is pre-1.0: APIs can
-            still change between minor versions.
-          </p>
-        </div>
-
-        <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          @for (feature of features; track feature.title) {
-            <volt-card>
-              <volt-card-header>
-                <volt-card-title>{{ feature.title }}</volt-card-title>
-                <volt-card-description>{{ feature.description }}</volt-card-description>
-              </volt-card-header>
-            </volt-card>
-          }
-        </div>
-
-        <div class="mt-14 grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+    <section id="architecture" class="border-y border-border bg-background">
+      <div class="mx-auto w-full max-w-7xl px-5 py-22 md:px-8 md:py-28">
+        <div class="grid gap-10 lg:grid-cols-[0.72fr_1.28fr] lg:gap-18">
           <div>
-            <h3 class="text-2xl font-semibold">What "Local API" means</h3>
-            <p class="mt-4 leading-7 text-muted-foreground">
-              Your server code talks to the CMS as a library, not a web service. An Analog route can
-              compose several collections into one payload with no internal HTTP. Pass
-              <code class="rounded bg-muted px-1 text-sm">overrideAccess: false</code> and the same
-              access rules and draft visibility apply as for an anonymous visitor. The REST API and
-              the Angular client use the same pipeline.
+            <p class="forge-section-mark">Working foundation</p>
+            <h2 class="forge-section-title mt-5">The CMS pieces already agree with each other.</h2>
+            <p class="mt-5 max-w-[46ch] leading-7 text-muted-foreground">
+              One collection definition drives validation, persistence, access rules, REST, the
+              Local API and the Angular admin. These are shipped capabilities, not a future list.
             </p>
-            <a
-              routerLink="/docs/local-api"
-              class="mt-4 inline-block text-sm font-medium underline underline-offset-4"
-              >Read the Local API guide</a
-            >
           </div>
-          <pre
-            class="overflow-x-auto rounded-md border border-border bg-muted p-5 text-sm leading-7 text-foreground"
-          ><code>{{ localApiCode }}</code></pre>
+
+          <div class="border-t border-border">
+            @for (feature of features; track feature.title) {
+              <article
+                class="grid gap-2 border-b border-border py-5 sm:grid-cols-[0.7fr_1.3fr] sm:gap-8"
+              >
+                <h3 class="font-semibold tracking-[-0.015em]">{{ feature.title }}</h3>
+                <p class="text-sm leading-6 text-muted-foreground">{{ feature.description }}</p>
+              </article>
+            }
+          </div>
+        </div>
+
+        <div
+          class="mt-20 grid overflow-hidden rounded-[1.4rem] border border-border bg-[#0A0F1A] lg:grid-cols-[0.82fr_1.18fr]"
+        >
+          <div class="flex flex-col justify-between p-7 text-white md:p-10">
+            <div>
+              <p class="text-sm font-medium text-[#22D3EE]">No internal HTTP hop</p>
+              <h3 class="mt-4 max-w-[14ch] text-3xl font-semibold leading-tight tracking-[-0.04em]">
+                Compose content where your server code already lives.
+              </h3>
+              <p class="mt-5 max-w-[48ch] leading-7 text-white/65">
+                The Local API calls the same access, hooks, drafts, validation and relation pipeline
+                as REST. It returns the payload your route needs without making your app call
+                itself.
+              </p>
+            </div>
+            <a
+              voltButton
+              variant="outline"
+              class="mt-8 w-fit border-white/25 bg-white/5 text-white hover:bg-white/10"
+              routerLink="/docs/local-api"
+            >
+              Read the Local API guide
+              <lmn-arrow-right [size]="16" />
+            </a>
+          </div>
+          <pre class="forge-code m-3 overflow-x-auto md:m-5"><code>{{ localApiCode }}</code></pre>
         </div>
       </div>
     </section>

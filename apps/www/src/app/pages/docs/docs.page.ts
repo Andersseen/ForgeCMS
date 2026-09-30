@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { injectContentFiles } from '@analogjs/content';
-import { DemoDialogComponent } from '../../components/demo-dialog.component';
 import { HeaderComponent } from '../../components/header.component';
 import { buildDocsNav, isDocsFile, type DocsFrontmatter } from './docs-nav';
 import { DocsSidebarComponent } from './docs-sidebar.component';
@@ -16,7 +15,7 @@ import { DocsSidebarComponent } from './docs-sidebar.component';
 @Component({
   selector: 'forge-cms-docs',
   standalone: true,
-  imports: [RouterOutlet, HeaderComponent, DemoDialogComponent, DocsSidebarComponent],
+  imports: [RouterOutlet, HeaderComponent, DocsSidebarComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="min-h-screen bg-background">
@@ -29,7 +28,6 @@ import { DocsSidebarComponent } from './docs-sidebar.component';
           <router-outlet />
         </main>
       </div>
-      <forge-cms-demo-dialog />
     </div>
   `
 })

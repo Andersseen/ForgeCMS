@@ -334,3 +334,6 @@ jobs:
           --branch=main
           --commit-hash=${{ github.sha }}
           --commit-dirty=true
+
+      - name: Verify the deployed demo is healthy
+        run: node scripts/verify-demo-deployment.mjs

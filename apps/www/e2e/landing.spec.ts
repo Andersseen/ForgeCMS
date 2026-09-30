@@ -1,134 +1,121 @@
 import { expect, test } from '@playwright/test';
 import { CURRENT_FORGE_VERSION } from '../src/app/forge-release';
 
-test('renders the ForgeCMS landing page', async ({ page }) => {
+test('presents ForgeCMS as an Angular-native product', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page).toHaveTitle(/ForgeCMS/);
+  await expect(page).toHaveTitle(/Angular-native headless CMS/);
   await expect(
-    page.getByRole('heading', { name: /headless CMS built for Angular/i })
+    page.getByRole('heading', { name: 'The Angular CMS that stays in your application.' })
   ).toBeVisible();
-  await expect(page.getByRole('link', { name: /ForgeCMS/i }).first()).toBeVisible();
-  await expect(page.getByRole('link', { name: 'GitHub' }).first()).toBeVisible();
-  await expect(page.getByText('collections / posts', { exact: true })).toBeVisible();
+  await expect(page.getByText('Live content pipeline')).toBeVisible();
+  await expect(page.getByText('Schema', { exact: true })).toBeVisible();
+  await expect(page.getByText('Runtime', { exact: true })).toBeVisible();
+  await expect(page.getByText('Admin', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Install command')).toContainText('@forge-cms/runtime');
 });
 
-test('the header links to docs', async ({ page }) => {
-  // The header used to carry #architecture/#packages/#roadmap anchors into this page. They were
-  // dead weight in a global header and broken on every other route, so the nav is just Docs.
+test('global navigation gives Product, Demo and Docs equal routes', async ({ page }) => {
   await page.goto('/');
 
-  // `routerLink` renders an absolute href, so match the path rather than the whole URL.
   const header = page.locator('header');
+  await expect(header.getByRole('link', { name: 'Product', exact: true })).toHaveAttribute(
+    'href',
+    new RegExp('/#product$')
+  );
+  await expect(header.getByRole('link', { name: 'Demo', exact: true })).toHaveAttribute(
+    'href',
+    new RegExp('/demo$')
+  );
   await expect(header.getByRole('link', { name: 'Docs', exact: true })).toHaveAttribute(
     'href',
-    /\/docs$/
+    new RegExp('/docs$')
   );
-  await expect(header.getByRole('button', { name: 'GitHub' })).toBeVisible();
-});
-
-test('CTA buttons are visible and enabled', async ({ page }) => {
-  await page.goto('/');
-
-  await expect(page.getByRole('link', { name: 'Get started' })).toHaveAttribute(
+  await expect(header.getByRole('link', { name: /GitHub/ })).toHaveAttribute(
     'href',
-    /\/docs\/small-project-guide$/
+    'https://github.com/Andersseen/ForgeCMS'
   );
-
-  await expect(page.getByRole('link', { name: 'View docs' })).toHaveCount(0);
-
-  const demoButton = page.getByRole('button', {
-    name: 'See the clinic demo powered by the real runtime'
-  });
-  await expect(demoButton).toBeVisible();
-  await expect(demoButton).toBeEnabled();
 });
 
-test('the homepage get-started path reaches the small-project guide', async ({ page }) => {
+test('primary actions route to the guide and the first-class demo page', async ({ page }) => {
   await page.goto('/');
 
-  await page.getByRole('link', { name: 'Get started' }).click();
+  await expect(page.getByRole('link', { name: 'Start building' })).toHaveAttribute(
+    'href',
+    new RegExp('/docs/small-project-guide$')
+  );
+  await expect(page.getByRole('link', { name: 'Explore the live demo' })).toHaveAttribute(
+    'href',
+    new RegExp('/demo$')
+  );
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 
-  await expect(page).toHaveURL(/\/docs\/small-project-guide$/);
-  await expect(page.getByRole('heading', { name: 'Small project guide', level: 1 })).toBeVisible();
+  await page.getByRole('link', { name: 'Explore the live demo' }).click();
+  await expect(page).toHaveURL(new RegExp('/demo$'));
+  await expect(
+    page.getByRole('heading', { name: /Lumea is a clinic built from content/ })
+  ).toBeVisible();
 });
 
-test('package versions and footer are real homepage content', async ({ page }) => {
+test('packages derive from the single release version', async ({ page }) => {
   await page.goto('/');
 
   const packages = page.locator('#packages');
   await expect(packages.getByText('@forge-cms/core', { exact: true })).toBeVisible();
   await expect(packages.getByText('@forge-cms/testing', { exact: true })).toBeVisible();
-  // Every card shows the one current version (src/app/forge-release.ts), and nothing stale.
   await expect(packages.locator('volt-badge', { hasText: CURRENT_FORGE_VERSION })).toHaveCount(10);
-  await expect(page.getByText(/\b0\.4\.\d/)).toHaveCount(0);
   await expect(page.getByText('0.0.0')).toHaveCount(0);
+});
+
+test('the homepage separates shipped foundations from the next checkpoint', async ({ page }) => {
+  await page.goto('/');
+
+  const architecture = page.locator('#architecture');
+  await expect(architecture.getByText('Local API, no internal HTTP')).toBeVisible();
+  await expect(
+    architecture.getByRole('heading', { name: /Compose content where your server code/ })
+  ).toBeVisible();
+
+  const roadmap = page.locator('#roadmap');
+  await expect(roadmap.getByText('0.6', { exact: true })).toBeVisible();
+  await expect(roadmap.getByText('0.7', { exact: true })).toBeVisible();
+  await expect(roadmap.getByText('0.8', { exact: true })).toBeVisible();
+  await expect(roadmap.getByText('0.9', { exact: true })).toHaveCount(0);
+  await expect(roadmap.getByText('Reviewed migrations')).toBeVisible();
+});
+
+test('mobile navigation remains usable and the page does not overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Toggle navigation' }).click();
+  const mobile = page.getByRole('navigation', { name: 'Mobile' });
+  await expect(mobile.getByRole('link', { name: 'Product' })).toBeVisible();
+  await expect(mobile.getByRole('link', { name: 'Demo' })).toBeVisible();
+  await expect(mobile.getByRole('link', { name: 'Docs' })).toBeVisible();
+  await expect(mobile.getByRole('link', { name: /GitHub/ })).toBeVisible();
+
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  );
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
+test('footer keeps the project destinations available', async ({ page }) => {
+  await page.goto('/');
 
   const footer = page.locator('footer');
   await expect(footer.getByRole('link', { name: 'ForgeCMS' })).toBeVisible();
-  await expect(footer.getByRole('link', { name: 'Docs' })).toHaveAttribute('href', /\/docs$/);
-  await expect(footer.getByRole('link', { name: 'GitHub' })).toHaveAttribute(
+  await expect(footer.getByRole('link', { name: 'Demo' })).toHaveAttribute(
     'href',
-    'https://github.com/Andersseen/ForgeCMS'
+    new RegExp('/demo$')
+  );
+  await expect(footer.getByRole('link', { name: 'Docs' })).toHaveAttribute(
+    'href',
+    new RegExp('/docs$')
   );
   await expect(footer.getByRole('link', { name: 'npm' })).toHaveAttribute(
     'href',
     'https://www.npmjs.com/org/forge-cms'
   );
-});
-
-test('the landing answers what works today, the Local API, and what remains', async ({ page }) => {
-  await page.goto('/');
-
-  await expect(page.getByText(/Experimental · pre-1\.0/)).toBeVisible();
-  await expect(page.getByLabel('Install command')).toContainText('@forge-cms/runtime');
-
-  const architecture = page.locator('#architecture');
-  await expect(architecture.getByText('Local API, no internal HTTP')).toBeVisible();
-  await expect(architecture.getByRole('heading', { name: /What "Local API" means/ })).toBeVisible();
-
-  const roadmap = page.locator('#roadmap');
-  await expect(roadmap.getByText('0.6 — Auth and data integrity')).toBeVisible();
-  await expect(roadmap.getByText('0.7 — Upgrade safety')).toBeVisible();
-  await expect(roadmap.getByText('In progress')).toBeVisible();
-  await expect(roadmap.getByText('Reviewed migrations')).toBeVisible();
-  await roadmap.getByRole('link', { name: 'How schema upgrades work today' }).click();
-  await expect(page).toHaveURL(/\/docs\/schema-upgrades$/);
-  await expect(page.getByRole('heading', { name: 'Schema upgrades', level: 1 })).toBeVisible();
-});
-
-test('the demo dialog opens, points at the real demo, and closes with Escape', async ({ page }) => {
-  await page.goto('/');
-
-  await page
-    .getByRole('button', { name: 'See the clinic demo powered by the real runtime' })
-    .click();
-  const dialog = page.getByRole('dialog', { name: /Lumea Aesthetics/ });
-  await expect(dialog).toBeVisible();
-  await expect(dialog).toBeFocused();
-
-  await expect(dialog.getByRole('link', { name: 'Open the demo site →' })).toHaveAttribute(
-    'href',
-    'https://forge-cms-demo.pages.dev'
-  );
-  await expect(dialog.getByRole('link', { name: 'Go straight to the CMS' })).toHaveAttribute(
-    'href',
-    'https://forge-cms-demo.pages.dev/login'
-  );
-
-  await dialog.getByRole('button', { name: "I'm an Angular developer" }).click();
-  await expect(dialog.getByRole('link', { name: 'Read the content model →' })).toHaveAttribute(
-    'href',
-    /github\.com\/Andersseen\/ForgeCMS\/tree\/main\/apps\/demo-aesthetics$/
-  );
-
-  await page.keyboard.press('Escape');
-  await expect(dialog).toBeHidden();
-
-  // The close button works too.
-  await page
-    .getByRole('button', { name: 'See the clinic demo powered by the real runtime' })
-    .click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
-  await expect(page.getByRole('dialog')).toBeHidden();
 });

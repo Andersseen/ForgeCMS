@@ -1,5 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { VoltNativeButton } from '@voltui/components';
+import { LmnArrowPathIcon } from 'lumen-icons/arrow-path';
+import { LmnArrowTopRightOnSquareIcon } from 'lumen-icons/arrow-top-right-on-square';
 import { SiteApiService } from '../../services/site-api.service';
 import { ServiceCard } from './service-card.component';
 import { asyncState } from './async-state';
@@ -54,13 +57,44 @@ interface CtaBlock extends PageBlock {
 @Component({
   selector: 'lumea-home-page',
   standalone: true,
-  imports: [RouterLink, ServiceCard],
+  imports: [
+    RouterLink,
+    VoltNativeButton,
+    ServiceCard,
+    LmnArrowPathIcon,
+    LmnArrowTopRightOnSquareIcon
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (state.loading()) {
       <div class="mx-auto max-w-6xl px-5 py-24 text-sm text-muted-foreground">Loading…</div>
     } @else if (state.error(); as message) {
-      <div class="mx-auto max-w-6xl px-5 py-24 text-sm text-destructive">{{ message }}</div>
+      <section class="mx-auto max-w-6xl px-5 py-24">
+        <div class="max-w-2xl rounded-2xl border border-border bg-card p-7 md:p-9">
+          <p class="text-sm font-medium text-destructive">The clinic content is unavailable</p>
+          <h1 class="lumea-display mt-3 text-3xl">The demo could not reach ForgeCMS.</h1>
+          <p class="mt-4 leading-relaxed text-muted-foreground">
+            The public site is still here, but its CMS request failed. Retry now or open the demo
+            guide to see the intended editor and developer journeys.
+          </p>
+          <p class="mt-3 font-mono text-xs text-muted-foreground">{{ message }}</p>
+          <div class="mt-7 flex flex-wrap gap-3">
+            <button voltButton type="button" (click)="reload()">
+              <lmn-arrow-path [size]="16" />
+              Retry
+            </button>
+            <a
+              voltButton
+              variant="outline"
+              href="https://forge-cms.pages.dev/demo"
+              rel="noreferrer"
+            >
+              Open the ForgeCMS demo guide
+              <lmn-arrow-top-right-on-square [size]="16" />
+            </a>
+          </div>
+        </div>
+      </section>
     } @else if (state.data(); as home) {
       @for (block of home.page?.sections ?? []; track $index) {
         @switch (block.blockType) {
@@ -236,6 +270,10 @@ export class HomePage {
   private readonly api = inject(SiteApiService);
 
   protected readonly state = asyncState(() => this.api.home());
+
+  protected reload(): void {
+    this.state.reload(() => this.api.home());
+  }
 
   protected asHero(block: PageBlock): HeroBlock {
     return block as HeroBlock;

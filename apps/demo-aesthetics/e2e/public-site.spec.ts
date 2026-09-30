@@ -3,6 +3,34 @@ import { useOwnThrottleBucket } from './visitor';
 
 useOwnThrottleBucket('public-site');
 
+test('a failed CMS request gives visitors a retry and a route back to the demo guide', async ({
+  page
+}) => {
+  let attempts = 0;
+  await page.route('**/api/site/home', async (route) => {
+    attempts += 1;
+    if (attempts === 1) {
+      await route.fulfill({ status: 500, contentType: 'application/json', body: '{}' });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto('/');
+
+  await expect(
+    page.getByRole('heading', { name: 'The demo could not reach ForgeCMS.' })
+  ).toBeVisible();
+  await expect(page.getByRole('link', { name: /Open the ForgeCMS demo guide/ })).toHaveAttribute(
+    'href',
+    'https://forge-cms.pages.dev/demo'
+  );
+
+  await page.getByRole('button', { name: 'Retry' }).click();
+  await expect(page.getByRole('link', { name: 'Treatments' }).first()).toBeVisible();
+  expect(attempts).toBe(2);
+});
+
 test('public site journey: home, treatment detail, booking CTA', async ({ page }) => {
   await page.goto('/');
 
