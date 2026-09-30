@@ -1,8 +1,20 @@
-import { defineEventHandler } from 'h3';
-import { getServerRuntime } from '../../api/runtime';
+import { defineEventHandler, setResponseStatus } from 'h3';
+import type { ForgeCmsRuntime } from '@forge-cms/runtime';
+import { getServerRuntime, type ServerEnv } from '../../api/runtime';
+import { startupFailureBody } from '../../api/startup';
 
+/**
+ * Adapter names and record counts. If the runtime cannot start, a `503` names the failed stage (auth,
+ * configuration, database, seed) without any secret — the post-deploy check prints it.
+ */
 export default defineEventHandler(async (event) => {
-  const runtime = await getServerRuntime(event.context.cloudflare?.env);
+  let runtime: ForgeCmsRuntime<ServerEnv>;
+  try {
+    runtime = await getServerRuntime(event.context.cloudflare?.env);
+  } catch (error) {
+    setResponseStatus(event, 503);
+    return startupFailureBody(error);
+  }
   const db = runtime.adapters.database;
 
   let totalRecords = 0;

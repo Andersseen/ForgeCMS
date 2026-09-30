@@ -17,6 +17,8 @@
     "e2e/**/*.ts",
     "vite-plugins/**/*.ts",
     "vite.config.ts",
-    "playwright.config.ts"
+    "playwright.config.ts",
+    "e2e-prod/**/*.ts",
+    "playwright.prod.config.ts"
   ]
 }

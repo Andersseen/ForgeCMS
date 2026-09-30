@@ -227,4 +227,9 @@ clinic demo is treated as a reliability target rather than a second redesign in 
 
 ## Outcome
 
-<!-- Fill when done: one line on what shipped, plus any divergence from the plan. -->
+Shipped (PR #59): the `/demo` route replacing the modal, the refreshed landing (Volt UI 1.1.0,
+angular-movement 1.2.0, Lumen icons, one reduced-motion-aware pipeline motion), mobile navigation,
+the demo failure state and the post-deploy demo health check. **Not achieved:** demo recovery —
+acceptance 1 failed in production (`/api/status` 500 on every attempt). Spec 075 found the real cause
+(blocking schema drift, not a missing `AUTH_SECRET`), added the fix path and a health gate for the
+official site too; applying the migrations is pending operator action.

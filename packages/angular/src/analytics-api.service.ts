@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { ApiAuthError } from './types.js';
+import { ApiAuthError, ForgeApiError } from './types.js';
 
 export type AnalyticsRange = '24h' | '7d' | '30d' | '90d';
 
@@ -26,9 +26,8 @@ export interface AnalyticsSummaryResponse {
 
 /**
  * Reads aggregated analytics for the admin dashboard. Kept apart from `CmsApiService`: this isn't CMS
- * document CRUD, and `/api/analytics/*` is a ForgeCMS-wide convention hardcoded here — the same way
- * `CmsApiService.getCurrentUser()` hardcodes `/api/auth/me` rather than deriving it from
- * `FORGE_CMS_CONFIG.baseUrl`.
+ * document CRUD, and `/api/analytics/*` is still hardcoded here. Experimental (spec 057) and outside
+ * spec 075: it does not use `FORGE_CMS_CONFIG` or its transport.
  */
 @Injectable({ providedIn: 'root' })
 export class ForgeAnalyticsApiService {
@@ -37,7 +36,14 @@ export class ForgeAnalyticsApiService {
       credentials: 'include'
     });
     if (response.status === 401) throw new ApiAuthError();
-    if (!response.ok) throw new Error(`Failed to fetch analytics: ${response.status}`);
+    if (!response.ok) {
+      throw new ForgeApiError({
+        kind: 'http',
+        status: response.status,
+        code: 'HTTP_ERROR',
+        message: `Failed to fetch analytics: ${response.status}`
+      });
+    }
     const result = (await response.json()) as { data: AnalyticsSummaryResponse };
     return result.data;
   }

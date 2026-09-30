@@ -2,21 +2,23 @@ import { Injectable, inject, signal } from '@angular/core';
 import type { Signal } from '@angular/core';
 import { buildQueryString } from './query.js';
 import type { QueryOptions, QueryWhere } from './query.js';
+import { ForgeRequester, PassedStatus, dataOf, encodePathSegment, joinUrl } from './transport.js';
+import type { SendOptions } from './transport.js';
 import {
-  ApiAuthActionError,
-  ApiAuthError,
-  ApiValidationError,
   FORGE_CMS_CONFIG,
-  type ApiErrorBody,
-  type ApiFieldError,
-  type ApiItemResponse,
   type ApiListResponse,
   type AuthUser,
   type CollectionMeta,
   type CreateUserInput,
+  type ForgeRequestOptions,
   type PaginatedDocuments
 } from './types.js';
 
+/**
+ * Promise-based client for Forge's HTTP API. Every method sends exactly one request through the
+ * configured transport (spec 075) and never retries. Every failure rejects with a `ForgeApiError`
+ * (or one of its compatible subclasses) that keeps the HTTP status, Forge `code` and `details`.
+ */
 @Injectable({ providedIn: 'root' })
 export class CmsApiService {
   private readonly config = inject(FORGE_CMS_CONFIG, { optional: true });
@@ -27,13 +29,17 @@ export class CmsApiService {
 
   /**
    * Plain callback registry `ForgeAuthSession` uses to detect a session going stale mid-app (a 401 on
-   * some unrelated request) without polling `/api/auth/me` in a loop — see `auth-session.ts`. A plain
-   * callback rather than an `effect()` on {@link unauthorized}: `effect()` needs the full Angular
-   * change-detection scheduler wired up (a real bootstrapped app, or `TestBed` with a platform), which
-   * this package's lightweight `Injector.create`-based tests don't set up, and a synchronous callback is
-   * simpler to reason about here regardless.
+   * some unrelated request) without polling `/me` in a loop — see `auth-session.ts`. A plain callback
+   * rather than an `effect()` on {@link unauthorized}: `effect()` needs the full Angular
+   * change-detection scheduler wired up, which this package's lightweight `Injector.create`-based tests
+   * don't set up, and a synchronous callback is simpler to reason about here regardless.
    */
   private readonly unauthorizedListeners = new Set<() => void>();
+
+  private readonly requester = new ForgeRequester(this.config, () => {
+    this.unauthorizedCount.update((count) => count + 1);
+    for (const listener of this.unauthorizedListeners) listener();
+  });
 
   /** Registers a listener called synchronously on every observed `401`. Returns an unsubscribe function. */
   onUnauthorized(listener: () => void): () => void {
@@ -41,113 +47,46 @@ export class CmsApiService {
     return () => this.unauthorizedListeners.delete(listener);
   }
 
-  private get baseUrl(): string {
-    return this.config?.baseUrl ?? '/api/v1';
+  private content(segments: readonly string[], query = ''): string {
+    return joinUrl(this.requester.contentBase, segments, query);
   }
 
-  /** See {@link ForgeCmsConfig.authBaseUrl}. Defaults to `/api/auth`, the literal every method below used before this existed. */
-  private get authBase(): string {
-    return this.config?.authBaseUrl ?? '/api/auth';
+  private auth(segments: readonly string[]): string {
+    return joinUrl(this.requester.authBase, segments);
   }
 
-  private get authToken(): string | null {
-    const token = this.config?.authToken;
-    if (typeof token === 'function') return token();
-    return token ?? null;
+  private async data<T>(options: SendOptions): Promise<T> {
+    return dataOf<T>(await this.requester.send(options), options.failure);
   }
 
-  private getHeaders(): Record<string, string> {
-    return { 'content-type': 'application/json', ...this.authHeader() };
+  private collection(slug: string): string {
+    return encodePathSegment(slug, 'collection slug');
   }
 
   /**
-   * The auth header alone, for requests that must not declare a JSON content type (a `GET`, or a
-   * multipart upload where the browser has to set the boundary itself).
+   * `GET {authBaseUrl}/me`. Resolves `null` only for a `401` (nobody is signed in); a `403`, `5xx`,
+   * network failure or malformed response rejects with a `ForgeApiError` — an outage is not "signed out".
    */
-  private authHeader(): Record<string, string> {
-    const token = this.authToken;
-    return token ? { authorization: `Bearer ${token}` } : {};
-  }
-
-  /**
-   * Turns a non-2xx response into an `Error`. Handles every shape this codebase's routes actually
-   * produce: the current Forge envelope (`{ error: { code, message, details? } }`, from
-   * `handlers.ts`/`auth-handlers.ts`/`authFailureResponse` — note `details` nests *inside* `error`,
-   * not at the top level), an older flat shape (`{ error: string, details: [...] }`, kept for backward
-   * compatibility), and h3's own `createError` shape (`{ statusMessage, message }`, used by the
-   * hand-rolled `apps/*` user-management routes for their own local validation). Without unwrapping
-   * the nested object form, a real per-field validation array or a real message like "Cannot remove
-   * the last remaining admin" previously surfaced as the useless string `"[object Object]"`.
-   */
-  private toApiError = async (response: Response, fallbackMessage: string): Promise<Error> => {
-    if (response.status === 401) {
-      this.unauthorizedCount.update((count) => count + 1);
-      for (const listener of this.unauthorizedListeners) listener();
-      return new ApiAuthError();
-    }
-    try {
-      const body = (await response.json()) as {
-        error?: string | { code?: string; message?: string; details?: unknown };
-        details?: ApiFieldError[];
-        statusMessage?: string;
-        message?: string;
-      };
-      const errorObject =
-        typeof body.error === 'object' && body.error !== null ? body.error : undefined;
-      const errorString = typeof body.error === 'string' ? body.error : undefined;
-      const details = (errorObject?.details as ApiFieldError[] | undefined) ?? body.details;
-
-      if (Array.isArray(details)) {
-        return new ApiValidationError(
-          errorObject?.message ?? errorString ?? fallbackMessage,
-          details
-        );
-      }
-      const text = errorObject?.message ?? errorString ?? body.statusMessage ?? body.message;
-      if (text) return new Error(text);
-      return new Error(`${fallbackMessage}: ${response.status}`);
-    } catch {
-      return new Error(`${fallbackMessage}: ${response.status}`);
-    }
-  };
-
-  private async toAuthActionError(
-    response: Response,
-    fallbackMessage: string
-  ): Promise<ApiAuthActionError> {
-    try {
-      const body = (await response.json()) as Partial<ApiErrorBody>;
-      if (body.error?.message) {
-        return new ApiAuthActionError(
-          body.error.code ?? 'UNKNOWN',
-          body.error.message,
-          response.status
-        );
-      }
-    } catch {
-      // fall through to the generic fallback below
-    }
-    return new ApiAuthActionError('UNKNOWN', fallbackMessage, response.status);
-  }
-
-  async getCurrentUser(): Promise<AuthUser | null> {
-    const response = await fetch(`${this.authBase}/me`, {
-      headers: this.getHeaders(),
-      credentials: 'include'
+  async getCurrentUser(request?: ForgeRequestOptions): Promise<AuthUser | null> {
+    const failure = 'Failed to load the current session';
+    const body = await this.requester.send({
+      method: 'GET',
+      url: this.auth(['me']),
+      failure,
+      passStatuses: [401],
+      signal: request?.signal
     });
-    if (!response.ok) return null;
-    const result = (await response.json()) as { data: AuthUser };
-    return result.data;
+    if (body instanceof PassedStatus) return null;
+    return dataOf<AuthUser>(body, failure);
   }
 
-  async getCollections(): Promise<CollectionMeta[]> {
-    const response = await fetch(`${this.baseUrl}/collections`, {
-      headers: this.authHeader(),
-      credentials: 'include'
+  async getCollections(request?: ForgeRequestOptions): Promise<CollectionMeta[]> {
+    return this.data<CollectionMeta[]>({
+      method: 'GET',
+      url: this.content(['collections']),
+      failure: 'Failed to fetch collections',
+      signal: request?.signal
     });
-    if (!response.ok) throw await this.toApiError(response, 'Failed to fetch collections');
-    const result = (await response.json()) as { data: CollectionMeta[] };
-    return result.data;
   }
 
   /**
@@ -156,24 +95,28 @@ export class CmsApiService {
    */
   async getDocuments<T = Record<string, unknown>>(
     collection: string,
-    options?: QueryOptions
+    options?: QueryOptions,
+    request?: ForgeRequestOptions
   ): Promise<T[]> {
-    const { docs } = await this.listDocuments<T>(collection, options);
+    const { docs } = await this.listDocuments<T>(collection, options, request);
     return docs;
   }
 
   /** Like {@link getDocuments}, but keeps the pagination metadata a paginator needs. */
   async listDocuments<T = Record<string, unknown>>(
     collection: string,
-    options?: QueryOptions
+    options?: QueryOptions,
+    request?: ForgeRequestOptions
   ): Promise<PaginatedDocuments<T>> {
-    const response = await fetch(`${this.baseUrl}/${collection}${buildQueryString(options)}`, {
-      headers: this.authHeader(),
-      credentials: 'include'
+    const failure = `Failed to fetch ${collection}`;
+    const body = await this.requester.send({
+      method: 'GET',
+      url: this.content([this.collection(collection)], buildQueryString(options)),
+      failure,
+      signal: request?.signal
     });
-    if (!response.ok) throw await this.toApiError(response, `Failed to fetch ${collection}`);
-    const result = (await response.json()) as ApiListResponse<T>;
-    return { docs: result.data, meta: result.meta };
+    const docs = dataOf<T[]>(body, failure);
+    return { docs, meta: (body as ApiListResponse<T>).meta };
   }
 
   /**
@@ -184,28 +127,32 @@ export class CmsApiService {
   async findOne<T = Record<string, unknown>>(
     collection: string,
     where?: QueryWhere,
-    options?: Omit<QueryOptions, 'where' | 'limit' | 'offset' | 'page'>
+    options?: Omit<QueryOptions, 'where' | 'limit' | 'offset' | 'page'>,
+    request?: ForgeRequestOptions
   ): Promise<T | null> {
-    const { docs } = await this.listDocuments<T>(collection, {
-      ...options,
-      ...(where !== undefined && { where }),
-      limit: 1
-    });
+    const { docs } = await this.listDocuments<T>(
+      collection,
+      { ...options, ...(where !== undefined && { where }), limit: 1 },
+      request
+    );
     return docs[0] ?? null;
   }
 
   async getDocument<T = Record<string, unknown>>(
     collection: string,
     id: string,
-    options?: Pick<QueryOptions, 'depth' | 'locale'>
+    options?: Pick<QueryOptions, 'depth' | 'locale'>,
+    request?: ForgeRequestOptions
   ): Promise<T> {
-    const response = await fetch(
-      `${this.baseUrl}/${collection}/${id}${buildQueryString(options)}`,
-      { headers: this.authHeader(), credentials: 'include' }
-    );
-    if (!response.ok) throw await this.toApiError(response, 'Failed to fetch document');
-    const result = (await response.json()) as ApiItemResponse<T>;
-    return result.data;
+    return this.data<T>({
+      method: 'GET',
+      url: this.content(
+        [this.collection(collection), encodePathSegment(id, 'document id')],
+        buildQueryString(options)
+      ),
+      failure: 'Failed to fetch document',
+      signal: request?.signal
+    });
   }
 
   /**
@@ -216,57 +163,54 @@ export class CmsApiService {
   async uploadFile<T = Record<string, unknown>>(
     collection: string,
     file: File,
-    fields: Record<string, string> = {}
+    fields: Record<string, string> = {},
+    request?: ForgeRequestOptions
   ): Promise<T> {
     const form = new FormData();
     form.set('file', file);
     for (const [name, value] of Object.entries(fields)) form.set(name, value);
 
-    const response = await fetch(`${this.baseUrl}/${collection}`, {
+    return this.data<T>({
       method: 'POST',
-      headers: this.authHeader(),
-      credentials: 'include',
-      body: form
+      url: this.content([this.collection(collection)]),
+      body: form,
+      failure: 'Failed to upload file',
+      signal: request?.signal
     });
-    if (!response.ok) throw await this.toApiError(response, 'Failed to upload file');
-    const result = (await response.json()) as ApiItemResponse<T>;
-    return result.data;
   }
 
   async createDocument<T = Record<string, unknown>>(
     collection: string,
     data: Record<string, unknown>,
-    options?: Pick<QueryOptions, 'locale'>
+    options?: Pick<QueryOptions, 'locale'>,
+    request?: ForgeRequestOptions
   ): Promise<T> {
-    const response = await fetch(`${this.baseUrl}/${collection}${buildQueryString(options)}`, {
+    return this.data<T>({
       method: 'POST',
-      headers: this.getHeaders(),
-      credentials: 'include',
-      body: JSON.stringify(data)
+      url: this.content([this.collection(collection)], buildQueryString(options)),
+      json: data,
+      failure: 'Failed to create document',
+      signal: request?.signal
     });
-    if (!response.ok) throw await this.toApiError(response, 'Failed to create document');
-    const result = (await response.json()) as ApiItemResponse<T>;
-    return result.data;
   }
 
   async updateDocument<T = Record<string, unknown>>(
     collection: string,
     id: string,
     data: Record<string, unknown>,
-    options?: Pick<QueryOptions, 'locale'>
+    options?: Pick<QueryOptions, 'locale'>,
+    request?: ForgeRequestOptions
   ): Promise<T> {
-    const response = await fetch(
-      `${this.baseUrl}/${collection}/${id}${buildQueryString(options)}`,
-      {
-        method: 'PUT',
-        headers: this.getHeaders(),
-        credentials: 'include',
-        body: JSON.stringify(data)
-      }
-    );
-    if (!response.ok) throw await this.toApiError(response, 'Failed to update document');
-    const result = (await response.json()) as ApiItemResponse<T>;
-    return result.data;
+    return this.data<T>({
+      method: 'PUT',
+      url: this.content(
+        [this.collection(collection), encodePathSegment(id, 'document id')],
+        buildQueryString(options)
+      ),
+      json: data,
+      failure: 'Failed to update document',
+      signal: request?.signal
+    });
   }
 
   /**
@@ -276,9 +220,10 @@ export class CmsApiService {
   async setDocumentStatus<T = Record<string, unknown>>(
     collection: string,
     id: string,
-    status: 'draft' | 'published'
+    status: 'draft' | 'published',
+    request?: ForgeRequestOptions
   ): Promise<T> {
-    return this.updateDocument<T>(collection, id, { _status: status });
+    return this.updateDocument<T>(collection, id, { _status: status }, undefined, request);
   }
 
   /**
@@ -289,119 +234,127 @@ export class CmsApiService {
   async previewDocument<T = Record<string, unknown>>(
     collection: string,
     data: Record<string, unknown>,
-    options?: { id?: string; depth?: 0 | 1 }
+    options?: { id?: string; depth?: 0 | 1 },
+    request?: ForgeRequestOptions
   ): Promise<T> {
-    const url = options?.id
-      ? `${this.baseUrl}/${collection}/${options.id}/preview${buildQueryString(options.depth !== undefined ? { depth: options.depth } : undefined)}`
-      : `${this.baseUrl}/${collection}/preview${buildQueryString(options?.depth !== undefined ? { depth: options.depth } : undefined)}`;
-
-    const response = await fetch(url, {
+    const query = buildQueryString(
+      options?.depth !== undefined ? { depth: options.depth } : undefined
+    );
+    const segments = options?.id
+      ? [this.collection(collection), encodePathSegment(options.id, 'document id'), 'preview']
+      : [this.collection(collection), 'preview'];
+    return this.data<T>({
       method: 'POST',
-      headers: this.getHeaders(),
-      credentials: 'include',
-      body: JSON.stringify(data)
+      url: this.content(segments, query),
+      json: data,
+      failure: 'Failed to preview document',
+      signal: request?.signal
     });
-    if (!response.ok) throw await this.toApiError(response, 'Failed to preview document');
-    const result = (await response.json()) as ApiItemResponse<T>;
-    return result.data;
   }
 
-  async deleteDocument(collection: string, id: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/${collection}/${id}`, {
+  async deleteDocument(
+    collection: string,
+    id: string,
+    request?: ForgeRequestOptions
+  ): Promise<void> {
+    await this.requester.send({
       method: 'DELETE',
-      headers: this.getHeaders(),
-      credentials: 'include'
+      url: this.content([this.collection(collection), encodePathSegment(id, 'document id')]),
+      failure: 'Failed to delete document',
+      signal: request?.signal
     });
-    if (!response.ok) throw await this.toApiError(response, 'Failed to delete document');
   }
 
   /**
    * `POST {authBaseUrl}/login` (default `/api/auth/login`). Returns `{ token, user }` unchanged
    * (Bearer-compatible), but a browser session should rely on the `Set-Cookie` header the server also
-   * sends (spec 053) — see `ForgeAuthSession`, which calls this and ignores `token`.
+   * sends (spec 053) — see `ForgeAuthSession`, which calls this and ignores `token`. An HTTP failure is
+   * an `ApiAuthActionError`; a failed login never counts as session expiry.
    */
-  async login(email: string, password: string): Promise<{ token: string; user: AuthUser }> {
-    const response = await fetch(`${this.authBase}/login`, {
+  async login(
+    email: string,
+    password: string,
+    request?: ForgeRequestOptions
+  ): Promise<{ token: string; user: AuthUser }> {
+    return this.data<{ token: string; user: AuthUser }>({
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ email, password })
+      url: this.auth(['login']),
+      json: { email, password },
+      failure: 'Login failed',
+      authAction: true,
+      signal: request?.signal
     });
-    if (!response.ok) throw await this.toAuthActionError(response, 'Login failed');
-    const result = (await response.json()) as { data: { token: string; user: AuthUser } };
-    return result.data;
   }
 
   /**
    * `POST {authBaseUrl}/signup` (default `/api/auth/signup`) — `404`s if the server hasn't enabled
    * public signup. No `role` field.
    */
-  async signup(input: {
-    email: string;
-    password: string;
-    name?: string;
-  }): Promise<{ token: string; user: AuthUser }> {
-    const response = await fetch(`${this.authBase}/signup`, {
+  async signup(
+    input: { email: string; password: string; name?: string },
+    request?: ForgeRequestOptions
+  ): Promise<{ token: string; user: AuthUser }> {
+    return this.data<{ token: string; user: AuthUser }>({
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(input)
+      url: this.auth(['signup']),
+      json: input,
+      failure: 'Signup failed',
+      authAction: true,
+      signal: request?.signal
     });
-    if (!response.ok) throw await this.toAuthActionError(response, 'Signup failed');
-    const result = (await response.json()) as { data: { token: string; user: AuthUser } };
-    return result.data;
   }
 
   /** `POST {authBaseUrl}/logout` (default `/api/auth/logout`) — clears the session cookie. `204` on success. */
-  async logout(): Promise<void> {
-    const response = await fetch(`${this.authBase}/logout`, {
+  async logout(request?: ForgeRequestOptions): Promise<void> {
+    await this.requester.send({
       method: 'POST',
-      credentials: 'include'
+      url: this.auth(['logout']),
+      failure: 'Logout failed',
+      authAction: true,
+      signal: request?.signal
     });
-    if (!response.ok) throw await this.toAuthActionError(response, 'Logout failed');
   }
 
-  async getUsers(): Promise<AuthUser[]> {
-    const response = await fetch(`${this.authBase}/users`, {
-      headers: this.getHeaders(),
-      credentials: 'include'
+  async getUsers(request?: ForgeRequestOptions): Promise<AuthUser[]> {
+    return this.data<AuthUser[]>({
+      method: 'GET',
+      url: this.auth(['users']),
+      failure: 'Failed to fetch users',
+      signal: request?.signal
     });
-    if (!response.ok) throw await this.toApiError(response, 'Failed to fetch users');
-    const result = (await response.json()) as { data: AuthUser[] };
-    return result.data;
   }
 
-  async createUser(input: CreateUserInput): Promise<AuthUser> {
-    const response = await fetch(`${this.authBase}/users`, {
+  async createUser(input: CreateUserInput, request?: ForgeRequestOptions): Promise<AuthUser> {
+    return this.data<AuthUser>({
       method: 'POST',
-      headers: this.getHeaders(),
-      credentials: 'include',
-      body: JSON.stringify(input)
+      url: this.auth(['users']),
+      json: input,
+      failure: 'Failed to create user',
+      signal: request?.signal
     });
-    if (!response.ok) throw await this.toApiError(response, 'Failed to create user');
-    const result = (await response.json()) as { data: AuthUser };
-    return result.data;
   }
 
-  async updateUser(id: string, input: Partial<CreateUserInput>): Promise<AuthUser> {
-    const response = await fetch(`${this.authBase}/users/${id}`, {
+  async updateUser(
+    id: string,
+    input: Partial<CreateUserInput>,
+    request?: ForgeRequestOptions
+  ): Promise<AuthUser> {
+    return this.data<AuthUser>({
       method: 'PUT',
-      headers: this.getHeaders(),
-      credentials: 'include',
-      body: JSON.stringify(input)
+      url: this.auth(['users', encodePathSegment(id, 'user id')]),
+      json: input,
+      failure: 'Failed to update user',
+      signal: request?.signal
     });
-    if (!response.ok) throw await this.toApiError(response, 'Failed to update user');
-    const result = (await response.json()) as { data: AuthUser };
-    return result.data;
   }
 
-  async deleteUser(id: string): Promise<void> {
-    const response = await fetch(`${this.authBase}/users/${id}`, {
+  async deleteUser(id: string, request?: ForgeRequestOptions): Promise<void> {
+    await this.requester.send({
       method: 'DELETE',
-      headers: this.getHeaders(),
-      credentials: 'include'
+      url: this.auth(['users', encodePathSegment(id, 'user id')]),
+      failure: 'Failed to delete user',
+      signal: request?.signal
     });
-    if (!response.ok) throw await this.toApiError(response, 'Failed to delete user');
   }
 
   // --- Globals -----------------------------------------------------------------------------
@@ -409,15 +362,20 @@ export class CmsApiService {
   /**
    * Reads a singleton global document. Returns `null` if the global has never been configured.
    */
-  async getGlobal<T = Record<string, unknown>>(global: string): Promise<T | null> {
-    const response = await fetch(`${this.baseUrl}/globals/${global}`, {
-      headers: this.authHeader(),
-      credentials: 'include'
+  async getGlobal<T = Record<string, unknown>>(
+    global: string,
+    request?: ForgeRequestOptions
+  ): Promise<T | null> {
+    const failure = `Failed to fetch global '${global}'`;
+    const body = await this.requester.send({
+      method: 'GET',
+      url: this.content(['globals', encodePathSegment(global, 'global slug')]),
+      failure,
+      passStatuses: [404],
+      signal: request?.signal
     });
-    if (response.status === 404) return null;
-    if (!response.ok) throw await this.toApiError(response, `Failed to fetch global '${global}'`);
-    const result = (await response.json()) as ApiItemResponse<T>;
-    return result.data;
+    if (body instanceof PassedStatus) return null;
+    return dataOf<T>(body, failure);
   }
 
   /**
@@ -425,16 +383,15 @@ export class CmsApiService {
    */
   async updateGlobal<T = Record<string, unknown>>(
     global: string,
-    data: Record<string, unknown>
+    data: Record<string, unknown>,
+    request?: ForgeRequestOptions
   ): Promise<T> {
-    const response = await fetch(`${this.baseUrl}/globals/${global}`, {
+    return this.data<T>({
       method: 'PUT',
-      headers: this.getHeaders(),
-      credentials: 'include',
-      body: JSON.stringify(data)
+      url: this.content(['globals', encodePathSegment(global, 'global slug')]),
+      json: data,
+      failure: `Failed to update global '${global}'`,
+      signal: request?.signal
     });
-    if (!response.ok) throw await this.toApiError(response, `Failed to update global '${global}'`);
-    const result = (await response.json()) as ApiItemResponse<T>;
-    return result.data;
   }
 }

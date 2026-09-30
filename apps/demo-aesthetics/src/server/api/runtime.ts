@@ -12,6 +12,7 @@ import { ForgeCmsRuntime } from '@forge-cms/runtime';
 import { collections, type DemoCollections } from './collections';
 import { seedContent } from './seed';
 import { setRuntimeRef } from './runtime-ref';
+import { logStartupFailure, startupStage } from './startup';
 
 export interface ServerEnv {
   /**
@@ -47,10 +48,18 @@ let runtimePromise: Promise<DemoRuntime> | undefined;
  * Lazily builds (and seeds) the runtime on first call. Must only be invoked from inside a request
  * handler: Cloudflare Workers forbids async I/O at module scope, so neither adapter construction
  * nor seeding may run at import time.
+ *
+ * A failed startup is not cached (spec 075): the request fails, the classified cause is logged, and
+ * the next request tries again — so a fixed secret or a finished migration takes effect without
+ * waiting for the isolate to be recycled.
  */
 export function getServerRuntime(env?: ServerEnv): Promise<DemoRuntime> {
   if (!runtimePromise) {
-    runtimePromise = buildRuntime(env);
+    runtimePromise = buildRuntime(env).catch((error: unknown) => {
+      runtimePromise = undefined;
+      logStartupFailure(error);
+      throw error;
+    });
   }
   return runtimePromise;
 }
@@ -94,18 +103,19 @@ export function createRuntime(env?: ServerEnv, options: { devMode?: boolean } = 
 }
 
 async function buildRuntime(env?: ServerEnv): Promise<DemoRuntime> {
-  const runtime = createRuntime(env);
-  await runtime.syncSchema();
+  // `createRuntime` initializes the auth adapter, so a missing or short `AUTH_SECRET` is classified
+  // as the `auth` stage from its message.
+  const runtime = await startupStage('configuration', () => createRuntime(env));
+  await startupStage('database', () => runtime.syncSchema());
 
   // `site_settings` is written exactly once by the seed and by nothing else, so it doubles as the
   // "already seeded?" sentinel — D1 keeps its rows across cold starts, the in-memory adapter does
   // not, and this handles both.
-  const existing = await runtime.adapters.database.findMany({
-    collection: 'site_settings',
-    limit: 1
-  });
+  const existing = await startupStage('database', () =>
+    runtime.adapters.database.findMany({ collection: 'site_settings', limit: 1 })
+  );
   if (existing.length === 0) {
-    await seedContent(runtime);
+    await startupStage('seed', () => seedContent(runtime));
   }
 
   return runtime;

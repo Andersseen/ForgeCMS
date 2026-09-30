@@ -2,11 +2,12 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { SiteApiService } from '../../services/site-api.service';
 import { ServiceCard } from './service-card.component';
 import { asyncState } from './async-state';
+import { SiteUnavailable } from './site-unavailable.component';
 
 @Component({
   selector: 'lumea-services-page',
   standalone: true,
-  imports: [ServiceCard],
+  imports: [SiteUnavailable, ServiceCard],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="lumea-hero border-b border-border/60">
@@ -22,8 +23,12 @@ import { asyncState } from './async-state';
     <section class="mx-auto max-w-6xl px-5 py-12">
       @if (state.loading()) {
         <p class="text-sm text-muted-foreground">Loading the menu…</p>
-      } @else if (state.error(); as message) {
-        <p class="text-sm text-destructive">{{ message }}</p>
+      } @else if (state.error()) {
+        <lumea-site-unavailable
+          subject="The treatment menu"
+          [compact]="true"
+          (retry)="state.retry()"
+        />
       } @else {
         <div class="flex flex-wrap gap-2">
           <button

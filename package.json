@@ -42,6 +42,7 @@
     "deploy:www": "pnpm build:www && wrangler pages deploy apps/www/dist/analog/public --project-name=forge-cms",
     "deploy:demo": "pnpm build:demo && wrangler pages deploy --cwd apps/demo-aesthetics --project-name=forge-cms-demo",
     "e2e:www": "pnpm --filter @forge-cms/www e2e",
+    "e2e:www:prod": "pnpm --filter @forge-cms/www e2e:prod",
     "e2e:demo": "pnpm --filter @forge-cms/demo-aesthetics e2e",
     "e2e:tiny-project": "pnpm --filter @forge-cms/tiny-project e2e",
     "test": "turbo run test && pnpm test:scripts",

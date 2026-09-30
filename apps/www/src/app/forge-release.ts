@@ -8,6 +8,9 @@
  * Product checkpoints are a separate axis. npm `0.8.x` is the roadmap `0.7` (upgrade safety) line:
  * `0.8.0` carries M01, `0.8.1` added M02's code (its changelog entry is in `0.8.2`); roadmap `0.8`
  * (Angular DX) will publish as npm `0.9.0` — see `ROADMAP_MILESTONES` and docs/STATE.md.
+ *
+ * Verified 2026-09-30 (spec 075): npm `latest` is `0.8.2`. `main` manifests say `0.8.3` (Version
+ * Packages PR #61), but that run's checks failed on a registry 404 and nothing was published.
  */
 export const CURRENT_FORGE_VERSION = '0.8.2';
 

@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ForgeAuthSession } from '@forge-cms/angular';
 import { VoltButton, VoltCard, VoltError, VoltInput, VoltLabel } from '@voltui/components';
+import { describeSessionError } from '@forge-cms/admin';
 
 const DEMO_EMAIL = 'demo@lumea.clinic';
 const DEMO_PASSWORD = 'lumea-demo';
@@ -58,7 +59,7 @@ const DEMO_PASSWORD = 'lumea-demo';
           </div>
 
           @if (session.error(); as error) {
-            <volt-error role="alert">{{ error.message }}</volt-error>
+            <volt-error role="alert">{{ describeError(error) }}</volt-error>
           }
 
           <volt-button type="submit" class="w-full" [disabled]="session.loading()">
@@ -83,6 +84,7 @@ const DEMO_PASSWORD = 'lumea-demo';
  */
 export class LoginPage {
   protected readonly session = inject(ForgeAuthSession);
+  protected readonly describeError = describeSessionError;
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 

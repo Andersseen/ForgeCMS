@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { ForgeAuthSession } from '@forge-cms/angular';
 import { VoltButton, VoltCard, VoltError, VoltInput, VoltLabel } from '@voltui/components';
 import { LmnEyeIcon, LmnEyeSlashIcon } from 'lumen-icons';
+import { describeSessionError } from './admin-error.js';
 
 /**
  * Reusable, optional sign-up page for `@forge-cms/admin` consumers (spec 054). Has no `role` field —
@@ -73,7 +74,7 @@ import { LmnEyeIcon, LmnEyeSlashIcon } from 'lumen-icons';
           </div>
 
           @if (session.error(); as error) {
-            <volt-error role="alert">{{ error.message }}</volt-error>
+            <volt-error role="alert">{{ describeError(error) }}</volt-error>
           }
 
           <volt-button type="submit" class="w-full" [disabled]="session.loading()">
@@ -90,6 +91,8 @@ export class ForgeSignUpComponent {
   readonly redirectTo = input<string>();
 
   protected readonly session = inject(ForgeAuthSession);
+  protected readonly describeError = describeSessionError;
+
   private readonly router = inject(Router);
 
   protected readonly name = signal('');

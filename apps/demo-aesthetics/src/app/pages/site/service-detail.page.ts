@@ -4,17 +4,22 @@ import { RouterLink } from '@angular/router';
 import { SiteApiService } from '../../services/site-api.service';
 import { ServiceCard } from './service-card.component';
 import { asyncState } from './async-state';
+import { SiteUnavailable } from './site-unavailable.component';
 import type { ServiceDetailPayload } from '../../../shared/site-content';
 
 @Component({
   selector: 'lumea-service-detail-page',
   standalone: true,
-  imports: [RouterLink, ServiceCard, CurrencyPipe],
+  imports: [SiteUnavailable, RouterLink, ServiceCard, CurrencyPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (state.loading()) {
       <div class="mx-auto max-w-6xl px-5 py-24 text-sm text-muted-foreground">Loading…</div>
-    } @else if (state.error()) {
+    } @else if (state.error() && !state.notFound()) {
+      <section class="mx-auto max-w-6xl px-5 py-24">
+        <lumea-site-unavailable subject="This treatment" (retry)="state.retry()" />
+      </section>
+    } @else if (state.notFound()) {
       <div class="mx-auto max-w-6xl px-5 py-24">
         <h1 class="lumea-display text-3xl">We could not find that treatment</h1>
         <a routerLink="/services" class="mt-4 inline-block text-sm underline underline-offset-4">

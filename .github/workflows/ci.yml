@@ -105,6 +105,12 @@ jobs:
       - name: E2E tests — apps/www
         run: pnpm e2e:www
 
+      # Spec 075: the official site's production build under workerd (`wrangler pages dev`, local D1,
+      # a per-run random AUTH_SECRET) — layout at 390/768/1440/1920, console, navigation, focus,
+      # reduced motion, metadata and links. Uses the build from "Build all packages and apps".
+      - name: E2E tests — apps/www production build
+        run: pnpm e2e:www:prod
+
       # Real browser journeys the readiness/consumer suites already had but were not release-gating
       # (spec 058 §11 / roadmap B03) — a small external-style consumer (tiny-project) and the
       # real-world demo, both driven end to end, not just their unit tests.
@@ -271,6 +277,21 @@ jobs:
       - name: Verify build output
         run: test -f apps/www/dist/analog/public/index.html
 
+      # Preflight (spec 075): the build refuses to start without AUTH_SECRET (spec 069), so deploying
+      # to a project that lacks it can only produce a 500. `pages secret list` prints secret *names*
+      # only (never values); they are not printed, only the presence of the name is checked. If the
+      # token cannot list them, the preflight warns instead of guessing.
+      - name: Preflight — required Pages secret is configured
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" -a -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Cloudflare deploy credentials are not configured"; exit 1; }
+          names=$(pnpm exec wrangler pages secret list --project-name=forge-cms 2>/dev/null) \
+            || { echo "::warning::Could not list Pages secret names; the post-deploy health check stays authoritative."; exit 0; }
+          grep -q -- '- AUTH_SECRET:' <<< "$names" \
+            || { echo "::error::forge-cms has no production AUTH_SECRET — see docs/DEPLOYMENT-HEALTH.md"; exit 1; }
+
       - name: Deploy to Cloudflare Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -281,6 +302,11 @@ jobs:
           --branch=main
           --commit-hash=${{ github.sha }}
           --commit-dirty=true
+
+      # A Pages upload is not a successful deployment: the API must start (spec 075). Never weaken
+      # this to hide a 500 — fix production (docs/DEPLOYMENT-HEALTH.md).
+      - name: Verify the deployed official site is healthy
+        run: node scripts/verify-deployment.mjs www
 
   deploy-demo:
     name: Deploy the demo app to Cloudflare Pages
@@ -318,6 +344,17 @@ jobs:
       - name: Verify build output
         run: test -f apps/demo-aesthetics/dist/analog/public/index.html
 
+      - name: Preflight — required Pages secret is configured
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" -a -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Cloudflare deploy credentials are not configured"; exit 1; }
+          names=$(pnpm exec wrangler pages secret list --project-name=forge-cms-demo 2>/dev/null) \
+            || { echo "::warning::Could not list Pages secret names; the post-deploy health check stays authoritative."; exit 0; }
+          grep -q -- '- AUTH_SECRET:' <<< "$names" \
+            || { echo "::error::forge-cms-demo has no production AUTH_SECRET — see docs/DEPLOYMENT-HEALTH.md"; exit 1; }
+
       # Idempotent: the first run creates the project, later runs report it already exists.
       - name: Ensure the Pages project exists
         continue-on-error: true
@@ -343,4 +380,4 @@ jobs:
           --commit-dirty=true
 
       - name: Verify the deployed demo is healthy
-        run: node scripts/verify-demo-deployment.mjs
+        run: node scripts/verify-deployment.mjs demo

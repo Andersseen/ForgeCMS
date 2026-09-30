@@ -28,7 +28,7 @@ export {
   visibleCollections,
   type WorkspaceQueryState
 } from './content-query.js';
-export { describeAdminError } from './admin-error.js';
+export { describeAdminError, describeSessionError } from './admin-error.js';
 export { ForgeRelationPickerComponent } from './relation-picker.component.js';
 export { ForgeUploadPickerComponent } from './upload-picker.component.js';
 export { ForgeRichTextEditorComponent } from './richtext-editor.component.js';

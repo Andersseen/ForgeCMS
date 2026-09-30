@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import type { OnInit } from '@angular/core';
-import { EmptyStateComponent, PageHeaderComponent } from '@forge-cms/admin';
+import { EmptyStateComponent, PageHeaderComponent, describeAdminError } from '@forge-cms/admin';
 import { CmsApiService } from '@forge-cms/angular';
 
 interface MediaDoc extends Record<string, unknown> {
@@ -123,7 +123,7 @@ export class AdminMediaPage implements OnInit {
       this.alt.set('');
       await this.load();
     } catch (err) {
-      this.uploadError.set(err instanceof Error ? err.message : 'Upload failed');
+      this.uploadError.set(describeAdminError(err));
     } finally {
       this.uploading.set(false);
     }

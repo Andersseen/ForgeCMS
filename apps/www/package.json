@@ -8,6 +8,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "e2e": "playwright test",
+    "e2e:prod": "playwright test -c playwright.prod.config.ts",
     "test": "vitest run --dir .",
     "test:watch": "vitest --dir .",
     "lint": "eslint .",

@@ -1,11 +1,41 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-09-29 (historical upgrade + backup/restore rehearsal — roadmap 0.7 M03, spec 073; roadmap 0.7 complete).**
+> **Last updated: 2026-09-30 (spec 075 in progress — roadmap 0.8 C01 Angular transport + public-surface reliability; WIP on branch).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Angular transport + public-surface reliability — C01 (spec 075, 2026-09-30, IN PROGRESS)
+
+Branch `feature/spec-075-angular-transport-public-reliability`. Spec:
+[docs/specs/075-angular-transport-and-public-surface-reliability.md](specs/075-angular-transport-and-public-surface-reliability.md).
+
+- **Done (tested):** `@forge-cms/angular` transport boundary (`transport.ts`: one URL joiner, per-segment
+  encoding, `credentials`/`trustedOrigins`/`transport` options, `{ signal }` on every method), one
+  `ForgeApiError` (`kind` http/network/aborted/invalid-response; old error classes are subclasses),
+  `/me` 401 → anonymous vs outage → `'error'`, failed logout keeps its error, no retries. 122 unit tests
+  - real-HTTP custom-mount fixture (`apps/tiny-project/src/tests/custom-mount.integration.test.ts`).
+    Admin `describeAdminError` reads structured status; new `describeSessionError`. Minor changeset
+    (→ npm `0.9.0`), API baseline updated (additions only).
+- **Apps:** route params decoded per segment (`routeParam`); safe startup diagnostics (`/api/status` →
+  503 with stage/reason, failed startup not cached); Lumea public error/retry state on every page;
+  www hero overflow at 390px fixed, canonical/OG metadata, route titles, roadmap 0.8 in progress.
+  Demo e2e 23/23 + responsive 6/6; www production-build e2e (`pnpm e2e:www:prod`) 11/11.
+- **Deploy:** `scripts/verify-deployment.mjs www|demo` (replaces the demo-only script), post-deploy
+  gates for both Pages projects, secret-name preflight. Runbook: [DEPLOYMENT-HEALTH.md](DEPLOYMENT-HEALTH.md).
+- **Production 500 root cause (verified from Pages logs):** not `AUTH_SECRET` (set on both projects) but
+  blocking drift — demo `media._storageKey` (9 static-image rows), www `posts._status` (1 row).
+  Migrations written, D1 backed up (outside git), rehearsed locally (plan → no changes); demo build on
+  the migrated copy passes the health gate. **Applying to production is PENDING (operator):**
+  `apps/upgrade-rehearsal/ops/remote-migrate.ts <demo|www> --apply`.
+- **Release truth:** npm `latest` = `0.8.2`. PR #61 bumped `main` to `0.8.3`, but its CI failed on a
+  registry 404 (`electron-to-chromium`) and nothing was published.
+- **Gates (local, 2026-09-30):** format, lint, typecheck, test, build, libsql, cloudflare, upgrade,
+  check:api, release:verify green (one `@forge-cms/db` test flaked under load, passed on rerun).
+- **Left:** apply the two production migrations (operator), then confirm both remote health gates.
+  Finding 24 stays for C02. **Next after 075: C02** — not started.
 
 ## Historical upgrade and backup/restore rehearsal — M03 (spec 073, 2026-09-29)
 
