@@ -21,6 +21,8 @@ body {
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -28,9 +30,182 @@ body {
 }
 
 .landing-bg {
-  background:
-    radial-gradient(circle at 18% 0%, oklch(0.94 0.05 255 / 0.75), transparent 28rem),
-    linear-gradient(180deg, oklch(0.99 0.004 260), oklch(0.96 0.006 260));
+  background-color: #f7f9fc;
+  background-image:
+    linear-gradient(to right, rgb(10 15 26 / 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(10 15 26 / 0.035) 1px, transparent 1px);
+  background-size: 56px 56px;
+  background-position: calc(50% - 28px) 0;
+}
+
+.forge-header {
+  backdrop-filter: blur(18px) saturate(150%);
+}
+
+.forge-nav-link,
+.forge-mobile-link,
+.forge-footer-link {
+  border-radius: var(--radius-sm);
+  color: var(--muted-foreground);
+  text-decoration: none;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+}
+
+.forge-nav-link {
+  padding: 0.55rem 0.8rem;
+}
+
+.forge-mobile-link {
+  padding: 0.8rem 0.75rem;
+  color: var(--foreground);
+}
+
+.forge-nav-link:hover,
+.forge-mobile-link:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.forge-footer-link:hover {
+  color: var(--foreground);
+}
+
+.forge-nav-link:focus-visible,
+.forge-mobile-link:focus-visible,
+.forge-footer-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.forge-display {
+  color: #0a0f1a;
+  font-weight: 650;
+  line-height: 0.98;
+  letter-spacing: -0.06em;
+  text-wrap: balance;
+}
+
+.forge-section-mark {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.forge-section-mark::before {
+  width: 1.75rem;
+  height: 2px;
+  background: linear-gradient(90deg, #8b5cf6, #22d3ee);
+  content: '';
+}
+
+.forge-section-title {
+  max-width: 18ch;
+  font-size: clamp(2.25rem, 4.5vw, 3.5rem);
+  font-weight: 650;
+  line-height: 1.04;
+  letter-spacing: -0.05em;
+  text-wrap: balance;
+}
+
+.forge-workbench {
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 1.35rem;
+  background: #0a0f1a;
+  box-shadow:
+    0 28px 70px rgb(10 15 26 / 0.18),
+    0 0 0 1px rgb(139 92 246 / 0.08);
+}
+
+.forge-pipeline-node {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.7rem;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 0.75rem;
+  background: rgb(255 255 255 / 0.055);
+  padding: 0.8rem;
+  color: white;
+}
+
+.forge-pipeline-node span,
+.forge-pipeline-node small,
+.forge-workbench-value,
+.forge-workbench small {
+  display: block;
+}
+
+.forge-pipeline-node span {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.forge-pipeline-node small,
+.forge-workbench small {
+  margin-top: 0.15rem;
+  color: rgb(255 255 255 / 0.45);
+  font-size: 0.675rem;
+}
+
+.forge-workbench-value {
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.forge-code {
+  min-height: 100%;
+  overflow-x: auto;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 0.8rem;
+  background: rgb(255 255 255 / 0.045);
+  padding: 1.15rem;
+  color: rgb(255 255 255 / 0.78);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.76rem;
+  line-height: 1.75;
+  white-space: pre;
+}
+
+.forge-package-group {
+  padding: 1.5rem;
+  background: rgb(255 255 255 / 0.7);
+}
+
+@media (min-width: 768px) {
+  .forge-package-group:nth-child(odd) {
+    border-right: 1px solid var(--border);
+  }
+
+  .forge-package-group:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+@media (max-width: 767px) {
+  .forge-package-group:not(:last-child) {
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
 
 /* ---------------------------------------------------------------------------------------------

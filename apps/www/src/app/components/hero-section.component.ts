@@ -1,103 +1,117 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { VoltBadge, VoltButton } from '@voltui/components';
+import { VoltBadge, VoltNativeButton } from '@voltui/components';
+import { MoveAnimateDirective, MoveStaggerDirective } from 'angular-movement';
+import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
+import { LmnCircleStackIcon } from 'lumen-icons/circle-stack';
+import { LmnCodeBracketIcon } from 'lumen-icons/code-bracket';
+import { LmnRectangleStackIcon } from 'lumen-icons/rectangle-stack';
 import { CURRENT_FORGE_VERSION } from '../forge-release';
 import { exampleCode, installCommand } from '../landing-data';
-import { DemoDialogService } from './demo-dialog.service';
 
 @Component({
   selector: 'forge-cms-hero-section',
   standalone: true,
-  imports: [RouterLink, VoltBadge, VoltButton],
+  imports: [
+    RouterLink,
+    VoltBadge,
+    VoltNativeButton,
+    MoveAnimateDirective,
+    MoveStaggerDirective,
+    LmnArrowRightIcon,
+    LmnCircleStackIcon,
+    LmnCodeBracketIcon,
+    LmnRectangleStackIcon
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section
-      class="mx-auto grid w-full max-w-7xl gap-12 px-6 pb-20 pt-12 md:px-8 lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:pb-28 lg:pt-20"
+      id="product"
+      class="mx-auto grid w-full max-w-7xl gap-14 px-5 pb-22 pt-14 md:px-8 lg:grid-cols-[1.16fr_0.84fr] lg:items-center lg:pb-30 lg:pt-22"
     >
       <div>
         <volt-badge variant="secondary">Experimental · pre-1.0 · v{{ version }}</volt-badge>
-        <h1
-          class="mt-6 max-w-4xl text-5xl font-semibold leading-[0.95] tracking-normal text-foreground md:text-7xl"
-        >
-          A headless CMS built for Angular and Analog.
+        <h1 class="forge-display mt-7 max-w-[13ch] text-5xl md:text-7xl lg:text-[5rem]">
+          The Angular CMS that stays in your application.
         </h1>
-        <p class="mt-7 max-w-2xl text-lg leading-8 text-muted-foreground md:text-xl">
-          A code-first CMS inspired by Payload's architecture. Collections are TypeScript, server
-          code calls a Local API with no internal HTTP, and the admin is Angular components you
-          mount in your own app. Runs on Cloudflare D1 and R2, or on libSQL anywhere else.
+        <p class="mt-7 max-w-[62ch] text-lg leading-8 text-muted-foreground md:text-xl">
+          Define content in TypeScript, call it through a Local API, and mount a real Angular admin.
+          ForgeCMS runs on Cloudflare D1 and R2 or travels with libSQL.
         </p>
 
         <div class="mt-9 flex flex-col gap-3 sm:flex-row">
-          <a routerLink="/docs/small-project-guide">
-            <volt-button size="lg">Get started</volt-button>
-          </a>
-          <a href="https://github.com/Andersseen/ForgeCMS" rel="noreferrer" target="_blank">
-            <volt-button variant="outline" size="lg">GitHub</volt-button>
-          </a>
+          <a voltButton size="lg" routerLink="/docs/small-project-guide">Start building</a>
+          <a voltButton variant="outline" size="lg" routerLink="/demo">Explore the live demo</a>
         </div>
-        <pre
-          class="mt-6 max-w-2xl overflow-x-auto rounded-md border border-border bg-muted px-4 py-3 text-xs leading-6 text-foreground"
+
+        <div
+          class="mt-7 flex max-w-2xl items-center gap-3 border-l-2 border-primary/50 pl-4"
           aria-label="Install command"
-        ><code>{{ installCommand }}</code></pre>
-        <button
-          type="button"
-          class="mt-4 text-sm font-medium text-muted-foreground underline underline-offset-4 transition hover:text-foreground"
-          (click)="demo.open()"
         >
-          See the clinic demo powered by the real runtime
-        </button>
+          <code class="min-w-0 overflow-x-auto whitespace-nowrap text-sm text-foreground">{{
+            installCommand
+          }}</code>
+        </div>
       </div>
 
-      <section
-        aria-label="ForgeCMS product preview"
-        class="relative rounded-lg border border-border bg-surface p-4 shadow-lg"
-      >
-        <div class="mb-4 flex items-center justify-between border-b border-border pb-3">
+      <section class="forge-workbench" aria-label="How ForgeCMS connects your schema to your admin">
+        <header class="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <div class="flex items-center gap-2">
-            <span class="size-3 rounded-full bg-error"></span>
-            <span class="size-3 rounded-full bg-warning"></span>
-            <span class="size-3 rounded-full bg-success"></span>
+            <span class="size-2 rounded-full bg-[#22D3EE]"></span>
+            <span class="text-sm font-medium text-white">Live content pipeline</span>
           </div>
-          <span class="text-xs font-medium text-muted-foreground">collections / posts</span>
-        </div>
-        <div class="rounded-md border border-border bg-background">
-          <div class="flex items-center justify-between border-b border-border px-4 py-3">
+          <span class="font-mono text-xs text-white/45">posts.ts</span>
+        </header>
+
+        <div class="p-5 md:p-6">
+          <div
+            class="grid items-center gap-3 sm:grid-cols-[1fr_auto_1fr_auto_1fr]"
+            moveStagger
+            moveStaggerStep="110ms"
+          >
+            <div class="forge-pipeline-node" [move]="'zoom-in'">
+              <lmn-code-bracket tone="info" [size]="20" />
+              <div>
+                <span>Schema</span>
+                <small>TypeScript</small>
+              </div>
+            </div>
+            <lmn-arrow-right class="hidden text-white/35 sm:block" [size]="20" />
+            <div class="forge-pipeline-node" [move]="'zoom-in'">
+              <lmn-circle-stack tone="primary" [size]="20" />
+              <div>
+                <span>Runtime</span>
+                <small>Local API</small>
+              </div>
+            </div>
+            <lmn-arrow-right class="hidden text-white/35 sm:block" [size]="20" />
+            <div class="forge-pipeline-node" [move]="'zoom-in'">
+              <lmn-rectangle-stack tone="success" [size]="20" />
+              <div>
+                <span>Admin</span>
+                <small>Angular</small>
+              </div>
+            </div>
+          </div>
+
+          <pre
+            class="forge-code mt-5"
+            aria-label="Collection example"
+          ><code>{{ exampleCode }}</code></pre>
+
+          <div class="mt-5 grid grid-cols-3 border-t border-white/10 pt-5 text-white">
             <div>
-              <p class="text-sm font-semibold">Posts</p>
-              <p class="text-xs text-muted-foreground">Search, drafts, relations and publishing</p>
+              <span class="forge-workbench-value">10</span>
+              <small>packages</small>
             </div>
-            <volt-badge variant="secondary">Published</volt-badge>
-          </div>
-          <div class="divide-y divide-border text-sm">
-            <div class="grid grid-cols-[1fr_auto] gap-4 px-4 py-3">
-              <span>Small project guide</span>
-              <span class="text-muted-foreground">Editor</span>
+            <div>
+              <span class="forge-workbench-value">2</span>
+              <small>database profiles</small>
             </div>
-            <div class="grid grid-cols-[1fr_auto] gap-4 px-4 py-3">
-              <span>Cloudflare deployment notes</span>
-              <span class="text-muted-foreground">Admin</span>
+            <div>
+              <span class="forge-workbench-value">MIT</span>
+              <small>license</small>
             </div>
-            <div class="grid grid-cols-[1fr_auto] gap-4 px-4 py-3">
-              <span>Portable libSQL setup</span>
-              <span class="text-muted-foreground">Draft</span>
-            </div>
-          </div>
-        </div>
-        <pre
-          class="mt-4 overflow-x-auto rounded-md bg-muted p-5 text-sm leading-7 text-foreground"
-        ><code>{{ exampleCode }}</code></pre>
-        <div class="mt-4 grid gap-3 sm:grid-cols-3">
-          <div class="rounded-md border border-border bg-background p-3">
-            <p class="text-xs text-muted-foreground">Runs on</p>
-            <p class="mt-1 font-semibold">D1 · libSQL</p>
-          </div>
-          <div class="rounded-md border border-border bg-background p-3">
-            <p class="text-xs text-muted-foreground">Built for</p>
-            <p class="mt-1 font-semibold">Angular · Analog</p>
-          </div>
-          <div class="rounded-md border border-border bg-background p-3">
-            <p class="text-xs text-muted-foreground">License</p>
-            <p class="mt-1 font-semibold">MIT</p>
           </div>
         </div>
       </section>
@@ -105,7 +119,6 @@ import { DemoDialogService } from './demo-dialog.service';
   `
 })
 export class HeroSectionComponent {
-  protected readonly demo = inject(DemoDialogService);
   protected readonly exampleCode = exampleCode;
   protected readonly installCommand = installCommand;
   protected readonly version = CURRENT_FORGE_VERSION;
