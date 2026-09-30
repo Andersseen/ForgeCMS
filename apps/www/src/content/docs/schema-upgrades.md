@@ -5,10 +5,10 @@ group: Client & deploy
 order: 5
 ---
 
-> **Availability.** Drift detection (`planSchema()`, `SchemaDriftError`) ships in `@forge-cms/*@0.8.0`.
-> Reviewed migrations (`runtime.runMigrations()`) are merged on `main` and ship in the next patch
-> release, `0.8.1`. With `0.7.0` or older, `syncSchema()` is additive only: it creates tables and adds
-> columns, and it does **not** detect or refuse the changes below.
+> **Availability.** Drift detection (`planSchema()`, `SchemaDriftError`) ships in `@forge-cms/*@0.8.0`,
+> reviewed migrations (`runtime.runMigrations()`) from `0.8.1`. With `0.7.0` or older, `syncSchema()`
+> is additive only: it creates tables and adds columns, and it does **not** detect or refuse the
+> changes below.
 
 You change a collection in TypeScript. The database already holds rows written with the old
 definition. What happens on the next start?
@@ -121,9 +121,19 @@ console.log(report.results, formatSchemaPlan(report.after)); // after never bloc
 
 ## Where this is going
 
-- **Done:** detect drift and refuse it safely (roadmap 0.7, M01), and reviewed, ordered migrations
-  with a durable history (M02).
-- **Next:** tested upgrade and backup/restore rehearsals on D1 and libSQL (M03).
+- **Done (roadmap 0.7):** detect drift and refuse it safely (M01), reviewed, ordered migrations with
+  a durable history (M02), and a release-gating rehearsal (M03): databases written by `0.4.0`, `0.6.0`
+  and `0.8.0` upgrade through this path on libSQL and local D1/R2, and an upgraded installation is
+  backed up and restored into an empty environment with working logins, content, history and files.
+
+## Backups
+
+A backup is the whole database plus every object a document references (`_storageKey`), taken while
+writes are stopped: the database and the object storage do not share a transaction. Restore into a
+new, empty database and bucket, verify (`planSchema()` clean, `readMigrationHistory()` unchanged,
+the same migrations report `already-applied`, a login, a file), then switch over. Commands for
+libSQL, D1 (`wrangler d1 export` / `d1 execute --file`) and R2 are in `docs/BACKUP-RESTORE.md` in the
+repository.
 
 The full reference, with the complete change matrix and the operator guide, is
 `docs/SCHEMA-UPGRADES.md` in the repository.

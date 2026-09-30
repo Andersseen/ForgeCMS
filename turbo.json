@@ -15,6 +15,10 @@
       "dependsOn": ["^build"],
       "outputs": []
     },
+    "test:upgrade": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
     "test:watch": {
       "cache": false,
       "persistent": true

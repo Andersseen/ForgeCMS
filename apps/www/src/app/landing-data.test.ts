@@ -30,10 +30,17 @@ describe('landing content', () => {
     expect(copy).not.toMatch(/production[- ]ready|payload replacement|1\.0 stable/i);
   });
 
-  it('shows 0.7 as in progress with M01 and M02 done and M03 next, never as complete', () => {
+  it('shows 0.7 as complete (M01–M03) and 0.8 Angular DX as next', () => {
     const upgrades = ROADMAP_MILESTONES.find((milestone) => milestone.version === '0.7');
-    expect(upgrades?.status).toBe('in-progress');
-    expect(upgrades?.steps?.map((step) => step.status)).toEqual(['complete', 'complete', 'next']);
+    expect(upgrades?.status).toBe('complete');
+    expect(upgrades?.steps?.map((step) => step.status)).toEqual([
+      'complete',
+      'complete',
+      'complete'
+    ]);
+    expect(ROADMAP_MILESTONES.find((milestone) => milestone.version === '0.8')?.status).toBe(
+      'next'
+    );
     expect(ROADMAP_MILESTONES.find((milestone) => milestone.version === '0.6')?.status).toBe(
       'complete'
     );

@@ -1,6 +1,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { decideAggregateRelease, isAlreadyPublishedError } from './release-decision.mjs';
+import {
+  decideAggregateRelease,
+  isAlreadyPublishedError,
+  releaseCommit
+} from './release-decision.mjs';
 
 const family = (version) => [
   { name: '@forge-cms/core', version },
@@ -66,5 +70,19 @@ describe('isAlreadyPublishedError', () => {
   it('does not swallow other failures', () => {
     assert.equal(isAlreadyPublishedError('npm error code E401\nUnable to authenticate'), false);
     assert.equal(isAlreadyPublishedError('npm error code E409\nConflict'), false);
+  });
+});
+
+describe('releaseCommit (spec 073)', () => {
+  it('decides for the triggering commit, not for HEAD left on changeset-release/main', () => {
+    assert.equal(
+      releaseCommit({ GITHUB_SHA: 'f4c22a9c32808186e374dccb705eb3a20b05cd1e' }),
+      'f4c22a9c32808186e374dccb705eb3a20b05cd1e'
+    );
+  });
+
+  it('falls back to HEAD outside CI', () => {
+    assert.equal(releaseCommit({}), 'HEAD');
+    assert.equal(releaseCommit({ GITHUB_SHA: '  ' }), 'HEAD');
   });
 });

@@ -109,14 +109,16 @@ Verified from packed npm artifacts (`pnpm release:verify`) and real consumer app
   host app's own routes — not a skeleton, and not a redesign target
 - adapter contract tests through `@forge-cms/testing/contracts`
 
-Since `0.8.0`: schema drift detection (`runtime.planSchema()`, and a `syncSchema()` that refuses
-unsafe drift instead of half-applying it). On `main`, in the next patch release: reviewed migrations
-(`runtime.runMigrations()`), which apply that drift exactly once, atomically, with a durable history.
-See [docs/SCHEMA-UPGRADES.md](docs/SCHEMA-UPGRADES.md).
+Upgrade safety (roadmap 0.7): schema drift detection (`runtime.planSchema()`, and a `syncSchema()`
+that refuses unsafe drift instead of half-applying it, since `0.8.0`), reviewed migrations
+(`runtime.runMigrations()`, since `0.8.1`) that apply that drift exactly once, atomically, with a
+durable history, and a release-gating rehearsal (`pnpm test:upgrade`): databases written by `0.4.0`,
+`0.6.0` and `0.8.0` upgrade on libSQL and local D1/R2, and an upgraded installation is backed up and
+restored into an empty environment. See [docs/SCHEMA-UPGRADES.md](docs/SCHEMA-UPGRADES.md) and
+[docs/BACKUP-RESTORE.md](docs/BACKUP-RESTORE.md).
 
-Not yet delivered pre-1.0: backup/restore rehearsal (roadmap 0.7 M03), a
-portable (S3-compatible) storage adapter, and production SSR for the Angular/Analog client — see
-[docs/ROADMAP.md](docs/ROADMAP.md).
+Not yet delivered pre-1.0: a portable (S3-compatible) storage adapter, and production SSR for the
+Angular/Analog client — see [docs/ROADMAP.md](docs/ROADMAP.md).
 
 Try it: the [Lumea clinic demo](https://forge-cms-demo.pages.dev) (a real site built on the CMS,
 source in [`apps/demo-aesthetics`](apps/demo-aesthetics)) and the docs at
@@ -127,12 +129,12 @@ source in [`apps/demo-aesthetics`](apps/demo-aesthetics)) and the docs at
 Two separate numbering schemes:
 
 - **npm versions.** The ten public packages are one fixed Changesets group; they always share a
-  version. The current release is **`0.8.0`**: everything through roadmap 0.6 plus M01 drift
-  detection. **npm `0.8.x` is the roadmap 0.7 (upgrade safety) line**: M02 and M03 ship as `0.8.x`
-  patches.
-- **Roadmap checkpoints** ([docs/ROADMAP.md](docs/ROADMAP.md)) are product guarantees. **0.6 is
-  complete. 0.7 (upgrade safety) is in progress:** M01 drift detection shipped in `0.8.0`, M02
-  reviewed migrations is done on `main`, M03 backup/restore is next.
+  version. The current release is **`0.8.2`**. **npm `0.8.x` is the roadmap 0.7 (upgrade safety)
+  line**: M01 shipped in `0.8.0`, M02 in `0.8.1` (its changelog entry landed in `0.8.2`), and M03's
+  one package fix ships as the next `0.8.x` patch.
+- **Roadmap checkpoints** ([docs/ROADMAP.md](docs/ROADMAP.md)) are product guarantees. **0.6 and 0.7
+  (upgrade safety: M01 drift detection, M02 reviewed migrations, M03 upgrade and backup/restore
+  rehearsal) are complete.** Next: roadmap 0.8, the Angular client and DX.
 
 A package version does not certify a roadmap checkpoint, and since `0.8.0` the numbers are offset by
 one: roadmap 0.8 (Angular client/DX) will publish as npm `0.9.0`.

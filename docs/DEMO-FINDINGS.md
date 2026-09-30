@@ -509,8 +509,8 @@ completeness, typed Local API and the linker plugin have shipped and are no long
 2. **Schema-aware wire types** — roadmap 0.8 C02: `date` representation (finding 24), populated
    relation types (rest of finding 8), and typed `blocks` rows (finding 16).
 3. **Moving the demo's settings to a real global** (finding 4). The mechanism exists since M02
-   (spec 072); what remains is a backed-up production run, which pairs naturally with M03's
-   backup/restore rehearsal.
+   (spec 072) and the backup/restore runbook since M03 ([BACKUP-RESTORE](BACKUP-RESTORE.md), spec
+   073); what remains is the backed-up production run itself.
 4. **Email** (finding 6). A booking form that notifies nobody is not finished. Post-1.0 per the
    roadmap, but it is the gap every content site hits first.
 5. **Hook access to the CMS** (finding 23) — pass the operation context into hook args.

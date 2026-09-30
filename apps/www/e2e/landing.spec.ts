@@ -82,6 +82,7 @@ test('the homepage separates shipped foundations from the next checkpoint', asyn
   await expect(roadmap.getByText('0.8', { exact: true })).toBeVisible();
   await expect(roadmap.getByText('0.9', { exact: true })).toHaveCount(0);
   await expect(roadmap.getByText('Reviewed migrations')).toBeVisible();
+  await expect(roadmap.getByText('Upgrade and backup/restore rehearsal')).toBeVisible();
 });
 
 test('mobile navigation remains usable and the page does not overflow', async ({ page }) => {

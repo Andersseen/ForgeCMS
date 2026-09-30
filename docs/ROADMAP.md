@@ -1,9 +1,9 @@
 # ROADMAP — A small, dependable ForgeCMS 1.0
 
-> **Current status (2026-09-29, spec 072):** npm family **`0.8.0`**: specs through 071, i.e.
-> **roadmap 0.6 complete** plus M01. **Roadmap 0.7 in progress:** M01 (drift detection, spec 070)
-> shipped in `0.8.0`; M02 (reviewed migrations, spec 072) is done on `main` and ships as `0.8.1`;
-> M03 (backup/restore) is next.
+> **Current status (2026-09-29, spec 073):** npm family **`0.8.2`**. **Roadmap 0.6 and 0.7 are
+> complete.** M01 (drift detection, spec 070) shipped in `0.8.0`; M02 (reviewed migrations, spec 072)
+> in `0.8.1` (changelog entry in `0.8.2`); M03 (historical upgrade + backup/restore rehearsal, spec 073) is done on `main` and its one package fix ships as the next `0.8.x` patch. **Next: roadmap
+> 0.8 / C01** (Angular transport and structured errors), the first npm `0.9.0` work.
 >
 > **Version policy (maintainer decision, 2026-09-29).** Release numbers in the table below are
 > **product checkpoints, not npm versions**. M01 was published as npm `0.8.0` before the numbering
@@ -12,7 +12,7 @@
 >
 > | npm        | Roadmap checkpoint                                                |
 > | ---------- | ----------------------------------------------------------------- |
-> | `0.8.x`    | 0.7 upgrade safety (M01 = `0.8.0`; M02, M03 as patches)           |
+> | `0.8.x`    | 0.7 upgrade safety (M01 = `0.8.0`; M02 = `0.8.1`; M03 a patch)    |
 > | `0.9.0`    | 0.8 Angular client/DX (its first minor)                           |
 > | `0.10.0` … | 0.9 SSR, then each later checkpoint on the next minor (one ahead) |
 >
@@ -99,6 +99,17 @@
 > outcomes are distinguished, and `runtime.runMigrations()` runs a `planSchema`/`syncSchema`
 > preflight and post-flight. The same spec fixes aggregate GitHub release tagging (tags only the commit that
 > introduced a version) and records the npm/roadmap offset above. Next: **M03**.
+>
+> **2026-09-29 update:** [spec 073](specs/073-historical-upgrade-and-backup-restore-rehearsal.md)
+> completes **M03** and with it **roadmap 0.7**. Databases written by the published `0.4.0`, `0.6.0`
+> and `0.8.0` packages (committed, hash-checked fixtures; `0.5.0`, `0.7.0` and `0.8.1` persist nothing
+> new) upgrade through `planSchema()` → reviewed migrations on on-disk libSQL and local D1/R2 with
+> working logins, API keys, relations, drafts, locales, globals, history and files. Upgraded
+> installations are backed up (cold libSQL copy / `wrangler d1 export`, plus exactly the R2 objects
+> the snapshot references) and restored into isolated empty environments. `pnpm test:upgrade` gates
+> the npm release; the runbook is [BACKUP-RESTORE.md](BACKUP-RESTORE.md). One runtime fix
+> (`reconcileStorage()` without uploads) and one release-tag fix (the missing `v0.8.1`). Next:
+> **roadmap 0.8 / C01**.
 
 ## Product direction
 

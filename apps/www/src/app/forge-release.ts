@@ -6,10 +6,10 @@
  * not when a changeset merges: the Version Packages PR publishes on merge.
  *
  * Product checkpoints are a separate axis. npm `0.8.x` is the roadmap `0.7` (upgrade safety) line:
- * `0.8.0` carries M01; roadmap `0.8` (Angular DX) will publish as npm `0.9.0` — see
- * `ROADMAP_MILESTONES` and docs/STATE.md.
+ * `0.8.0` carries M01, `0.8.1` added M02's code (its changelog entry is in `0.8.2`); roadmap `0.8`
+ * (Angular DX) will publish as npm `0.9.0` — see `ROADMAP_MILESTONES` and docs/STATE.md.
  */
-export const CURRENT_FORGE_VERSION = '0.8.0';
+export const CURRENT_FORGE_VERSION = '0.8.2';
 
 export interface ForgePackage {
   /** The name after `@forge-cms/`. */

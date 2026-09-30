@@ -25,6 +25,7 @@ Node >= 22 (`.nvmrc`), pnpm `10.11.0` (via `packageManager` field). Never use np
 | `pnpm lint` / `pnpm typecheck`         | ESLint / `tsc --noEmit` across the repo                   |
 | `pnpm format` / `pnpm format:check`    | Prettier write / check                                    |
 | `pnpm e2e:www`                         | Playwright e2e for `apps/www`                             |
+| `pnpm test:upgrade`                    | Historical upgrades + backup/restore rehearsal (0.7 gate) |
 | `pnpm changeset`                       | Add a changeset (required when changing any `packages/*`) |
 
 **Quality gates — run before declaring any task done:**
@@ -41,6 +42,9 @@ apps/
   demo-aesthetics/  Real-world demo: a clinic marketing site built on the CMS (spec 039). Its point is
                     docs/DEMO-FINDINGS.md — gaps stay as app-side workarounds marked `FINDING n`, so
                     never "fix" one by editing packages/* without updating that doc.
+  upgrade-rehearsal/  Roadmap 0.7 release gate (spec 073): committed historical fixtures (never edit or
+                    regenerate them casually — they are hash-checked evidence) upgraded and backed
+                    up/restored on libSQL and local D1/R2. `pnpm test:upgrade`. Not deployed.
 packages/
   core/         Schema DSL (defineCollection / defineField) + runtime validation
   db/           DatabaseAdapter contract + InMemory + LibSQL(drizzle) adapters + SQL schema generator

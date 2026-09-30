@@ -358,6 +358,15 @@ destructive, statements: [{ sql, args? }], resetBaseline? })` is data, not a cal
   read-only. `init()`/`syncSchema()` never run migrations. InMemory and custom adapters without the
   capability get `MIGRATION_UNSUPPORTED`. No down migrations, no CLI.
 
+**Upgrade and recovery rehearsal (spec 073, roadmap 0.7 M03).** No package code: a private workspace,
+`apps/upgrade-rehearsal`, consumes the public entry points only. Committed fixtures hold databases and
+objects written by the published `0.4.0`, `0.6.0` and `0.8.0` packages. `pnpm test:upgrade` upgrades
+each one through `planSchema()` → `runMigrations()` on on-disk libSQL and on local D1/R2 (Miniflare
+bindings, pinned Wrangler for `d1 export`/`d1 execute --local`), then backs the result up and restores
+it into an isolated, empty environment. A backup's object set comes from the `_storageKey` columns of
+the database snapshot, never from `StorageAdapter.list()`. The operator runbook is
+[BACKUP-RESTORE.md](BACKUP-RESTORE.md).
+
 ## Build & tooling architecture
 
 - **Turbo** orders tasks: `build`/`typecheck`/`test` depend on `^build` because

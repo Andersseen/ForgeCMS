@@ -85,6 +85,13 @@ jobs:
       - name: libSQL portable-profile integration tests
         run: pnpm test:libsql
 
+      # Roadmap 0.7 release gate (spec 073, M03): installations written by historical releases
+      # (committed, hash-checked fixtures — no network) upgrade through planSchema → reviewed
+      # migrations on on-disk libSQL and local D1/R2, then are backed up and restored into isolated,
+      # empty environments with `wrangler d1 export/execute --local`. `release` needs this job.
+      - name: Upgrade and backup/restore rehearsal
+        run: pnpm test:upgrade
+
       - name: Verify packed package installation
         run: pnpm release:verify
 
