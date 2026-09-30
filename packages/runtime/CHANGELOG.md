@@ -1,5 +1,20 @@
 # @forge-cms/runtime
 
+## 0.8.3
+
+### Patch Changes
+
+- 3acc19a: `runtime.reconcileStorage()` is now a no-op that returns an empty report when no collection is
+  upload-enabled. It used to throw `Collection '_forge_storage_intents' not registered` on such a site,
+  because `syncSchema()` only creates the intents table where uploads exist. Found by the roadmap 0.7
+  M03 upgrade/backup rehearsal (spec 073), whose recovery runbook runs `reconcileStorage()` after every
+  restore.
+  - @forge-cms/core@0.8.3
+  - @forge-cms/db@0.8.3
+  - @forge-cms/auth@0.8.3
+  - @forge-cms/storage@0.8.3
+  - @forge-cms/api@0.8.3
+
 ## 0.8.2
 
 ### Patch Changes
