@@ -10,7 +10,12 @@ import {
   IconTrash
 } from '../../../components/icons';
 import { CmsApiService } from '@forge-cms/angular';
-import { PageHeaderComponent, ErrorStateComponent, EmptyStateComponent } from '@forge-cms/admin';
+import {
+  PageHeaderComponent,
+  ErrorStateComponent,
+  EmptyStateComponent,
+  describeAdminError
+} from '@forge-cms/admin';
 import { SearchToolbarComponent } from '../components';
 
 @Component({
@@ -147,7 +152,7 @@ export class MediaPage implements OnInit {
       const docs = await this.api.getDocuments('media');
       this.mediaItems.set(docs);
     } catch (e) {
-      this.error.set(e instanceof Error ? e.message : 'Failed to load media');
+      this.error.set(describeAdminError(e));
     } finally {
       this.loading.set(false);
     }

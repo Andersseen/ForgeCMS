@@ -4,6 +4,7 @@ import { UsersCollectionAuthAdapter, withAuthFields } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import { D1DatabaseAdapter, type D1Database } from '@forge-cms/cloudflare';
 import { ForgeCmsRuntime } from '@forge-cms/runtime';
+import { logStartupFailure, startupStage } from './startup';
 
 export interface ServerEnv {
   DB?: D1Database;
@@ -196,7 +197,7 @@ const landingPages = defineCollection({
   }
 });
 
-const collections = [
+export const collections = [
   pages,
   posts,
   tags,
@@ -220,7 +221,7 @@ const siteSettingsGlobal = defineGlobal({
   }
 });
 
-const globals = [siteSettingsGlobal];
+export const globals = [siteSettingsGlobal];
 
 /**
  * Development mode is an explicit decision (spec 069), never "the secret is missing": Nitro replaces
@@ -237,35 +238,47 @@ let runtimePromise: Promise<ForgeCmsRuntime<ServerEnv>> | undefined;
  * handler — Cloudflare Workers forbids async I/O (including crypto.randomUUID) at module/global
  * scope, so both adapter construction and seeding must wait for a real request instead of running
  * eagerly at module load time.
+ *
+ * A failed startup is not cached (spec 075): the request fails, the classified cause is logged, and
+ * the next request tries again — so a fixed secret or a finished migration takes effect without
+ * waiting for the isolate to be recycled.
  */
 export function getServerRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>> {
   if (!runtimePromise) {
-    runtimePromise = buildRuntime(env);
+    runtimePromise = buildRuntime(env).catch((error: unknown) => {
+      runtimePromise = undefined;
+      logStartupFailure(error);
+      throw error;
+    });
   }
   return runtimePromise;
 }
 
 async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>> {
   const database = env?.DB ? new D1DatabaseAdapter() : new InMemoryDatabaseAdapter();
-  const auth = new UsersCollectionAuthAdapter({ devMode: AUTH_DEV_MODE }).init({
-    ...env,
-    userDatabase: database
-  });
+  const auth = await startupStage('auth', () =>
+    new UsersCollectionAuthAdapter({ devMode: AUTH_DEV_MODE }).init({
+      ...env,
+      userDatabase: database
+    })
+  );
 
-  const runtime = new ForgeCmsRuntime<ServerEnv>({
-    collections,
-    globals,
-    adapters: {
-      database,
-      auth,
-      storage: new InMemoryStorageAdapter()
-    },
-    ...(env !== undefined && { env })
+  const runtime = await startupStage('configuration', () => {
+    const created = new ForgeCmsRuntime<ServerEnv>({
+      collections,
+      globals,
+      adapters: {
+        database,
+        auth,
+        storage: new InMemoryStorageAdapter()
+      },
+      ...(env !== undefined && { env })
+    });
+    created.init();
+    return created;
   });
-
-  runtime.init();
-  await runtime.syncSchema();
-  await seedIfEmpty(runtime);
+  await startupStage('database', () => runtime.syncSchema());
+  await startupStage('seed', () => seedIfEmpty(runtime));
 
   return runtime;
 }

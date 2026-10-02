@@ -3,10 +3,12 @@ import type { Routes } from '@angular/router';
 export const routes: Routes = [
   {
     path: '',
+    title: 'ForgeCMS — the Angular-native headless CMS',
     loadComponent: () => import('./pages/landing.page').then((m) => m.LandingPage)
   },
   {
     path: 'demo',
+    title: 'Demo — ForgeCMS',
     loadComponent: () => import('./pages/demo.page').then((m) => m.DemoPage)
   },
   {
@@ -23,6 +25,7 @@ export const routes: Routes = [
   },
   {
     path: 'admin',
+    title: 'Admin — ForgeCMS',
     loadChildren: () => import('./admin.routes').then((m) => m.ADMIN_ROUTES)
   },
   { path: '**', redirectTo: '', pathMatch: 'full' }

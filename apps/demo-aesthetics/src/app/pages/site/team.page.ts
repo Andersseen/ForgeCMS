@@ -1,9 +1,11 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { SiteApiService } from '../../services/site-api.service';
 import { asyncState } from './async-state';
+import { SiteUnavailable } from './site-unavailable.component';
 
 @Component({
   selector: 'lumea-team-page',
+  imports: [SiteUnavailable],
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -20,8 +22,8 @@ import { asyncState } from './async-state';
     <section class="mx-auto max-w-6xl px-5 py-16">
       @if (state.loading()) {
         <p class="text-sm text-muted-foreground">Loading…</p>
-      } @else if (state.error(); as message) {
-        <p class="text-sm text-destructive">{{ message }}</p>
+      } @else if (state.error()) {
+        <lumea-site-unavailable subject="The team" [compact]="true" (retry)="state.retry()" />
       } @else {
         <div class="grid gap-10 md:grid-cols-3">
           @for (member of state.data() ?? []; track member.id) {

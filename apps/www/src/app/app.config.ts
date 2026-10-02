@@ -18,8 +18,9 @@ export const appConfig: ApplicationConfig = {
     provideContent(withMarkdownRenderer()),
     provideVoltTheme({ color: 'volt', style: 'sharp' }),
     provideMovement({ duration: '320ms', easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }),
-    // No `authToken` here: the browser session is cookie-based (spec 054) — `CmsApiService` sends
-    // `credentials: 'include'` on every request, and the `forge_session` cookie does the rest.
-    provideForgeCms({ baseUrl: '/api/v1' })
+    // The reference transport policy (spec 075), stated even where it equals the defaults: same-origin
+    // content and auth routes, the `forge_session` cookie (spec 054) and no Bearer token — so no other
+    // origin can ever receive a credential from this app.
+    provideForgeCms({ baseUrl: '/api/v1', authBaseUrl: '/api/auth', credentials: 'include' })
   ]
 };

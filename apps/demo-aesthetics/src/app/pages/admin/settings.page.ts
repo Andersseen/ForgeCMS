@@ -5,7 +5,8 @@ import {
   ErrorStateComponent,
   ForgeFieldControlComponent,
   PageHeaderComponent,
-  normaliseReferences
+  normaliseReferences,
+  describeAdminError
 } from '@forge-cms/admin';
 import { VoltButton } from '@voltui/components';
 
@@ -95,7 +96,7 @@ export class AdminSettingsPage implements OnInit {
       this.document.set(settings ?? null);
       this.edits.set({});
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Failed to load settings');
+      this.error.set(describeAdminError(err));
     }
   }
 
@@ -131,7 +132,7 @@ export class AdminSettingsPage implements OnInit {
         this.fieldErrors.set(errors);
         return;
       }
-      this.error.set(err instanceof Error ? err.message : 'Failed to save settings');
+      this.error.set(describeAdminError(err));
     }
   }
 }

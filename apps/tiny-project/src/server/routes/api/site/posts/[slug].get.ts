@@ -1,9 +1,10 @@
-import { defineEventHandler, getRouterParam, createError } from 'h3';
+import { defineEventHandler, createError } from 'h3';
 import { getServerRuntime } from '../../../../api/runtime';
+import { routeParam } from '../../../../api/route-param';
 
 /** GET /api/site/posts/:slug — public, published-only single post, populated author. */
 export default defineEventHandler(async (event) => {
-  const slug = getRouterParam(event, 'slug') ?? '';
+  const slug = routeParam(event, 'slug');
   const runtime = await getServerRuntime(event.context.cloudflare?.env);
   const doc = await runtime.findOne({
     collection: 'posts',

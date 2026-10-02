@@ -1,6 +1,7 @@
-import { defineEventHandler, getRouterParam, createError } from 'h3';
+import { defineEventHandler, createError } from 'h3';
 import { UserMutationError } from '@forge-cms/auth';
 import { requireAdminAuth } from '../../../../api/auth-request';
+import { routeParam } from '../../../../api/route-param';
 
 /**
  * DELETE /api/auth/users/:id
@@ -9,7 +10,7 @@ import { requireAdminAuth } from '../../../../api/auth-request';
  * references (spec 065) — see `UsersCollectionAuthAdapter.deleteUser` (spec 054).
  */
 export default defineEventHandler(async (event) => {
-  const id = getRouterParam(event, 'id');
+  const id = routeParam(event, 'id');
   if (!id) {
     throw createError({ statusCode: 400, statusMessage: 'Missing user id' });
   }

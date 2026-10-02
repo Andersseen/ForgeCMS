@@ -1,4 +1,4 @@
-import { defineEventHandler, getRouterParam, createError } from 'h3';
+import { defineEventHandler, createError } from 'h3';
 import type { CreateUserInput } from '@forge-cms/auth';
 import { UserMutationError } from '@forge-cms/auth';
 import {
@@ -7,13 +7,14 @@ import {
   readJsonBody,
   requireAdminAuth
 } from '../../../../api/auth-request';
+import { routeParam } from '../../../../api/route-param';
 
 /**
  * PUT /api/auth/users/:id — updates a user. Rejects (409/400) a change that would violate the
  * last-admin invariant or the password policy.
  */
 export default defineEventHandler(async (event) => {
-  const id = getRouterParam(event, 'id');
+  const id = routeParam(event, 'id');
   if (!id) {
     throw createError({ statusCode: 400, statusMessage: 'Missing user id' });
   }

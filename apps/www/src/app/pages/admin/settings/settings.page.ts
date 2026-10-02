@@ -29,7 +29,12 @@ import {
   IconZap
 } from '../../../components/icons';
 import { CmsApiService } from '@forge-cms/angular';
-import { PageHeaderComponent, LoadingStateComponent, ErrorStateComponent } from '@forge-cms/admin';
+import {
+  PageHeaderComponent,
+  LoadingStateComponent,
+  ErrorStateComponent,
+  describeAdminError
+} from '@forge-cms/admin';
 import { SettingsCardComponent } from '../components';
 
 function bool(value: unknown): boolean {
@@ -475,7 +480,7 @@ export class SettingsPage implements OnInit {
         this.ssoOAuth.set(bool(d.ssoOAuth));
       }
     } catch (e) {
-      this.error.set(e instanceof Error ? e.message : 'Failed to load settings');
+      this.error.set(describeAdminError(e));
     } finally {
       this.loading.set(false);
     }
@@ -535,7 +540,7 @@ export class SettingsPage implements OnInit {
       this.saved.set(true);
       setTimeout(() => this.saved.set(false), 3000);
     } catch (e) {
-      this.saveError.set(e instanceof Error ? e.message : 'Failed to save settings');
+      this.saveError.set(describeAdminError(e));
     } finally {
       this.saving.set(false);
     }

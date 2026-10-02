@@ -3,11 +3,12 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { SiteApiService } from '../../services/site-api.service';
 import { asyncState } from './async-state';
+import { SiteUnavailable } from './site-unavailable.component';
 
 @Component({
   selector: 'lumea-journal-page',
   standalone: true,
-  imports: [RouterLink, DatePipe],
+  imports: [SiteUnavailable, RouterLink, DatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="lumea-hero border-b border-border/60">
@@ -22,8 +23,8 @@ import { asyncState } from './async-state';
     <section class="mx-auto max-w-4xl px-5 py-16">
       @if (state.loading()) {
         <p class="text-sm text-muted-foreground">Loading…</p>
-      } @else if (state.error(); as message) {
-        <p class="text-sm text-destructive">{{ message }}</p>
+      } @else if (state.error()) {
+        <lumea-site-unavailable subject="The journal" [compact]="true" (retry)="state.retry()" />
       } @else {
         <div class="space-y-10">
           @for (post of state.data() ?? []; track post.id) {

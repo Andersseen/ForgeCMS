@@ -2,7 +2,7 @@ import '@angular/compiler';
 import { describe, expect, it, vi } from 'vitest';
 import { Injector, runInInjectionContext } from '@angular/core';
 import type { Injector as InjectorType } from '@angular/core';
-import { ForgeAnalyticsApiService } from '@forge-cms/angular';
+import { ForgeAnalyticsApiService, ForgeApiError } from '@forge-cms/angular';
 import type { AnalyticsSummaryResponse } from '@forge-cms/angular';
 import { ForgeAnalyticsDashboardComponent } from './analytics-dashboard.component.js';
 
@@ -82,7 +82,12 @@ describe('ForgeAnalyticsDashboardComponent', () => {
   it('surfaces a failed request as a friendly error message', async () => {
     const { component, injector } = createComponent({
       getSummary: vi.fn(async () => {
-        throw new Error('Failed to fetch analytics: 500');
+        throw new ForgeApiError({
+          kind: 'http',
+          status: 500,
+          code: 'HTTP_ERROR',
+          message: 'Failed to fetch analytics: 500'
+        });
       })
     });
 

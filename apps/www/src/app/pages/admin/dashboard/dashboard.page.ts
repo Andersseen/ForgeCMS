@@ -15,7 +15,12 @@ import {
 } from '../../../components/icons';
 import { CmsApiService } from '@forge-cms/angular';
 import { RouterLink } from '@angular/router';
-import { PageHeaderComponent, LoadingStateComponent, ErrorStateComponent } from '@forge-cms/admin';
+import {
+  PageHeaderComponent,
+  LoadingStateComponent,
+  ErrorStateComponent,
+  describeAdminError
+} from '@forge-cms/admin';
 import { StatCardComponent, SectionHeaderComponent, CollectionIconComponent } from '../components';
 
 interface CollectionStat {
@@ -307,7 +312,7 @@ export class DashboardPage implements OnInit {
       this.collections.set(stats);
       this.totalDocuments.set(total);
     } catch (e) {
-      this.error.set(e instanceof Error ? e.message : 'Failed to load');
+      this.error.set(describeAdminError(e));
     } finally {
       this.loading.set(false);
     }

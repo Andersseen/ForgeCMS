@@ -15,15 +15,46 @@ dependencies), signal-based resources over it, and typed errors.
 import { provideForgeCms } from '@forge-cms/angular';
 
 export const appConfig: ApplicationConfig = {
-  providers: [provideForgeCms({ baseUrl: '/api/v1' })]
+  providers: [provideForgeCms()] // same-origin /api/v1 and /api/auth, cookie session
 };
 ```
 
-Every request already sends `credentials: 'include'`, so a browser session works out of the box once
-you're using [the reusable auth UI](/docs/browser-auth) — no `authToken` needed for that path. `authToken`
-(a string, or a function re-read on every request) is for **machine/API-key clients** sending
-`Authorization: Bearer <token>` instead of a cookie — omit it entirely for a read-only public site or a
-browser app using cookie sessions.
+`provideForgeCms()` with no options is a complete same-origin setup. Every option is optional:
+
+| Option           | Default       | Meaning                                                               |
+| ---------------- | ------------- | --------------------------------------------------------------------- |
+| `baseUrl`        | `'/api/v1'`   | Content API: collections, documents, globals, preview                 |
+| `authBaseUrl`    | `'/api/auth'` | `login`, `signup`, `logout`, `me`, `users*`                           |
+| `credentials`    | `'include'`   | Browser cookies for credential targets; `'omit'` for Bearer-only apps |
+| `authToken`      | none          | `Authorization: Bearer …` (string, or function re-read per request)   |
+| `trustedOrigins` | `[]`          | Other origins allowed to receive cookies and the Bearer token         |
+| `transport`      | native fetch  | `(request) => Promise<Response>` — tests, and later SSR               |
+
+**URLs.** A relative base (`/cms/api`) resolves against the page's origin; an absolute one
+(`https://cms.example.com/api`) is used as given. A trailing slash is ignored, and every collection
+slug, document id, user id and global slug is encoded as one path segment
+(`getDocument('posts', 'a/b c')` → `/api/v1/posts/a%2Fb%20c`). Empty, `.` and `..` ids are refused.
+
+**Credentials.** Cookies and the Bearer token go only to _credential targets_: relative URLs, the
+page's own origin, and origins listed in `trustedOrigins`. Any other absolute origin receives a
+request with `credentials: 'omit'` and no `Authorization` header — a token is never forwarded to an
+origin you did not name. A cross-origin setup also needs the server to allow it (CORS with
+credentials). `login`/`signup`/`logout` never attach the Bearer token.
+
+```ts
+provideForgeCms({
+  baseUrl: 'https://cms.example.com/content-api',
+  authBaseUrl: 'https://cms.example.com/account-api',
+  trustedOrigins: ['https://cms.example.com']
+});
+```
+
+Use `authToken` only for **machine/API-key clients**; a browser app uses the cookie session of
+[the reusable auth UI](/docs/browser-auth).
+
+**No retries.** Each method sends exactly one request. A failed `POST`/`PUT`/`DELETE`, upload, login,
+signup or logout is never retried: a lost connection leaves the server-side outcome unknown. Every
+method takes a last `{ signal }` argument; aborting rejects with `kind: 'aborted'`.
 
 ## `CmsApiService`
 
@@ -151,22 +182,67 @@ Every resource exposes `value()`, `isLoading()`, `error()` and `reload()`.
 
 ## Errors
 
+Every failure is a `ForgeApiError`: `kind` says what happened, `status` and the server's Forge
+`code`/`details` are kept. `ApiValidationError`, `ApiAuthError` and `ApiAuthActionError` are
+subclasses, so existing `instanceof` checks still work.
+
+| Scenario                     | `kind`             | `status`  | `code` (example)            | Class                | Session effect          |
+| ---------------------------- | ------------------ | --------- | --------------------------- | -------------------- | ----------------------- |
+| 400 with field errors        | `http`             | 400       | `VALIDATION_ERROR`          | `ApiValidationError` | none                    |
+| 401                          | `http`             | 401       | `UNAUTHORIZED`              | `ApiAuthError`       | signed-in → `anonymous` |
+| 403                          | `http`             | 403       | `FORBIDDEN`                 | `ForgeApiError`      | none — still signed in  |
+| 404 / 409 / 413 / 429 / 500  | `http`             | as sent   | server code, `details` kept | `ForgeApiError`      | none                    |
+| Non-JSON error page (proxy)  | `http`             | as sent   | `HTTP_ERROR` (body dropped) | `ForgeApiError`      | none                    |
+| 2xx that is not valid JSON   | `invalid-response` | as sent   | `INVALID_RESPONSE`          | `ForgeApiError`      | none                    |
+| Offline / DNS / CORS refused | `network`          | undefined | `NETWORK_ERROR`             | `ForgeApiError`      | none                    |
+| `AbortSignal` fired          | `aborted`          | undefined | `ABORTED`                   | `ForgeApiError`      | none                    |
+| Login/signup/logout HTTP     | `http`             | as sent   | server code                 | `ApiAuthActionError` | see below               |
+
 ```ts
-import { ApiAuthError, ApiValidationError } from '@forge-cms/angular';
+import { ApiValidationError, ForgeApiError, isForgeApiError } from '@forge-cms/angular';
 
 try {
   await cms.createDocument('bookings', form);
 } catch (err) {
   if (err instanceof ApiValidationError) {
     // err.details → [{ field: 'email', message: '…', code: 'type_email' }]
-  } else if (err instanceof ApiAuthError) {
-    // A 401 on any request also flips a signed-in ForgeAuthSession to 'anonymous' automatically
-    // (see /docs/browser-auth) — forgeAuthGuard then redirects on the next navigation. This manual
-    // check/redirect is only for one-off calls made outside a guarded route.
-    router.navigate(['/admin/login']);
+  } else if (err instanceof ForgeApiError && err.status === 409) {
+    // err.code === 'UNIQUE_CONSTRAINT', err.details → which value conflicted
+  } else if (isForgeApiError(err, 'network')) {
+    // no response: show "offline", keep the form
   }
 }
 ```
+
+A non-JSON body is never copied into the error. For readable UI copy, `@forge-cms/admin` exports
+`describeAdminError(err)` and `describeSessionError(err)`.
+
+### Session semantics
+
+`ForgeAuthSession` bootstraps from `GET {authBaseUrl}/me`:
+
+- `401` → `status() === 'anonymous'`, `error() === null`.
+- `200` → `'authenticated'`.
+- `403`, `5xx`, network failure or a malformed response → `'error'`, with the `ForgeApiError` in
+  `error()`. An outage is not presented as "signed out"; `forgeAuthGuard` still denies access.
+
+`logout()` always clears the local user (`status() === 'anonymous'`). If the request failed,
+`error()` keeps the `ForgeApiError`: the server session or its cookie may still exist, so do not tell
+the user they signed out cleanly.
+
+### Migrating from 0.8.x
+
+Nothing is required: defaults and method signatures are unchanged, and every method gained only an
+optional last `{ signal }` argument.
+
+- `baseUrl` is now optional (was required); `provideForgeCms()` works with no argument.
+- `getCurrentUser()` used to resolve `null` for **any** failure. It now resolves `null` only for a 401
+  and throws `ForgeApiError` for a 403, 5xx, network failure or malformed response.
+- A failed `ForgeAuthSession.logout()` used to clear `error()`; it now keeps the failure.
+- Other failures used to be a plain `Error` whose message ended in `: <status>`; they are now
+  `ForgeApiError` with `status`/`code`/`details` (the message is unchanged when the server sent none).
+- An absolute `baseUrl`/`authBaseUrl` on another origin no longer receives cookies or the Bearer
+  token unless its origin is listed in `trustedOrigins`.
 
 ## Role helpers
 

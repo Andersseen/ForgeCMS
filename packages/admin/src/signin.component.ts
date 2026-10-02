@@ -3,6 +3,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ForgeAuthSession } from '@forge-cms/angular';
 import { VoltButton, VoltCard, VoltError, VoltInput, VoltLabel } from '@voltui/components';
 import { LmnEyeIcon, LmnEyeSlashIcon } from 'lumen-icons';
+import { describeSessionError } from './admin-error.js';
 import { safeAdminRedirect } from './safe-redirect.js';
 
 /**
@@ -77,7 +78,7 @@ import { safeAdminRedirect } from './safe-redirect.js';
           </div>
 
           @if (session.error(); as error) {
-            <volt-error role="alert">{{ error.message }}</volt-error>
+            <volt-error role="alert">{{ describeError(error) }}</volt-error>
           }
 
           <volt-button type="submit" class="w-full" [disabled]="session.loading()">
@@ -107,6 +108,8 @@ export class ForgeSignInComponent {
   readonly redirectTo = input<string>();
 
   protected readonly session = inject(ForgeAuthSession);
+  protected readonly describeError = describeSessionError;
+
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 

@@ -5,6 +5,7 @@
  * service and the types without an import cycle (`import/no-cycle` is an error in this repo):
  *
  * - `types.ts`        response shapes, config token, typed errors, role helpers
+ * - `transport.ts`    URL joining, identifier encoding, credential policy, error decoding (spec 075)
  * - `query.ts`        `QueryOptions` → the query string the API parses
  * - `api.service.ts`  `CmsApiService`, promise-based
  * - `resources.ts`    signal-based reads over the same service
@@ -17,6 +18,8 @@ export {
   ApiAuthActionError,
   ApiAuthError,
   ApiValidationError,
+  ForgeApiError,
+  isForgeApiError,
   USER_ROLES,
   userRole,
   isAdmin,
@@ -31,7 +34,12 @@ export {
   type CollectionMeta,
   type CreateUserInput,
   type FieldMeta,
+  type ForgeApiErrorInit,
+  type ForgeApiErrorKind,
   type ForgeCmsConfig,
+  type ForgeRequestOptions,
+  type ForgeTransport,
+  type ForgeTransportRequest,
   type GlobalMeta,
   type ListMeta,
   type PaginatedDocuments,
@@ -49,6 +57,13 @@ export {
   type SortField,
   type SortInput
 } from './query.js';
+
+export {
+  DEFAULT_AUTH_BASE_URL,
+  DEFAULT_CONTENT_BASE_URL,
+  encodePathSegment,
+  fetchTransport
+} from './transport.js';
 
 export { CmsApiService } from './api.service.js';
 

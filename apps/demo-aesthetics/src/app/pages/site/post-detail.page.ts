@@ -3,17 +3,22 @@ import { ChangeDetectionStrategy, Component, effect, inject, input } from '@angu
 import { RouterLink } from '@angular/router';
 import { SiteApiService } from '../../services/site-api.service';
 import { asyncState } from './async-state';
+import { SiteUnavailable } from './site-unavailable.component';
 import type { PostDetail } from '../../../shared/site-content';
 
 @Component({
   selector: 'lumea-post-detail-page',
   standalone: true,
-  imports: [RouterLink, DatePipe],
+  imports: [SiteUnavailable, RouterLink, DatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (state.loading()) {
       <div class="mx-auto max-w-3xl px-5 py-24 text-sm text-muted-foreground">Loading…</div>
-    } @else if (state.error()) {
+    } @else if (state.error() && !state.notFound()) {
+      <section class="mx-auto max-w-3xl px-5 py-24">
+        <lumea-site-unavailable subject="This journal entry" (retry)="state.retry()" />
+      </section>
+    } @else if (state.notFound()) {
       <div class="mx-auto max-w-3xl px-5 py-24">
         <h1 class="lumea-display text-3xl">That entry is not published</h1>
         <p class="mt-3 text-sm text-muted-foreground">

@@ -1,5 +1,9 @@
 # ROADMAP — A small, dependable ForgeCMS 1.0
 
+> **2026-09-30 (spec 075):** roadmap 0.8 **C01** (configurable Angular transport, structured errors)
+> is implemented; it publishes with the next minor (npm `0.9.0`). Next: **C02**. npm `latest` is still
+> `0.8.2` (`main`'s `0.8.3` bump did not publish).
+>
 > **Current status (2026-09-29, spec 073):** npm family **`0.8.2`**. **Roadmap 0.6 and 0.7 are
 > complete.** M01 (drift detection, spec 070) shipped in `0.8.0`; M02 (reviewed migrations, spec 072)
 > in `0.8.1` (changelog entry in `0.8.2`); M03 (historical upgrade + backup/restore rehearsal, spec 073) is done on `main` and its one package fix ships as the next `0.8.x` patch. **Next: roadmap

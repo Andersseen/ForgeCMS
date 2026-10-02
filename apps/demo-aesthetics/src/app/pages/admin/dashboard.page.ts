@@ -2,7 +2,7 @@ import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import type { OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { PageHeaderComponent } from '@forge-cms/admin';
+import { PageHeaderComponent, describeAdminError } from '@forge-cms/admin';
 import { CmsApiService, ForgeAnalyticsApiService } from '@forge-cms/angular';
 import type { AnalyticsSummaryResponse } from '@forge-cms/angular';
 
@@ -173,7 +173,7 @@ export class AdminDashboardPage implements OnInit {
       this.draftCount.set([...services, ...posts].filter((doc) => doc._status === 'draft').length);
       this.postCount.set(posts.length);
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Failed to load the dashboard');
+      this.error.set(describeAdminError(err));
     } finally {
       this.loading.set(false);
     }
@@ -185,7 +185,7 @@ export class AdminDashboardPage implements OnInit {
     try {
       this.analytics.set(await this.analyticsApi.getSummary('7d'));
     } catch (err) {
-      this.analyticsError.set(err instanceof Error ? err.message : 'Failed to load analytics');
+      this.analyticsError.set(describeAdminError(err));
     } finally {
       this.analyticsLoading.set(false);
     }

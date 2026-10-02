@@ -14,7 +14,8 @@ export const appConfig: ApplicationConfig = {
     provideVoltTheme({ color: 'sage', style: 'soft' }),
     // No `authToken`: the staff session is the `forge_session` cookie (spec 054). A bearer kept in
     // `localStorage` outlived "Log out", because logout can only clear the cookie.
-    provideForgeCms({ baseUrl: '/api/v1' }),
+    // Same-origin content and auth routes with cookie credentials (spec 075), stated explicitly.
+    provideForgeCms({ baseUrl: '/api/v1', authBaseUrl: '/api/auth', credentials: 'include' }),
     // One-off cleanup for browsers that signed in before spec 071: nothing reads the old bearer any
     // more, but a stored token is still a credential a script on the page could take.
     provideAppInitializer(() => {

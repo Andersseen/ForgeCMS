@@ -1,6 +1,7 @@
-import { defineEventHandler, getRouterParam, toWebRequest } from 'h3';
+import { defineEventHandler, toWebRequest } from 'h3';
 import { handleFile } from '@forge-cms/runtime';
 import { getServerRuntime } from '../../../api/runtime';
+import { routeParam } from '../../../api/route-param';
 
 /**
  * Serves an uploaded file out of the storage adapter.
@@ -16,7 +17,7 @@ export default defineEventHandler(async (event) => {
   return handleFile(
     {
       request: toWebRequest(event),
-      params: { key: getRouterParam(event, 'key') ?? '' },
+      params: { key: routeParam(event, 'key') },
       env: event.context.cloudflare?.env
     },
     { runtime }

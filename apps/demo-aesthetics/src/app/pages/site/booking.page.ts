@@ -109,6 +109,18 @@ import { asyncState } from './async-state';
                 <option [value]="option.id">{{ option.name }}</option>
               }
             </select>
+            @if (services.error()) {
+              <span class="mt-1.5 block text-xs text-muted-foreground" role="status">
+                The treatment list could not be loaded — you can still send a request.
+                <button
+                  type="button"
+                  class="underline underline-offset-4"
+                  (click)="services.retry()"
+                >
+                  Retry
+                </button>
+              </span>
+            }
           </label>
 
           <label class="block">

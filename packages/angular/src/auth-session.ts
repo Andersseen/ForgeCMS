@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import type { Signal } from '@angular/core';
 import { CmsApiService } from './api.service.js';
-import type { AuthUser } from './types.js';
+import { ForgeApiError, type AuthUser } from './types.js';
 
 export type ForgeAuthStatus = 'loading' | 'authenticated' | 'anonymous' | 'error';
 
@@ -51,7 +51,11 @@ export class ForgeAuthSession {
     return this.bootstrap;
   }
 
-  /** Re-runs the `/api/auth/me` bootstrap. */
+  /**
+   * Re-runs the `/me` bootstrap. `401` → `'anonymous'`; any other failure (`403`, `5xx`, network,
+   * malformed response) → `'error'` with the `ForgeApiError` in {@link error} — an outage never
+   * pretends the visitor signed out. The previously known user is kept on failure.
+   */
   async refresh(): Promise<void> {
     this.statusState.set('loading');
     this.errorState.set(null);
@@ -100,17 +104,25 @@ export class ForgeAuthSession {
     }
   }
 
-  /** Never throws — local state clears even if the network request fails. */
+  /**
+   * Never throws. Local state always clears — this browser stops presenting itself as signed in even if
+   * the request fails. If the server call fails, `status()` is `'anonymous'` but {@link error} holds the
+   * `ForgeApiError`: the server session (or its cookie) may still exist, so a UI must not report a clean
+   * sign-out. On success `error()` is `null`.
+   */
   async logout(): Promise<void> {
+    let failure: Error | null = null;
     try {
       await this.api.logout();
-    } catch {
-      // The point of logging out client-side is to stop presenting this browser as authenticated,
-      // which must not depend on the network round trip succeeding.
+    } catch (err) {
+      failure =
+        err instanceof Error
+          ? err
+          : new ForgeApiError({ kind: 'network', code: 'NETWORK_ERROR', message: 'Logout failed' });
     } finally {
       this.userState.set(null);
       this.statusState.set('anonymous');
-      this.errorState.set(null);
+      this.errorState.set(failure);
       this.expiredState.set(false);
     }
   }

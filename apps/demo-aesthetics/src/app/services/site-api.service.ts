@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { ForgeApiError } from '@forge-cms/angular';
 import type {
   BookingRequest,
   HomePayload,
@@ -26,13 +27,45 @@ interface Envelope<T> {
  */
 @Injectable({ providedIn: 'root' })
 export class SiteApiService {
+  /**
+   * Failures use the SDK's structured `ForgeApiError` (spec 075), so a page can tell a real 404 from
+   * an outage. The operator detail goes to the console; pages only ever show visitor copy.
+   */
   private async get<T>(path: string): Promise<T> {
-    const response = await fetch(`/api/site/${path}`);
-    if (!response.ok) {
-      throw new Error(`Request to /api/site/${path} failed with ${response.status}`);
+    const url = `/api/site/${path}`;
+    let response: Response;
+    try {
+      response = await fetch(url);
+    } catch (cause) {
+      console.warn(`[lumea] ${url} could not be reached`, cause);
+      throw new ForgeApiError({
+        kind: 'network',
+        code: 'NETWORK_ERROR',
+        message: `${url} could not be reached`,
+        cause
+      });
     }
-    const body = (await response.json()) as Envelope<T>;
-    return body.data;
+    const body = (await response.json().catch(() => undefined)) as
+      | (Partial<Envelope<T>> & { error?: { code?: string } })
+      | undefined;
+    if (!response.ok) {
+      if (response.status !== 404) console.warn(`[lumea] ${url} failed with ${response.status}`);
+      throw new ForgeApiError({
+        kind: 'http',
+        status: response.status,
+        code: body?.error?.code ?? 'HTTP_ERROR',
+        message: `${url} failed with ${response.status}`
+      });
+    }
+    if (body === undefined || !('data' in body)) {
+      throw new ForgeApiError({
+        kind: 'invalid-response',
+        status: response.status,
+        code: 'INVALID_RESPONSE',
+        message: `${url} returned an unexpected response`
+      });
+    }
+    return body.data as T;
   }
 
   home(): Promise<HomePayload> {
@@ -64,11 +97,19 @@ export class SiteApiService {
   }
 
   async requestBooking(request: BookingRequest): Promise<{ id: string }> {
-    const response = await fetch('/api/site/bookings', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(request)
-    });
+    let response: Response;
+    try {
+      response = await fetch('/api/site/bookings', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(request)
+      });
+    } catch {
+      // Not retried: a lost connection leaves the server-side outcome unknown (spec 075).
+      throw new Error(
+        'We could not reach the clinic. Check your connection before sending the request again.'
+      );
+    }
 
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as {

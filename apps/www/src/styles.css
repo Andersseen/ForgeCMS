@@ -172,6 +172,12 @@ body {
   white-space: pre;
 }
 
+/* A scrollable region must be reachable by keyboard (it has tabindex="0"); show where focus is. */
+.forge-code:focus-visible {
+  outline: 2px solid #22d3ee;
+  outline-offset: 2px;
+}
+
 .forge-package-group {
   padding: 1.5rem;
   background: rgb(255 255 255 / 0.7);

@@ -29,7 +29,9 @@ import { exampleCode, installCommand } from '../landing-data';
       id="product"
       class="mx-auto grid w-full max-w-7xl gap-14 px-5 pb-22 pt-14 md:px-8 lg:grid-cols-[1.16fr_0.84fr] lg:items-center lg:pb-30 lg:pt-22"
     >
-      <div>
+      <!-- min-w-0: a grid item defaults to its min-content width, which let the hero overflow (and be
+           clipped) on phones. -->
+      <div class="min-w-0">
         <volt-badge variant="secondary">Experimental · pre-1.0 · v{{ version }}</volt-badge>
         <h1 class="forge-display mt-7 max-w-[13ch] text-5xl md:text-7xl lg:text-[5rem]">
           The Angular CMS that stays in your application.
@@ -48,13 +50,20 @@ import { exampleCode, installCommand } from '../landing-data';
           class="mt-7 flex max-w-2xl items-center gap-3 border-l-2 border-primary/50 pl-4"
           aria-label="Install command"
         >
-          <code class="min-w-0 overflow-x-auto whitespace-nowrap text-sm text-foreground">{{
-            installCommand
-          }}</code>
+          <!-- Wraps between tokens, never inside a package name; copying still yields one command. -->
+          <code class="min-w-0 text-sm leading-relaxed text-foreground">
+            @for (token of installTokens; track $index) {
+              <span class="whitespace-nowrap">{{ token }}</span
+              >{{ $last ? '' : ' ' }}
+            }
+          </code>
         </div>
       </div>
 
-      <section class="forge-workbench" aria-label="How ForgeCMS connects your schema to your admin">
+      <section
+        class="forge-workbench min-w-0"
+        aria-label="How ForgeCMS connects your schema to your admin"
+      >
         <header class="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <div class="flex items-center gap-2">
             <span class="size-2 rounded-full bg-[#22D3EE]"></span>
@@ -96,6 +105,7 @@ import { exampleCode, installCommand } from '../landing-data';
 
           <pre
             class="forge-code mt-5"
+            tabindex="0"
             aria-label="Collection example"
           ><code>{{ exampleCode }}</code></pre>
 
@@ -120,6 +130,6 @@ import { exampleCode, installCommand } from '../landing-data';
 })
 export class HeroSectionComponent {
   protected readonly exampleCode = exampleCode;
-  protected readonly installCommand = installCommand;
+  protected readonly installTokens = installCommand.split(' ');
   protected readonly version = CURRENT_FORGE_VERSION;
 }
