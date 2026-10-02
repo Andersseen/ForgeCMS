@@ -179,7 +179,7 @@ export class ForgeCollectionWorkspaceComponent {
     return collectionMeta ? findSearchableField(collectionMeta) : null;
   });
 
-  protected readonly documentsResource = collectionResource<Record<string, unknown>>(() => {
+  protected readonly documentsResource = collectionResource(() => {
     const slug = this.collectionSlug();
     if (slug === undefined) return undefined;
     this.refresh?.version();

@@ -47,7 +47,11 @@ defineField.boolean({ defaultValue: false });
 defineField.date({ withTime: true });
 ```
 
-Values are `Date` in TypeScript; the adapter stores an ISO string.
+A date is an ISO-8601 string in `toISOString()` form everywhere: in the database, on Local API reads
+and in HTTP responses (`"2026-01-15T10:30:00.000Z"`). Writes accept a `Date` or any string `Date` can
+parse (a numeric timestamp too, though the typed input only advertises `Date | string`); Forge stores
+the canonical string, so every adapter returns the same value. Parse it with `new Date(value)` when you
+need a `Date`.
 
 ### `email`
 

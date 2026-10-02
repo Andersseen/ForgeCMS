@@ -246,11 +246,9 @@ describe('custom-mounted Forge over real HTTP (spec 075)', () => {
     expect(session.error()).toBeNull();
 
     // Public content reads.
-    const posts = await api.getDocuments<{ id: string; title: string }>('posts');
+    const posts = await api.getDocuments('posts');
     expect(posts.map((p) => p.title)).toEqual(['Mounted hello']);
-    expect((await api.getDocument<{ title: string }>('posts', posts[0]!.id)).title).toBe(
-      'Mounted hello'
-    );
+    expect((await api.getDocument('posts', posts[0]!.id)).title).toBe('Mounted hello');
 
     // A wrong password: curated 401, never session expiry.
     await session.login(ADMIN.email, 'wrong-password-123');
@@ -264,11 +262,11 @@ describe('custom-mounted Forge over real HTTP (spec 075)', () => {
     expect((await api.getCurrentUser())?.email).toBe(ADMIN.email);
 
     // Authorized writes through the custom content base.
-    const created = await api.createDocument<{ id: string; slug: string }>('posts', {
+    const created = await api.createDocument('posts', {
       title: 'Written through a custom mount',
       author: session.user()!.id
     });
-    const updated = await api.updateDocument<{ title: string }>('posts', created.id, {
+    const updated = await api.updateDocument('posts', created.id, {
       title: 'Renamed through a custom mount'
     });
     expect(updated.title).toBe('Renamed through a custom mount');

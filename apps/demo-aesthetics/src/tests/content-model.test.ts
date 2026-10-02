@@ -389,16 +389,14 @@ describe('the typed Local API (finding 8, spec 047)', () => {
     expect(rejectedAtCompileTime).toBeTypeOf('function');
   });
 
-  it('maps a SQL-style Date read to the same ISO string as a string read (finding 24)', async () => {
+  it('reads a date as its canonical ISO string (finding 24, closed by spec 076)', async () => {
     const post = await cms.findOne({
       collection: 'posts',
       where: { title: 'The only two products your morning routine actually needs' }
     });
     expect(post).not.toBeNull();
-    const asString = toPostSummary(post!);
-    const asDate = toPostSummary({ ...post!, publishedAt: new Date(asString.publishedAt) });
-
-    expect(asString.publishedAt).not.toBe('');
-    expect(asDate.publishedAt).toBe(new Date(asString.publishedAt).toISOString());
+    expectTypeOf(post!.publishedAt).toEqualTypeOf<string>();
+    expect(post!.publishedAt).toBe(new Date(post!.publishedAt).toISOString());
+    expect(toPostSummary(post!).publishedAt).toBe(post!.publishedAt);
   });
 });

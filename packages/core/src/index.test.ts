@@ -25,7 +25,7 @@ describe('core schema DSL', () => {
       title: 'Hello ForgeCMS',
       views: 1,
       published: true,
-      publishedAt: new Date('2026-01-01T00:00:00.000Z'),
+      publishedAt: '2026-01-01T00:00:00.000Z',
       author: 'user-1'
     };
 

@@ -2,7 +2,13 @@ import { effect, inject, signal } from '@angular/core';
 import type { Signal } from '@angular/core';
 import { CmsApiService } from './api.service.js';
 import type { PaginatedDocuments } from './types.js';
-import type { QueryOptions } from './query.js';
+import type {
+  ForgeCollectionSlug,
+  ForgeDocument,
+  ForgeQueryOptions,
+  ForgeSchema,
+  UntypedForgeSchema
+} from './schema.js';
 
 /**
  * A reactive read: the three signals every screen needs around one request, plus `reload()`.
@@ -17,14 +23,22 @@ export interface ForgeResource<T> {
   reload(): void;
 }
 
-export interface CollectionRequest extends QueryOptions {
-  collection: string;
-}
+/** A list request: the collection plus its query options (schema-aware when `S` is a typed schema). */
+export type CollectionRequest<
+  S extends ForgeSchema = UntypedForgeSchema,
+  TSlug extends ForgeCollectionSlug<S> = ForgeCollectionSlug<S>,
+  D extends 0 | 1 = 0,
+  L extends string | undefined = undefined
+> = ForgeQueryOptions<S, TSlug, D, L> & { collection: TSlug };
 
-export interface DocumentRequest {
-  collection: string;
+export interface DocumentRequest<
+  S extends ForgeSchema = UntypedForgeSchema,
+  TSlug extends ForgeCollectionSlug<S> = ForgeCollectionSlug<S>,
+  D extends 0 | 1 = 0
+> {
+  collection: TSlug;
   id: string;
-  depth?: 0 | 1;
+  depth?: D;
 }
 
 function toError(err: unknown): Error {
@@ -83,10 +97,11 @@ function createResource<TRequest, TValue>(
 }
 
 /**
- * A page of documents as signals. Call in an injection context:
+ * A page of documents as signals. Call in an injection context. Untyped by default; pass the schema and
+ * the slug (and `depth`/`locale` literals when used) to type the value:
  *
  * ```ts
- * readonly services = collectionResource<Service>(() => ({
+ * readonly services = collectionResource<SiteSchema, 'services'>(() => ({
  *   collection: 'services',
  *   where: { featured: true },
  *   sort: 'order',
@@ -94,21 +109,30 @@ function createResource<TRequest, TValue>(
  * }));
  * ```
  */
-export function collectionResource<T = Record<string, unknown>>(
-  params: () => CollectionRequest | undefined
-): ForgeResource<PaginatedDocuments<T> | undefined> {
-  const api = inject(CmsApiService);
+export function collectionResource<
+  S extends ForgeSchema = UntypedForgeSchema,
+  TSlug extends ForgeCollectionSlug<S> = ForgeCollectionSlug<S>,
+  D extends 0 | 1 = 0,
+  L extends string | undefined = undefined
+>(
+  params: () => CollectionRequest<S, TSlug, D, L> | undefined
+): ForgeResource<PaginatedDocuments<ForgeDocument<S, TSlug, D, L>> | undefined> {
+  const api = inject(CmsApiService) as unknown as CmsApiService<S>;
   return createResource(params, ({ collection, ...query }) =>
-    api.listDocuments<T>(collection, query)
+    api.listDocuments<TSlug, D, L>(collection, query as ForgeQueryOptions<S, TSlug, D, L>)
   );
 }
 
 /** One document as signals. Returns `undefined` until `params` yields a request. */
-export function documentResource<T = Record<string, unknown>>(
-  params: () => DocumentRequest | undefined
-): ForgeResource<T | undefined> {
-  const api = inject(CmsApiService);
+export function documentResource<
+  S extends ForgeSchema = UntypedForgeSchema,
+  TSlug extends ForgeCollectionSlug<S> = ForgeCollectionSlug<S>,
+  D extends 0 | 1 = 0
+>(
+  params: () => DocumentRequest<S, TSlug, D> | undefined
+): ForgeResource<ForgeDocument<S, TSlug, D> | undefined> {
+  const api = inject(CmsApiService) as unknown as CmsApiService<S>;
   return createResource(params, ({ collection, id, depth }) =>
-    api.getDocument<T>(collection, id, ...(depth !== undefined ? [{ depth }] : []))
+    api.getDocument<TSlug, D>(collection, id, ...(depth !== undefined ? [{ depth }] : []))
   );
 }

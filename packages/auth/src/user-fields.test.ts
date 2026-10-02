@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, expectTypeOf } from 'vitest';
 import { defineCollection, defineField } from '@forge-cms/core';
 import { generateCreateTableSql } from '@forge-cms/db';
-import { AUTH_USER_FIELDS, withAuthFields } from './user-fields.js';
+import { AUTH_USER_FIELDS, defineUsersCollection, withAuthFields } from './user-fields.js';
 
 describe('withAuthFields', () => {
   const base = defineCollection({
@@ -98,5 +98,11 @@ describe('withAuthFields', () => {
   it('makes the generated users table include the _sessionVersion column', () => {
     expect(generateCreateTableSql(base)).not.toContain('_sessionVersion');
     expect(generateCreateTableSql(withAuthFields(base))).toContain('"_sessionVersion" REAL');
+  });
+
+  it('keeps the slug of defineUsersCollection() a literal type (spec 076)', () => {
+    expectTypeOf(defineUsersCollection().slug).toEqualTypeOf<'users'>();
+    expectTypeOf(defineUsersCollection({ slug: 'members' }).slug).toEqualTypeOf<'members'>();
+    expect(defineUsersCollection({ slug: 'members' }).slug).toBe('members');
   });
 });

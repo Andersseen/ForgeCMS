@@ -9,10 +9,12 @@
  * `0.8.0` carries M01, `0.8.1` added M02's code (its changelog entry is in `0.8.2`); roadmap `0.8`
  * (Angular DX) will publish as npm `0.9.0` — see `ROADMAP_MILESTONES` and docs/STATE.md.
  *
- * Verified 2026-09-30 (spec 075): npm `latest` is `0.8.2`. `main` manifests say `0.8.3` (Version
- * Packages PR #61), but that run's checks failed on a registry 404 and nothing was published.
+ * Verified 2026-10-02 (spec 076): npm `latest` is `0.8.3`, published by the release job of the
+ * PR #62 merge run (so it already contains roadmap 0.8 C01's code; C01's changelog entry is still a
+ * pending minor changeset and lands with `0.9.0`). That run's deploy health gates failed on the known
+ * production schema drift, not on the release.
  */
-export const CURRENT_FORGE_VERSION = '0.8.2';
+export const CURRENT_FORGE_VERSION = '0.8.3';
 
 export interface ForgePackage {
   /** The name after `@forge-cms/`. */

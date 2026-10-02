@@ -4,7 +4,7 @@
  * — `expectTypeOf` calls are no-ops at runtime, and `@ts-expect-error` lines live inside a function
  * that is declared but never invoked, so nothing here affects the (trivial) runtime assertions below.
  */
-import { describe, expectTypeOf, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { defineCollection, defineField } from '@forge-cms/core';
 import type { CollectionDefinition } from '@forge-cms/core';
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
@@ -189,5 +189,37 @@ describe('typed Local API (compile-time only)', () => {
       void runtime.find({ collection: 'anything' });
     }
     void explicitEnvOnly;
+  });
+
+  it('accepts a Date or an ISO string for a date and returns a string (spec 076)', async () => {
+    const events = defineCollection({
+      slug: 'events',
+      fields: { startsAt: defineField.date({ required: true }) }
+    });
+    const runtime = new ForgeCmsRuntime({
+      collections: [events],
+      adapters: {
+        database: new InMemoryDatabaseAdapter(),
+        auth: new InMemoryAuthAdapter(),
+        storage: new InMemoryStorageAdapter()
+      }
+    });
+    const fromDate = await runtime.create({
+      collection: 'events',
+      data: { startsAt: new Date('2026-01-15T10:00:00Z') }
+    });
+    const fromString = await runtime.create({
+      collection: 'events',
+      data: { startsAt: '2026-01-15T10:00:00.000Z' }
+    });
+    expectTypeOf(fromDate.startsAt).toEqualTypeOf<string>();
+    expect(fromDate.startsAt).toBe(fromString.startsAt);
+
+    // Never executed: a number is accepted by validation but is not part of the typed input.
+    async function rejected() {
+      // @ts-expect-error - a numeric timestamp is not a typed date input
+      await runtime.create({ collection: 'events', data: { startsAt: 1 } });
+    }
+    void rejected;
   });
 });

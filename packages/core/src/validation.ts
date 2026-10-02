@@ -56,6 +56,15 @@ function createError(field: string, code: ValidationErrorCode, message: string):
   return { field, message, code };
 }
 
+function isEmptyLocaleMap(value: unknown): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.keys(value).length === 0
+  );
+}
+
 function validateTextLike(
   field: AnyField,
   value: unknown,
@@ -190,9 +199,15 @@ export function validateField(
   const errors: ValidationError[] = [];
   const opts = field.options;
 
-  // required check
+  // required check — a localized value with no locale at all (`{}`) holds nothing either (spec 076):
+  // it used to pass and then read back absent in every locale.
   if (opts.required === true) {
-    if (value === undefined || value === null || value === '') {
+    if (
+      value === undefined ||
+      value === null ||
+      value === '' ||
+      (opts.localized === true && isEmptyLocaleMap(value))
+    ) {
       errors.push(createError(fieldName, 'required', `Field "${fieldName}" is required.`));
       // If required and missing, stop further type checks
       return errors;

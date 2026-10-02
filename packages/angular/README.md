@@ -22,7 +22,19 @@ and every failure is a `ForgeApiError` with `kind`, `status`, `code` and `detail
 puts `ForgeAuthSession` in `'error'`, not `'anonymous'`. Full guide:
 https://forge-cms.pages.dev/docs/angular-client
 
-Exports include `CmsApiService`, `ForgeAuthSession`, `forgeAuthGuard`, `provideForgeCms`,
+Typed client without codegen (spec 076): share the content model's type and call
+`injectForgeClient<SiteSchema>()` — slugs, query fields, create/update payloads and read results are
+checked against the JSON the server sends (ISO date strings, `depth: 1` targets or `null`,
+access-controlled fields optional, localized maps vs strings). `inject(CmsApiService)` stays the
+untyped client for dynamic code.
+
+```ts
+import type { ForgeSchema } from '@forge-cms/angular';
+import type { collections } from '../server/content'; // erased: no server code is bundled
+export type SiteSchema = ForgeSchema<typeof collections>;
+```
+
+Exports include `CmsApiService`, `injectForgeClient`, `ForgeSchema` and the projection types, `ForgeAuthSession`, `forgeAuthGuard`, `provideForgeCms`,
 `ForgeApiError`, query helpers, typed response shapes, auth role helpers, and signal-based read
 resources.
 

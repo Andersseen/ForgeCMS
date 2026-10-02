@@ -16,6 +16,7 @@ import {
 } from './errors.js';
 import { documentMatches, resolveAccess } from './access.js';
 import { afterStamp } from './concurrency.js';
+import { canonicalizeDates } from './dates.js';
 import { applyAutoSlugs, applyFieldDefaults } from './defaults.js';
 import type { AccessDecision } from './access.js';
 import { statusConstraint } from './read-policy.js';
@@ -388,6 +389,7 @@ export async function updateGlobal(
     'beforeChange hook'
   );
   data = screenHookOutput(data, stored, 'beforeChange', `global '${global.slug}'`);
+  data = canonicalizeDates(global.fields, data);
 
   // A global's relation/upload targets must exist, now and when it commits (spec 064 §4) — a global
   // reference restricts deletion of its target, so it must never be written pointing at nothing.

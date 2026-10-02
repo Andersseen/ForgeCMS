@@ -147,6 +147,30 @@ function assertPackedContents(pkg, files, packageDir) {
   }
 
   assertRuntimeImportsDeclared(pkg, files, packageDir);
+  assertTypeOnlyCoreDependency(pkg, files, packageDir);
+}
+
+// Spec 076: `@forge-cms/angular` depends on `@forge-cms/core` for **types only**. Its packed JavaScript
+// must never import core (a browser bundle would pull in server-side validation code), while its
+// declarations must, and the dependency must be declared so a consumer's compiler resolves them.
+function assertTypeOnlyCoreDependency(pkg, files, packageDir) {
+  if (pkg.name !== '@forge-cms/angular') return;
+  if (!pkg.dependencies?.['@forge-cms/core']) {
+    fail(
+      '@forge-cms/angular must declare @forge-cms/core in dependencies (its .d.ts files import it)'
+    );
+  }
+  let declarationsUseCore = false;
+  for (const file of files) {
+    const source = readFileSync(join(packageDir, file), 'utf8');
+    const importsCore = /(?:from\s+|import\s*\()\s*['"]@forge-cms\/core['"]/.test(source);
+    if (file.endsWith('.js') && importsCore) {
+      fail(`@forge-cms/angular ${file} imports @forge-cms/core at runtime; it must be type-only`);
+    }
+    if (file.endsWith('.d.ts') && importsCore) declarationsUseCore = true;
+  }
+  if (!declarationsUseCore)
+    fail('@forge-cms/angular declarations no longer reference @forge-cms/core');
 }
 
 function parseDependencySpec(spec) {
@@ -1074,6 +1098,162 @@ export class ExternalAdminComponent {
   run('pnpm', ['exec', 'ngc', '-p', 'tsconfig.json'], { cwd: dir });
 }
 
+// Spec 076 (roadmap C02): a typed Angular consumer built from the packed tarballs only. It declares
+// exactly the two Forge packages it imports (core for the server-side model, angular for the browser),
+// shares the model with the browser through `import type`, and proves (1) the typed client accepts valid
+// CRUD/draft/global usage without casts, (2) invalid slugs, fields and values fail `tsc`, and (3) the
+// compiled browser modules contain no server code.
+function verifyTypedAngularConsumer(tarballs) {
+  const forge = tarballs.filter((tarball) =>
+    ['@forge-cms/core', '@forge-cms/angular'].includes(tarball.name)
+  );
+  const dir = installConsumer('typed-angular-consumer', forge, [
+    '@angular/core@^21.2.10',
+    '@angular/router@^21.2.10',
+    'rxjs@^7.8.2',
+    'typescript@5.9.2'
+  ]);
+  mkdirSync(join(dir, 'src', 'server'), { recursive: true });
+  mkdirSync(join(dir, 'src', 'browser'), { recursive: true });
+  writeBaseTsconfig(dir, { lib: ['ES2022', 'DOM'] });
+
+  writeFileSync(
+    join(dir, 'src', 'server', 'content.ts'),
+    `import { defineCollection, defineField, defineGlobal } from '@forge-cms/core';
+
+const SECRET = 'SERVER_ONLY_SECRET_MARKER';
+
+export const users = defineCollection({
+  slug: 'users',
+  fields: {
+    email: defineField.email({ required: true }),
+    passwordHash: defineField.text({ access: { read: [], write: [] } })
+  },
+  access: { read: ({ user }) => user !== null }
+});
+
+export const posts = defineCollection({
+  slug: 'posts',
+  drafts: true,
+  fields: {
+    title: defineField.text({ required: true }),
+    publishedAt: defineField.date(),
+    author: defineField.relation({ collection: 'users', required: true }),
+    internalNote: defineField.textarea({ access: { read: ['admin'] } })
+  },
+  hooks: {
+    beforeChange: [({ data }) => ({ ...data, signature: SECRET + 'SERVER_ONLY_HOOK_MARKER' })]
+  }
+});
+
+export const settings = defineGlobal({
+  slug: 'settings',
+  fields: { siteName: defineField.text({ required: true }) }
+});
+
+export const collections = [users, posts];
+`
+  );
+
+  writeFileSync(
+    join(dir, 'src', 'browser', 'schema.ts'),
+    `import type { ForgeSchema } from '@forge-cms/angular';
+import type { collections, settings } from '../server/content.js';
+
+export type SiteSchema = ForgeSchema<typeof collections, [typeof settings]>;
+`
+  );
+
+  writeFileSync(
+    join(dir, 'src', 'browser', 'client.ts'),
+    `import {
+  injectForgeClient,
+  provideForgeCms,
+  type CmsApiService,
+  type ForgeDocument,
+  type ForgeWriteReceipt
+} from '@forge-cms/angular';
+import type { SiteSchema } from './schema.js';
+
+export const providers = provideForgeCms({ baseUrl: '/api/v1' });
+
+type Post = ForgeDocument<SiteSchema, 'posts'>;
+type User = ForgeDocument<SiteSchema, 'users'>;
+
+/** Valid usage: no response generics, no casts. */
+export async function useTypedClient(): Promise<string> {
+  const cms = injectForgeClient<SiteSchema>();
+  const posts: Post[] = await cms.getDocuments('posts', {
+    where: { _status: 'published' },
+    sort: [{ field: 'publishedAt', order: 'desc' }]
+  });
+  const date: string | null | undefined = posts[0]?.publishedAt;
+  const populated = await cms.getDocument('posts', 'p1', { depth: 1 });
+  const author: User | null = populated.author;
+  const created: Post | ForgeWriteReceipt = await cms.createDocument('posts', {
+    title: 'Hello',
+    author: 'u1',
+    publishedAt: new Date()
+  });
+  await cms.updateDocument('posts', created.id, { title: 'Renamed' });
+  await cms.setDocumentStatus('posts', created.id, 'published');
+  const settings = await cms.getGlobal('settings');
+  return [date, author?.email, settings?.siteName].join(' ');
+}
+
+/** The untyped escape hatch still accepts anything. */
+export async function useUntypedClient(api: CmsApiService): Promise<unknown> {
+  const slug: string = 'anything';
+  return (await api.getDocuments(slug, { where: { any: 1 } }))[0]?.['field'];
+}
+
+// Never invoked. Removing any @ts-expect-error here fails 'tsc -p tsconfig.json'.
+export async function rejected(cms: CmsApiService<SiteSchema>): Promise<void> {
+  // @ts-expect-error - unknown collection slug
+  await cms.getDocuments('pages');
+  // @ts-expect-error - unknown global slug
+  await cms.getGlobal('footer');
+  // @ts-expect-error - unknown where field
+  await cms.getDocuments('posts', { where: { nope: true } });
+  // @ts-expect-error - missing required author on create
+  await cms.createDocument('posts', { title: 'x' });
+  // @ts-expect-error - wrong value type on update
+  await cms.updateDocument('posts', 'id', { title: 42 });
+  // @ts-expect-error - Forge generates ids
+  await cms.createDocument('posts', { title: 'x', author: 'u', id: 'mine' });
+  const post = await cms.getDocument('posts', 'id');
+  // @ts-expect-error - a date is a string on the wire
+  post.publishedAt?.getTime();
+  // @ts-expect-error - an access-controlled field is not guaranteed
+  void post.internalNote.length;
+  const populated = await cms.getDocument('posts', 'id', { depth: 1 });
+  // @ts-expect-error - a populated single relation may be null
+  void populated.author.email;
+  // @ts-expect-error - never-readable fields are not in the type
+  void populated.author?.passwordHash;
+}
+`
+  );
+
+  run('pnpm', ['exec', 'tsc', '-p', 'tsconfig.json'], { cwd: dir });
+
+  // The browser modules compiled to JavaScript without the server module or any core import.
+  for (const file of ['client.js', 'schema.js']) {
+    const output = readFileSync(join(dir, 'dist', 'browser', file), 'utf8');
+    for (const forbidden of [
+      'server/content',
+      '@forge-cms/core',
+      'SERVER_ONLY_HOOK_MARKER',
+      'SERVER_ONLY_SECRET_MARKER'
+    ]) {
+      if (output.includes(forbidden)) {
+        fail(`typed Angular consumer: dist/browser/${file} contains '${forbidden}'`);
+      }
+    }
+  }
+  console.log('typed angular consumer ok');
+}
+
 try {
   run('mkdir', ['-p', packDir]);
 
@@ -1123,6 +1303,7 @@ try {
   verifyCloudflareConsumer(tarballs);
   verifyUpgradeConsumer(tarballs);
   verifyAngularConsumer(tarballs);
+  verifyTypedAngularConsumer(tarballs);
 
   console.log('Release verification passed.');
 } finally {

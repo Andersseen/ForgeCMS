@@ -19,7 +19,7 @@
 ---
 
 > [!WARNING]
-> ForgeCMS is pre-1.0 (npm `0.8.0`). The fundamentals — schema DSL, Local API, HTTP handlers, access
+> ForgeCMS is pre-1.0 (npm `0.8.3`). The fundamentals — schema DSL, Local API, HTTP handlers, access
 > control, hooks, drafts, versions, globals, live preview, localization, relations, and a reusable
 > Angular admin — are usable and exercised by real consumer apps in this repo, but API stability is
 > not guaranteed before `1.0`. See [docs/STATE.md](docs/STATE.md) for exactly what is implemented and
@@ -129,12 +129,14 @@ source in [`apps/demo-aesthetics`](apps/demo-aesthetics)) and the docs at
 Two separate numbering schemes:
 
 - **npm versions.** The ten public packages are one fixed Changesets group; they always share a
-  version. The current release is **`0.8.2`**. **npm `0.8.x` is the roadmap 0.7 (upgrade safety)
-  line**: M01 shipped in `0.8.0`, M02 in `0.8.1` (its changelog entry landed in `0.8.2`), and M03's
-  one package fix ships as the next `0.8.x` patch.
+  version. The current release is **`0.8.3`**. **npm `0.8.x` is the roadmap 0.7 (upgrade safety)
+  line**: M01 shipped in `0.8.0`, M02 in `0.8.1` (its changelog entry landed in `0.8.2`), M03's
+  package fix in `0.8.3`. `0.8.3` was published from `main` after roadmap 0.8 C01 merged, so it
+  already contains C01's code; its changelog entry is a pending minor and lands with `0.9.0`.
 - **Roadmap checkpoints** ([docs/ROADMAP.md](docs/ROADMAP.md)) are product guarantees. **0.6 and 0.7
   (upgrade safety: M01 drift detection, M02 reviewed migrations, M03 upgrade and backup/restore
-  rehearsal) are complete.** Next: roadmap 0.8, the Angular client and DX.
+  rehearsal) are complete.** Roadmap 0.8 (the Angular client and DX) is in progress: C01 (transport
+  and errors) is merged and C02 (schema-aware wire types, spec 076) is implemented on its branch.
 
 A package version does not certify a roadmap checkpoint, and since `0.8.0` the numbers are offset by
 one: roadmap 0.8 (Angular client/DX) will publish as npm `0.9.0`.
@@ -156,7 +158,7 @@ All public packages are versioned together.
 | [`@forge-cms/admin`](packages/admin)           | Reusable Angular admin components (content, users, auth)            |
 | [`@forge-cms/testing`](packages/testing)       | Adapter contract test suites                                        |
 
-They share one version (currently `0.8.0` on npm); see each package's `CHANGELOG.md` for what
+They share one version (currently `0.8.3` on npm); see each package's `CHANGELOG.md` for what
 changed.
 
 ## Schema Synchronization

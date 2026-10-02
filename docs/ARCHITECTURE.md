@@ -261,6 +261,16 @@ See `packages/storage/src/index.ts` — mirror of the others (init + file CRUD).
 
 `@forge-cms/angular`'s `CmsApiService` and the admin UI parse exactly this shape.
 
+**Schema-to-wire types (spec 076, `@forge-cms/angular`).** The only edge from `angular` to `core` is
+**type-only** (`import type`; `release:verify` fails if angular's packed JS imports core). A consumer
+shares `ForgeSchema<typeof collections, [typeof global]>` with the browser and calls
+`injectForgeClient<S>()` — the same `CmsApiService` instance, typed. The projections in `schema.ts`
+describe the JSON the handlers send, not the server-side value: create/update inputs differ from reads;
+dates are ISO strings; `depth: 1` targets may be `null` (many: readable targets only, not populated
+further, localized maps kept); a field with an `access.read` rule is optional; localized fields are maps
+unless `locale` was requested; writes may answer `{ id }` (spec 068). They rely on the literal option
+types `defineField.*` captures. `inject(CmsApiService)` stays the untyped (`UntypedDocument`) client.
+
 ### Contract tests
 
 `@forge-cms/testing/contracts` exports `runDatabaseAdapterContractTests` (plus the additive
@@ -273,8 +283,10 @@ run the matching suite in its test file.** This is what makes adapters swappable
 
 ## Schema DSL (core concepts)
 
-- `defineField.text({ required: true })` → `FieldDefinition<'text', string, TextFieldOptions>`; the
-  phantom `__value` carries the value type for inference.
+- `defineField.text({ required: true })` → `FieldDefinition<'text', string, { readonly required: true }>`
+  (spec 076: options keep their literal type; still assignable to `TextField`); the phantom `__value`
+  carries the value type for inference. A `date` value is an ISO string at rest, on reads and on the
+  wire (spec 076); writes also take a `Date` (`FieldInputValue`), canonicalized by the runtime.
 - `defineField.richtext()` (spec 015) → value type `RichTextContent` (`RichTextNode[]`), where a node is
   `{ type: string, text?: string, children?: RichTextNode[], ...marks/extra }`. Validated recursively
   (structural only — no fixed node-type vocabulary); stored as JSON text, same pattern as `json`.

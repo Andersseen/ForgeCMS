@@ -25,6 +25,7 @@ import {
 import { documentMatches, mergeWhere } from './access.js';
 import { assertNotAuthManaged } from './auth-managed.js';
 import { validateSort, validateWhere } from './query-validation.js';
+import { canonicalizeDates } from './dates.js';
 import { applyAutoSlugs, applyFieldDefaults } from './defaults.js';
 import { checkAccess, statusConstraint } from './read-policy.js';
 import {
@@ -852,6 +853,8 @@ async function createDocument(
     'beforeChange hook'
   );
   data = screenHookOutput(data, {}, 'beforeChange', args.collection);
+  // One date representation at rest and on the wire (spec 076).
+  data = canonicalizeDates(collection.fields, data);
 
   // Every relation target this document names must exist, now and when it commits (spec 064 §4).
   const assertions = await relationTargetGuards(ctx, collection, data, undefined, explicitId);
@@ -1042,6 +1045,7 @@ async function prepareUpdate(
     'beforeChange hook'
   );
   data = screenHookOutput(data, existing, 'beforeChange', args.collection);
+  data = canonicalizeDates(collection.fields, data);
 
   return {
     collection,
@@ -1662,6 +1666,8 @@ export async function preview(ctx: OperationContext, args: PreviewArgs): Promise
     applyFieldDefaults(collection, previewData),
     existing ?? undefined
   );
+  // A preview renders like a read, so its dates take the stored representation (spec 076).
+  previewData = canonicalizeDates(collection.fields, previewData);
 
   if (args.depth && args.depth > 0) {
     previewData = await populateRecord(previewData, collection, ctx, {

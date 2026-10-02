@@ -35,11 +35,9 @@ export default defineEventHandler(async (event) => {
         ...(body.email !== undefined && { email: body.email }),
         ...(body.phone !== undefined && { phone: body.phone }),
         ...(body.service !== undefined && body.service !== '' && { service: body.service }),
-        // FINDING 24 (and 3): stored exactly as the visitor's zone-less `datetime-local` value. The
-        // validator accepts an ISO string, but the typed Local API declares `date` as `Date`.
-        ...(body.preferredDate !== undefined && {
-          preferredDate: body.preferredDate as unknown as Date
-        }),
+        // FINDING 3: the visitor's zone-less `datetime-local` value is read in the server's time
+        // zone and stored as its ISO string (spec 076 closed finding 24's typing half).
+        ...(body.preferredDate !== undefined && { preferredDate: body.preferredDate }),
         ...(body.notes !== undefined && { notes: body.notes }),
         source: 'website'
       }

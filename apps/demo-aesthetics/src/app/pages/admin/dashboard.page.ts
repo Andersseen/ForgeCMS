@@ -3,16 +3,9 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import type { OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { PageHeaderComponent, describeAdminError } from '@forge-cms/admin';
-import { CmsApiService, ForgeAnalyticsApiService } from '@forge-cms/angular';
+import { ForgeAnalyticsApiService, injectForgeClient } from '@forge-cms/angular';
 import type { AnalyticsSummaryResponse } from '@forge-cms/angular';
-
-interface BookingRow extends Record<string, unknown> {
-  id: string;
-  name: string;
-  email: string;
-  status: string;
-  preferredDate: string;
-}
+import type { DemoDocument, DemoSchema } from '../../forge-schema';
 
 @Component({
   selector: 'lumea-admin-dashboard',
@@ -116,10 +109,11 @@ interface BookingRow extends Record<string, unknown> {
   `
 })
 export class AdminDashboardPage implements OnInit {
-  private readonly api = inject(CmsApiService);
+  // Typed by the content model (spec 076): slugs, `where`/`sort` fields and results are checked.
+  private readonly api = injectForgeClient<DemoSchema>();
   private readonly analyticsApi = inject(ForgeAnalyticsApiService);
 
-  protected readonly bookings = signal<BookingRow[]>([]);
+  protected readonly bookings = signal<DemoDocument<'bookings'>[]>([]);
   protected readonly serviceCount = signal(0);
   protected readonly draftCount = signal(0);
   protected readonly postCount = signal(0);
@@ -158,7 +152,7 @@ export class AdminDashboardPage implements OnInit {
   private async load(): Promise<void> {
     try {
       const [bookings, services, posts] = await Promise.all([
-        this.api.getDocuments<BookingRow>('bookings', {
+        this.api.getDocuments('bookings', {
           where: { status: { ne: 'cancelled' } },
           sort: 'preferredDate',
           order: 'asc',

@@ -82,6 +82,17 @@ export function decodeFieldValue(value: unknown, field: AnyField): unknown {
   return fromDbValue(value, field.kind);
 }
 
+/**
+ * A stored date as the canonical `toISOString()` string. An unparseable legacy value (e.g. a numeric
+ * timestamp SQLite stored as text) is returned unchanged rather than turned into an `Invalid Date`, which
+ * `JSON.stringify` prints as `null`.
+ */
+function canonicalDateString(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
+}
+
 export function fromDbValue(value: unknown, kind: AnyField['kind']): unknown {
   if (value === null || value === undefined) return null;
   switch (kind) {
@@ -97,7 +108,9 @@ export function fromDbValue(value: unknown, kind: AnyField['kind']): unknown {
       }
       return value;
     case 'date':
-      return typeof value === 'string' ? new Date(value) : value;
+      // A date is an ISO-8601 string everywhere — at rest, on Local API reads and on the wire
+      // (spec 076, demo finding 24) — not a `Date` here and a string on the in-memory adapter.
+      return canonicalDateString(value);
     case 'json':
     case 'richtext':
     case 'group':

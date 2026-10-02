@@ -7,6 +7,7 @@
  * - `types.ts`        response shapes, config token, typed errors, role helpers
  * - `transport.ts`    URL joining, identifier encoding, credential policy, error decoding (spec 075)
  * - `query.ts`        `QueryOptions` → the query string the API parses
+ * - `schema.ts`       schema-aware wire types (spec 076), types only
  * - `api.service.ts`  `CmsApiService`, promise-based
  * - `resources.ts`    signal-based reads over the same service
  * - `auth-session.ts` `ForgeAuthSession` — signals-based browser session state (spec 054)
@@ -65,7 +66,37 @@ export {
   fetchTransport
 } from './transport.js';
 
-export { CmsApiService } from './api.service.js';
+export {
+  type ForgeBlockRow,
+  type ForgeCollectionSlug,
+  type ForgeCreateInput,
+  type ForgeDocument,
+  type ForgeDocumentMeta,
+  type ForgeDraftsCollectionSlug,
+  type ForgeGlobalDocument,
+  type ForgeGlobalInput,
+  type ForgeGlobalSlug,
+  type ForgeGlobalWriteResult,
+  type ForgeLocalizedValue,
+  type ForgeQueryField,
+  type ForgeQueryOptions,
+  type ForgeSchema,
+  type ForgeSort,
+  type ForgeUpdateInput,
+  type ForgeUploadFields,
+  type ForgeWhere,
+  type ForgeWriteReceipt,
+  type ForgeWriteResult,
+  type UntypedDocument,
+  type UntypedForgeSchema
+} from './schema.js';
+
+export {
+  CmsApiService,
+  injectForgeClient,
+  type ForgeDocumentReadOptions,
+  type ForgeWriteOptions
+} from './api.service.js';
 
 export {
   collectionResource,

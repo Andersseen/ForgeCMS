@@ -105,8 +105,8 @@ export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
     status: 'in-progress',
     steps: [
       { title: 'Configurable transport and structured errors', status: 'complete' },
-      { title: 'Honest schema-to-wire types', status: 'next' },
-      { title: 'Resource reliability and peer compatibility', status: 'pending' }
+      { title: 'Honest schema-to-wire types', status: 'complete' },
+      { title: 'Resource reliability and peer compatibility', status: 'next' }
     ]
   },
   { version: '0.9', title: 'SSR for Analog', status: 'planned' },

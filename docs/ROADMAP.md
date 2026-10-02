@@ -1,8 +1,14 @@
 # ROADMAP — A small, dependable ForgeCMS 1.0
 
+> **2026-10-02 (spec 076):** roadmap 0.8 **C02** (honest schema-to-wire types) is implemented on its
+> branch: `injectForgeClient<Schema>()` types slugs, queries, create/update payloads and the JSON reads
+> actually return (ISO dates, `depth: 1` targets or `null`, access-controlled fields optional, localized
+> maps vs strings), with no codegen and no server code in the browser; demo finding 24 is closed.
+> **C01** (spec 075) merged in PR #62. npm `latest` is **`0.8.3`** (published by that merge run, so it
+> already contains C01's code); C01 + C02 changelog entries land in npm `0.9.0`. Next: **C03**.
+>
 > **2026-09-30 (spec 075):** roadmap 0.8 **C01** (configurable Angular transport, structured errors)
-> is implemented; it publishes with the next minor (npm `0.9.0`). Next: **C02**. npm `latest` is still
-> `0.8.2` (`main`'s `0.8.3` bump did not publish).
+> is implemented; it publishes with the next minor (npm `0.9.0`).
 >
 > **Current status (2026-09-29, spec 073):** npm family **`0.8.2`**. **Roadmap 0.6 and 0.7 are
 > complete.** M01 (drift detection, spec 070) shipped in `0.8.0`; M02 (reviewed migrations, spec 072)
