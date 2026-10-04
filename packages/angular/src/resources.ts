@@ -1,6 +1,9 @@
-import { effect, inject, signal } from '@angular/core';
+import { computed, effect, inject, signal, untracked } from '@angular/core';
 import type { Signal } from '@angular/core';
 import { CmsApiService } from './api.service.js';
+import { credentialBoundary } from './credentials.js';
+import { buildQueryString } from './query.js';
+import type { QueryOptions } from './query.js';
 import type { PaginatedDocuments } from './types.js';
 import type {
   ForgeCollectionSlug,
@@ -13,8 +16,10 @@ import type {
 /**
  * A reactive read: the three signals every screen needs around one request, plus `reload()`.
  *
- * Shaped like `@angular/core`'s `resource()` but implemented with plain signals, because `resource`
- * is still experimental and this package supports Angular 19 and up.
+ * Shaped like `@angular/core`'s `resource()` but implemented with plain signals (`resource` is still
+ * experimental). Contract (spec 077): `value()` is `undefined` or the result of the **current** request
+ * under the **current** credentials; a superseded request is aborted and can never commit; an abort is
+ * never an `error()`; nothing is retried. See the Angular client guide for every transition.
  */
 export interface ForgeResource<T> {
   value: Signal<T>;
@@ -45,54 +50,97 @@ function toError(err: unknown): Error {
   return err instanceof Error ? err : new Error(String(err));
 }
 
+/** What the signals show, plus what it belongs to. Replaced as a whole, never mutated. */
+interface ResourceState<TValue> {
+  /** Key of the request these signals describe; `undefined` while idle. */
+  key: string | undefined;
+  /** Credential revision the state was produced under (spec 077). */
+  revision: object;
+  value: TValue | undefined;
+  isLoading: boolean;
+  error: Error | null;
+}
+
 /**
- * The shared machinery: re-run `load` whenever `params` changes, drop out-of-order responses, and
- * stay idle while `params` returns `undefined` (the "no id in the route yet" case).
+ * The shared machinery (spec 077 — the resource contract in the Angular client guide):
+ *
+ * - every run of `params()` that yields a request starts one **attempt** with its own `AbortController`;
+ *   the effect's cleanup aborts it when the attempt is superseded (new params, `reload()`, idle, a
+ *   credential change) or the owner is destroyed;
+ * - an attempt commits only while its signal is not aborted and the credential revision it started under
+ *   is still current — a custom transport that ignores the signal still cannot overwrite newer state;
+ * - `value()` only ever holds a result of the current request key under the current credentials: a new
+ *   key, idle and a credential change reset it, a same-key re-run (`reload()`) keeps it while loading;
+ * - an aborted attempt never becomes an `error()`; a real failure is surfaced as-is and clears `value()`;
+ * - nothing is retried.
  */
 function createResource<TRequest, TValue>(
   params: () => TRequest | undefined,
-  load: (request: TRequest) => Promise<TValue>
+  keyOf: (request: TRequest) => string,
+  load: (request: TRequest, signal: AbortSignal) => Promise<TValue>
 ): ForgeResource<TValue | undefined> {
-  const value = signal<TValue | undefined>(undefined);
-  const isLoading = signal(false);
-  const error = signal<Error | null>(null);
-  const reloadCount = signal(0);
+  const credentials = credentialBoundary(inject(CmsApiService)).revision;
+  const reloads = signal(0);
+  const state = signal<ResourceState<TValue>>({
+    key: undefined,
+    revision: untracked(credentials),
+    value: undefined,
+    isLoading: false,
+    error: null
+  });
 
-  let latest = 0;
+  // A credential change hides the previous identity's result synchronously — before Angular has re-run
+  // the effect below — so code reading `value()` right after `await session.logout()` never sees it.
+  const visible = computed<ResourceState<TValue>>(() => {
+    const current = state();
+    if (current.revision === credentials()) return current;
+    return { ...current, value: undefined, error: null, isLoading: current.key !== undefined };
+  });
 
-  effect(() => {
+  effect((onCleanup) => {
     const request = params();
-    reloadCount();
+    reloads();
+    const revision = credentials();
 
-    if (request === undefined) {
-      isLoading.set(false);
-      return;
-    }
+    untracked(() => {
+      if (request === undefined) {
+        state.set({ key: undefined, revision, value: undefined, isLoading: false, error: null });
+        return;
+      }
 
-    const attempt = ++latest;
-    isLoading.set(true);
-    error.set(null);
-
-    void load(request)
-      .then((result) => {
-        if (attempt !== latest) return;
-        value.set(result);
-      })
-      .catch((err: unknown) => {
-        if (attempt !== latest) return;
-        error.set(toError(err));
-      })
-      .finally(() => {
-        if (attempt !== latest) return;
-        isLoading.set(false);
+      const key = keyOf(request);
+      const previous = state();
+      const sameRequest = previous.key === key && previous.revision === revision;
+      state.set({
+        key,
+        revision,
+        value: sameRequest ? previous.value : undefined,
+        isLoading: true,
+        error: null
       });
+
+      const controller = new AbortController();
+      onCleanup(() => controller.abort());
+      const current = () => !controller.signal.aborted && untracked(credentials) === revision;
+
+      load(request, controller.signal).then(
+        (value) => {
+          if (current()) state.set({ key, revision, value, isLoading: false, error: null });
+        },
+        (err: unknown) => {
+          if (current()) {
+            state.set({ key, revision, value: undefined, isLoading: false, error: toError(err) });
+          }
+        }
+      );
+    });
   });
 
   return {
-    value: value.asReadonly(),
-    isLoading: isLoading.asReadonly(),
-    error: error.asReadonly(),
-    reload: () => reloadCount.update((count) => count + 1)
+    value: computed(() => visible().value),
+    isLoading: computed(() => visible().isLoading),
+    error: computed(() => visible().error),
+    reload: () => reloads.update((count) => count + 1)
   };
 }
 
@@ -118,8 +166,15 @@ export function collectionResource<
   params: () => CollectionRequest<S, TSlug, D, L> | undefined
 ): ForgeResource<PaginatedDocuments<ForgeDocument<S, TSlug, D, L>> | undefined> {
   const api = inject(CmsApiService) as unknown as CmsApiService<S>;
-  return createResource(params, ({ collection, ...query }) =>
-    api.listDocuments<TSlug, D, L>(collection, query as ForgeQueryOptions<S, TSlug, D, L>)
+  return createResource(
+    params,
+    // The wire identity: the same collection and query string is the same request.
+    ({ collection, ...query }) =>
+      `${collection}${buildQueryString(query as unknown as QueryOptions)}`,
+    ({ collection, ...query }, signal) =>
+      api.listDocuments<TSlug, D, L>(collection, query as ForgeQueryOptions<S, TSlug, D, L>, {
+        signal
+      })
   );
 }
 
@@ -132,7 +187,12 @@ export function documentResource<
   params: () => DocumentRequest<S, TSlug, D> | undefined
 ): ForgeResource<ForgeDocument<S, TSlug, D> | undefined> {
   const api = inject(CmsApiService) as unknown as CmsApiService<S>;
-  return createResource(params, ({ collection, id, depth }) =>
-    api.getDocument<TSlug, D>(collection, id, ...(depth !== undefined ? [{ depth }] : []))
+  return createResource(
+    params,
+    ({ collection, id, depth }) => JSON.stringify([collection, id, depth ?? 0]),
+    ({ collection, id, depth }, signal) =>
+      api.getDocument<TSlug, D>(collection, id, depth !== undefined ? { depth } : undefined, {
+        signal
+      })
   );
 }

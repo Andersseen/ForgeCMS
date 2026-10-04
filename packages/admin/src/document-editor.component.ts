@@ -5,7 +5,8 @@ import {
   effect,
   inject,
   input,
-  signal
+  signal,
+  untracked
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -126,6 +127,19 @@ export class ForgeDocumentEditorComponent {
       const slug = this.collectionSlug();
       if (slug === undefined) return;
       void this.loadMeta();
+    });
+
+    // A different document (A → B, or edit → `new`) starts clean: A's unsaved-changes flag and save
+    // errors must not carry over. Its loaded value cannot either — `documentResource` resets on a new
+    // request (spec 077).
+    effect(() => {
+      this.collectionSlug();
+      this.effectiveId();
+      untracked(() => {
+        this.dirty.set(false);
+        this.saveError.set(null);
+        this.fieldErrors.set({});
+      });
     });
   }
 

@@ -1,11 +1,83 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-04 (production recovery: both Pages apps healthy after the spec 075 reviewed migrations; spec 076 / C02 merged in PR #64; next is C03).**
+> **Last updated: 2026-10-04 (spec 077 / C03: Angular resource reliability + proven peer ranges — roadmap
+> 0.8 complete on its branch; next is roadmap 0.9 / S01).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Angular resource reliability and peer compatibility — C03 (spec 077, 2026-10-04)
+
+Branch `feature/spec-077-angular-resource-reliability-peer-compat`. Spec:
+[docs/specs/077-angular-resource-reliability-and-peer-compatibility.md](specs/077-angular-resource-reliability-and-peer-compatibility.md).
+**Roadmap 0.8 (C01–C03) is complete** once this merges. Next: **roadmap 0.9 / S01** (Analog Local API +
+safe public SSR/hydration) — not started.
+
+- **Bugs found in `createResource` (fixed):** no cancellation (the C01 signal was never passed); params →
+  `undefined` did not invalidate the in-flight request, which then refilled the idle resource; `value()`
+  kept the previous request's result while a different one loaded (admin editor showed document A while B
+  loaded — a save in that window would write A's fields to B; edit → `new` prefilled the create form);
+  nothing tied results to an identity (logout / another user left the old data and let old requests
+  commit); destroy left the request running. No runtime resource tests existed.
+- **Resource contract (public types unchanged):** one `AbortController` per attempt, aborted by the
+  effect cleanup on new params, `reload()`, idle, credential change and owner destroy; commits only while
+  not aborted and under the same credential revision (so a transport that ignores abort cannot win);
+  `value()` = result of the current request key under the current credentials — reset on a new key, idle,
+  failure and credential change, kept on `reload()`/same-key re-run; aborts never become `error()`;
+  errors are the original `ForgeApiError`; no retries. Table in the Angular guide (`#resource-contract`).
+- **Credential boundary (internal `credentials.ts`, no new main-entry export):** one revision per
+  `CmsApiService` (epoch + reactively read `authToken`). `ForgeAuthSession` invalidates on login/signup
+  success, every logout, the first 401 while authenticated, a failed login that clears a known user, and a
+  `refresh()` that finds another user; the bootstrap `/me` and anonymous 401s do not. Values are hidden
+  synchronously (computed over the revision), before Angular re-runs the effect.
+- **Admin:** document editor resets `dirty`/save errors when the document identity changes; save still
+  awaits the write before clearing `dirty`/navigating (now pinned by tests). Workspace unchanged.
+- **Peers (proven by `pnpm release:compat`):** `@forge-cms/angular` `@angular/core|router`
+  `^21.0.0 || ^22.0.0`; `@forge-cms/admin` `@angular/* ^21.2.0` (VoltUI 1.x limit), `rxjs ^7.8.0`,
+  `@voltui/components ^1.0.1`, `lumen-icons ^0.2.0`, optional `@babel/core ^7.28.0`, `vite ^7 || ^8`.
+  Before: exact pins that the repo's own app versions failed under a strict install (VoltUI 1.1.0, rxjs
+  7.8.2, Vite 7.1.4).
+- **Found by the matrix: `@forge-cms/angular` alone could not be production-built with Vite/Analog**
+  (Analog links only `fesm20` APF files; Forge's `ngc` output stayed unlinked → `JIT compiler
+unavailable`). The linker moved to new **`@forge-cms/angular/vite`** (optional peers
+  `@angular/compiler-cli`, `@babel/core ^7.28.0 || ^8.0.0` — Angular 22 needs Babel 8 — and `vite`);
+  `@forge-cms/admin/vite` re-exports it. API baseline: only that subpath added.
+- **Matrix** (`scripts/verify-angular-compat.mjs`, CI `checks` job): external Vite +
+  `@analogjs/vite-plugin-angular` apps from packed tarballs, `strict-peer-dependencies=true`,
+  `auto-install-peers=false`; single-copy check (store + real-path resolution from app/Forge/VoltUI),
+  `tsc` + `ngc` strictTemplates (typed C02 client + resources + `@ts-expect-error`s, admin routes/layout),
+  production `vite build`, bundle fully linked / one `getBaseHrefFromDOM` / no server code. Combinations
+  run 2026-10-04: `angular-min` (Angular 21.0.0, TS 5.9.2, rxjs 7.8.0, Vite 7.0.0, Babel 7.28.0),
+  `admin-min` (21.2.0, VoltUI 1.0.1), `current` (21.2.10, VoltUI 1.1.0, Vite 7.1.4), `latest-21`
+  (21.2.25, `@angular/build` 21.2.24, TS 5.9.3, Vite 8.3.2, vite-plugin-angular 2.8.0, Babel 7.29.7),
+  `angular-22` (22.2.1, TS 6.0.3, Vite 8.3.2, Babel 8.0.6). Third-party strict-install needs satisfied in the
+  consumer: `@angular/cdk` (VoltUI → ng-primitives) and `@emnapi/*` (`@angular/build` → rolldown wasm).
+- **Duplicate-Angular evidence:** strict install rejects the 2026-09-17 pattern (admin re-pinned to exact
+  `@angular/* 21.2.0` vs an app on 21.2.10 — `ERR_PNPM_PEER_DEP_ISSUES`, pnpm 10.11.0 and 10.18.3). A lenient
+  pnpm 10 install of the same no longer creates a second copy (it warns and links the app's), so the
+  store/path/bundle detectors are proven by unit fixtures of the incident layout
+  (`scripts/angular-compat.test.mjs`), not by a live duplicate.
+- **Tests:** `packages/angular/src/resources.test.ts` (34; 20 fail on the old implementation),
+  `packages/admin/src/content-resources.test.ts` (8; 5 fail on the old code, 3 pin the save semantics),
+  `scripts/angular-compat.test.mjs` (9). Angular/admin tests now use `TestBed` + jsdom (devDependency) to
+  flush effects.
+- **Release truth (verified 2026-10-04 against npm and CI):** npm `latest` = **`0.9.1`**, published
+  16:12Z by the release job of the PR #66 merge run (37215083001); `0.9.0` (C01 + C02) at 06:51Z by the PR
+  #64 merge run. Per-package GitHub releases `@forge-cms/*@0.9.1` exist. `main` manifests `0.9.1`; no pending
+  changeset before this branch, which adds one `patch` (→ `0.9.2`). Website `CURRENT_FORGE_VERSION` →
+  `0.9.1`, roadmap 0.8 complete / 0.9 next.
+- **Deploy gate flake (open):** in run 37215083001 both post-deploy health gates failed — every
+  `/api/status` attempt **timed out** (10 s × 12), unlike the earlier 503 drift. Re-running
+  `scripts/verify-deployment.mjs www` and `demo` at ~16:35Z: both healthy (200 on attempt 1). Cause not
+  investigated (no code change here).
+- **Gates (local, 2026-10-04, newly executed):** format:check (only the git-ignored `.kilo/` worktree
+  warns), lint, typecheck, test, build, check:api, release:verify, **release:compat (5/5)**, e2e:www 25/25,
+  e2e:tiny-project 13/13, e2e:demo 29/29. Not run: test:cloudflare/libsql/upgrade (no backend change; CI
+  runs them), e2e:www:prod. Cached vs new detail in spec 077's Outcome.
+- **Not done (by design):** SSR / roadmap 0.9; Angular 19/20; admin on Angular 22 (VoltUI); caching,
+  retries, `isRefreshing`; a non-reactive `authToken` function cannot trigger a resource reload.
 
 ## Production recovery — both Pages apps healthy (2026-10-04)
 

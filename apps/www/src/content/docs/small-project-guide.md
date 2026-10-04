@@ -176,13 +176,14 @@ document editor, and a users workspace gated to admins. No host-written CRUD pag
 `app.config.ts`, add `provideForgeCms({ baseUrl: '/api/v1' })` — no `authToken`; the browser session
 is the `forge_session` HttpOnly cookie, and `CmsApiService` sends it automatically.
 
-**One thing to watch for**: `@forge-cms/admin` ships partial-Ivy components, which need Angular's
-linker at your app's build time or you'll hit a production-only `JIT compiler unavailable` crash. If
-you're on Vite (Analog.js), add the plugin ForgeCMS ships for exactly this:
+**One thing to watch for**: `@forge-cms/angular` and `@forge-cms/admin` ship partial-Ivy code, which
+needs Angular's linker at your app's build time or you'll hit a production-only
+`JIT compiler unavailable` crash. If you're on Vite (Analog.js), add the plugin ForgeCMS ships for
+exactly this (`@forge-cms/admin/vite` re-exports the same plugin):
 
 ```ts
 // vite.config.ts
-import { angularLinker } from '@forge-cms/admin/vite';
+import { angularLinker } from '@forge-cms/angular/vite';
 
 export default defineConfig({
   plugins: [angularLinker() /* your other plugins, e.g. analog() */]

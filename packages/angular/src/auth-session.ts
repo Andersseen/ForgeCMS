@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import type { Signal } from '@angular/core';
 import { CmsApiService } from './api.service.js';
+import { credentialBoundary } from './credentials.js';
 import { ForgeApiError, type AuthUser } from './types.js';
 
 export type ForgeAuthStatus = 'loading' | 'authenticated' | 'anonymous' | 'error';
@@ -31,6 +32,14 @@ export class ForgeAuthSession {
   /** The initial bootstrap — `ready()` returns this same promise, never triggers a second one. */
   private readonly bootstrap: Promise<void>;
 
+  /**
+   * Resources commit only against the current credential revision (spec 077). Every identity change
+   * this session controls invalidates it, so no resource keeps or accepts another identity's data.
+   */
+  private readonly credentials = credentialBoundary(this.api);
+  /** `undefined` until the first `/me` settles: learning who is signed in is not an identity change. */
+  private knownUserId: string | null | undefined = undefined;
+
   constructor() {
     this.bootstrap = this.refresh();
 
@@ -42,6 +51,7 @@ export class ForgeAuthSession {
         this.userState.set(null);
         this.statusState.set('anonymous');
         this.expiredState.set(true);
+        this.identityChanged(null);
       }
     });
   }
@@ -63,6 +73,10 @@ export class ForgeAuthSession {
       const user = await this.api.getCurrentUser();
       this.userState.set(user);
       this.statusState.set(user ? 'authenticated' : 'anonymous');
+      // The first answer only reveals who the existing cookie belongs to; a later different answer
+      // (another tab signed in or out) is an identity change.
+      if (this.knownUserId === undefined) this.knownUserId = user?.id ?? null;
+      else this.identityChanged(user?.id ?? null);
     } catch (err) {
       this.errorState.set(err instanceof Error ? err : new Error('Failed to load session'));
       this.statusState.set('error');
@@ -81,10 +95,12 @@ export class ForgeAuthSession {
       this.userState.set(user);
       this.statusState.set('authenticated');
       this.expiredState.set(false);
+      this.identityChanged(user.id, true);
     } catch (err) {
       this.userState.set(null);
       this.statusState.set('anonymous');
       this.errorState.set(err instanceof Error ? err : new Error('Login failed'));
+      this.identityChanged(null);
     }
   }
 
@@ -97,10 +113,12 @@ export class ForgeAuthSession {
       this.userState.set(user);
       this.statusState.set('authenticated');
       this.expiredState.set(false);
+      this.identityChanged(user.id, true);
     } catch (err) {
       this.userState.set(null);
       this.statusState.set('anonymous');
       this.errorState.set(err instanceof Error ? err : new Error('Signup failed'));
+      this.identityChanged(null);
     }
   }
 
@@ -124,6 +142,20 @@ export class ForgeAuthSession {
       this.statusState.set('anonymous');
       this.errorState.set(failure);
       this.expiredState.set(false);
+      // Always: even a failed request may have cleared the cookie, and this browser stopped
+      // presenting the previous user either way.
+      this.identityChanged(null, true);
     }
+  }
+
+  /**
+   * Records the identity the browser now presents and invalidates resources when it differs from the
+   * last known one. `always` is for a successful login/signup/logout: the session cookie itself
+   * was replaced, even when the user id happens to be the same.
+   */
+  private identityChanged(userId: string | null, always = false): void {
+    const previous = this.knownUserId;
+    this.knownUserId = userId;
+    if (always || (previous !== undefined && previous !== userId)) this.credentials.invalidate();
   }
 }

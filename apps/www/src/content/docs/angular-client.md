@@ -280,7 +280,7 @@ const post = await cms.findOne('posts', { slug: 'hello-world' });
 ## Signal-based resources
 
 The idiomatic way to read in a component. The resource re-runs whenever the params signal changes,
-drops out-of-order responses, and stays idle while params return `undefined`:
+cancels the request it supersedes, and stays idle while params return `undefined`:
 
 ```ts
 import { Component, computed, inject, input, signal } from '@angular/core';
@@ -326,6 +326,40 @@ protected readonly product = documentResource(() => {
 ```
 
 Every resource exposes `value()`, `isLoading()`, `error()` and `reload()`.
+
+### Resource contract
+
+A resource sends at most one request at a time and never retries. `value()` is `undefined` or the
+result of **the current request under the current credentials** — never a previous query, never
+another user's data. `value()` and `error()` are never both set. Two requests are "the same" when they
+produce the same URL (a `page` without `limit`, for example, is not sent and does not change it).
+
+| What happens                              | `value()`                 | `isLoading()` | `error()`           |
+| ----------------------------------------- | ------------------------- | ------------- | ------------------- |
+| Params return `undefined` (idle)          | `undefined`               | `false`       | `null`              |
+| First request / a different request       | `undefined`               | `true`        | `null`              |
+| Success                                   | the result                | `false`       | `null`              |
+| Failure (HTTP, network, invalid response) | `undefined`               | `false`       | the `ForgeApiError` |
+| `reload()`, or the same request rebuilt   | kept until the new result | `true`        | `null`              |
+| Sign-in, sign-out, session expiry         | `undefined` immediately   | `true`        | `null`              |
+| The owning component is destroyed         | frozen                    | frozen        | frozen              |
+
+- **Cancellation.** Each request gets its own `AbortSignal` (passed to your `transport` too). It is
+  aborted when params change, on `reload()`, when params become `undefined`, on a credential change,
+  and when the component (injection context) that created the resource is destroyed. A cancelled
+  request never becomes an `error()`. Even a custom transport that ignores the signal cannot
+  overwrite newer state: only the current request may write the signals.
+- **`reload()`** cancels the active request and runs the current params once (several calls before
+  Angular re-runs the resource collapse into one); it does nothing while idle.
+- **Credentials.** `ForgeAuthSession` marks every identity change it makes — successful login or
+  signup, every logout (even a failed one), the first `401` while signed in, a refresh that finds
+  another user — and every resource immediately hides its value and reloads under the new identity.
+  A request started as user A can never fill a resource after the switch to user B. The first `/me`
+  check on page load is not a change. With `authToken`, a function that reads a **signal** is
+  observed the same way (`authToken: () => this.token()`); a function reading non-reactive storage
+  is re-read per request but cannot trigger a reload. A static API key never changes identity.
+- **Errors** are the same `ForgeApiError` instance the service threw (`kind`, `status`, `code`,
+  `details`).
 
 ## Errors
 
@@ -400,6 +434,43 @@ security:
 import { canManageUsers, canWriteContent, isAdmin, userRole } from '@forge-cms/angular';
 ```
 
+## Compatibility
+
+Peer ranges are the versions proven by `pnpm release:compat`: external Vite +
+`@analogjs/vite-plugin-angular` apps installed only from the packed tarballs with
+`strict-peer-dependencies=true` and `auto-install-peers=false`, each checked for a single Angular
+copy, `tsc` + `ngc` with `strictTemplates`, and a fully linked production build.
+
+| Package              | Angular                | Other peers                                                                                                                   |
+| -------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `@forge-cms/angular` | `^21.0.0 \|\| ^22.0.0` | optional, for `/vite`: `@angular/compiler-cli` (same as Angular), `@babel/core` `^7.28.0 \|\| ^8.0.0`, `vite` `^7 \|\| ^8`    |
+| `@forge-cms/admin`   | `^21.2.0`              | `rxjs` `^7.8.0`, `@voltui/components` `^1.0.1`, `lumen-icons` `^0.2.0`; optional `@babel/core` `^7.28.0`, `vite` `^7 \|\| ^8` |
+
+Tested combinations (2026-10-04):
+
+| Combination   | Packages        | Angular | `@angular/build` | TypeScript | rxjs  | Vite  | vite-plugin-angular | Babel  | VoltUI |
+| ------------- | --------------- | ------- | ---------------- | ---------- | ----- | ----- | ------------------- | ------ | ------ |
+| `angular-min` | angular         | 21.0.0  | 21.0.0           | 5.9.2      | 7.8.0 | 7.0.0 | 2.4.8               | 7.28.0 | —      |
+| `admin-min`   | angular + admin | 21.2.0  | 21.2.0           | 5.9.2      | 7.8.0 | 7.0.0 | 2.4.8               | 7.28.0 | 1.0.1  |
+| `current`     | angular + admin | 21.2.10 | 21.2.10          | 5.9.2      | 7.8.2 | 7.1.4 | 2.4.8               | 7.29.0 | 1.1.0  |
+| `latest-21`   | angular + admin | 21.2.25 | 21.2.24          | 5.9.3      | 7.8.2 | 8.3.2 | 2.8.0               | 7.29.7 | 1.1.0  |
+| `angular-22`  | angular         | 22.2.1  | 22.2.1           | 6.0.3      | 7.8.2 | 8.3.2 | 2.8.0               | 8.0.6  | —      |
+
+- `@forge-cms/admin` stops at Angular 21 because its UI library, VoltUI 1.x, peers
+  `@angular/* ^21.2.0`; VoltUI's own dependency also needs `@angular/cdk` installed by the app.
+- Angular 22's linker requires Babel 8; Angular 21 was tested with Babel 7.
+- Angular 19/20 are not supported.
+- **Vite/Analog apps need the linker** — for `@forge-cms/angular` alone too. Forge's packages are
+  partial-Ivy `ngc` output, which Analog does not link (it only links `fesm2022` packages); without
+  it a production build crashes with `JIT compiler unavailable`. The Angular CLI links them itself.
+
+```ts
+// vite.config.ts
+import { angularLinker } from '@forge-cms/angular/vite'; // `@forge-cms/admin/vite` is the same plugin
+
+export default defineConfig({ plugins: [angularLinker(), analog()] });
+```
+
 ## Limits
 
 - **No SSR-safe fetch or transfer state.** The base URL is relative and the service is browser-first.
@@ -407,4 +478,4 @@ import { canManageUsers, canWriteContent, isAdmin, userRole } from '@forge-cms/a
   hand the page a purpose-built payload — better for payload size anyway.
 - **Documents are `UntypedDocument` on the untyped client.** Use
   [`injectForgeClient<Schema>()`](#typed-client-schema-aware) for schema-derived types.
-- No caching or normalised store.
+- No caching, normalised store or retries — a failed read stays failed until `reload()`.

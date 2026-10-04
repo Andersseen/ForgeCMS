@@ -1,5 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import type { Signal } from '@angular/core';
+import { registerCredentialBoundary } from './credentials.js';
 import { buildQueryString } from './query.js';
 import type { QueryOptions } from './query.js';
 import type {
@@ -74,6 +75,11 @@ export class CmsApiService<S extends ForgeSchema = UntypedForgeSchema> {
     this.unauthorizedCount.update((count) => count + 1);
     for (const listener of this.unauthorizedListeners) listener();
   });
+
+  constructor() {
+    // The identity boundary resources commit against (spec 077). Kept off the public class surface.
+    registerCredentialBoundary(this, () => this.requester.token());
+  }
 
   /** Registers a listener called synchronously on every observed `401`. Returns an unsubscribe function. */
   onUnauthorized(listener: () => void): () => void {

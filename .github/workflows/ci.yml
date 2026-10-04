@@ -95,6 +95,12 @@ jobs:
       - name: Verify packed package installation
         run: pnpm release:verify
 
+      # Spec 077: the advertised Angular/admin peer ranges, proven by external Vite apps installed
+      # from the packed tarballs with strict peers (min / current / latest combinations): one copy
+      # of Angular, tsc + ngc strict templates, production build fully linked. `release` needs this job.
+      - name: Angular compatibility matrix (strict packed consumers)
+        run: pnpm release:compat
+
       # One install is enough: www, tiny-project and demo-aesthetics pin the same @playwright/test
       # version, so they share the browser cache. Filtering all three ran three `--with-deps`
       # installs in parallel and they raced for the apt lock (E: Could not get lock

@@ -102,14 +102,14 @@ export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
   {
     version: '0.8',
     title: 'Angular client and DX',
-    status: 'in-progress',
+    status: 'complete',
     steps: [
       { title: 'Configurable transport and structured errors', status: 'complete' },
       { title: 'Honest schema-to-wire types', status: 'complete' },
-      { title: 'Resource reliability and peer compatibility', status: 'next' }
+      { title: 'Resource reliability and peer compatibility', status: 'complete' }
     ]
   },
-  { version: '0.9', title: 'SSR for Analog', status: 'planned' },
+  { version: '0.9', title: 'SSR for Analog', status: 'next' },
   { version: '0.10', title: 'Portable S3 storage', status: 'planned' },
   { version: '0.11', title: 'Admin certification', status: 'planned' },
   { version: '0.12', title: 'Release-candidate preparation', status: 'planned' }
