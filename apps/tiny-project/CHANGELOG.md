@@ -1,5 +1,20 @@
 # @forge-cms/tiny-project
 
+## 0.0.11
+
+### Patch Changes
+
+- Updated dependencies [5dbf847]
+  - @forge-cms/core@0.9.1
+  - @forge-cms/db@0.9.1
+  - @forge-cms/auth@0.9.1
+  - @forge-cms/runtime@0.9.1
+  - @forge-cms/angular@0.9.1
+  - @forge-cms/admin@0.9.1
+  - @forge-cms/api@0.9.1
+  - @forge-cms/cloudflare@0.9.1
+  - @forge-cms/storage@0.9.1
+
 ## 0.0.10
 
 ### Patch Changes
