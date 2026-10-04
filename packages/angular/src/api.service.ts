@@ -1,7 +1,24 @@
 import { Injectable, inject, signal } from '@angular/core';
 import type { Signal } from '@angular/core';
 import { buildQueryString } from './query.js';
-import type { QueryOptions, QueryWhere } from './query.js';
+import type { QueryOptions } from './query.js';
+import type {
+  ForgeCollectionSlug,
+  ForgeCreateInput,
+  ForgeDocument,
+  ForgeDraftsCollectionSlug,
+  ForgeGlobalDocument,
+  ForgeGlobalInput,
+  ForgeGlobalSlug,
+  ForgeGlobalWriteResult,
+  ForgeQueryOptions,
+  ForgeSchema,
+  ForgeUpdateInput,
+  ForgeUploadFields,
+  ForgeWhere,
+  ForgeWriteResult,
+  UntypedForgeSchema
+} from './schema.js';
 import { ForgeRequester, PassedStatus, dataOf, encodePathSegment, joinUrl } from './transport.js';
 import type { SendOptions } from './transport.js';
 import {
@@ -14,13 +31,30 @@ import {
   type PaginatedDocuments
 } from './types.js';
 
+/** Read options of a single document: the `depth` and `locale` that shape the result. */
+export interface ForgeDocumentReadOptions<D extends 0 | 1, L extends string | undefined> {
+  depth?: D;
+  locale?: L;
+}
+
+/** Write options: a `locale` makes localized fields take a plain string for that locale. */
+export interface ForgeWriteOptions<L extends string | undefined> {
+  locale?: L;
+}
+
 /**
  * Promise-based client for Forge's HTTP API. Every method sends exactly one request through the
  * configured transport (spec 075) and never retries. Every failure rejects with a `ForgeApiError`
  * (or one of its compatible subclasses) that keeps the HTTP status, Forge `code` and `details`.
+ *
+ * `S` is the content model's type (spec 076). `inject(CmsApiService)` is the **untyped** client: any
+ * slug, `Record<string, unknown>` payloads, `UntypedDocument` results — what a dynamic consumer such as
+ * the admin needs. `injectForgeClient<SiteSchema>()` returns the same instance typed by a schema, so
+ * slugs, fields, payloads and results are checked against the JSON the server sends. Responses are
+ * not validated at runtime: the types are only as true as the shared schema type.
  */
 @Injectable({ providedIn: 'root' })
-export class CmsApiService {
+export class CmsApiService<S extends ForgeSchema = UntypedForgeSchema> {
   private readonly config = inject(FORGE_CMS_CONFIG, { optional: true });
 
   /** Bumped once per observed `401` — a signal for any UI that wants to react to it generically. */
@@ -91,32 +125,40 @@ export class CmsApiService {
 
   /**
    * Lists documents. Everything the API supports — filters, sorting, pagination, `depth`, draft
-   * visibility — goes through {@link QueryOptions}.
+   * visibility, `locale` — goes through the query options.
    */
-  async getDocuments<T = Record<string, unknown>>(
-    collection: string,
-    options?: QueryOptions,
+  async getDocuments<
+    TSlug extends ForgeCollectionSlug<S>,
+    D extends 0 | 1 = 0,
+    L extends string | undefined = undefined
+  >(
+    collection: TSlug,
+    options?: ForgeQueryOptions<S, TSlug, D, L>,
     request?: ForgeRequestOptions
-  ): Promise<T[]> {
-    const { docs } = await this.listDocuments<T>(collection, options, request);
+  ): Promise<ForgeDocument<S, TSlug, D, L>[]> {
+    const { docs } = await this.listDocuments(collection, options, request);
     return docs;
   }
 
   /** Like {@link getDocuments}, but keeps the pagination metadata a paginator needs. */
-  async listDocuments<T = Record<string, unknown>>(
-    collection: string,
-    options?: QueryOptions,
+  async listDocuments<
+    TSlug extends ForgeCollectionSlug<S>,
+    D extends 0 | 1 = 0,
+    L extends string | undefined = undefined
+  >(
+    collection: TSlug,
+    options?: ForgeQueryOptions<S, TSlug, D, L>,
     request?: ForgeRequestOptions
-  ): Promise<PaginatedDocuments<T>> {
+  ): Promise<PaginatedDocuments<ForgeDocument<S, TSlug, D, L>>> {
     const failure = `Failed to fetch ${collection}`;
     const body = await this.requester.send({
       method: 'GET',
-      url: this.content([this.collection(collection)], buildQueryString(options)),
+      url: this.content([this.collection(collection)], query(options)),
       failure,
       signal: request?.signal
     });
-    const docs = dataOf<T[]>(body, failure);
-    return { docs, meta: (body as ApiListResponse<T>).meta };
+    const docs = dataOf<ForgeDocument<S, TSlug, D, L>[]>(body, failure);
+    return { docs, meta: (body as ApiListResponse<unknown>).meta };
   }
 
   /**
@@ -124,31 +166,43 @@ export class CmsApiService {
    * route: this calls the existing list endpoint with `limit: 1` and returns its first result — the
    * Local API's `findOne()` is the important primitive; this is client convenience over it.
    */
-  async findOne<T = Record<string, unknown>>(
-    collection: string,
-    where?: QueryWhere,
-    options?: Omit<QueryOptions, 'where' | 'limit' | 'offset' | 'page'>,
+  async findOne<
+    TSlug extends ForgeCollectionSlug<S>,
+    D extends 0 | 1 = 0,
+    L extends string | undefined = undefined
+  >(
+    collection: TSlug,
+    where?: ForgeWhere<S, TSlug>,
+    options?: Omit<ForgeQueryOptions<S, TSlug, D, L>, 'where' | 'limit' | 'offset' | 'page'>,
     request?: ForgeRequestOptions
-  ): Promise<T | null> {
-    const { docs } = await this.listDocuments<T>(
+  ): Promise<ForgeDocument<S, TSlug, D, L> | null> {
+    const { docs } = await this.listDocuments<TSlug, D, L>(
       collection,
-      { ...options, ...(where !== undefined && { where }), limit: 1 },
+      {
+        ...options,
+        ...(where !== undefined && { where }),
+        limit: 1
+      } as ForgeQueryOptions<S, TSlug, D, L>,
       request
     );
     return docs[0] ?? null;
   }
 
-  async getDocument<T = Record<string, unknown>>(
-    collection: string,
+  async getDocument<
+    TSlug extends ForgeCollectionSlug<S>,
+    D extends 0 | 1 = 0,
+    L extends string | undefined = undefined
+  >(
+    collection: TSlug,
     id: string,
-    options?: Pick<QueryOptions, 'depth' | 'locale'>,
+    options?: ForgeDocumentReadOptions<D, L>,
     request?: ForgeRequestOptions
-  ): Promise<T> {
-    return this.data<T>({
+  ): Promise<ForgeDocument<S, TSlug, D, L>> {
+    return this.data<ForgeDocument<S, TSlug, D, L>>({
       method: 'GET',
       url: this.content(
         [this.collection(collection), encodePathSegment(id, 'document id')],
-        buildQueryString(options)
+        query(options)
       ),
       failure: 'Failed to fetch document',
       signal: request?.signal
@@ -156,21 +210,24 @@ export class CmsApiService {
   }
 
   /**
-   * Uploads a file to an `upload: true` collection (the multipart path from spec 016).
+   * Uploads a file to an `upload: true` collection (the multipart path from spec 016). `fields` are
+   * sent as text parts; the server keeps only declared fields.
    *
    * The content type is deliberately not set: the browser has to add the multipart boundary.
    */
-  async uploadFile<T = Record<string, unknown>>(
-    collection: string,
+  async uploadFile<TSlug extends ForgeCollectionSlug<S>>(
+    collection: TSlug,
     file: File,
-    fields: Record<string, string> = {},
+    fields: ForgeUploadFields<S, TSlug> = {} as ForgeUploadFields<S, TSlug>,
     request?: ForgeRequestOptions
-  ): Promise<T> {
+  ): Promise<ForgeWriteResult<S, TSlug>> {
     const form = new FormData();
     form.set('file', file);
-    for (const [name, value] of Object.entries(fields)) form.set(name, value);
+    for (const [name, value] of Object.entries(fields as Record<string, string | undefined>)) {
+      if (value !== undefined) form.set(name, value);
+    }
 
-    return this.data<T>({
+    return this.data<ForgeWriteResult<S, TSlug>>({
       method: 'POST',
       url: this.content([this.collection(collection)]),
       body: form,
@@ -179,33 +236,45 @@ export class CmsApiService {
     });
   }
 
-  async createDocument<T = Record<string, unknown>>(
-    collection: string,
-    data: Record<string, unknown>,
-    options?: Pick<QueryOptions, 'locale'>,
+  /**
+   * `POST` a new document. With `options.locale`, localized fields take a plain string for that locale;
+   * without it, a per-locale map. Resolves the created document, or only `{ id }` when the caller may
+   * create but not read it (spec 068).
+   */
+  async createDocument<
+    TSlug extends ForgeCollectionSlug<S>,
+    L extends string | undefined = undefined
+  >(
+    collection: TSlug,
+    data: ForgeCreateInput<S, NoInfer<TSlug>, NoInfer<L>>,
+    options?: ForgeWriteOptions<L>,
     request?: ForgeRequestOptions
-  ): Promise<T> {
-    return this.data<T>({
+  ): Promise<ForgeWriteResult<S, TSlug, L>> {
+    return this.data<ForgeWriteResult<S, TSlug, L>>({
       method: 'POST',
-      url: this.content([this.collection(collection)], buildQueryString(options)),
+      url: this.content([this.collection(collection)], query(options)),
       json: data,
       failure: 'Failed to create document',
       signal: request?.signal
     });
   }
 
-  async updateDocument<T = Record<string, unknown>>(
-    collection: string,
+  /** `PUT` a partial update. Same `locale` and result rules as {@link createDocument}. */
+  async updateDocument<
+    TSlug extends ForgeCollectionSlug<S>,
+    L extends string | undefined = undefined
+  >(
+    collection: TSlug,
     id: string,
-    data: Record<string, unknown>,
-    options?: Pick<QueryOptions, 'locale'>,
+    data: ForgeUpdateInput<S, NoInfer<TSlug>, NoInfer<L>>,
+    options?: ForgeWriteOptions<L>,
     request?: ForgeRequestOptions
-  ): Promise<T> {
-    return this.data<T>({
+  ): Promise<ForgeWriteResult<S, TSlug, L>> {
+    return this.data<ForgeWriteResult<S, TSlug, L>>({
       method: 'PUT',
       url: this.content(
         [this.collection(collection), encodePathSegment(id, 'document id')],
-        buildQueryString(options)
+        query(options)
       ),
       json: data,
       failure: 'Failed to update document',
@@ -216,36 +285,44 @@ export class CmsApiService {
   /**
    * Sets a `drafts: true` document's `_status` (spec 052). Thin convenience over
    * {@link updateDocument} — every draft/publish UI otherwise repeats the same `{ _status }` literal.
+   * A typed client accepts only the schema's drafts collections.
    */
-  async setDocumentStatus<T = Record<string, unknown>>(
-    collection: string,
+  async setDocumentStatus<TSlug extends ForgeDraftsCollectionSlug<S> & ForgeCollectionSlug<S>>(
+    collection: TSlug,
     id: string,
     status: 'draft' | 'published',
     request?: ForgeRequestOptions
-  ): Promise<T> {
-    return this.updateDocument<T>(collection, id, { _status: status }, undefined, request);
+  ): Promise<ForgeWriteResult<S, TSlug>> {
+    return this.data<ForgeWriteResult<S, TSlug>>({
+      method: 'PUT',
+      url: this.content([this.collection(collection), encodePathSegment(id, 'document id')]),
+      json: { _status: status },
+      failure: 'Failed to update document',
+      signal: request?.signal
+    });
   }
 
   /**
    * Generates a preview of a document by merging stored data with unsaved changes.
    * Useful for live preview in the admin UI before saving.
    * If id is provided, merges changes with existing document. Otherwise, previews new document.
+   * The result is not validated, so every field may be missing.
    */
-  async previewDocument<T = Record<string, unknown>>(
-    collection: string,
-    data: Record<string, unknown>,
-    options?: { id?: string; depth?: 0 | 1 },
+  async previewDocument<TSlug extends ForgeCollectionSlug<S>, D extends 0 | 1 = 0>(
+    collection: TSlug,
+    data: ForgeUpdateInput<S, NoInfer<TSlug>>,
+    options?: { id?: string; depth?: D },
     request?: ForgeRequestOptions
-  ): Promise<T> {
-    const query = buildQueryString(
+  ): Promise<Partial<ForgeDocument<S, TSlug, D>>> {
+    const queryString = buildQueryString(
       options?.depth !== undefined ? { depth: options.depth } : undefined
     );
     const segments = options?.id
       ? [this.collection(collection), encodePathSegment(options.id, 'document id'), 'preview']
       : [this.collection(collection), 'preview'];
-    return this.data<T>({
+    return this.data<Partial<ForgeDocument<S, TSlug, D>>>({
       method: 'POST',
-      url: this.content(segments, query),
+      url: this.content(segments, queryString),
       json: data,
       failure: 'Failed to preview document',
       signal: request?.signal
@@ -253,7 +330,7 @@ export class CmsApiService {
   }
 
   async deleteDocument(
-    collection: string,
+    collection: ForgeCollectionSlug<S>,
     id: string,
     request?: ForgeRequestOptions
   ): Promise<void> {
@@ -360,12 +437,13 @@ export class CmsApiService {
   // --- Globals -----------------------------------------------------------------------------
 
   /**
-   * Reads a singleton global document. Returns `null` if the global has never been configured.
+   * Reads a singleton global document (depth 0, no locale: localized fields are per-locale maps).
+   * Returns `null` if the global has never been configured.
    */
-  async getGlobal<T = Record<string, unknown>>(
-    global: string,
+  async getGlobal<TSlug extends ForgeGlobalSlug<S>>(
+    global: TSlug,
     request?: ForgeRequestOptions
-  ): Promise<T | null> {
+  ): Promise<ForgeGlobalDocument<S, TSlug> | null> {
     const failure = `Failed to fetch global '${global}'`;
     const body = await this.requester.send({
       method: 'GET',
@@ -375,18 +453,18 @@ export class CmsApiService {
       signal: request?.signal
     });
     if (body instanceof PassedStatus) return null;
-    return dataOf<T>(body, failure);
+    return dataOf<ForgeGlobalDocument<S, TSlug>>(body, failure);
   }
 
   /**
-   * Creates or updates a singleton global document.
+   * Creates or updates a singleton global document. Partial: omitted fields keep their stored values.
    */
-  async updateGlobal<T = Record<string, unknown>>(
-    global: string,
-    data: Record<string, unknown>,
+  async updateGlobal<TSlug extends ForgeGlobalSlug<S>>(
+    global: TSlug,
+    data: ForgeGlobalInput<S, NoInfer<TSlug>>,
     request?: ForgeRequestOptions
-  ): Promise<T> {
-    return this.data<T>({
+  ): Promise<ForgeGlobalWriteResult<S, TSlug>> {
+    return this.data<ForgeGlobalWriteResult<S, TSlug>>({
       method: 'PUT',
       url: this.content(['globals', encodePathSegment(global, 'global slug')]),
       json: data,
@@ -394,4 +472,26 @@ export class CmsApiService {
       signal: request?.signal
     });
   }
+}
+
+/**
+ * The injected {@link CmsApiService}, typed by a content model (spec 076). Same instance, same
+ * transport and configuration as `inject(CmsApiService)` — only the types differ. Call in an injection
+ * context (a field initializer, a constructor, `runInInjectionContext`).
+ *
+ * ```ts
+ * private readonly cms = injectForgeClient<SiteSchema>();
+ * const posts = await this.cms.getDocuments('posts', { where: { featured: true }, depth: 1 });
+ * ```
+ */
+export function injectForgeClient<S extends ForgeSchema>(): CmsApiService<S> {
+  return inject(CmsApiService) as unknown as CmsApiService<S>;
+}
+
+/**
+ * The typed option objects are a refinement of {@link QueryOptions}; the query string builder only
+ * needs the shared shape. (`locale?: L` admits `undefined` under `exactOptionalPropertyTypes`.)
+ */
+function query(options: object | undefined): string {
+  return buildQueryString(options as QueryOptions | undefined);
 }

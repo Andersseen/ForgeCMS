@@ -1,6 +1,6 @@
 ---
 title: Angular client
-description: provideForgeCms, CmsApiService, query options and signal-based resources.
+description: provideForgeCms, the typed and untyped CmsApiService, query options and signal-based resources.
 group: Client & deploy
 order: 1
 ---
@@ -61,23 +61,33 @@ method takes a last `{ signal }` argument; aborting rejects with `kind: 'aborted
 ```ts
 import { CmsApiService } from '@forge-cms/angular';
 
-const cms = inject(CmsApiService);
+const cms = inject(CmsApiService); // untyped: any slug, UntypedDocument results
 ```
 
-| Method                                                    | Returns                                                        |
-| --------------------------------------------------------- | -------------------------------------------------------------- |
-| `getDocuments(collection, options?)`                      | `T[]` — just the docs                                          |
-| `listDocuments(collection, options?)`                     | `{ docs, meta }` — with pagination                             |
-| `getDocument(collection, id, { depth? })`                 | `T`                                                            |
-| `findOne(collection, where?, options?)`                   | `T \| null` — first match, via `limit: 1` on the list endpoint |
-| `createDocument(collection, data)`                        | `T`                                                            |
-| `updateDocument(collection, id, data)`                    | `T`                                                            |
-| `deleteDocument(collection, id)`                          | `void`                                                         |
-| `uploadFile(collection, file, fields?)`                   | `T` — multipart create                                         |
-| `getCollections()`                                        | `CollectionMeta[]` — schema metadata                           |
-| `login(email, password)` / `signup(input)` / `logout()`   | `{ token, user }` / `void` — see below                         |
-| `getCurrentUser()`                                        | `AuthUser \| null`                                             |
-| `getUsers()` / `createUser` / `updateUser` / `deleteUser` | user management (admin)                                        |
+`inject(CmsApiService)` is the **untyped** client — the right choice for code that discovers
+collections at runtime (the admin UI does). For application code, bind it to your content model with
+[`injectForgeClient<Schema>()`](#typed-client-schema-aware): same instance, same configuration, checked
+types.
+
+| Method                                                    | Returns (untyped / typed)                          |
+| --------------------------------------------------------- | -------------------------------------------------- |
+| `getDocuments(collection, options?)`                      | documents — just the docs                          |
+| `listDocuments(collection, options?)`                     | `{ docs, meta }` — with pagination                 |
+| `getDocument(collection, id, { depth?, locale? })`        | one document                                       |
+| `findOne(collection, where?, options?)`                   | document `\| null` — first match, via `limit: 1`   |
+| `createDocument(collection, data, { locale? })`           | the document, or `{ id }` when you may not read it |
+| `updateDocument(collection, id, data, { locale? })`       | the document, or `{ id }` when you may not read it |
+| `setDocumentStatus(collection, id, status)`               | as `updateDocument` (drafts collections)           |
+| `deleteDocument(collection, id)`                          | `void`                                             |
+| `uploadFile(collection, file, fields?)`                   | multipart create, as `createDocument`              |
+| `getGlobal(slug)` / `updateGlobal(slug, data)`            | global document `\| null` / write result           |
+| `getCollections()`                                        | `CollectionMeta[]` — schema metadata               |
+| `login(email, password)` / `signup(input)` / `logout()`   | `{ token, user }` / `void` — see below             |
+| `getCurrentUser()`                                        | `AuthUser \| null`                                 |
+| `getUsers()` / `createUser` / `updateUser` / `deleteUser` | user management (admin)                            |
+
+Untyped results are `UntypedDocument` (`{ id: string; [field: string]: unknown }`) and payloads are
+`Record<string, unknown>`.
 
 Bearer/`authToken` requests send the token on **reads as well as writes**, which is what makes drafts
 and field-level read rules work for a signed-in editor over that path.
@@ -85,6 +95,143 @@ and field-level read rules work for a signed-in editor over that path.
 `login`/`signup`/`logout` are the low-level primitives — they exist so `ForgeAuthSession` (below) can
 be built on `CmsApiService` alone, with zero extra dependencies. A real app should use
 `ForgeAuthSession`, not these three directly; see [Browser auth](/docs/browser-auth).
+
+## Typed client (schema-aware)
+
+Define the content model once on the server and share only its **type** with the browser. No code
+generation: `import type` is erased from the compiled JavaScript, so hooks, access functions, adapters
+and secrets never reach the bundle.
+
+```ts
+// src/server/content.ts — server code (hooks, access rules, …)
+export const posts = defineCollection({
+  slug: 'posts',
+  drafts: true,
+  locales: ['en', 'es'],
+  fields: {
+    title: defineField.text({ required: true, localized: true }),
+    slug: defineField.slug({ required: true, autoGenerate: true, sourceField: 'title' }),
+    publishedAt: defineField.date(),
+    author: defineField.relation({ collection: 'users', required: true }),
+    internalNote: defineField.textarea({ access: { read: ['admin'] } })
+  },
+  hooks: { beforeChange: [stampEditor] }
+});
+export const users = defineUsersCollection();
+export const collections = [users, posts];
+export const siteSettings = defineGlobal({ slug: 'site', fields: { name: defineField.text() } });
+```
+
+```ts
+// src/app/forge-schema.ts — browser code, types only
+import type { ForgeSchema } from '@forge-cms/angular';
+import type { collections, siteSettings } from '../server/content';
+
+export type SiteSchema = ForgeSchema<typeof collections, [typeof siteSettings]>;
+```
+
+```ts
+// app.config.ts: provideForgeCms() as above. Then, in any component or service:
+import { injectForgeClient } from '@forge-cms/angular';
+import type { SiteSchema } from './forge-schema';
+
+export class JournalPage {
+  private readonly cms = injectForgeClient<SiteSchema>();
+
+  async load() {
+    // Typed query: unknown slugs and fields do not compile.
+    const { docs } = await this.cms.listDocuments('posts', {
+      where: { _status: 'published' },
+      sort: [{ field: 'publishedAt', order: 'desc' }],
+      depth: 1,
+      locale: 'es'
+    });
+    docs[0]?.title; // string (resolved to 'es')
+    docs[0]?.publishedAt; // string | null | undefined — an ISO string, not a Date
+    docs[0]?.author; // populated user document | null
+
+    // Typed create: `title` and `author` are required, `slug` is generated, `id` is refused.
+    const created = await this.cms.createDocument(
+      'posts',
+      { title: 'Hola', author: 'user-1', publishedAt: new Date() },
+      { locale: 'es' }
+    );
+    // Typed update: any subset; a value of the wrong type does not compile.
+    await this.cms.updateDocument('posts', created.id, { _status: 'published' });
+  }
+}
+```
+
+Every slug needs to be a literal: one collection typed with slug `string` makes every slug valid.
+`defineUsersCollection()` keeps its `'users'` slug; inline `withAuthFields(defineCollection({ … }))`
+widens it, so define the collection first and wrap it second.
+
+### What the types promise
+
+The types describe the JSON the server sends, which is not the same as the server-side value:
+
+| In the schema                            | In a read (`ForgeDocument`)                                            |
+| ---------------------------------------- | ---------------------------------------------------------------------- |
+| `id`, `created_at`, `updated_at`         | always present (`string`); `_status` too on `drafts: true` collections |
+| `required: true`                         | present                                                                |
+| not required                             | optional and nullable — absent on in-memory, `null` on SQL             |
+| `access: { read: … }` (any rule)         | optional: the server omits the field for callers the rule denies       |
+| `access: { read: [] }`                   | not in the type (never sent, e.g. `passwordHash`)                      |
+| `date`                                   | `string` (ISO-8601, `toISOString()` form)                              |
+| `relation` / `upload` at `depth: 0`      | the id (`string`), or `string[]` for `many: true`                      |
+| `relation` / `upload` at `depth: 1`      | target document **or `null`** (missing, unreadable, a hidden draft)    |
+| `relation({ many: true })` at `depth: 1` | array of the readable targets (others are dropped)                     |
+| `localized: true` without `locale`       | `Record<string, string>` — one value per locale                        |
+| `localized: true` with `locale`          | `string`, resolved with fallback                                       |
+| `select({ options: ['a', 'b'] })`        | `'a' \| 'b'`                                                           |
+
+A populated target is the target's own depth-0 projection (not populated further; its localized fields
+stay per-locale maps) and is filtered by its own read rules.
+
+**Writes.** `ForgeCreateInput` requires exactly the fields Forge requires from the caller — `required`
+fields without a `defaultValue` that are not auto-generated slugs — and refuses `id`, timestamps and
+fields nobody may write. `ForgeUpdateInput` makes everything optional; only non-required fields accept
+`null`. A date input is `Date | string` (a `Date` is sent as its ISO string). With `{ locale }` a
+localized field takes a plain string; without it, a per-locale map.
+
+**Write results.** A create or update answers with the document, or only `{ id }` when the writer may
+not read it back (a public form posting to a staff-only collection). Narrow with
+`if ('created_at' in result) …`.
+
+**Globals.** `getGlobal` reads at depth 0 without a locale (localized fields are maps);
+`updateGlobal` takes a partial body.
+
+**Limits.** Responses are not validated at runtime: the types are as true as the schema type you
+share. `afterRead` hooks that reshape documents are not visible to the types — read such a collection
+with the untyped client. `where` values stay loosely typed (field names are checked); the server
+validates them. `blocks` rows are `{ blockType: string; [field: string]: unknown }`.
+
+### Typed resources
+
+```ts
+protected readonly posts = collectionResource<SiteSchema, 'posts', 1>(() => ({
+  collection: 'posts',
+  depth: 1,
+  limit: this.pageSize()
+}));
+```
+
+Pass the schema and the slug (plus a `depth`/`locale` literal when you use one). Without type
+arguments a resource stays untyped.
+
+### Migrating from the `<T>` pattern (C02)
+
+The per-method response generic is gone: `getDocument<Post>('posts', id)` no longer compiles, because
+it let a caller assert any shape.
+
+- Typed code: `injectForgeClient<SiteSchema>().getDocument('posts', id)` — the result is derived from
+  the schema. View models built server-side (a `/api/site/*` payload) keep their own hand-written
+  types; they are not raw CMS documents.
+- Dynamic code: keep `inject(CmsApiService)`; results are `UntypedDocument`.
+- `collectionResource<Post>(…)` → `collectionResource<SiteSchema, 'posts'>(…)`, or no type argument.
+- Typed create/update results are `document | { id }` (see above).
+- Date fields are ISO strings in every response — they always were on the wire; the Local API now
+  returns them as strings too instead of a `Date` on libSQL/D1.
 
 ## Query options
 
@@ -258,7 +405,6 @@ import { canManageUsers, canWriteContent, isAdmin, userRole } from '@forge-cms/a
 - **No SSR-safe fetch or transfer state.** The base URL is relative and the service is browser-first.
   For a content site that needs SSR, call the [Local API](/docs/local-api) from a server route and
   hand the page a purpose-built payload — better for payload size anyway.
-- **Documents are `Record<string, unknown>` by default.** Pass a type parameter
-  (`listDocuments<Product>('products')`) — collection types reaching the client without codegen is
-  still on the roadmap.
+- **Documents are `UntypedDocument` on the untyped client.** Use
+  [`injectForgeClient<Schema>()`](#typed-client-schema-aware) for schema-derived types.
 - No caching or normalised store.

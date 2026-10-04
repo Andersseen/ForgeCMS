@@ -58,7 +58,7 @@ consumer falls back to `fetch`.
 | [20](#f20) | The admin sidebar's nav items are hardcoded                         | admin routing             | ✅ 042                                                         |
 | [22](#f22) | Adapters disagree about `created_at`/`updated_at`                   | sorting by creation date  | ✅ 040                                                         |
 | [23](#f23) | A hook cannot query the CMS                                         | the demo's limit hooks    | open                                                           |
-| [24](#f24) | `date` is typed `Date` but travels as a string                      | journal, promotions, form | open → 0.8 C02                                                 |
+| [24](#f24) | `date` is typed `Date` but travels as a string                      | journal, promotions, form | ✅ 076                                                         |
 
 ---
 
@@ -152,7 +152,10 @@ takes `CollectionDocument<typeof services>` etc. `shared/site-content.ts` stays 
 purpose: it is the browser's view model (richtext flattened, relations resolved, internal fields
 left out), not a copy of the documents. **Remaining limits:** a populated relation/upload is still
 typed as its id, `date` is typed `Date` for writes and reads (finding 24), and browser-side types
-from the schema are roadmap 0.8 (C02). Typing also caught one app bug: writing
+from the schema are roadmap 0.8 (C02). **Update 2026-10-02 (spec 076):** dates are `string` on reads
+and `Date | string` on writes, and the browser has schema-derived types: the demo's admin dashboard and
+media library read through `injectForgeClient<DemoSchema>()` (`src/app/forge-schema.ts`, `import type`
+of the server registry). The Local API itself still types a populated relation as its id. Typing also caught one app bug: writing
 `withAuthFields(defineCollection({ … }))` inline widens the users slug to `string`, which let the
 typed registry accept any collection name. Defining the collection first keeps the literal (as the
 docs already show).
@@ -451,6 +454,16 @@ writes through the untyped runtime view, and the booking route casts the visitor
 adapters). That belongs to roadmap 0.8 C02 (schema-aware wire types). It changes public types and
 adapter output, so it was recorded rather than patched in a consolidation pass.
 
+**Status 2026-10-02 (spec 076): ✅ closed.** One representation everywhere: the runtime stores every
+valid date as its `toISOString()` string (top-level and nested), the SQL adapters return that string
+instead of a `Date`, and the Local API and the Angular wire types both say `string`; typed writes take
+`Date | string`. Investigating it also found a real bug: a numeric timestamp passed validation, was
+stored by SQLite as text and read back as `null` on libSQL/D1 (a number on in-memory). The demo
+deleted `isoDate()` (mappers use `str()`) and the booking route's `as unknown as Date` cast. The seed
+keeps the untyped runtime view for a different reason, now stated in its comment: it passes
+`string | undefined` lookup ids. Finding 3 (time zones) is unchanged — a zone-less visitor value is
+still read in the server's time zone.
+
 <a id="status-07"></a>
 
 ## 0.7 status (2026-09-28, spec 071)
@@ -464,7 +477,7 @@ adapter output, so it was recorded rather than patched in a consolidation pass.
 | 14  | Fixed binding names                 | 040         | **Comment only**: names kept for the deployed bindings                                         | —                                                   |
 | 15  | SDK cannot query                    | 041         | **Rationale rewritten**: `/api/site/*` kept as the recommended design; admin on package routes | —                                                   |
 | 23  | Hooks cannot query the CMS          | —           | Workaround kept (`runtime-ref.ts`)                                                             | Needs an operation handle in hook args              |
-| 24  | `date` typed `Date`, sent as string | —           | Workaround kept (`isoDate`, one cast)                                                          | 0.8 C02                                             |
+| 24  | `date` typed `Date`, sent as string | 076         | **Closed** (2026-10-02): `isoDate()` and the cast deleted                                      | —                                                   |
 
 Admin package defects found by moving the demo onto `forgeAdminContentRoutes()` and fixed in spec 071
 (patch changeset):
@@ -506,8 +519,9 @@ completeness, typed Local API and the linker plugin have shipped and are no long
 
 1. **SSR** (finding 2) — roadmap 0.9. The Local API makes ForgeCMS ideally placed for it and the demo
    still ships as an SPA.
-2. **Schema-aware wire types** — roadmap 0.8 C02: `date` representation (finding 24), populated
-   relation types (rest of finding 8), and typed `blocks` rows (finding 16).
+2. **Schema-aware wire types** — roadmap 0.8 C02, done in spec 076 for the browser: dates
+   (finding 24, closed), populated relations at `depth: 1` in the Angular types. Still open: populated
+   relation types in the **Local API** (rest of finding 8) and typed `blocks` rows (finding 16).
 3. **Moving the demo's settings to a real global** (finding 4). The mechanism exists since M02
    (spec 072) and the backup/restore runbook since M03 ([BACKUP-RESTORE](BACKUP-RESTORE.md), spec
    073); what remains is the backed-up production run itself.

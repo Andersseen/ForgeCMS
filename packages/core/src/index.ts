@@ -252,10 +252,16 @@ export function defineBlock<TSlug extends string, TFields extends FieldMap>(
   return block;
 }
 
+/**
+ * `TOptions` is deliberately unconstrained (spec 076): the factories capture options as a literal type,
+ * and a literal such as `{ collection: 'users' }` shares no key with the all-optional
+ * `BaseFieldOptions`, which TypeScript's weak-type check would reject as a type argument. Each factory
+ * still constrains its own options (`TextFieldOptions`, `RelationFieldOptions`, …).
+ */
 export interface FieldDefinition<
   TKind extends FieldKind = FieldKind,
   TValue = unknown,
-  TOptions extends BaseFieldOptions = BaseFieldOptions
+  TOptions = BaseFieldOptions
 > {
   kind: TKind;
   options: Readonly<TOptions>;
@@ -265,7 +271,11 @@ export interface FieldDefinition<
 export type TextField = FieldDefinition<'text', string, TextFieldOptions>;
 export type NumberField = FieldDefinition<'number', number, NumberFieldOptions>;
 export type BooleanField = FieldDefinition<'boolean', boolean, BooleanFieldOptions>;
-export type DateField = FieldDefinition<'date', Date, DateFieldOptions>;
+/**
+ * A date's value is an ISO-8601 string in `Date.prototype.toISOString()` form — at rest, on Local API
+ * reads and on the wire (spec 076). Writes also accept a `Date` (see {@link FieldInputValue}).
+ */
+export type DateField = FieldDefinition<'date', string, DateFieldOptions>;
 export type RelationField = FieldDefinition<'relation', string | string[], RelationFieldOptions>;
 export type JsonField = FieldDefinition<'json', unknown, JsonFieldOptions>;
 export type SelectField = FieldDefinition<'select', string, SelectFieldOptions>;
@@ -299,11 +309,37 @@ export type FieldMap = Record<string, AnyField>;
 
 /** The runtime value a single field definition carries. */
 export type FieldValue<TField> =
-  TField extends FieldDefinition<FieldKind, infer TValue, BaseFieldOptions> ? TValue : never;
+  TField extends FieldDefinition<FieldKind, infer TValue, infer _TOptions> ? TValue : never;
 
-/** The runtime shape of a whole `FieldMap` — used for collections and for nested composite fields. */
+/**
+ * The runtime shape of a whole `FieldMap` — used for collections and for nested composite fields.
+ * `-readonly`: a `const`-inferred nested `fields` map is readonly, the values read from it are not.
+ */
 export type InferFields<TFields extends FieldMap> = {
-  [Key in keyof TFields]: FieldValue<TFields[Key]>;
+  -readonly [Key in keyof TFields]: FieldValue<TFields[Key]>;
+};
+
+/** The options a field definition was declared with — the literal type since spec 076. */
+export type FieldOptionsOf<TField> =
+  TField extends FieldDefinition<FieldKind, infer _TValue, infer TOptions> ? TOptions : never;
+
+/**
+ * The value a write may carry for one field (spec 076). Same as {@link FieldValue}, except that a `date`
+ * also accepts a `Date` (stored as its ISO string) and `group`/`array` rows map their nested fields the
+ * same way. Validation accepts more than this (a numeric timestamp, for example); the type advertises
+ * the representations a typed caller should use.
+ */
+export type FieldInputValue<TField> = TField extends { kind: 'date' }
+  ? Date | string
+  : TField extends { kind: 'group'; options: { fields: infer TNested extends FieldMap } }
+    ? InferInputFields<TNested>
+    : TField extends { kind: 'array'; options: { fields: infer TNested extends FieldMap } }
+      ? InferInputFields<TNested>[]
+      : FieldValue<TField>;
+
+/** {@link InferFields} for writes: every value as {@link FieldInputValue}. */
+export type InferInputFields<TFields extends FieldMap> = {
+  -readonly [Key in keyof TFields]: FieldInputValue<TFields[Key]>;
 };
 
 export type HookOperation = 'create' | 'update' | 'read' | 'delete';
@@ -569,9 +605,12 @@ export interface DocumentMeta {
 export type CollectionDocument<TCollection extends CollectionDefinition> =
   CollectionData<TCollection> & DocumentMeta;
 
-/** A typed create/update payload: any subset of the collection's declared fields. */
+/**
+ * A typed Local API create/update payload: any subset of the collection's declared fields, each as its
+ * write value ({@link FieldInputValue} — a `date` takes a `Date` or a string).
+ */
 export type CollectionInput<TCollection extends CollectionDefinition> = Partial<
-  CollectionData<TCollection> & Pick<DocumentMeta, '_status'>
+  InferInputFields<TCollection['fields']> & Pick<DocumentMeta, '_status'>
 >;
 
 function createField<
@@ -585,74 +624,162 @@ function createField<
   };
 }
 
+// Spec 076: every factory is an overload pair — no options, or options captured as a `const` literal
+// type — so `required: true`, `access.read`, `localized`, a relation's target slug, `many` and select
+// options survive into the field's type for schema-aware clients. (A single signature with an optional,
+// defaulted generic parameter would lose contextual typing of access/hook callbacks.) Every result is
+// still assignable to the matching `TextField`/`RelationField`/… alias, so `FieldMap` is unchanged.
+// `EmptyOptions` is the options type of a field declared with no options at all.
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+type EmptyOptions = {};
+
+function text(): FieldDefinition<'text', string, EmptyOptions>;
+function text<const TOptions extends TextFieldOptions>(
+  options: TOptions
+): FieldDefinition<'text', string, TOptions>;
+function text(options: TextFieldOptions = {}): TextField {
+  return createField<'text', string, TextFieldOptions>('text', options);
+}
+
+function number(): FieldDefinition<'number', number, EmptyOptions>;
+function number<const TOptions extends NumberFieldOptions>(
+  options: TOptions
+): FieldDefinition<'number', number, TOptions>;
+function number(options: NumberFieldOptions = {}): NumberField {
+  return createField<'number', number, NumberFieldOptions>('number', options);
+}
+
+function boolean(): FieldDefinition<'boolean', boolean, EmptyOptions>;
+function boolean<const TOptions extends BooleanFieldOptions>(
+  options: TOptions
+): FieldDefinition<'boolean', boolean, TOptions>;
+function boolean(options: BooleanFieldOptions = {}): BooleanField {
+  return createField<'boolean', boolean, BooleanFieldOptions>('boolean', options);
+}
+
+function date(): FieldDefinition<'date', string, EmptyOptions>;
+function date<const TOptions extends DateFieldOptions>(
+  options: TOptions
+): FieldDefinition<'date', string, TOptions>;
+function date(options: DateFieldOptions = {}): DateField {
+  return createField<'date', string, DateFieldOptions>('date', options);
+}
+
+function relation<const TOptions extends RelationFieldOptions>(
+  options: TOptions
+): FieldDefinition<'relation', string | string[], TOptions>;
+function relation(options: RelationFieldOptions): RelationField {
+  return createField<'relation', string | string[], RelationFieldOptions>('relation', options);
+}
+
+/**
+ * `defineField.json()` infers `unknown`, same as before. A consumer-provided generic
+ * (`defineField.json<CatalogContent>()`) is a **compile-time annotation only** — it carries a type
+ * through `InferFields`/`CollectionData` for DX, but does not add runtime shape validation. Callers
+ * remain responsible for validating untrusted JSON at runtime. With an explicit `TValue`, TypeScript
+ * cannot also infer the options literal, so they keep the broad `JsonFieldOptions` type.
+ */
+function json<TValue = unknown>(): FieldDefinition<'json', TValue, EmptyOptions>;
+function json<TValue = unknown, const TOptions extends JsonFieldOptions = JsonFieldOptions>(
+  options: TOptions
+): FieldDefinition<'json', TValue, TOptions>;
+function json(options: JsonFieldOptions = {}): FieldDefinition<'json', unknown, JsonFieldOptions> {
+  return createField<'json', unknown, JsonFieldOptions>('json', options);
+}
+
+function select<const TOptions extends SelectFieldOptions>(
+  options: TOptions
+): FieldDefinition<'select', string, TOptions>;
+function select(options: SelectFieldOptions): SelectField {
+  return createField<'select', string, SelectFieldOptions>('select', options);
+}
+
+function slug(): FieldDefinition<'slug', string, EmptyOptions>;
+function slug<const TOptions extends SlugFieldOptions>(
+  options: TOptions
+): FieldDefinition<'slug', string, TOptions>;
+function slug(options: SlugFieldOptions = {}): SlugField {
+  return createField<'slug', string, SlugFieldOptions>('slug', options);
+}
+
+function email(): FieldDefinition<'email', string, EmptyOptions>;
+function email<const TOptions extends EmailFieldOptions>(
+  options: TOptions
+): FieldDefinition<'email', string, TOptions>;
+function email(options: EmailFieldOptions = {}): EmailField {
+  return createField<'email', string, EmailFieldOptions>('email', options);
+}
+
+function textarea(): FieldDefinition<'textarea', string, EmptyOptions>;
+function textarea<const TOptions extends TextareaFieldOptions>(
+  options: TOptions
+): FieldDefinition<'textarea', string, TOptions>;
+function textarea(options: TextareaFieldOptions = {}): TextareaField {
+  return createField<'textarea', string, TextareaFieldOptions>('textarea', options);
+}
+
+function richtext(): FieldDefinition<'richtext', RichTextContent, EmptyOptions>;
+function richtext<const TOptions extends RichTextFieldOptions>(
+  options: TOptions
+): FieldDefinition<'richtext', RichTextContent, TOptions>;
+function richtext(options: RichTextFieldOptions = {}): RichTextField {
+  return createField<'richtext', RichTextContent, RichTextFieldOptions>('richtext', options);
+}
+
+function upload<const TOptions extends UploadFieldOptions>(
+  options: TOptions
+): FieldDefinition<'upload', string, TOptions>;
+function upload(options: UploadFieldOptions): UploadField {
+  return createField<'upload', string, UploadFieldOptions>('upload', options);
+}
+
+/**
+ * A fixed set of nested fields. Keeps full type inference through the nesting:
+ * `defineField.group({ fields: { city: defineField.text() } })` infers `{ city: string }`.
+ */
+function group<const TOptions extends GroupFieldOptions>(
+  options: TOptions
+): FieldDefinition<'group', InferFields<TOptions['fields']>, TOptions>;
+function group(options: GroupFieldOptions): GroupField {
+  return createField<'group', Record<string, unknown>, GroupFieldOptions>('group', options);
+}
+
+/** A repeatable list of rows sharing one shape; infers `Row[]`. */
+function array<const TOptions extends ArrayFieldOptions>(
+  options: TOptions
+): FieldDefinition<'array', InferFields<TOptions['fields']>[], TOptions>;
+function array(options: ArrayFieldOptions): ArrayField {
+  return createField<'array', Record<string, unknown>[], ArrayFieldOptions>('array', options);
+}
+
+/**
+ * A repeatable list where each row picks one of `blocks`, discriminated by `blockType`. Rows stay
+ * typed as {@link BlockValue} rather than a discriminated union — narrowing on `blockType` is a
+ * consumer-side concern, and a precise union here makes the recursive field types unresolvable.
+ */
+function blocks<const TOptions extends BlocksFieldOptions>(
+  options: TOptions
+): FieldDefinition<'blocks', BlockValue[], TOptions>;
+function blocks(options: BlocksFieldOptions): BlocksField {
+  return createField<'blocks', BlockValue[], BlocksFieldOptions>('blocks', options);
+}
+
 export const defineField = {
-  text(options: TextFieldOptions = {}): TextField {
-    return createField<'text', string, TextFieldOptions>('text', options);
-  },
-  number(options: NumberFieldOptions = {}): NumberField {
-    return createField<'number', number, NumberFieldOptions>('number', options);
-  },
-  boolean(options: BooleanFieldOptions = {}): BooleanField {
-    return createField<'boolean', boolean, BooleanFieldOptions>('boolean', options);
-  },
-  date(options: DateFieldOptions = {}): DateField {
-    return createField<'date', Date, DateFieldOptions>('date', options);
-  },
-  relation(options: RelationFieldOptions): RelationField {
-    return createField<'relation', string | string[], RelationFieldOptions>('relation', options);
-  },
-  /**
-   * `defineField.json()` infers `unknown`, same as before. A consumer-provided generic
-   * (`defineField.json<CatalogContent>()`) is a **compile-time annotation only** — it carries a type
-   * through `InferFields`/`CollectionData` for DX, but does not add runtime shape validation. Callers
-   * remain responsible for validating untrusted JSON at runtime.
-   */
-  json<TValue = unknown>(
-    options: JsonFieldOptions = {}
-  ): FieldDefinition<'json', TValue, JsonFieldOptions> {
-    return createField<'json', TValue, JsonFieldOptions>('json', options);
-  },
-  select(options: SelectFieldOptions): SelectField {
-    return createField<'select', string, SelectFieldOptions>('select', options);
-  },
-  slug(options: SlugFieldOptions = {}): SlugField {
-    return createField<'slug', string, SlugFieldOptions>('slug', options);
-  },
-  email(options: EmailFieldOptions = {}): EmailField {
-    return createField<'email', string, EmailFieldOptions>('email', options);
-  },
-  textarea(options: TextareaFieldOptions = {}): TextareaField {
-    return createField<'textarea', string, TextareaFieldOptions>('textarea', options);
-  },
-  richtext(options: RichTextFieldOptions = {}): RichTextField {
-    return createField<'richtext', RichTextContent, RichTextFieldOptions>('richtext', options);
-  },
-  upload(options: UploadFieldOptions): UploadField {
-    return createField<'upload', string, UploadFieldOptions>('upload', options);
-  },
-  /**
-   * A fixed set of nested fields. The generic keeps full type inference through the nesting:
-   * `defineField.group({ fields: { city: defineField.text() } })` infers `{ city: string }`.
-   */
-  group<TFields extends FieldMap>(
-    options: GroupFieldOptions & { fields: TFields }
-  ): FieldDefinition<'group', InferFields<TFields>, GroupFieldOptions> {
-    return createField<'group', InferFields<TFields>, GroupFieldOptions>('group', options);
-  },
-  /** A repeatable list of rows sharing one shape; infers `Row[]`. */
-  array<TFields extends FieldMap>(
-    options: ArrayFieldOptions & { fields: TFields }
-  ): FieldDefinition<'array', InferFields<TFields>[], ArrayFieldOptions> {
-    return createField<'array', InferFields<TFields>[], ArrayFieldOptions>('array', options);
-  },
-  /**
-   * A repeatable list where each row picks one of `blocks`, discriminated by `blockType`. Rows stay
-   * typed as {@link BlockValue} rather than a discriminated union — narrowing on `blockType` is a
-   * consumer-side concern, and a precise union here makes the recursive field types unresolvable.
-   */
-  blocks(options: BlocksFieldOptions): BlocksField {
-    return createField<'blocks', BlockValue[], BlocksFieldOptions>('blocks', options);
-  }
+  text,
+  number,
+  boolean,
+  date,
+  relation,
+  json,
+  select,
+  slug,
+  email,
+  textarea,
+  richtext,
+  upload,
+  group,
+  array,
+  blocks
 } as const;
 
 /**
@@ -670,9 +797,20 @@ function reservedSlugError(kind: 'Collection' | 'Global', slug: string): string[
     : [];
 }
 
-export function defineCollection<TSlug extends string, TFields extends FieldMap>(
-  config: CollectionDefinition<TSlug, TFields>
-): CollectionDefinition<TSlug, TFields> {
+/**
+ * What `defineCollection`/`defineGlobal` add to the returned type for a literal `drafts: true`
+ * (spec 076): `{ drafts: true }`, so a schema-aware client knows the documents carry `_status`. Any other
+ * value (absent, `false`, a non-literal `boolean`) adds nothing.
+ */
+export type DraftsFlag<TDrafts> = [TDrafts] extends [true] ? { drafts: true } : unknown;
+
+export function defineCollection<
+  TSlug extends string,
+  TFields extends FieldMap,
+  TDrafts extends boolean | undefined = undefined
+>(
+  config: CollectionDefinition<TSlug, TFields> & { drafts?: TDrafts }
+): CollectionDefinition<TSlug, TFields> & DraftsFlag<TDrafts> {
   const errors = [
     ...validateCollectionIdentifiers(config),
     ...validateCollectionIndexes(config),
@@ -681,12 +819,16 @@ export function defineCollection<TSlug extends string, TFields extends FieldMap>
   if (errors.length > 0) {
     throw new Error(errors.join('\n'));
   }
-  return config;
+  return config as CollectionDefinition<TSlug, TFields> & DraftsFlag<TDrafts>;
 }
 
-export function defineGlobal<TSlug extends string, TFields extends FieldMap>(
-  config: GlobalDefinition<TSlug, TFields>
-): GlobalDefinition<TSlug, TFields> {
+export function defineGlobal<
+  TSlug extends string,
+  TFields extends FieldMap,
+  TDrafts extends boolean | undefined = undefined
+>(
+  config: GlobalDefinition<TSlug, TFields> & { drafts?: TDrafts }
+): GlobalDefinition<TSlug, TFields> & DraftsFlag<TDrafts> {
   const errors = [
     ...validateGlobalIdentifiers(config),
     ...reservedSlugError('Global', config.slug)
@@ -694,7 +836,7 @@ export function defineGlobal<TSlug extends string, TFields extends FieldMap>(
   if (errors.length > 0) {
     throw new Error(errors.join('\n'));
   }
-  return config;
+  return config as GlobalDefinition<TSlug, TFields> & DraftsFlag<TDrafts>;
 }
 
 /**

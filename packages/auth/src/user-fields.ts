@@ -46,7 +46,7 @@ export function withAuthFields<TSlug extends string, TFields extends FieldMap>(
   const fields = {
     ...collection.fields,
     ...missingAuthFields
-  } as TFields & typeof AUTH_USER_FIELDS;
+  } as unknown as TFields & typeof AUTH_USER_FIELDS;
   return {
     ...collection,
     fields
@@ -68,9 +68,9 @@ const RECOMMENDED_USER_FIELDS = {
   })
 } satisfies FieldMap;
 
-export interface DefineUsersCollectionOptions {
+export interface DefineUsersCollectionOptions<TSlug extends string = string> {
   /** Defaults to `'users'`. */
-  slug?: string;
+  slug?: TSlug;
 }
 
 /**
@@ -87,12 +87,14 @@ export interface DefineUsersCollectionOptions {
  * their own record (e.g. their name or password via `updateUser`); only an admin may create, update
  * any record, or delete.
  */
-export function defineUsersCollection(
-  options: DefineUsersCollectionOptions = {}
-): CollectionDefinition<string, typeof RECOMMENDED_USER_FIELDS & typeof AUTH_USER_FIELDS> {
+export function defineUsersCollection<TSlug extends string = 'users'>(
+  options: DefineUsersCollectionOptions<TSlug> = {}
+): CollectionDefinition<TSlug, typeof RECOMMENDED_USER_FIELDS & typeof AUTH_USER_FIELDS> {
+  // The slug stays a literal type (spec 076): a `string` slug would make every registry containing
+  // this collection accept any collection name in typed clients.
   return withAuthFields(
     defineCollection({
-      slug: options.slug ?? 'users',
+      slug: (options.slug ?? 'users') as TSlug,
       fields: RECOMMENDED_USER_FIELDS,
       access: {
         read: ({ user }) => user !== null,

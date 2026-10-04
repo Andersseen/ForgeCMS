@@ -105,7 +105,7 @@ export class ForgeDocumentEditorComponent {
   protected readonly metaError = signal<string | null>(null);
   private metaToken = 0;
 
-  protected readonly documentRef = documentResource<Record<string, unknown>>(() => {
+  protected readonly documentRef = documentResource(() => {
     const collection = this.collectionSlug();
     const id = this.effectiveId();
     if (collection === undefined || id === undefined) return undefined;

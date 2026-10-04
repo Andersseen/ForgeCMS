@@ -280,4 +280,22 @@ describe('runtime validation', () => {
       expect(errors[0]?.code).toBe('type_upload');
     });
   });
+
+  describe('required localized field (spec 076)', () => {
+    const field = defineField.text({ required: true, localized: true });
+
+    it('rejects a per-locale map with no locale', () => {
+      const errors = validateField(field, {}, 'title');
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.code).toBe('required');
+    });
+
+    it('accepts a map with at least one locale', () => {
+      expect(validateField(field, { en: 'Hello' }, 'title')).toHaveLength(0);
+    });
+
+    it('still accepts an empty map on an optional localized field', () => {
+      expect(validateField(defineField.text({ localized: true }), {}, 'title')).toHaveLength(0);
+    });
+  });
 });

@@ -1,16 +1,8 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import type { OnInit } from '@angular/core';
 import { EmptyStateComponent, PageHeaderComponent, describeAdminError } from '@forge-cms/admin';
-import { CmsApiService } from '@forge-cms/angular';
-
-interface MediaDoc extends Record<string, unknown> {
-  id: string;
-  filename: string;
-  alt: string;
-  url: string;
-  contentType: string;
-  filesize: number;
-}
+import { injectForgeClient } from '@forge-cms/angular';
+import type { DemoDocument, DemoSchema } from '../../forge-schema';
 
 /**
  * The media library — and the only place in the demo that exercises spec 016's multipart upload
@@ -72,7 +64,7 @@ interface MediaDoc extends Record<string, unknown> {
             <figure class="overflow-hidden rounded-xl border border-border bg-card">
               <div class="aspect-square bg-muted">
                 @if (item.url) {
-                  <img [src]="item.url" [alt]="item.alt" class="h-full w-full object-cover" />
+                  <img [src]="item.url" [alt]="item.alt ?? ''" class="h-full w-full object-cover" />
                 }
               </div>
               <figcaption class="space-y-1 p-3">
@@ -89,9 +81,9 @@ interface MediaDoc extends Record<string, unknown> {
   `
 })
 export class AdminMediaPage implements OnInit {
-  private readonly api = inject(CmsApiService);
+  private readonly api = injectForgeClient<DemoSchema>();
 
-  protected readonly documents = signal<MediaDoc[]>([]);
+  protected readonly documents = signal<DemoDocument<'media'>[]>([]);
   protected readonly loading = signal(true);
   protected readonly file = signal<File | null>(null);
   protected readonly alt = signal('');
@@ -132,7 +124,7 @@ export class AdminMediaPage implements OnInit {
   private async load(): Promise<void> {
     this.loading.set(true);
     try {
-      this.documents.set(await this.api.getDocuments<MediaDoc>('media', { limit: 100 }));
+      this.documents.set(await this.api.getDocuments('media', { limit: 100 }));
     } finally {
       this.loading.set(false);
     }

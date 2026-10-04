@@ -26,9 +26,10 @@ function daysFromNow(days: number, hour = 10): string {
 }
 
 /**
- * FINDING 24: the seed writes dates as ISO strings — what the validator and the HTTP API accept — but
- * the typed Local API types a `date` field as `Date` on writes. Until wire types land (roadmap 0.8,
- * C02) the seed writes through the untyped view of the runtime, taken once in `seedContent`.
+ * The seed writes through the untyped view of the runtime, taken once in `seedContent`: it resolves
+ * related ids from lookup maps (`string | undefined`, an absent id simply leaves the relation unset),
+ * which the typed Local API's `exactOptionalPropertyTypes` input rejects. Dates are no longer a reason —
+ * the typed `date` input is `Date | string` since spec 076 (finding 24 closed).
  */
 type SeedRuntime = ForgeCmsRuntime;
 

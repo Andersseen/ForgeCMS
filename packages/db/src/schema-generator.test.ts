@@ -111,6 +111,21 @@ describe('richtext field storage', () => {
   });
 });
 
+describe('date field storage (spec 076)', () => {
+  it('reads a stored date back as the canonical ISO string, not a Date', () => {
+    expect(fromDbValue('2026-01-15', 'date')).toBe('2026-01-15T00:00:00.000Z');
+    expect(fromDbValue('2026-01-15T10:30:00.000Z', 'date')).toBe('2026-01-15T10:30:00.000Z');
+    expect(fromDbValue(toDbValue(new Date('2026-03-01T08:00:00Z'), 'date'), 'date')).toBe(
+      '2026-03-01T08:00:00.000Z'
+    );
+  });
+
+  it('returns an unparseable legacy value as stored instead of an invalid date', () => {
+    expect(fromDbValue('1700000000000', 'date')).toBe('1700000000000');
+    expect(fromDbValue(null, 'date')).toBeNull();
+  });
+});
+
 describe('upload field storage', () => {
   it('maps to the TEXT sql type', () => {
     const field = defineField.upload({ collection: 'media' });

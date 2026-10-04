@@ -44,16 +44,6 @@ function str(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
 }
 
-/**
- * A `date` field as an ISO string. The SQL adapters (libSQL, D1) return `Date` objects on read while
- * the in-memory adapter returns what was written (finding 24). `str()` alone would turn every
- * production date into `''`.
- */
-function isoDate(value: unknown): string {
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? '' : value.toISOString();
-  return str(value);
-}
-
 function num(value: unknown): number | null {
   return typeof value === 'number' ? value : null;
 }
@@ -188,7 +178,7 @@ export function toPromotion(record: CollectionDocument<typeof promotions>): Prom
     description: str(record.description),
     discountPercent: num(record.discountPercent),
     code: str(record.code),
-    validUntil: isoDate(record.validUntil)
+    validUntil: str(record.validUntil)
   };
 }
 
@@ -199,7 +189,7 @@ export function toPostSummary(record: CollectionDocument<typeof posts>): PostSum
     slug: str(record.slug),
     excerpt: str(record.excerpt),
     topic: str(record.topic),
-    publishedAt: isoDate(record.publishedAt),
+    publishedAt: str(record.publishedAt),
     readingMinutes: num(record.readingMinutes) ?? 1,
     coverImage: toMedia(record.coverImage),
     authorName: str(obj(record.author)?.name)
