@@ -1,5 +1,13 @@
 # ROADMAP — A small, dependable ForgeCMS 1.0
 
+> **2026-10-04 (spec 077):** roadmap 0.8 **C03** (resource reliability and peer compatibility) is
+> implemented on its branch, which **completes roadmap 0.8 (C01–C03)**. Resources abort superseded
+> requests, can never be overwritten by a stale response, reset on a new query/idle/credential change, and
+> follow `ForgeAuthSession` identity changes; peers are ranges proven by a strict packed-consumer matrix
+> (`pnpm release:compat`: `@forge-cms/angular` Angular `^21.0.0 || ^22.0.0`, `@forge-cms/admin` `^21.2.0`),
+> and the Vite linker is now also `@forge-cms/angular/vite`. npm `latest` is **`0.9.1`**; C03 ships as a
+> `0.9.x` patch. **Next: roadmap 0.9 / S01** (Analog Local API + safe public SSR/hydration).
+>
 > **2026-10-02 (spec 076):** roadmap 0.8 **C02** (honest schema-to-wire types) is implemented on its
 > branch: `injectForgeClient<Schema>()` types slugs, queries, create/update payloads and the JSON reads
 > actually return (ISO dates, `depth: 1` targets or `null`, access-controlled fields optional, localized

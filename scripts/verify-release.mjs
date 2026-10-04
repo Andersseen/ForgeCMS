@@ -989,7 +989,7 @@ function verifyAngularConsumer(tarballs) {
     '@angular/forms@^21.2.10',
     '@angular/platform-browser@^21.2.10',
     '@angular/router@^21.2.10',
-    '@voltui/components@^0.6.0',
+    '@voltui/components@^1.0.1',
     'lumen-icons@^0.2.0',
     'rxjs@^7.8.2',
     'typescript@5.9.2'

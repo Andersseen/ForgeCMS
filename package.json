@@ -64,6 +64,7 @@
     "changeset": "changeset",
     "changeset:version": "changeset version",
     "release:verify": "node scripts/verify-release.mjs",
+    "release:compat": "node scripts/verify-angular-compat.mjs",
     "check:api": "node scripts/check-public-api.mjs",
     "check:api:update": "node scripts/check-public-api.mjs --update",
     "release:publish-unpublished": "node scripts/publish-unpublished.mjs",

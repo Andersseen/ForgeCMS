@@ -38,5 +38,25 @@ Exports include `CmsApiService`, `injectForgeClient`, `ForgeSchema` and the proj
 `ForgeApiError`, query helpers, typed response shapes, auth role helpers, and signal-based read
 resources.
 
-This package is compiled as an Angular partial-Ivy library. Consumers must install a compatible
-Angular version and let their Angular build/linker process dependencies as usual.
+Signal resources (`collectionResource`, `documentResource`) abort the request they supersede (new
+params, `reload()`, idle, destroy), never let an old response overwrite the current one, never turn a
+cancellation into an `error()`, and reset `value()` on a new query, on idle and on every sign-in,
+sign-out or session expiry — so another user's data is never shown. Nothing is retried. Full contract:
+https://forge-cms.pages.dev/docs/angular-client#resource-contract
+
+## Compatibility
+
+Peers: `@angular/core` and `@angular/router` `^21.0.0 || ^22.0.0`, proven by strict packed-consumer
+builds (`pnpm release:compat`: Angular 21.0.0, 21.2.10, 21.2.25 and 22.2.1). Angular 19/20 are not
+supported.
+
+This package is compiled as an Angular partial-Ivy library. The Angular CLI links it automatically;
+a **Vite/Analog** app must add the linker, or its production build crashes with
+`JIT compiler unavailable`:
+
+```ts
+// vite.config.ts — needs @angular/compiler-cli, @babel/core (7 for Angular 21, 8 for 22) and vite
+import { angularLinker } from '@forge-cms/angular/vite';
+
+export default defineConfig({ plugins: [angularLinker(), analog()] });
+```

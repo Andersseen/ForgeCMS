@@ -123,7 +123,8 @@ export class ForgeRequester {
     return this.config?.authBaseUrl ?? DEFAULT_AUTH_BASE_URL;
   }
 
-  private token(): string | null {
+  /** The configured Bearer token (also read reactively by the credential boundary, spec 077). */
+  token(): string | null {
     const token = this.config?.authToken;
     if (typeof token === 'function') return token();
     return token ?? null;
