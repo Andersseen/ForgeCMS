@@ -1,5 +1,12 @@
 # @forge-cms/api
 
+## 0.9.1
+
+### Patch Changes
+
+- Updated dependencies [5dbf847]
+  - @forge-cms/core@0.9.1
+
 ## 0.9.0
 
 ### Patch Changes

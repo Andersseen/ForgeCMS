@@ -1,5 +1,14 @@
 # @forge-cms/cloudflare
 
+## 0.9.1
+
+### Patch Changes
+
+- Updated dependencies [5dbf847]
+  - @forge-cms/core@0.9.1
+  - @forge-cms/db@0.9.1
+  - @forge-cms/storage@0.9.1
+
 ## 0.9.0
 
 ### Patch Changes
