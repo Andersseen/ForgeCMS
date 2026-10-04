@@ -1,6 +1,6 @@
 # 075 — Angular transport and public-surface reliability
 
-- **Status:** in-progress (code done; production migration pending operator action)
+- **Status:** done (production migrations applied 2026-10-04)
 - **Author:** agent draft
 - **Date:** 2026-09-30
 - **Branch:** feature/spec-075-angular-transport-public-reliability
@@ -91,4 +91,6 @@ None.
 Code complete on the branch. Production root cause: blocking schema drift (not `AUTH_SECRET`, which
 both projects have) — demo `media._storageKey`, www `posts._status`. Reviewed migrations written,
 backed up and rehearsed locally; the demo build on the migrated copy passes the health gate. Applying
-them to production is **pending operator action** (see [DEPLOYMENT-HEALTH.md](../DEPLOYMENT-HEALTH.md)).
+them to production was left to the operator; done on 2026-10-04 after a fresh backup and rehearsal —
+both `/api/status` return 200 and both `scripts/verify-deployment.mjs` gates pass (acceptance 3 met
+the strong way). Evidence: [DEPLOYMENT-HEALTH.md](../DEPLOYMENT-HEALTH.md#status-log).

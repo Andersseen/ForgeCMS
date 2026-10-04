@@ -1,11 +1,24 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-02 (spec 076 — roadmap 0.8 C02 honest schema-to-wire types, implemented on branch `feature/spec-076-honest-schema-to-wire-types`; C01/spec 075 merged in PR #62).**
+> **Last updated: 2026-10-04 (production recovery: both Pages apps healthy after the spec 075 reviewed migrations; spec 076 / C02 merged in PR #64; next is C03).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Production recovery — both Pages apps healthy (2026-10-04)
+
+Operator follow-up to specs 074/075; no code or package change. Remote plans still showed one blocking
+change per app; after a fresh `wrangler d1 export --remote` (outside git) and a local rehearsal, the
+reviewed migrations were applied with `apps/upgrade-rehearsal/ops/remote-migrate.ts`:
+`20260930_001_posts_status` → `forge-cms`, `20260930_001_media_storage_key` → `forge-cms-demo`. Each is
+recorded once, a fresh plan reports no changes, a rerun is `already-applied`, and a post-migration export
+matches the backup table-for-table (no reseed). `scripts/verify-deployment.mjs www` and `demo` pass.
+Evidence: [DEPLOYMENT-HEALTH.md](DEPLOYMENT-HEALTH.md#status-log). Not exercised by the agent: the
+published demo login against production (the demo's users table is unchanged). The official site's D1
+has no users rows (pre-existing; its seed sentinel was already present), so `/admin` login on
+`forge-cms.pages.dev` has no account — the published credentials are the demo's.
 
 ## Honest schema-to-wire types — C02 (spec 076, 2026-10-02)
 
@@ -48,7 +61,7 @@ Branch `feature/spec-076-honest-schema-to-wire-types`. Spec:
   run's release job — so it already contains C01's code; C01's changelog entry is the pending minor
   changeset (→ `0.9.0`). No `v0.8.3` aggregate tag/GitHub release was found. That run's two deploy
   health gates failed (`503 RUNTIME_STARTUP_FAILED`, blocking schema drift): the production migrations
-  from spec 075 are **still not applied** (operator). This branch adds one `patch` changeset (the group
+  from spec 075 were not applied yet (done 2026-10-04, entry above). This branch adds one `patch` changeset (the group
   moves to `0.9.0` via C01's minor). Website version → `0.8.3`, roadmap C02 complete / C03 next.
 - **Not done (by design):** C03 (stale requests, resources, peers), Local API populated-relation types,
   typed `blocks` rows, `where` value typing, `afterRead`-hook reshaping, depth/locale for globals.
@@ -75,14 +88,14 @@ Merged to `main` in PR #62 (`ca35e48`, 2026-10-02). Spec:
 - **Production 500 root cause (verified from Pages logs):** not `AUTH_SECRET` (set on both projects) but
   blocking drift — demo `media._storageKey` (9 static-image rows), www `posts._status` (1 row).
   Migrations written, D1 backed up (outside git), rehearsed locally (plan → no changes); demo build on
-  the migrated copy passes the health gate. **Applying to production is PENDING (operator):**
-  `apps/upgrade-rehearsal/ops/remote-migrate.ts <demo|www> --apply`.
+  the migrated copy passes the health gate. Applied to production on 2026-10-04 (production recovery
+  entry above).
 - **Release truth (as of 2026-09-30; superseded):** npm `latest` was `0.8.2`; PR #61's `0.8.3` had not
   published. The PR #62 merge run then published `0.8.3` on 2026-10-02 — see the spec 076 entry.
 - **Gates (local, 2026-09-30):** format, lint, typecheck, test, build, libsql, cloudflare, upgrade,
   check:api, release:verify green (one `@forge-cms/db` test flaked under load, passed on rerun).
-- **Left:** apply the two production migrations (operator), then confirm both remote health gates —
-  still pending on 2026-10-02 (both gates failed after the PR #62 deploy). Finding 24 → closed by C02
+- **Left (closed 2026-10-04):** apply the two production migrations, then confirm both remote health
+  gates — both gates failed after the PR #62 deploy; recovered by the production recovery entry above. Finding 24 → closed by C02
   (spec 076).
 
 ## Historical upgrade and backup/restore rehearsal — M03 (spec 073, 2026-09-29)

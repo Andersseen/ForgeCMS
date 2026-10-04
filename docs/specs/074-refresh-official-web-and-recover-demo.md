@@ -1,6 +1,6 @@
 # 074 — Refresh the official web and recover the demo
 
-- **Status:** in-progress
+- **Status:** done (demo recovered in production 2026-10-04; see Outcome)
 - **Author:** agent draft
 - **Date:** 2026-09-29
 - **Branch:** codex/spec-074-web-demo-refresh
@@ -232,4 +232,13 @@ angular-movement 1.2.0, Lumen icons, one reduced-motion-aware pipeline motion), 
 the demo failure state and the post-deploy demo health check. **Not achieved:** demo recovery —
 acceptance 1 failed in production (`/api/status` 500 on every attempt). Spec 075 found the real cause
 (blocking schema drift, not a missing `AUTH_SECRET`), added the fix path and a health gate for the
-official site too; applying the migrations is pending operator action.
+official site too.
+
+**Recovered 2026-10-04.** After a fresh backup and a local rehearsal, the reviewed migration
+`20260930_001_media_storage_key` was applied to the demo's production D1 (and
+`20260930_001_posts_status` to the official site's) through `apps/upgrade-rehearsal/ops/remote-migrate.ts`.
+Post-flight plan: no changes; each migration recorded once; existing content unchanged (no reseed).
+`/api/status`, `/api/site/home` and `/api/site/settings` return 200 and
+`node scripts/verify-deployment.mjs demo` passes. Acceptance 1's login half was not exercised by the
+agent (it does not authenticate against production); the demo's users table is unchanged by the
+migration. Evidence: [DEPLOYMENT-HEALTH.md](../DEPLOYMENT-HEALTH.md#status-log).

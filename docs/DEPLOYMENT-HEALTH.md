@@ -112,5 +112,28 @@ secret: it never issues or verifies sessions and never reads the production `AUT
   - `forge-cms`: `posts._status` on 1 row. Migration `20260930_001_posts_status`.
 
   Both were backed up (`wrangler d1 export --remote`, SHA-256 recorded outside git), planned remotely
-  and rehearsed on local restores (post-flight plan: no changes). Applying them to production is the
-  pending operator step 4 above.
+  and rehearsed on local restores (post-flight plan: no changes). Production was migrated on
+  2026-10-04 (next entry).
+
+- **2026-10-04 — recovered.** Remote read-only plans still showed exactly the one blocking change per
+  app (above), its reviewed migration `pending`, and nothing destructive. Both apps had been failing
+  startup since, so writes were already quiesced. For each app separately:
+  1. Fresh `wrangler d1 export --remote` outside the repository (`forge-cms` SHA-256 `52a239b2…3158d`,
+     `forge-cms-demo` `f279cf58…8277b`). Neither DB references an R2 object (`www` media empty; the demo's
+     9 media rows are static images with no stored key), so no object copy was needed.
+  2. Restored locally and rehearsed `--apply`: post-flight `Schema plan: no changes.`, rerun
+     `already-applied`, every pre-existing table's row count and content digest unchanged.
+  3. `remote-migrate.ts <www|demo> --apply` on production: `20260930_001_posts_status` (`forge-cms`) and
+     `20260930_001_media_storage_key` (`forge-cms-demo`) → `applied`, post-flight `no changes`.
+     (Wrangler's remote proxy printed transient `Network connection lost` lines, also on read-only runs;
+     the ledger and a fresh plan were checked directly afterwards.)
+  4. Verified: `_forge_migrations` holds exactly one row per DB (`applied`); a fresh plan reports
+     `no changes`; a second `--apply` returns `already-applied`; the www post reads as `published`, the
+     demo's 9 media rows keep `_storageKey` NULL.
+  5. Health: `/api/status` and `/api/v1/collections` (www), `/api/status`, `/api/site/home` and
+     `/api/site/settings` (demo) all 200; `node scripts/verify-deployment.mjs www` and `… demo` healthy
+     on attempt 1 without redeploying (startup failures are not cached).
+  6. A post-migration export, taken after both apps had started, matches the pre-migration backup
+     table-for-table (row counts and content digests, ignoring only the migrated column): no reseed, no
+     data change. Only Forge's internal tables (`_forge_schema`, `_forge_migrations`,
+     `_forge_storage_intents`) and www's empty `tags` table were added by the post-flight sync.
