@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/upgrade-rehearsal",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": true,
   "description": "Roadmap 0.7 M03 release gate: historical-fixture upgrades and backup/restore rehearsals on real libSQL and local D1/R2 (spec 073). Not deployed.",
   "type": "module",
