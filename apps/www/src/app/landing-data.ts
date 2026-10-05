@@ -2,7 +2,7 @@ import { CURRENT_FORGE_VERSION, FORGE_PACKAGES } from './forge-release';
 
 /**
  * What already works, in the order a first-time visitor cares about. Nothing here is planned work;
- * the schema card's reviewed migrations are on `main` and it says they ship in the next patch release.
+ * all capability copy describes released work rather than pending releases.
  */
 export const features = [
   {
@@ -38,7 +38,7 @@ export const features = [
   {
     title: 'Schema-drift safety',
     description:
-      'Schema sync plans before it writes. It applies safe additive changes and refuses drift that needs a migration. Reviewed migrations (next patch release) run once, atomically, with a durable history.'
+      'Schema sync plans before it writes. It applies safe additive changes and refuses drift that needs a migration. Reviewed migrations run once, atomically, with a durable history.'
   },
   {
     title: 'Real consumer fixtures',
@@ -114,3 +114,14 @@ export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
   { version: '0.11', title: 'Admin certification', status: 'planned' },
   { version: '0.12', title: 'Release-candidate preparation', status: 'planned' }
 ];
+
+/** Static, illustrative content shared by the three product showcase views. */
+export const showcasePost = {
+  id: 'post_angular',
+  title: 'A home for your next idea',
+  slug: 'a-home-for-your-next-idea',
+  author: 'user_editor',
+  _status: 'published'
+} as const;
+
+export const showcaseResponse = JSON.stringify({ data: showcasePost }, null, 2);

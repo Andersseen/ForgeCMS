@@ -11,11 +11,13 @@ import { packages } from '../landing-data';
   imports: [RouterLink, VoltBadge, VoltNativeButton, LmnArrowRightIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section id="packages" class="mx-auto w-full max-w-7xl px-5 py-22 md:px-8 md:py-28">
+    <section id="packages" class="mx-auto w-full max-w-7xl px-5 py-18 md:px-8 md:py-22">
       <div class="flex flex-col justify-between gap-6 md:flex-row md:items-end">
         <div>
-          <p class="forge-section-mark">One release line</p>
-          <h2 class="forge-section-title mt-5 max-w-[16ch]">Install the system in layers.</h2>
+          <p class="forge-section-mark">A composable foundation</p>
+          <h2 class="forge-section-title mt-5 max-w-[16ch]">
+            Bring the pieces your project needs.
+          </h2>
         </div>
         <div class="max-w-xl">
           <p class="leading-7 text-muted-foreground">

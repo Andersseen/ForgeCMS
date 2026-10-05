@@ -1,12 +1,33 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-05 (spec 078 / roadmap 0.9 S01 — request-scoped server transport and SSR identity
+> **Last updated: 2026-10-05 (spec 079 official product web redesign implemented; spec 078 / roadmap 0.9 S01 — request-scoped server transport and SSR identity
 > isolation — implemented on its branch; next is roadmap 0.9 / S02).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Official product website redesign (spec 079, 2026-10-05)
+
+Implemented on `feature/spec-079-official-web-redesign` (pending merge). Spec:
+[079-redesign-official-product-web.md](specs/079-redesign-official-product-web.md).
+
+- Official homepage now uses the logo's ink/violet/cyan palette, a large centred product hero and
+  an interactive VoltUI Schema / Content / API showcase driven by one static, explicitly illustrative
+  record. Angular Movement handles one entrance and user-triggered view transitions; Lumen Icons
+  supplies interface symbols. No live mutation or new backend behaviour.
+- Copyable install command with success/denial feedback; keyboard-operable tabs, skip link, sticky
+  homepage header and mobile Escape/focus handling. Revised capabilities, Lumea invitation, packages,
+  readiness and final actions. Marketing styles remain isolated from admin and docs prose.
+- Website release source updated to **0.9.3**, verified with `pnpm view @forge-cms/core version` on
+  2026-10-05; reviewed migrations no longer claim they await a patch release. Older release entries
+  below remain historical evidence, not the current npm version.
+- Gates: format:check, lint, typecheck, test, build and www e2e **33/33** pass. Visual inspection:
+  all three showcase views and full page at 390/768/1440/1920px, reduced motion and keyboard checks.
+  Initial sandboxed integration tests failed on local socket permissions; authorised rerun passed.
+- Scope: `apps/www` public presentation and spec/status docs only. Packages, other apps, backend,
+  dependency manifests and lockfile unchanged; no changeset or deployment.
 
 ## Request-scoped server transport and SSR identity isolation — S01 (spec 078, 2026-10-05)
 

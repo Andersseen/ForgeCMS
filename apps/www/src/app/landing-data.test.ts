@@ -1,8 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { CURRENT_FORGE_VERSION, FORGE_PACKAGES } from './forge-release';
-import { ROADMAP_MILESTONES, features, packages } from './landing-data';
+import {
+  ROADMAP_MILESTONES,
+  features,
+  packages,
+  exampleCode,
+  showcasePost,
+  showcaseResponse
+} from './landing-data';
 
 describe('landing content', () => {
+  it('uses the same illustrative record for the content and item API preview', () => {
+    expect(JSON.parse(showcaseResponse)).toEqual({ data: showcasePost });
+    expect(showcasePost._status).toBe('published');
+    for (const field of ['title', 'slug', 'author']) expect(exampleCode).toContain(`${field}:`);
+    expect(exampleCode).toContain('drafts: true');
+  });
   it('derives every package card from the one current version', () => {
     expect(CURRENT_FORGE_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
     expect(packages.map((pkg) => pkg.name)).toEqual(FORGE_PACKAGES.map((pkg) => pkg.name));
