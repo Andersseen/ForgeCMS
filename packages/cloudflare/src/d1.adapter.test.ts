@@ -18,7 +18,10 @@ interface MockIndex {
 
 /** Spec 070 schema planning traffic, which the SQL-capturing mocks below leave out of what they record. */
 function isSchemaRead(sql: string): boolean {
-  return sql.startsWith('PRAGMA') || /FROM (pragma_|"sqlite_master")/.test(sql);
+  return (
+    sql.startsWith('PRAGMA') ||
+    /FROM (pragma_|json_each\(\?\) AS t, pragma_|"sqlite_master")/.test(sql)
+  );
 }
 function isSchemaWrite(sql: string): boolean {
   return /^(CREATE|ALTER)\b/i.test(sql) || sql.startsWith('INSERT INTO "_forge_schema"');
@@ -417,6 +420,38 @@ class MockD1PreparedStatement implements D1PreparedStatement {
     if (this.query.includes('FROM "sqlite_master"')) {
       const index = this.indexes.find((i) => i.name === this.bindings[0]);
       return { results: (index ? [{ tbl_name: index.table }] : []) as T[], success: true };
+    }
+
+    // Schema planning's batched metadata reads: every table named in one JSON array (`json_each`).
+    if (this.query.includes('FROM json_each(?) AS t, pragma_')) {
+      const names = JSON.parse(String(this.bindings[0])) as string[];
+      let results: Record<string, unknown>[];
+      if (this.query.includes('pragma_index_info')) {
+        results = this.indexes
+          .filter((i) => names.includes(i.table))
+          .sort((a, b) => (a.name < b.name ? -1 : 1))
+          .flatMap((i) => i.columns.map((column) => ({ idx: i.name, name: column })));
+      } else if (this.query.includes('pragma_index_list')) {
+        results = this.indexes
+          .filter((i) => names.includes(i.table))
+          .map((i) => ({
+            tbl: i.table,
+            name: i.name,
+            unique: i.unique ? 1 : 0,
+            origin: 'c',
+            partial: 0
+          }));
+      } else {
+        results = [...names].sort().flatMap((tbl) =>
+          Array.from(this.schemas.get(tbl) ?? new Map<string, string>()).map(([column, type]) => ({
+            tbl,
+            name: column,
+            type,
+            pk: column === 'id' ? 1 : 0
+          }))
+        );
+      }
+      return { results: results as T[], success: true };
     }
 
     // Schema planning's metadata reads (spec 070): table-valued PRAGMA functions with a bound name.
