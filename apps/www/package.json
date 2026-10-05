@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/www",
-  "version": "0.0.19",
+  "version": "0.0.20",
   "private": true,
   "description": "Official ForgeCMS landing app.",
   "type": "module",
