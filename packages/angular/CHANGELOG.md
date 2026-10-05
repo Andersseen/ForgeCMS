@@ -1,5 +1,11 @@
 # @forge-cms/angular
 
+## 0.9.3
+
+### Patch Changes
+
+- @forge-cms/core@0.9.3
+
 ## 0.9.2
 
 ### Patch Changes

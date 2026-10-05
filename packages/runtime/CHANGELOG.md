@@ -1,5 +1,16 @@
 # @forge-cms/runtime
 
+## 0.9.3
+
+### Patch Changes
+
+- Updated dependencies [5aa0bfe]
+  - @forge-cms/db@0.9.3
+  - @forge-cms/auth@0.9.3
+  - @forge-cms/core@0.9.3
+  - @forge-cms/storage@0.9.3
+  - @forge-cms/api@0.9.3
+
 ## 0.9.2
 
 ### Patch Changes
