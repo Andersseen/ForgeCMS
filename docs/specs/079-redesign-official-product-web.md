@@ -1,6 +1,6 @@
 # 079 — Redesign the official product web
 
-- **Status:** in-progress
+- **Status:** done (implemented and verified; PR #73 pending merge)
 - **Author:** agent draft
 - **Date:** 2026-10-05
 - **Branch:** feature/spec-079-official-web-redesign
@@ -162,7 +162,7 @@ from FORGE_PACKAGES and CURRENT_FORGE_VERSION. No dependency or lockfile change 
 - [x] Update landing-data.test.ts and e2e/landing.spec.ts; run focused checks and inspect screenshots.
 - [x] Run formatting, full quality gates and www e2e; update STATE.md and record outcome/evidence.
       No changeset is required because packages/\* is out of scope.
-- [ ] Open one PR into main containing only the official-site work and its spec/status documentation.
+- [x] Open one PR into main containing only the official-site work and its spec/status documentation.
 
 ## Test plan
 
@@ -197,7 +197,7 @@ the proposed composition and copy above are concrete defaults for approval.
 
 ## Outcome
 
-Implemented on `feature/spec-079-official-web-redesign`, pending PR creation and merge: centred
+Implemented on `feature/spec-079-official-web-redesign`, [PR #73](https://github.com/Andersseen/ForgeCMS/pull/73) pending merge: centred
 brand-colour hero, VoltUI Schema/Content/API showcase, Angular Movement opacity transitions,
 Lumen Icons, copy feedback, accessible navigation, Lumea invitation and revised product sections.
 Published version verified with `pnpm view @forge-cms/core version`: `0.9.3`.

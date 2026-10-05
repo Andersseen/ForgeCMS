@@ -10,7 +10,7 @@
 
 ## Official product website redesign (spec 079, 2026-10-05)
 
-Implemented on `feature/spec-079-official-web-redesign` (pending merge). Spec:
+Implemented on `feature/spec-079-official-web-redesign` — [PR #73](https://github.com/Andersseen/ForgeCMS/pull/73), pending merge. Spec:
 [079-redesign-official-product-web.md](specs/079-redesign-official-product-web.md).
 
 - Official homepage now uses the logo's ink/violet/cyan palette, a large centred product hero and
