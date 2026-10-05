@@ -1,18 +1,12 @@
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
-
-interface PublicPost {
-  id: string;
-  title: string;
-  slug: string;
-  author?: { name?: string; email?: string } | string | null;
-}
+import { collectionResource } from '@forge-cms/angular';
 
 /**
- * The whole public site: one list of published posts, fetched from the app-local
- * `/api/site/posts` route (Local API, `overrideAccess: false`) — not `@forge-cms/angular`'s
- * `CmsApiService`, which talks to the authenticated `/api/v1/*` surface. Deliberately no styling
- * framework: this fixture proves integration, not design.
+ * The whole public site: one list of published posts. Read through `@forge-cms/angular`'s
+ * `collectionResource` (anonymous `GET /api/v1/posts`, which returns published posts only) so the same
+ * code runs in the browser and during SSR (spec 078) — a raw relative `fetch` cannot run on a server.
+ * Deliberately no styling framework: this fixture proves integration, not design.
  */
 @Component({
   selector: 'tiny-home-page',
@@ -28,36 +22,27 @@ interface PublicPost {
     <h1>Tiny project</h1>
     <p>A deliberately tiny external-style ForgeCMS consumer — users, posts, one relation.</p>
 
-    @if (loading()) {
-      <p>Loading…</p>
-    } @else if (error(); as message) {
-      <p class="tiny-error">{{ message }}</p>
-    } @else {
+    @if (posts.error(); as error) {
+      <p class="tiny-error">{{ error.message }}</p>
+    } @else if (posts.value(); as page) {
       <ul class="tiny-post-list">
-        @for (post of posts(); track post.id) {
+        @for (post of page.docs; track post.id) {
           <li>
-            <a [routerLink]="['/posts', post.slug]">{{ post.title }}</a>
+            <a [routerLink]="['/posts', post['slug']]">{{ post['title'] }}</a>
           </li>
         } @empty {
           <li>No published posts yet.</li>
         }
       </ul>
+    } @else {
+      <p>Loading…</p>
     }
   `
 })
 export class HomePage {
-  protected readonly posts = signal<PublicPost[]>([]);
-  protected readonly loading = signal(true);
-  protected readonly error = signal<string | null>(null);
-
-  constructor() {
-    fetch('/api/site/posts')
-      .then((res) => {
-        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-        return res.json() as Promise<{ data: PublicPost[] }>;
-      })
-      .then((body) => this.posts.set(body.data))
-      .catch((err: unknown) => this.error.set(err instanceof Error ? err.message : 'Unknown error'))
-      .finally(() => this.loading.set(false));
-  }
+  protected readonly posts = collectionResource(() => ({
+    collection: 'posts',
+    sort: 'title',
+    limit: 100
+  }));
 }

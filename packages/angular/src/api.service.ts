@@ -1,7 +1,9 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, PLATFORM_ID, PendingTasks, inject, signal } from '@angular/core';
 import type { Signal } from '@angular/core';
 import { registerCredentialBoundary } from './credentials.js';
 import { buildQueryString } from './query.js';
+import { FORGE_SERVER_CONTEXT } from './server-token.js';
+import type { ForgeServerContext } from './server-token.js';
 import type { QueryOptions } from './query.js';
 import type {
   ForgeCollectionSlug,
@@ -21,13 +23,14 @@ import type {
   UntypedForgeSchema
 } from './schema.js';
 import { ForgeRequester, PassedStatus, dataOf, encodePathSegment, joinUrl } from './transport.js';
-import type { SendOptions } from './transport.js';
+import type { RequesterEnvironment, SendOptions } from './transport.js';
 import {
   FORGE_CMS_CONFIG,
   type ApiListResponse,
   type AuthUser,
   type CollectionMeta,
   type CreateUserInput,
+  type ForgeCmsConfig,
   type ForgeRequestOptions,
   type PaginatedDocuments
 } from './types.js';
@@ -41,6 +44,25 @@ export interface ForgeDocumentReadOptions<D extends 0 | 1, L extends string | un
 /** Write options: a `locale` makes localized fields take a plain string for that locale. */
 export interface ForgeWriteOptions<L extends string | undefined> {
   locale?: L;
+}
+
+/**
+ * The browser gets `{ server: null, onServer: false }` and nothing else. On a server platform (spec 078)
+ * every request holds the render open (`PendingTasks`) and is aborted when this application is destroyed,
+ * and the render's own server context — never a shared one — decides the origin and forwarded identity.
+ * Called in the service's injection context.
+ */
+function requesterEnvironment(config: ForgeCmsConfig | null): RequesterEnvironment {
+  if (inject(PLATFORM_ID, { optional: true }) !== 'server') {
+    return { server: null, onServer: false };
+  }
+  const server: ForgeServerContext | null =
+    inject(FORGE_SERVER_CONTEXT, { optional: true }) ?? null;
+  server?.assertCompatible(config);
+  const tasks = inject(PendingTasks);
+  const lifetime = new AbortController();
+  inject(DestroyRef).onDestroy(() => lifetime.abort());
+  return { server, onServer: true, track: () => tasks.add(), lifetime: lifetime.signal };
 }
 
 /**
@@ -71,10 +93,14 @@ export class CmsApiService<S extends ForgeSchema = UntypedForgeSchema> {
    */
   private readonly unauthorizedListeners = new Set<() => void>();
 
-  private readonly requester = new ForgeRequester(this.config, () => {
-    this.unauthorizedCount.update((count) => count + 1);
-    for (const listener of this.unauthorizedListeners) listener();
-  });
+  private readonly requester = new ForgeRequester(
+    this.config,
+    () => {
+      this.unauthorizedCount.update((count) => count + 1);
+      for (const listener of this.unauthorizedListeners) listener();
+    },
+    requesterEnvironment(this.config)
+  );
 
   constructor() {
     // The identity boundary resources commit against (spec 077). Kept off the public class surface.

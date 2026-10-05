@@ -28,7 +28,7 @@ export const appConfig: ApplicationConfig = {
 | `credentials`    | `'include'`   | Browser cookies for credential targets; `'omit'` for Bearer-only apps |
 | `authToken`      | none          | `Authorization: Bearer …` (string, or function re-read per request)   |
 | `trustedOrigins` | `[]`          | Other origins allowed to receive cookies and the Bearer token         |
-| `transport`      | native fetch  | `(request) => Promise<Response>` — tests, and later SSR               |
+| `transport`      | native fetch  | `(request) => Promise<Response>` — tests, in-process routing          |
 
 **URLs.** A relative base (`/cms/api`) resolves against the page's origin; an absolute one
 (`https://cms.example.com/api`) is used as given. A trailing slash is ignored, and every collection
@@ -51,6 +51,11 @@ provideForgeCms({
 
 Use `authToken` only for **machine/API-key clients**; a browser app uses the cookie session of
 [the reusable auth UI](/docs/browser-auth).
+
+**Server rendering.** In an SSR render there is no page origin or cookie jar: add
+`provideForgeCmsServer({ origin })` from `@forge-cms/angular/server` to the server render. It sets
+the origin relative URLs resolve against and which of the incoming request's credentials may be
+forwarded (none by default). See [Server rendering](/docs/ssr).
 
 **No retries.** Each method sends exactly one request. A failed `POST`/`PUT`/`DELETE`, upload, login,
 signup or logout is never retried: a lost connection leaves the server-side outcome unknown. Every
@@ -463,6 +468,10 @@ Tested combinations (2026-10-04):
 - **Vite/Analog apps need the linker** — for `@forge-cms/angular` alone too. Forge's packages are
   partial-Ivy `ngc` output, which Analog does not link (it only links `fesm2022` packages); without
   it a production build crashes with `JIT compiler unavailable`. The Angular CLI links them itself.
+- **SSR:** the same plugin marks Forge's Angular packages `ssr.noExternal`, so the server build is
+  linked too (an external, unlinked copy would fail every render with `JIT compiler unavailable`).
+  `pnpm release:ssr` proves a packed Analog SSR consumer (Angular 21.2.10, Analog 2.5.2, Vite 7.1.4,
+  Nitro `node-server`) with nothing but `angularLinker()`.
 
 ```ts
 // vite.config.ts

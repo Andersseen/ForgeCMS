@@ -1,5 +1,13 @@
 # ROADMAP — A small, dependable ForgeCMS 1.0
 
+> **2026-10-05 (spec 078):** roadmap 0.9 **S01** (request-scoped server transport and SSR identity
+> isolation) is implemented on its branch. `@forge-cms/angular/server`'s `provideForgeCmsServer({ origin })`
+> gives `CmsApiService` an explicit server origin and a per-render, anonymous-by-default identity policy
+> read from Angular's `REQUEST`; tiny-project server-renders its public pages; concurrent anonymous/A/B
+> renders are proven isolated in-repo and by a strict packed production SSR consumer (`pnpm release:ssr`).
+> npm `latest` is **`0.9.2`**; S01 is a minor changeset (→ `0.10.0`). Hydration transfer is **not**
+> done. **Next: roadmap 0.9 / S02** (safe public hydration and transfer behavior).
+>
 > **2026-10-04 (spec 077):** roadmap 0.8 **C03** (resource reliability and peer compatibility) is
 > implemented on its branch, which **completes roadmap 0.8 (C01–C03)**. Resources abort superseded
 > requests, can never be overwritten by a stale response, reset on a new query/idle/credential change, and

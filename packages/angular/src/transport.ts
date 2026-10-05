@@ -15,6 +15,7 @@ import {
   type ForgeTransport,
   type ForgeTransportRequest
 } from './types.js';
+import type { ForgeServerContext } from './server-token.js';
 
 export const DEFAULT_CONTENT_BASE_URL = '/api/v1';
 export const DEFAULT_AUTH_BASE_URL = '/api/auth';
@@ -25,6 +26,19 @@ export const fetchTransport: ForgeTransport = (request) =>
     method: request.method,
     headers: request.headers,
     credentials: request.credentials,
+    ...(request.body !== undefined && { body: request.body }),
+    ...(request.signal !== undefined && { signal: request.signal })
+  });
+
+/**
+ * A server platform without `provideForgeCmsServer` (spec 078): no `credentials` field (no cookie jar)
+ * and never following a redirect with a configured token.
+ */
+const noRedirectFetchTransport: ForgeTransport = (request) =>
+  globalThis.fetch(request.url, {
+    method: request.method,
+    headers: request.headers,
+    redirect: 'manual',
     ...(request.body !== undefined && { body: request.body }),
     ...(request.signal !== undefined && { signal: request.signal })
   });
@@ -51,7 +65,8 @@ export function joinUrl(base: string, segments: readonly string[], query = ''): 
   return `${trimmed}/${segments.join('/')}${query}`;
 }
 
-function isAbsolute(url: string): boolean {
+/** `true` for `scheme:` and protocol-relative (`//host`) URLs. */
+export function isAbsolute(url: string): boolean {
   return /^[a-z][a-z\d+.-]*:/i.test(url) || url.startsWith('//');
 }
 
@@ -66,9 +81,13 @@ function pageOrigin(): string | undefined {
  * page's origin or is listed in `trustedOrigins`. Outside a browser (no `location`) an absolute URL is
  * trusted only through `trustedOrigins`.
  */
-export function isCredentialTarget(url: string, trustedOrigins: readonly string[] = []): boolean {
+export function isCredentialTarget(
+  url: string,
+  trustedOrigins: readonly string[] = [],
+  usePageOrigin = true
+): boolean {
   if (!isAbsolute(url)) return true;
-  const page = pageOrigin();
+  const page = usePageOrigin ? pageOrigin() : undefined;
   let origin: string;
   try {
     origin = new URL(url, page).origin;
@@ -83,6 +102,37 @@ export function isCredentialTarget(url: string, trustedOrigins: readonly string[
       return false;
     }
   });
+}
+
+/** Combines the caller's signal with the owner's lifetime signal (either may be absent). */
+function combineSignals(
+  a: AbortSignal | undefined,
+  b: AbortSignal | undefined
+): AbortSignal | undefined {
+  if (a === undefined) return b;
+  if (b === undefined) return a;
+  if (typeof AbortSignal.any === 'function') return AbortSignal.any([a, b]);
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (a.aborted || b.aborted) abort();
+  a.addEventListener('abort', abort, { once: true });
+  b.addEventListener('abort', abort, { once: true });
+  return controller.signal;
+}
+
+/**
+ * Where the requester runs (spec 078). The browser default is `{ server: null, onServer: false }` and
+ * changes nothing.
+ */
+export interface RequesterEnvironment {
+  /** The render's resolved server context (`provideForgeCmsServer`), or `null`. */
+  server: ForgeServerContext | null;
+  /** Running on a server platform (`PLATFORM_ID === 'server'`). */
+  onServer: boolean;
+  /** Registers a pending task for the duration of one request; returns its release. */
+  track?: () => () => void;
+  /** Aborted when the owning application is destroyed. */
+  lifetime?: AbortSignal;
 }
 
 export interface SendOptions {
@@ -112,7 +162,8 @@ export class PassedStatus {
 export class ForgeRequester {
   constructor(
     private readonly config: ForgeCmsConfig | null,
-    private readonly onUnauthorized: () => void
+    private readonly onUnauthorized: () => void,
+    private readonly env: RequesterEnvironment = { server: null, onServer: false }
   ) {}
 
   get contentBase(): string {
@@ -131,7 +182,29 @@ export class ForgeRequester {
   }
 
   private buildRequest(options: SendOptions): ForgeTransportRequest {
-    const trusted = isCredentialTarget(options.url, this.config?.trustedOrigins);
+    const server = this.env.server;
+    if (server !== null) {
+      // SSR (spec 078): the render's own policy resolves the URL and forwards its visitor's identity.
+      return server.request(
+        {
+          url: options.url,
+          method: options.method,
+          ...(options.json !== undefined && { json: options.json }),
+          ...(options.body !== undefined && { body: options.body }),
+          signal: options.signal,
+          authAction: options.authAction === true,
+          token: () => this.token()
+        },
+        this.config
+      );
+    }
+    // A server without `provideForgeCmsServer` (absolute URLs only — relative ones were refused) never
+    // consults `location`: only `trustedOrigins` may receive the configured token (spec 078).
+    const trusted = isCredentialTarget(
+      options.url,
+      this.config?.trustedOrigins,
+      !this.env.onServer
+    );
     const headers: Record<string, string> = {};
     if (options.json !== undefined) headers['content-type'] = 'application/json';
     // Login/signup/logout identify the caller by their body or cookie, never a configured token.
@@ -144,7 +217,7 @@ export class ForgeRequester {
       url: options.url,
       method: options.method,
       headers,
-      credentials: cookies ? 'include' : 'omit',
+      credentials: cookies && !this.env.onServer ? 'include' : 'omit',
       ...(body !== undefined && { body }),
       ...(options.signal !== undefined && { signal: options.signal })
     };
@@ -152,8 +225,38 @@ export class ForgeRequester {
 
   /** Sends and returns the parsed JSON body (`undefined` for a `204`). Never retries. */
   async send(options: SendOptions): Promise<unknown> {
+    const signal = combineSignals(options.signal, this.env.lifetime);
+    const sending = { ...options, signal };
+    // A server render without `provideForgeCmsServer` has no origin for a relative URL: fail before any
+    // request rather than letting `fetch` guess (spec 078). A custom transport may route it in-process.
+    if (
+      this.env.onServer &&
+      this.env.server === null &&
+      this.config?.transport === undefined &&
+      !isAbsolute(options.url)
+    ) {
+      throw new ForgeApiError({
+        kind: 'network',
+        code: 'SERVER_ORIGIN_REQUIRED',
+        message: `${options.failure}: no server origin is configured for server rendering (provideForgeCmsServer)`
+      });
+    }
+    // The owning server application is gone: nothing it starts may reach the network.
+    if (this.env.lifetime?.aborted) throw abortedError(options, this.env.lifetime.reason);
+    const release = this.env.track?.();
+    try {
+      return await this.dispatch(sending);
+    } finally {
+      release?.();
+    }
+  }
+
+  private async dispatch(options: SendOptions): Promise<unknown> {
     const request = this.buildRequest(options);
-    const transport = this.config?.transport ?? fetchTransport;
+    const transport =
+      this.config?.transport ??
+      this.env.server?.transport ??
+      (this.env.onServer ? noRedirectFetchTransport : fetchTransport);
 
     let response: Response;
     try {

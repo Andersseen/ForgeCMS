@@ -13,3 +13,8 @@ pages_build_output_dir = "dist/analog/public"
 binding = "DB"
 database_name = "forge-cms-tiny-project"
 database_id = "00000000-0000-0000-0000-000000000001"
+
+# SSR (spec 078): where the server render reaches this app's own `/api/*` routes — `wrangler pages dev`'s
+# default address. A production render without it fails instead of guessing from the Host header.
+[vars]
+FORGE_SSR_ORIGIN = "http://127.0.0.1:8788"

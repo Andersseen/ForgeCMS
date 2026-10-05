@@ -101,6 +101,11 @@ jobs:
       - name: Angular compatibility matrix (strict packed consumers)
         run: pnpm release:compat
 
+      # Spec 078 (roadmap S01): a strict packed Analog SSR consumer, production-built and served by
+      # `node`; concurrent anonymous/A/B renders over real HTTP, linked bundles, no server code in the browser.
+      - name: Packed production SSR consumer
+        run: pnpm release:ssr
+
       # One install is enough: www, tiny-project and demo-aesthetics pin the same @playwright/test
       # version, so they share the browser cache. Filtering all three ran three `--with-deps`
       # installs in parallel and they raced for the apt lock (E: Could not get lock
