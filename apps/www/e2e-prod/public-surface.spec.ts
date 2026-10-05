@@ -132,12 +132,20 @@ test('keyboard focus reaches the header controls and is visible', async ({ page 
   expect(seen.some((name) => /Docs/.test(name))).toBe(true);
 });
 
-test('reduced motion renders the pipeline statically', async ({ browser }) => {
+test('reduced motion keeps the product showcase usable without continuous animation', async ({
+  browser
+}) => {
   const context = await browser.newContext({ reducedMotion: 'reduce' });
   const page = await context.newPage();
   const problems = guardConsole(page);
   await page.goto('/');
-  await expect(page.getByText('Live content pipeline')).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Schema' })).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('tab', { name: 'Content', exact: true }).click();
+  await expect(page.getByRole('tab', { name: 'Content', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true'
+  );
+  await expect(page.getByRole('tabpanel')).toBeVisible();
   const running = await page.evaluate(
     () =>
       document
