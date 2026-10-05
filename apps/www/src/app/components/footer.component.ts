@@ -17,11 +17,11 @@ import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
           <h2
             class="max-w-[16ch] text-3xl font-semibold leading-tight tracking-[-0.04em] md:text-4xl"
           >
-            Read the model. Then change it live.
+            Your next project starts with your content.
           </h2>
           <p class="mt-3 max-w-xl leading-7 text-muted-foreground">
-            The documentation explains the contracts; the Lumea clinic shows what they feel like in
-            a real Angular application.
+            Get to know the model, explore a working project, and build a content system that
+            belongs in your Angular application.
           </p>
         </div>
         <div class="flex flex-col gap-3 sm:flex-row">

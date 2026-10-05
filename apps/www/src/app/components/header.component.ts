@@ -1,17 +1,32 @@
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, viewChild } from '@angular/core';
+import type { ElementRef } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { VoltNativeButton } from '@voltui/components';
 import { LmnArrowTopRightOnSquareIcon } from 'lumen-icons/arrow-top-right-on-square';
 import { LmnBars3Icon } from 'lumen-icons/bars-3';
+import { SiteThemeService } from '../site-theme.service';
+import { LmnSunIcon } from 'lumen-icons/sun';
+import { LmnMoonIcon } from 'lumen-icons/moon';
 import { LmnXMarkIcon } from 'lumen-icons/x-mark';
 
 @Component({
   selector: 'forge-cms-header',
   standalone: true,
-  imports: [RouterLink, VoltNativeButton, LmnArrowTopRightOnSquareIcon, LmnBars3Icon, LmnXMarkIcon],
+  imports: [
+    RouterLink,
+    VoltNativeButton,
+    LmnArrowTopRightOnSquareIcon,
+    LmnBars3Icon,
+    LmnXMarkIcon,
+    LmnSunIcon,
+    LmnMoonIcon
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <header class="forge-header sticky top-0 z-40 border-b border-border/70 bg-background/88">
+    <header
+      class="forge-header sticky top-0 z-40 border-b border-border/70 bg-background/88"
+      (keydown.escape)="dismiss()"
+    >
       <div class="mx-auto flex min-h-18 w-full max-w-7xl items-center justify-between px-5 md:px-8">
         <a
           class="group flex items-center gap-3 text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
@@ -34,7 +49,7 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
           <a class="forge-nav-link" routerLink="/docs">Docs</a>
         </nav>
 
-        <div class="hidden md:flex">
+        <div class="hidden items-center gap-3 md:flex">
           <a
             voltButton
             variant="outline"
@@ -46,9 +61,27 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
             GitHub
             <lmn-arrow-top-right-on-square [size]="16" ariaLabel="Opens in a new tab" />
           </a>
+          <a voltButton size="sm" routerLink="/docs/small-project-guide">Get started</a>
         </div>
 
         <button
+          voltButton
+          variant="ghost"
+          size="icon"
+          type="button"
+          class="forge-theme-toggle"
+          [attr.aria-label]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
+          (click)="theme.toggle()"
+        >
+          @if (theme.isDark()) {
+            <lmn-sun [size]="20" />
+          } @else {
+            <lmn-moon [size]="20" />
+          }
+        </button>
+
+        <button
+          #menuTrigger
           voltButton
           variant="ghost"
           size="icon"
@@ -96,7 +129,15 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
   `
 })
 export class HeaderComponent {
+  protected readonly theme = inject(SiteThemeService);
   protected readonly open = signal(false);
+  private readonly menuTrigger = viewChild<ElementRef<HTMLButtonElement>>('menuTrigger');
+
+  protected dismiss(): void {
+    if (!this.open()) return;
+    this.close();
+    this.menuTrigger()?.nativeElement.focus();
+  }
 
   protected toggle(): void {
     this.open.update((value) => !value);

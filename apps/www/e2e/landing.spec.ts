@@ -6,19 +6,20 @@ test('presents ForgeCMS as an Angular-native product', async ({ page }) => {
 
   await expect(page).toHaveTitle(/Angular-native headless CMS/);
   await expect(
-    page.getByRole('heading', { name: 'The Angular CMS that stays in your application.' })
+    page.getByRole('heading', { name: 'Your content. Your code. Your Angular.' })
   ).toBeVisible();
-  await expect(page.getByText('Live content pipeline')).toBeVisible();
-  await expect(page.getByText('Schema', { exact: true })).toBeVisible();
-  await expect(page.getByText('Runtime', { exact: true })).toBeVisible();
-  await expect(page.getByText('Admin', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('Install command')).toContainText('@forge-cms/runtime');
+  await expect(page.getByRole('tab', { name: 'Schema', exact: true })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Content', exact: true })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'API', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Install command', { exact: true })).toContainText(
+    '@forge-cms/runtime'
+  );
 });
 
 test('global navigation gives Product, Demo and Docs equal routes', async ({ page }) => {
   await page.goto('/');
 
-  const header = page.locator('header');
+  const header = page.locator('.forge-header');
   await expect(header.getByRole('link', { name: 'Product', exact: true })).toHaveAttribute(
     'href',
     new RegExp('/#product$')
@@ -120,3 +121,131 @@ test('footer keeps the project destinations available', async ({ page }) => {
     'https://www.npmjs.com/org/forge-cms'
   );
 });
+
+test('showcase connects the schema, content and API without a mutation', async ({ page }) => {
+  const mutations: string[] = [];
+  page.on('request', (request) => {
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method()))
+      mutations.push(request.url());
+  });
+  await page.goto('/');
+  const schema = page.getByRole('tab', { name: 'Schema', exact: true });
+  const content = page.getByRole('tab', { name: 'Content', exact: true });
+  const api = page.getByRole('tab', { name: 'API', exact: true });
+  await expect(schema).toHaveAttribute('aria-selected', 'true');
+  const schemaPanel = page.getByRole('tabpanel');
+  await expect(schemaPanel).toHaveAttribute(
+    'id',
+    (await schema.getAttribute('aria-controls')) ?? ''
+  );
+  await expect(schemaPanel).toContainText('defineCollection');
+  await schema.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(content).toBeFocused();
+  await expect(content).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tabpanel')).toContainText('A home for your next idea');
+  await expect(page.getByRole('tabpanel')).toContainText('a-home-for-your-next-idea');
+  await page.keyboard.press('End');
+  await expect(api).toBeFocused();
+  await expect(page.getByRole('tabpanel')).toContainText('"data"');
+  await expect(page.getByRole('tabpanel')).toContainText('a-home-for-your-next-idea');
+  await page.keyboard.press('Home');
+  await expect(schema).toBeFocused();
+  await expect(schema).toHaveAttribute('aria-selected', 'true');
+  expect(mutations).toEqual([]);
+});
+
+test('copy command reports success and provides a fallback on clipboard denial', async ({
+  page
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: (text: string) => {
+          sessionStorage.setItem('copied-command', text);
+          return Promise.resolve();
+        }
+      }
+    });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Copy install command' }).click();
+  await expect(page.getByRole('status')).toHaveText('Copied');
+  expect(await page.evaluate(() => sessionStorage.getItem('copied-command'))).toContain(
+    '@forge-cms/runtime'
+  );
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: () => Promise.reject(new Error('Denied')) }
+    });
+  });
+  await page.getByRole('button', { name: 'Copy install command' }).click();
+  await expect(page.getByRole('status')).toHaveText('Select and copy the command');
+  await expect(page.getByLabel('Install command', { exact: true })).toBeVisible();
+});
+
+test('mobile menu closes on Escape and navigation, and restores focus on Escape', async ({
+  page
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  const trigger = page.getByRole('button', { name: 'Toggle navigation' });
+  await trigger.click();
+  await page
+    .getByRole('navigation', { name: 'Mobile' })
+    .getByRole('link', { name: 'Demo', exact: true })
+    .focus();
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await trigger.click();
+  await page
+    .getByRole('navigation', { name: 'Mobile' })
+    .getByRole('link', { name: 'Product', exact: true })
+    .click();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('skip link reaches the single main landmark', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Skip to content' })).toBeAttached();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('link', { name: 'Skip to content' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('main')).toBeFocused();
+  await expect(page.getByRole('main')).toHaveCount(1);
+});
+
+for (const width of [390, 768, 1440, 1920]) {
+  test(`all showcase views fit at ${width}px with reduced motion`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    for (const name of ['Schema', 'Content', 'API']) {
+      await page.getByRole('tab', { name, exact: true }).click();
+      await expect(page.getByRole('tabpanel')).toBeVisible();
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+        )
+      ).toBeLessThanOrEqual(1);
+      expect(
+        await page.locator('.forge-showcase').evaluate((el) => getComputedStyle(el).opacity)
+      ).toBe('1');
+      expect(
+        await page
+          .locator('.forge-showcase-view')
+          .evaluate((el) =>
+            el
+              .getAnimations()
+              .every((animation) => Number(animation.effect?.getTiming().duration ?? 0) <= 1)
+          )
+      ).toBe(true);
+      expect(
+        await page.locator('.forge-showcase-view').evaluate((el) => getComputedStyle(el).opacity)
+      ).toBe('1');
+    }
+  });
+}

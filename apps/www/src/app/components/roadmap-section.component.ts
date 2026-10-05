@@ -27,11 +27,11 @@ const STATUS_LABELS: Record<MilestoneStatus, string> = {
             <h2
               class="mt-5 max-w-[14ch] text-4xl font-semibold leading-[1.05] tracking-[-0.045em] md:text-5xl"
             >
-              Finish the guarantees, then call it stable.
+              Built in the open. Getting stronger.
             </h2>
             <p class="mt-5 max-w-[48ch] leading-7 text-white/65">
-              ForgeCMS is not racing toward a feature count. Each checkpoint turns an existing
-              capability into something an Angular team can rely on.
+              The foundations below are complete. Safe SSR and hydration, portable S3 storage and
+              admin certification are the next steps toward 1.0. ForgeCMS remains experimental.
             </p>
             <a
               voltButton

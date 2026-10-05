@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, DOCUMENT, inject } from '@angular/c
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Meta } from '@angular/platform-browser';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
+import { SiteThemeService } from './site-theme.service';
 import { filter } from 'rxjs';
 
 const SITE_ORIGIN = 'https://forge-cms.pages.dev';
@@ -16,6 +17,7 @@ const DEFAULT_DESCRIPTION =
   template: `<router-outlet />`
 })
 export class AppComponent {
+  private readonly theme = inject(SiteThemeService);
   private readonly document = inject(DOCUMENT);
   private readonly meta = inject(Meta);
 
@@ -29,6 +31,7 @@ export class AppComponent {
         takeUntilDestroyed()
       )
       .subscribe((event) => {
+        this.theme.restore();
         const path = event.urlAfterRedirects.split(/[?#]/)[0] ?? '/';
         const url = `${SITE_ORIGIN}${path}`;
         this.document.querySelector('link[rel="canonical"]')?.setAttribute('href', url);

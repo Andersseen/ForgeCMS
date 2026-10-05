@@ -9,11 +9,10 @@
  * `0.8.0` carries M01, `0.8.1` added M02's code (its changelog entry is in `0.8.2`); roadmap `0.8`
  * (Angular DX) will publish as npm `0.9.0` — see `ROADMAP_MILESTONES` and docs/STATE.md.
  *
- * Verified 2026-10-04 (spec 077): npm `latest` is `0.9.1`, published 2026-10-04T16:12Z by the
- * release job of the PR #66 merge run (`0.9.0` — C01 + C02 — was published at 06:51Z by the PR #64
- * merge run). Roadmap 0.8 C03 publishes with the next `0.9.x` patch.
+ * Verified 2026-10-05 (spec 079): `pnpm view @forge-cms/core version` reports `0.9.3`.
+ * The website reports the published fixed-group release, independently of unmerged roadmap work.
  */
-export const CURRENT_FORGE_VERSION = '0.9.1';
+export const CURRENT_FORGE_VERSION = '0.9.3';
 
 export interface ForgePackage {
   /** The name after `@forge-cms/`. */
