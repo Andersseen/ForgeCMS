@@ -33,7 +33,7 @@ schema-to-content demonstration and reach the real demo or getting-started guide
 - No live mutation, login or remote API request from the homepage showcase.
 - No documentation content rewrite, new public routes, translation system or dependency upgrades.
 - No fabricated customer logos, testimonials, usage numbers, latency claims or enterprise promises.
-- No blog, pricing page, account funnel, theme toggle or analytics expansion.
+- No blog, pricing page, account funnel, analytics expansion.
 - No production deployment, remote migrations or release publication in this PR.
 
 ## Design
@@ -150,6 +150,28 @@ including the distinction between API version history and admin history UI. Upda
 patch release” wording only after verifying the feature is released. Keep package versions derived
 from FORGE_PACKAGES and CURRENT_FORGE_VERSION. No dependency or lockfile change is expected.
 
+### Maintainer-approved shared light/dark theme (2026-10-05)
+
+The maintainer reviewed PR #73 and explicitly requested a shared, user-selected light/dark theme:
+Home, Demo and Docs must no longer look like separate themes. This supersedes the earlier fixed
+ink hero / paper reading-surface treatment and the theme-toggle non-goal.
+
+- Add one app-local `SiteThemeService` with `toggle()`, `restore()` and an `isDark` signal; use
+  VoltUI `applyVoltTheme` and its standard `.dark` class, not a second component theme engine.
+- Default to the OS preference until the user chooses light or dark. Persist explicit choices under
+  the existing `forgecms-theme` key so the app-local public shell and the existing admin agree.
+  Invalid or unavailable storage falls back safely; switching still works when storage is blocked.
+- Render an accessible Volt button with Lumen sun/moon icons in the shared header, available on
+  desktop and mobile, labelled with the action (“Switch to dark/light mode”).
+- Initialise the root theme before first paint in index.html; restore it in the Angular shell and
+  on route navigation. Honour OS changes when there is no explicit choice. No backend/API changes.
+- Home, Demo and Docs share a scoped `forge-public` palette. Convert fixed backgrounds, text,
+  showcase/editor panels, Local API illustration, demo source panel, footer and docs code colours
+  to the selected theme. Retain the logo and violet/cyan brand accents with accessible variants.
+- Add browser tests for both themes across all three routes, reload persistence, mobile control,
+  system default/change, invalid/blocked storage and early bootstrap. Review both palettes at
+  mobile/desktop sizes and re-run existing gates and www e2e. Keep this work in PR #73.
+
 ## Implementation plan
 
 - [x] Create feature/spec-079-official-web-redesign from main; visually inspect references and current
@@ -163,6 +185,8 @@ from FORGE_PACKAGES and CURRENT_FORGE_VERSION. No dependency or lockfile change 
 - [x] Run formatting, full quality gates and www e2e; update STATE.md and record outcome/evidence.
       No changeset is required because packages/\* is out of scope.
 - [x] Open one PR into main containing only the official-site work and its spec/status documentation.
+
+- [x] Implement and validate the maintainer-approved shared theme follow-up above.
 
 ## Test plan
 
@@ -219,6 +243,13 @@ Evidence by acceptance criterion:
    hits for unaffected packages. Integration tests require local socket access; the first sandboxed
    test run failed with `listen EPERM`, and the authorised rerun passed.
 
-No scope divergence, dependency upgrade, package change, changeset or deployment. Screenshot
+The maintainer-approved theme amendment is implemented in the same PR: shared public palette,
+header control, persisted choice, OS fallback/change handling and early theme bootstrap. Home,
+Demo and Docs were visually inspected in light and dark at 390/1440px. `e2e/theme.spec.ts` covers
+both palettes (including the Content preview), route/reload persistence, mobile, system changes,
+invalid/blocked storage and theme application before Angular starts. www e2e now passes **41/41**;
+format:check and the full lint/typecheck/test/build gates pass after the amendment.
+
+No unapproved scope divergence, dependency upgrade, package change, changeset or deployment. Screenshot
 artifacts are local review evidence in `/tmp/forge-final-*.png` and `/tmp/forge-showcase-*.png`;
 they are not production assets or committed files.

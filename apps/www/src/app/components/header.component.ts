@@ -1,15 +1,26 @@
-import { ChangeDetectionStrategy, Component, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, viewChild } from '@angular/core';
 import type { ElementRef } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { VoltNativeButton } from '@voltui/components';
 import { LmnArrowTopRightOnSquareIcon } from 'lumen-icons/arrow-top-right-on-square';
 import { LmnBars3Icon } from 'lumen-icons/bars-3';
+import { SiteThemeService } from '../site-theme.service';
+import { LmnSunIcon } from 'lumen-icons/sun';
+import { LmnMoonIcon } from 'lumen-icons/moon';
 import { LmnXMarkIcon } from 'lumen-icons/x-mark';
 
 @Component({
   selector: 'forge-cms-header',
   standalone: true,
-  imports: [RouterLink, VoltNativeButton, LmnArrowTopRightOnSquareIcon, LmnBars3Icon, LmnXMarkIcon],
+  imports: [
+    RouterLink,
+    VoltNativeButton,
+    LmnArrowTopRightOnSquareIcon,
+    LmnBars3Icon,
+    LmnXMarkIcon,
+    LmnSunIcon,
+    LmnMoonIcon
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header
@@ -52,6 +63,22 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
           </a>
           <a voltButton size="sm" routerLink="/docs/small-project-guide">Get started</a>
         </div>
+
+        <button
+          voltButton
+          variant="ghost"
+          size="icon"
+          type="button"
+          class="forge-theme-toggle"
+          [attr.aria-label]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
+          (click)="theme.toggle()"
+        >
+          @if (theme.isDark()) {
+            <lmn-sun [size]="20" />
+          } @else {
+            <lmn-moon [size]="20" />
+          }
+        </button>
 
         <button
           #menuTrigger
@@ -102,6 +129,7 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
   `
 })
 export class HeaderComponent {
+  protected readonly theme = inject(SiteThemeService);
   protected readonly open = signal(false);
   private readonly menuTrigger = viewChild<ElementRef<HTMLButtonElement>>('menuTrigger');
 

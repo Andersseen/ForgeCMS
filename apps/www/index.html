@@ -2,6 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <script>
+      (() => {
+        let theme;
+        try {
+          theme = localStorage.getItem('forgecms-theme');
+        } catch {}
+        const dark =
+          theme === 'dark' ||
+          (theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', dark);
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+      })();
+    </script>
     <title>ForgeCMS — the Angular-native headless CMS</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta

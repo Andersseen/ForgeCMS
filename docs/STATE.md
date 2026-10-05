@@ -17,14 +17,20 @@ Implemented on `feature/spec-079-official-web-redesign` — [PR #73](https://git
   an interactive VoltUI Schema / Content / API showcase driven by one static, explicitly illustrative
   record. Angular Movement handles one entrance and user-triggered view transitions; Lumen Icons
   supplies interface symbols. No live mutation or new backend behaviour.
+- Maintainer follow-up: **Home, Demo and Docs share light/dark themes**, with a VoltUI header
+  selector and Lumen sun/moon icons on mobile/desktop. Explicit choices persist under the existing
+  `forgecms-theme` key; system preference is the default, storage errors are tolerated and an early
+  bootstrap applies the choice before Angular renders. Panels, code, footer and navigation follow
+  the same palette. No package/admin implementation changes.
 - Copyable install command with success/denial feedback; keyboard-operable tabs, skip link, sticky
   homepage header and mobile Escape/focus handling. Revised capabilities, Lumea invitation, packages,
   readiness and final actions. Marketing styles remain isolated from admin and docs prose.
 - Website release source updated to **0.9.3**, verified with `pnpm view @forge-cms/core version` on
   2026-10-05; reviewed migrations no longer claim they await a patch release. Older release entries
   below remain historical evidence, not the current npm version.
-- Gates: format:check, lint, typecheck, test, build and www e2e **33/33** pass. Visual inspection:
-  all three showcase views and full page at 390/768/1440/1920px, reduced motion and keyboard checks.
+- Gates: format:check, lint, typecheck, test, build and www e2e **41/41** pass. Visual inspection:
+  all three showcase views and full page at 390/768/1440/1920px, reduced motion and keyboard checks;
+  both themes across Home/Demo/Docs at 390/1440px.
   Initial sandboxed integration tests failed on local socket permissions; authorised rerun passed.
 - Scope: `apps/www` public presentation and spec/status docs only. Packages, other apps, backend,
   dependency manifests and lockfile unchanged; no changeset or deployment.

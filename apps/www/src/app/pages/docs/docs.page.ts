@@ -18,7 +18,7 @@ import { DocsSidebarComponent } from './docs-sidebar.component';
   imports: [RouterOutlet, HeaderComponent, DocsSidebarComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="min-h-screen bg-background">
+    <div class="forge-public min-h-screen bg-background">
       <forge-cms-header />
       <div
         class="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-8 md:flex-row md:gap-12 md:px-8 md:py-12"

@@ -21,7 +21,7 @@ import { RoadmapSectionComponent } from '../components/roadmap-section.component
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="forge-marketing landing-bg">
+    <div class="forge-public forge-marketing landing-bg">
       <a class="forge-skip-link" href="#main-content">Skip to content</a>
       <forge-cms-header />
       <main id="main-content" tabindex="-1">
