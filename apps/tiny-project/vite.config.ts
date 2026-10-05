@@ -6,7 +6,8 @@ import { angularLinker } from '@forge-cms/admin/vite';
 export default defineConfig({
   plugins: [
     angularLinker(),
-    analog({ ssr: false, nitro: { preset: 'cloudflare-pages' } }),
+    // SSR (spec 078). `prerender.routes: []`: no build-time render of `/` against an empty build database.
+    analog({ ssr: true, prerender: { routes: [] }, nitro: { preset: 'cloudflare-pages' } }),
     tsconfigPaths()
   ],
   optimizeDeps: {
@@ -21,7 +22,8 @@ export default defineConfig({
     exclude: ['@angular/compiler']
   },
   ssr: {
-    noExternal: ['@angular/**', 'zone.js', 'rxjs']
+    // `rxjs` stays external under SSR: inlining it makes Vite's SSR runner evaluate its CommonJS build.
+    noExternal: ['@angular/**', 'zone.js']
   },
   test: {
     // The slow real-libSQL suite is excluded by the `test` npm script's own `--exclude` flag

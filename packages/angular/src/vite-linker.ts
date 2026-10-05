@@ -5,6 +5,9 @@ import type { Plugin } from 'vite';
 
 const JS_FILE = /\.[cm]?js$/;
 
+/** Forge's partially compiled Angular packages. */
+const FORGE_ANGULAR_PACKAGES = ['@forge-cms/angular', '@forge-cms/admin'] as const;
+
 /**
  * A Vite plugin required by every Vite/Analog app that consumes `@forge-cms/angular` or
  * `@forge-cms/admin` (or any other Angular library built with `compilationMode: "partial"`, the
@@ -27,6 +30,9 @@ const JS_FILE = /\.[cm]?js$/;
  * });
  * ```
  *
+ * With SSR (spec 078) it also marks `@forge-cms/angular` and `@forge-cms/admin` as `ssr.noExternal`, so
+ * the server build links them too — no extra Vite configuration is needed.
+ *
  * `@forge-cms/admin/vite` re-exports the same plugin. Requires `@angular/compiler-cli`, `@babel/core`
  * and `vite` in the consumer's own devDependencies (optional peer dependencies of this package — only
  * needed if this subpath is actually imported).
@@ -34,6 +40,12 @@ const JS_FILE = /\.[cm]?js$/;
 export function angularLinker(): Plugin {
   return {
     name: 'forge-cms:angular-linker',
+    // A server (SSR) build externalizes `node_modules` by default, so Forge's packages would be loaded
+    // by the server unlinked and every render would fail with `JIT compiler unavailable` (spec 078).
+    // Bundling them lets this plugin link them on the server too. Vite merges the array with the app's.
+    config() {
+      return { ssr: { noExternal: [...FORGE_ANGULAR_PACKAGES] } };
+    },
     async transform(code, id) {
       const path = id.split('?')[0] ?? id;
       if (!JS_FILE.test(path) || !needsLinking(path, code)) {

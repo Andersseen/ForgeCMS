@@ -47,6 +47,14 @@ post lifecycle (create/draft-hidden/publish/edit/delete), the author relation, a
 - **Admin:** `@forge-cms/admin`'s auth, content and users routes, with no host CRUD pages.
 - **Relations:** `post.author -> users`, populated with `depth=1` according to the caller's access.
 - **Strata read controllers:** `GET /api/v1/:collection` and `GET /api/v1/:collection/:id`.
+- **Server rendering (spec 078):** `ssr: true`. `src/main.server.ts` renders each request with
+  Angular's `renderApplication`, the request's headers as `REQUEST`, and
+  `provideForgeCmsServer({ origin })` (`FORGE_SSR_ORIGIN`, or `http://127.0.0.1:5175` under `pnpm dev`; a
+  production render without it fails). The public pages read through `collectionResource` with their own
+  anonymous client (route-level `provideForgeCms({ credentials: 'omit' })`), so the server HTML and the
+  browser both show published content only. No hydration transfer yet (S02): the browser fetches again.
+  `src/tests/ssr-isolation.integration.test.ts` proves concurrent anonymous / A / B renders stay
+  isolated; the e2e checks the no-JS HTML. `/api/site/*` remain the Local API server-route example.
 
 ## Strata (experimental integration)
 

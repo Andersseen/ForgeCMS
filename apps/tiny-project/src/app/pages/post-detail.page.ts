@@ -1,14 +1,8 @@
-import { ChangeDetectionStrategy, Component, effect, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { collectionResource } from '@forge-cms/angular';
 
-interface PublicPost {
-  id: string;
-  title: string;
-  slug: string;
-  body?: unknown;
-  author?: { name?: string; email?: string } | string | null;
-}
-
+/** One published post by slug, author populated (`depth: 1`) — SSR-safe like the home page. */
 @Component({
   selector: 'tiny-post-detail-page',
   standalone: true,
@@ -20,53 +14,46 @@ interface PublicPost {
       <a routerLink="/admin">Admin</a>
     </nav>
 
-    @if (loading()) {
-      <p>Loading…</p>
-    } @else if (error(); as message) {
-      <p class="tiny-error">{{ message }}</p>
-    } @else if (post(); as p) {
-      <h1>{{ p.title }}</h1>
-      @if (authorLabel(); as author) {
-        <p>
-          <em>By {{ author }}</em>
-        </p>
+    @if (result.error(); as error) {
+      <p class="tiny-error">{{ error.message }}</p>
+    } @else if (result.value()) {
+      @if (post(); as p) {
+        <h1>{{ p['title'] }}</h1>
+        @if (authorLabel(); as author) {
+          <p>
+            <em>By {{ author }}</em>
+          </p>
+        }
+      } @else {
+        <p class="tiny-error">Not found</p>
       }
+    } @else {
+      <p>Loading…</p>
     }
   `
 })
 export class PostDetailPage {
   readonly slug = input.required<string>();
 
-  protected readonly post = signal<PublicPost | null>(null);
-  protected readonly loading = signal(true);
-  protected readonly error = signal<string | null>(null);
+  protected readonly result = collectionResource(() => ({
+    collection: 'posts',
+    where: { slug: this.slug() },
+    limit: 1,
+    depth: 1 as const
+  }));
 
-  constructor() {
-    // A required `input()` signal has no value until Angular assigns it after construction —
-    // reading it synchronously in the constructor body throws. `effect()` defers until inputs are
-    // actually set, matching the pattern apps/demo-aesthetics's own post-detail page already uses.
-    effect(() => {
-      const slug = this.slug();
-      fetch(`/api/site/posts/${encodeURIComponent(slug)}`)
-        .then((res) => {
-          if (!res.ok)
-            throw new Error(res.status === 404 ? 'Not found' : `Request failed: ${res.status}`);
-          return res.json() as Promise<{ data: PublicPost }>;
-        })
-        .then((body) => this.post.set(body.data))
-        .catch((err: unknown) =>
-          this.error.set(err instanceof Error ? err.message : 'Unknown error')
-        )
-        .finally(() => this.loading.set(false));
-    });
-  }
+  protected readonly post = computed(() => this.result.value()?.docs[0] ?? null);
 
-  protected authorLabel(): string | null {
-    const author = this.post()?.author;
+  protected readonly authorLabel = computed(() => {
+    const author = this.post()?.['author'] as
+      | { name?: string; email?: string }
+      | string
+      | null
+      | undefined;
     if (!author) return null;
     if (typeof author === 'string') return author;
     // `name` is optional and stored as `''` (not absent) when never set — `||` falls through an
     // empty string to `email`, unlike `??`, which only falls through null/undefined.
     return author.name || author.email || null;
-  }
+  });
 }

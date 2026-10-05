@@ -33,6 +33,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    },
     "./vite": {
       "types": "./dist/vite-linker.d.ts",
       "default": "./dist/vite-linker.js"
@@ -62,6 +66,7 @@
     "@angular/compiler-cli": "21.2.10",
     "@angular/core": "21.2.10",
     "@angular/platform-browser": "21.2.10",
+    "@angular/platform-server": "21.2.10",
     "@angular/router": "21.2.10",
     "@babel/core": "7.29.0",
     "@types/babel__core": "7.20.5",

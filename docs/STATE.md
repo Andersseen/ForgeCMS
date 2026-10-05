@@ -1,12 +1,62 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-05 (CI deploy health gate fixed: cold-start D1 round trips cut from ~100 to a
-> handful; spec 077 / C03 merged — roadmap 0.8 complete; next is roadmap 0.9 / S01).**
+> **Last updated: 2026-10-05 (spec 078 / roadmap 0.9 S01 — request-scoped server transport and SSR identity
+> isolation — implemented on its branch; next is roadmap 0.9 / S02).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Request-scoped server transport and SSR identity isolation — S01 (spec 078, 2026-10-05)
+
+Branch `feature/spec-078-request-scoped-server-transport`. Spec:
+[docs/specs/078-request-scoped-server-transport.md](specs/078-request-scoped-server-transport.md). Guide:
+`apps/www/src/content/docs/ssr.md` (`/docs/ssr`). **S02 (hydration/transfer) and S03 not started.**
+
+- **Problem found:** nothing in `@forge-cms/angular` had run on a server. Relative `/api/v1` cannot resolve
+  without `location` (every resource errored), a server has no cookie jar (identity undefined), the C01
+  credential rule fell back to `globalThis.location`, requests were not `PendingTasks` (a zoneless render
+  could serialize "Loading…"), and nothing aborted a render's direct requests on teardown.
+- **Design:** Angular 21.2.10's `renderApplication` builds a new platform + root injector per request
+  (verified in source), so `CmsApiService`/`ForgeAuthSession`/resources are already per render. New
+  `@forge-cms/angular/server` → `provideForgeCmsServer({ origin, forwardCookies?, forwardAuthorization? })`,
+  resolved per render from Angular's standard `REQUEST` token: explicit validated origin (never `Host`/
+  `Forwarded`), anonymous by default, listed cookies → configured origin only, `Authorization` (opt-in) →
+  origin + `trustedOrigins`, no redirects followed, `authToken` + forwarding refused, a `credentials:
+'omit'` client gets no forwarded cookie. Server platform: `PendingTasks`, abort on destroy, `SERVER_ORIGIN_REQUIRED` without the
+  provider. The implementation sits behind an internal token (`server-token.ts`) so browser bundles that
+  don't import `/server` don't contain it. No module-global request/user state; the isolate-level
+  `ForgeCmsRuntime` cache is unchanged (identity per operation).
+- **Linker:** `angularLinker()` now sets `ssr.noExternal` for `@forge-cms/angular`/`@forge-cms/admin` — an
+  externalized, unlinked copy failed every SSR render with a JIT error (found by the packed consumer).
+- **Paths:** server routes → Local API with explicit `user`/`overrideAccess: false`; Angular components →
+  `CmsApiService` + `provideForgeCmsServer`. Documented, not forced either way.
+- **tiny-project:** `ssr: true` (`prerender.routes: []`), real `main.server.ts` (`REQUEST` + per-render
+  provider, `FORGE_SSR_ORIGIN` / dev origin), public pages on `collectionResource` with a route-level
+  anonymous client (`provideForgeCms({ credentials: 'omit' })`, preserving "public pages read as
+  anonymous even for a signed-in editor"); `@angular/platform-server` added. `www`/`demo` unchanged (SPA).
+- **Evidence (newly executed 2026-10-05):** `server-transport.test.ts` (33, real `platformServer`, Forge
+  access to `window`/`location`/`document` fails the test); `ssr-isolation.integration.test.ts` (7: real
+  runtime + handlers over HTTP, anonymous/A/B by cookie and Bearer across all 6 completion orders × 3, a
+  failing and an aborted render, distinct instances, Local API with zero HTTP hits; a mutation that caches
+  the context globally fails 4/7); tiny-project e2e no-JS HTML; `pnpm release:ssr` (new, CI): strict packed
+  Analog 2.5.2 node-server consumer, 45 concurrent anonymous/A/B renders, linked browser+server bundles,
+  no server code/secret in the browser. Manual: tiny-project production build served by `wrangler pages
+dev` (local workerd + D1) rendered a published post server-side.
+- **Gates:** format:check, lint, typecheck, test, build, check:api (only `@forge-cms/angular/server`
+  added), release:verify, release:compat 5/5, release:ssr, e2e:www 25/25, e2e:demo 29/29,
+  e2e:tiny-project 14/14, test:cloudflare, test:libsql — all newly run. test:upgrade not run (no
+  schema/backend change; inherited from CI).
+- **Release truth (2026-10-05):** npm `latest` = `0.9.2` (published by PR #68's run; its deploy jobs failed
+  on the old health timeout). PR #69's main run (37288736715) passed every job incl. both deploy gates, so
+  the timeout did not recur. Version Packages PR #70 (→ `0.9.3`, the `@forge-cms/db` patch) is open. This
+  branch adds a **minor** changeset for `@forge-cms/angular` (fixed group → `0.10.0`).
+- **Finding (not S01):** `@forge-cms/db`'s entry statically imports `@libsql/client`, so a Node/Nitro
+  consumer using only InMemory still loads native `libsql`, which Nitro's tracer misses. The packed
+  consumer works around it (inline + alias); a follow-up task is suggested.
+- **Not done (by design):** TransferState/hydration (S02), production journey/deployed profiles (S03),
+  Cloudflare self-subrequest on a deployed project, admin SSR.
 
 ## Cold-start D1 round trips — CI deploy health gate (2026-10-05)
 

@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { APIRequestContext, Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 
 /**
@@ -49,6 +49,26 @@ test('anonymous cannot reach a nested admin URL; the public site shows no posts 
   await expect(page.getByText('No published posts yet.')).toBeVisible();
 });
 
+/** The server-rendered HTML of `path`, as a client without JavaScript (or cookies) receives it. */
+async function serverHtml(request: APIRequestContext, path: string): Promise<string> {
+  const response = await request.get(path, { headers: { accept: 'text/html' } });
+  expect(response.status()).toBe(200);
+  return response.text();
+}
+
+test('SSR (spec 078): the server renders the resolved public page, not a loading state', async ({
+  request
+}) => {
+  const html = await serverHtml(request, '/');
+  expect(html).toContain('<tiny-home-page>');
+  expect(html).toContain('No published posts yet.');
+  expect(html).not.toContain('Loading…');
+  expect(html).not.toContain('SERVER_ORIGIN_REQUIRED');
+
+  const missing = await serverHtml(request, '/posts/does-not-exist');
+  expect(missing).toContain('Not found');
+});
+
 test('first-run bootstrap creates the admin and signs them straight in', async ({ page }) => {
   await page.goto('/setup');
   await page.locator('input[name="email"]').fill(ADMIN_EMAIL);
@@ -75,7 +95,8 @@ test('a second bootstrap attempt is refused once an admin exists', async ({ page
 });
 
 test('content admin: create a post with a relation, verify draft is hidden, publish, edit', async ({
-  page
+  page,
+  playwright
 }) => {
   const title = `Tiny Post ${Date.now()}`;
   const slug = `tiny-post-${Date.now()}`;
@@ -118,6 +139,15 @@ test('content admin: create a post with a relation, verify draft is hidden, publ
   await page.getByRole('link', { name: title }).click();
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
   await expect(page.getByText(/admin@tiny\.e2e\.test/)).toHaveCount(0);
+
+  // The same content is in the server-rendered HTML (spec 078), read as anonymous: no JS, no cookie.
+  const detailPath = new URL(page.url()).pathname;
+  const anonymous = await playwright.request.newContext({ baseURL: 'http://127.0.0.1:5175' });
+  expect(await serverHtml(anonymous, '/')).toContain(`>${title}</a>`);
+  const detailHtml = await serverHtml(anonymous, detailPath);
+  expect(detailHtml).toContain(`<h1>${title}</h1>`);
+  expect(detailHtml).not.toContain('admin@tiny.e2e.test');
+  await anonymous.dispose();
 
   // Edit.
   await page.goto('/admin/collections/posts');
