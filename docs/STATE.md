@@ -1,12 +1,26 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-04 (spec 077 / C03: Angular resource reliability + proven peer ranges — roadmap
-> 0.8 complete on its branch; next is roadmap 0.9 / S01).**
+> **Last updated: 2026-10-05 (CI deploy health gate fixed: cold-start D1 round trips cut from ~100 to a
+> handful; spec 077 / C03 merged — roadmap 0.8 complete; next is roadmap 0.9 / S01).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Cold-start D1 round trips — CI deploy health gate (2026-10-05)
+
+The post-deploy gate (`scripts/verify-deployment.mjs`, spec 075) had never passed in CI: from GitHub's
+runners (Cloudflare colo IAD) `/api/status` took 13–15 s while both D1 databases live in WEUR, so every
+10 s attempt timed out (from Europe it answered in 0.3–4 s, so it looked healthy locally). Cause: schema
+planning on each cold isolate ran `pragma_table_info` + `pragma_index_list` + one `pragma_index_info`
+per index, **sequentially, per table** (~100 transatlantic round trips).
+
+- `packages/db/src/sqlite-schema.ts`: `inspectTables()` reads all tables in **3 queries** (`json_each(?)`
+  over a JSON array of names joined with the pragma functions — verified on real D1). Pinned by
+  `sqlite-schema.test.ts` (read count constant in table count). Changeset: `@forge-cms/db` patch.
+- Both apps' `/api/status` run their per-collection `count()`s concurrently.
+- Not done (option if far colos are still slow): Smart Placement in the two `wrangler.toml`s.
 
 ## Angular resource reliability and peer compatibility — C03 (spec 077, 2026-10-04)
 

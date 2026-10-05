@@ -17,10 +17,9 @@ export default defineEventHandler(async (event) => {
   }
   const db = runtime.adapters.database;
 
-  let totalRecords = 0;
-  for (const collection of runtime.getCollections()) {
-    totalRecords += await db.count(collection.slug);
-  }
+  // Concurrent: each count is a D1 round trip, which is slow far from the database.
+  const counts = await Promise.all(runtime.getCollections().map((c) => db.count(c.slug)));
+  const totalRecords = counts.reduce((sum, n) => sum + n, 0);
 
   return {
     data: {

@@ -11,7 +11,6 @@ import {
   type SchemaChange,
   type SchemaPlan,
   type SchemaProbe,
-  type StoredIndex,
   type StoredTable,
   type TableBaseline
 } from './schema-plan.js';
@@ -37,48 +36,72 @@ function baselineDefinition(): CollectionDefinition {
   };
 }
 
-async function inspectTable(
+/**
+ * Reads the stored shape of every named table in three queries, whatever the table and index count:
+ * a remote database (D1) pays one network round trip per query, and a cold start used to issue
+ * `2 + indexes` per table — about a hundred for a small site, many seconds far from the database.
+ * Table names travel as one JSON array (`json_each`), so D1's 100-bound-parameter cap never applies.
+ * A table with no columns does not exist and maps to `null`.
+ */
+async function inspectTables(
   executor: SqliteSchemaExecutor,
-  name: string
-): Promise<StoredTable | null> {
+  names: readonly string[]
+): Promise<Map<string, StoredTable | null>> {
+  const tables = JSON.stringify(names);
   const columnRows = await executor.query(
-    'SELECT "cid", "name", "type", "pk" FROM pragma_table_info(?) ORDER BY "cid"',
-    [name]
+    'SELECT t."value" AS "tbl", p."name", p."type", p."pk" FROM json_each(?) AS t, ' +
+      'pragma_table_info(t."value") AS p ORDER BY t."value", p."cid"',
+    [tables]
   );
-  if (columnRows.length === 0) return null;
-
   const indexRows = await executor.query(
-    'SELECT "name", "unique", "origin", "partial" FROM pragma_index_list(?)',
-    [name]
+    'SELECT t."value" AS "tbl", l."name", l."unique", l."origin", l."partial" FROM json_each(?) AS t, ' +
+      'pragma_index_list(t."value") AS l',
+    [tables]
   );
-  const indexes: StoredIndex[] = [];
+  const keyRows = await executor.query(
+    'SELECT l."name" AS "idx", k."name" FROM json_each(?) AS t, pragma_index_list(t."value") AS l, ' +
+      'pragma_index_info(l."name") AS k ORDER BY l."name", k."seqno"',
+    [tables]
+  );
+
+  const keys = new Map<string, (string | null)[]>();
+  for (const row of keyRows) {
+    const index = String(row.idx);
+    const column = row.name === null || row.name === undefined ? null : String(row.name);
+    keys.set(index, [...(keys.get(index) ?? []), column]);
+  }
+
+  const found = new Map<string, StoredTable>();
+  for (const row of columnRows) {
+    const name = String(row.tbl);
+    let table = found.get(name);
+    if (!table) {
+      table = { name, columns: [], indexes: [] };
+      found.set(name, table);
+    }
+    table.columns.push({
+      name: String(row.name),
+      type: typeof row.type === 'string' ? row.type : '',
+      primaryKey: Number(row.pk)
+    });
+  }
   for (const row of indexRows) {
+    const table = found.get(String(row.tbl));
+    if (!table) continue;
     const indexName = String(row.name);
-    const keyRows = await executor.query(
-      'SELECT "seqno", "name" FROM pragma_index_info(?) ORDER BY "seqno"',
-      [indexName]
-    );
-    indexes.push({
+    table.indexes.push({
       name: indexName,
-      columns: keyRows.map((k) =>
-        k.name === null || k.name === undefined ? null : String(k.name)
-      ),
+      columns: keys.get(indexName) ?? [],
       unique: Number(row.unique) === 1,
       origin: String(row.origin),
       partial: Number(row.partial) === 1
     });
   }
-  indexes.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  for (const table of found.values()) {
+    table.indexes.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  }
 
-  return {
-    name,
-    columns: columnRows.map((row) => ({
-      name: String(row.name),
-      type: typeof row.type === 'string' ? row.type : '',
-      primaryKey: Number(row.pk)
-    })),
-    indexes
-  };
+  return new Map(names.map((name) => [name, found.get(name) ?? null]));
 }
 
 const q = (identifier: string) => `"${identifier}"`;
@@ -150,7 +173,8 @@ async function buildSqlitePlan(
   if (bySlug.size === 0) return { plan: toSchemaPlan([]), statements: [] };
 
   const slugs = [...bySlug.keys()].sort();
-  const baselineStored = await inspectTable(executor, SCHEMA_BASELINE_TABLE);
+  const stored = await inspectTables(executor, [SCHEMA_BASELINE_TABLE, ...slugs]);
+  const baselineStored = stored.get(SCHEMA_BASELINE_TABLE) ?? null;
   const baselines = baselineStored
     ? await readBaselines(executor, slugs)
     : new Map<string, unknown>();
@@ -198,11 +222,13 @@ async function buildSqlitePlan(
   }
 
   for (const [slug, collection] of [...bySlug.entries()].sort(([a], [b]) => (a < b ? -1 : 1))) {
-    const stored = await inspectTable(executor, slug);
     const raw = baselines.get(slug);
     const baseline: TableBaseline | 'unknown' | null =
       raw === undefined ? null : parseTableBaseline(raw);
-    const result = await planTable({ collection, stored, baseline, recordsBaseline: true }, probe);
+    const result = await planTable(
+      { collection, stored: stored.get(slug) ?? null, baseline, recordsBaseline: true },
+      probe
+    );
     changes.push(...result.changes);
     statements.push(...result.statements.map((sql) => ({ sql })));
 
