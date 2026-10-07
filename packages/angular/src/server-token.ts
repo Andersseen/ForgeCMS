@@ -21,6 +21,12 @@ export interface ServerRequestInput {
  */
 export interface ForgeServerContext {
   readonly origin: string;
+  /**
+   * `true` when this render forwards the visitor's `Authorization` header (cookies are already withheld
+   * from a `credentials: 'omit'` client). Public transfer (spec 080) treats anything but `false` as
+   * identity-bearing.
+   */
+  readonly forwardsAuthorization?: boolean;
   /** Throws a `TypeError` when the app's `ForgeCmsConfig` contradicts the forwarding policy. */
   assertCompatible(config: ForgeCmsConfig | null): void;
   request(input: ServerRequestInput, config: ForgeCmsConfig | null): ForgeTransportRequest;

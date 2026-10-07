@@ -103,7 +103,8 @@ export {
   documentResource,
   type CollectionRequest,
   type DocumentRequest,
-  type ForgeResource
+  type ForgeResource,
+  type ForgeResourceOptions
 } from './resources.js';
 
 export { ForgeAuthSession, type ForgeAuthStatus } from './auth-session.js';

@@ -35,12 +35,15 @@ import { collectionResource } from '@forge-cms/angular';
 export class PostDetailPage {
   readonly slug = input.required<string>();
 
-  protected readonly result = collectionResource(() => ({
-    collection: 'posts',
-    where: { slug: this.slug() },
-    limit: 1,
-    depth: 1 as const
-  }));
+  protected readonly result = collectionResource(
+    () => ({
+      collection: 'posts',
+      where: { slug: this.slug() },
+      limit: 1,
+      depth: 1 as const
+    }),
+    { transfer: 'public' }
+  );
 
   protected readonly post = computed(() => this.result.value()?.docs[0] ?? null);
 

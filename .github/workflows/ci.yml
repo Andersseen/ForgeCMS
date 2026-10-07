@@ -101,17 +101,19 @@ jobs:
       - name: Angular compatibility matrix (strict packed consumers)
         run: pnpm release:compat
 
-      # Spec 078 (roadmap S01): a strict packed Analog SSR consumer, production-built and served by
-      # `node`; concurrent anonymous/A/B renders over real HTTP, linked bundles, no server code in the browser.
-      - name: Packed production SSR consumer
-        run: pnpm release:ssr
-
       # One install is enough: www, tiny-project and demo-aesthetics pin the same @playwright/test
       # version, so they share the browser cache. Filtering all three ran three `--with-deps`
       # installs in parallel and they raced for the apt lock (E: Could not get lock
       # /var/lib/apt/lists/lock). If the pins ever diverge, add a second, sequential step.
       - name: Install Playwright (chromium)
         run: pnpm --filter @forge-cms/www exec playwright install --with-deps chromium
+
+      # Spec 078 (roadmap S01): a strict packed Analog SSR consumer, production-built and served by
+      # `node`; concurrent anonymous/A/B renders over real HTTP, linked bundles, no server code in the browser.
+      # Spec 080 (S02): the same consumer then runs the built app in Chromium (hydration, request counts,
+      # transfer-state inspection), so Playwright's browser must be installed first.
+      - name: Packed production SSR consumer
+        run: pnpm release:ssr
 
       - name: E2E tests — apps/www
         run: pnpm e2e:www

@@ -26,8 +26,18 @@ const SECOND_ADMIN_PASSWORD = 'second-admin-password-123';
 // header so it actually exercises that check instead of always tripping CSRF first.
 const SAME_ORIGIN_HEADERS = { origin: 'http://127.0.0.1:5175' };
 
+/**
+ * Server-rendered pages show before Angular has hydrated them (spec 080): typing into a form earlier
+ * would be wiped when the app attaches. Waits for the app to be bootstrapped and stable.
+ */
+async function hydrated(page: Page) {
+  // Angular removes the `ngh` hydration annotation from a server-rendered element once it has hydrated it.
+  await page.waitForFunction(() => document.querySelector('[ngh]') === null);
+}
+
 async function loginAs(page: Page, email: string, password: string) {
   await page.goto('/admin/login');
+  await hydrated(page);
   await page.locator('input#forge-signin-email').fill(email);
   await page.locator('input#forge-signin-password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
@@ -60,7 +70,7 @@ test('SSR (spec 078): the server renders the resolved public page, not a loading
   request
 }) => {
   const html = await serverHtml(request, '/');
-  expect(html).toContain('<tiny-home-page>');
+  expect(html).toContain('<tiny-home-page');
   expect(html).toContain('No published posts yet.');
   expect(html).not.toContain('Loading…');
   expect(html).not.toContain('SERVER_ORIGIN_REQUIRED');
@@ -69,8 +79,36 @@ test('SSR (spec 078): the server renders the resolved public page, not a loading
   expect(missing).toContain('Not found');
 });
 
+test('hydration (spec 080): the browser reuses the server-rendered public read — no duplicate request', async ({
+  page
+}) => {
+  const problems: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error' || /NG0\d+/.test(message.text())) problems.push(message.text());
+  });
+  page.on('pageerror', (error) => problems.push(error.message));
+  const reads: string[] = [];
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname.startsWith('/api/v1/posts')) reads.push(request.url());
+  });
+
+  await page.goto('/');
+  await expect(page.getByText('No published posts yet.')).toBeVisible();
+  // Hydrated: the app is interactive and stable, and no list request left the browser.
+  await expect(page.locator('tiny-home-page')).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(reads).toEqual([]);
+  expect(problems).toEqual([]);
+
+  // The state script carries only the public Forge result.
+  const html = await (await page.request.get('/', { headers: { accept: 'text/html' } })).text();
+  expect(html).toContain('forge:public:');
+  expect(html).not.toMatch(/forge_session|authorization|bearer/i);
+});
+
 test('first-run bootstrap creates the admin and signs them straight in', async ({ page }) => {
   await page.goto('/setup');
+  await hydrated(page);
   await page.locator('input[name="email"]').fill(ADMIN_EMAIL);
   await page.locator('input[name="password"]').fill(ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Create admin' }).click();
@@ -294,6 +332,7 @@ test('signup is opt-in, cannot select a role, and never elevates past the second
   page
 }) => {
   await page.goto('/admin/signup');
+  await hydrated(page);
   await expect(page.locator('select, input[name="role"]')).toHaveCount(0);
 
   const email = `viewer-${Date.now()}@tiny.e2e.test`;

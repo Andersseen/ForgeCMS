@@ -40,9 +40,14 @@ import { collectionResource } from '@forge-cms/angular';
   `
 })
 export class HomePage {
-  protected readonly posts = collectionResource(() => ({
-    collection: 'posts',
-    sort: 'title',
-    limit: 100
-  }));
+  // `transfer: 'public'` (spec 080): the anonymous list the server rendered hydrates the browser
+  // without a second request.
+  protected readonly posts = collectionResource(
+    () => ({
+      collection: 'posts',
+      sort: 'title',
+      limit: 100
+    }),
+    { transfer: 'public' }
+  );
 }

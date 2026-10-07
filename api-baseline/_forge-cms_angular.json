@@ -48,6 +48,7 @@
   "ForgeQueryOptions",
   "ForgeRequestOptions",
   "ForgeResource",
+  "ForgeResourceOptions",
   "ForgeSchema",
   "ForgeSort",
   "ForgeTransport",

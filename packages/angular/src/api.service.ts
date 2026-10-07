@@ -1,6 +1,6 @@
 import { DestroyRef, Injectable, PLATFORM_ID, PendingTasks, inject, signal } from '@angular/core';
 import type { Signal } from '@angular/core';
-import { registerCredentialBoundary } from './credentials.js';
+import { registerCredentialBoundary, registerPublicTransferPolicy } from './credentials.js';
 import { buildQueryString } from './query.js';
 import { FORGE_SERVER_CONTEXT } from './server-token.js';
 import type { ForgeServerContext } from './server-token.js';
@@ -105,6 +105,19 @@ export class CmsApiService<S extends ForgeSchema = UntypedForgeSchema> {
   constructor() {
     // The identity boundary resources commit against (spec 077). Kept off the public class surface.
     registerCredentialBoundary(this, () => this.requester.token());
+    // Anonymous by construction (spec 080): cookies omitted, no app token, no forwarded Authorization.
+    const server = inject(FORGE_SERVER_CONTEXT, { optional: true }) ?? null;
+    registerPublicTransferPolicy(this, {
+      eligible:
+        this.config?.credentials === 'omit' &&
+        this.config.authToken === undefined &&
+        // On a server the render's own context must state that no Authorization is forwarded; a server
+        // render without `provideForgeCmsServer` is unknown territory (e.g. a custom in-process
+        // transport), so it fails closed.
+        (inject(PLATFORM_ID, { optional: true }) !== 'server' ||
+          server?.forwardsAuthorization === false),
+      namespace: this.requester.contentBase
+    });
   }
 
   /** Registers a listener called synchronously on every observed `401`. Returns an unsubscribe function. */
