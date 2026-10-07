@@ -58,7 +58,13 @@ export class R2StorageAdapter implements StorageAdapter {
 
   async put(options: PutObjectOptions): Promise<StorageObject> {
     const bucket = this.getBucket();
-    const r2Object = await bucket.put(options.key, options.body, {
+    // Real R2 refuses a ReadableStream of unknown length ("must have a known length"), which is exactly
+    // what the StorageAdapter contract allows callers to pass. Buffer it (spec 082).
+    const body =
+      options.body instanceof ReadableStream
+        ? await new Response(options.body).arrayBuffer()
+        : options.body;
+    const r2Object = await bucket.put(options.key, body, {
       ...(options.metadata !== undefined && { customMetadata: options.metadata }),
       ...(options.contentType !== undefined && {
         httpMetadata: { contentType: options.contentType }
@@ -94,7 +100,8 @@ export class R2StorageAdapter implements StorageAdapter {
   }
 
   async getPublicUrl(key: string): Promise<string> {
-    return `${this.publicUrlBase}/${key}`;
+    // Per-segment encoding keeps `/` as the hierarchy; `handleFile` decodes it (spec 082).
+    return `${this.publicUrlBase}/${key.split('/').map(encodeURIComponent).join('/')}`;
   }
 
   async list(prefix?: string): Promise<StorageObject[]> {

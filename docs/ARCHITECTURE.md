@@ -19,6 +19,9 @@ Arrows point from dependent to dependency. Everything ultimately rests on `core`
         │ cloudflare │   │           runtime           │─────────┘
         └────────────┘   └─────────────────────────────┘
          D1, R2 adapters    orchestrator + HTTP handlers
+
+   s3 ──► storage   S3-API StorageAdapter (AWS SDK v3). Server-side only; the AWS SDK is confined to this
+                    package and must never be reachable from angular/admin (spec 082).
                                         ▲
                                         │ (server side)
    ┌─────────┐   ┌─────────┐   ┌───────┴────────┐   ┌────────────┐

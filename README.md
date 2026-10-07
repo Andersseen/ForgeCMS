@@ -117,8 +117,9 @@ durable history, and a release-gating rehearsal (`pnpm test:upgrade`): databases
 restored into an empty environment. See [docs/SCHEMA-UPGRADES.md](docs/SCHEMA-UPGRADES.md) and
 [docs/BACKUP-RESTORE.md](docs/BACKUP-RESTORE.md).
 
-Not yet delivered pre-1.0: a portable (S3-compatible) storage adapter, and production SSR for the
-Angular/Analog client — see [docs/ROADMAP.md](docs/ROADMAP.md).
+Roadmap 0.10 / P01: `@forge-cms/s3` (an S3-API `StorageAdapter`, certified in CI against a real Garage service) is
+added by this change and ships with the next release (`0.11.0`); the libSQL + S3 upload lifecycle and the
+complete deployment guides (P02/P03) are not delivered yet — see [docs/ROADMAP.md](docs/ROADMAP.md).
 
 Try it: the [Lumea clinic demo](https://forge-cms-demo.pages.dev) (a real site built on the CMS,
 source in [`apps/demo-aesthetics`](apps/demo-aesthetics)) and the docs at
@@ -145,18 +146,19 @@ one: roadmap 0.8 (Angular client/DX) will publish as npm `0.9.0`.
 
 All public packages are versioned together.
 
-| Package                                        | Purpose                                                             |
-| ---------------------------------------------- | ------------------------------------------------------------------- |
-| [`@forge-cms/core`](packages/core)             | Schema DSL, collection/global definitions, validation, base types   |
-| [`@forge-cms/db`](packages/db)                 | Database contract, InMemory and LibSQL adapters, SQL schema helpers |
-| [`@forge-cms/auth`](packages/auth)             | Auth contract and built-in auth adapters                            |
-| [`@forge-cms/storage`](packages/storage)       | Storage contract and InMemory adapter                               |
-| [`@forge-cms/api`](packages/api)               | `ApiContext` and HTTP handler contracts                             |
-| [`@forge-cms/runtime`](packages/runtime)       | Runtime orchestrator, Local API, HTTP handlers                      |
-| [`@forge-cms/cloudflare`](packages/cloudflare) | Cloudflare D1 and R2 adapters                                       |
-| [`@forge-cms/angular`](packages/angular)       | Angular client SDK                                                  |
-| [`@forge-cms/admin`](packages/admin)           | Reusable Angular admin components (content, users, auth)            |
-| [`@forge-cms/testing`](packages/testing)       | Adapter contract test suites                                        |
+| Package                                        | Purpose                                                              |
+| ---------------------------------------------- | -------------------------------------------------------------------- |
+| [`@forge-cms/core`](packages/core)             | Schema DSL, collection/global definitions, validation, base types    |
+| [`@forge-cms/db`](packages/db)                 | Database contract, InMemory and LibSQL adapters, SQL schema helpers  |
+| [`@forge-cms/auth`](packages/auth)             | Auth contract and built-in auth adapters                             |
+| [`@forge-cms/storage`](packages/storage)       | Storage contract and InMemory adapter                                |
+| [`@forge-cms/api`](packages/api)               | `ApiContext` and HTTP handler contracts                              |
+| [`@forge-cms/runtime`](packages/runtime)       | Runtime orchestrator, Local API, HTTP handlers                       |
+| [`@forge-cms/s3`](packages/s3)                 | S3-compatible storage adapter (added in 0.10 P01; ships in `0.11.0`) |
+| [`@forge-cms/cloudflare`](packages/cloudflare) | Cloudflare D1 and R2 adapters                                        |
+| [`@forge-cms/angular`](packages/angular)       | Angular client SDK                                                   |
+| [`@forge-cms/admin`](packages/admin)           | Reusable Angular admin components (content, users, auth)             |
+| [`@forge-cms/testing`](packages/testing)       | Adapter contract test suites                                         |
 
 They share one version (currently `0.8.3` on npm); see each package's `CHANGELOG.md` for what
 changed.

@@ -1,10 +1,15 @@
 # ROADMAP — A small, dependable ForgeCMS 1.0
 
+> **2026-10-07 (spec 082):** roadmap 0.10 **P01 — Basic S3-compatible StorageAdapter — is complete**
+> (`@forge-cms/s3`, certified against a real Garage service; MinIO was replaced because its community images are no
+> longer published). Roadmap 0.10 is **not** complete. **Next bounded responsibility: roadmap 0.10 / P02 — Portable
+> upload lifecycle and access.**
+>
 > **2026-10-07 (spec 081):** roadmap **0.9 — SSR and Analog consumption — is complete** (S01–S03). S03 certified
 > the production consumer journey from packed public packages on a built Node server with on-disk libSQL (incl. a
 > restart) and on the Cloudflare Pages output under local workerd + local D1 (local evidence; no remote deployment
 > claim), and made `@forge-cms/db` load libSQL lazily (patch, published as `0.10.2`). npm `latest` is `0.10.2`.
-> **Next bounded responsibility: roadmap 0.10 / P01 — Basic S3-compatible StorageAdapter.**
+> _(Superseded: P01 is complete — see above.)_
 >
 > **2026-10-07 (spec 080):** roadmap 0.9 **S02** (safe public hydration and transfer) is implemented on
 > its branch. `collectionResource`/`documentResource` accept `{ transfer: 'public' }`: only an anonymous

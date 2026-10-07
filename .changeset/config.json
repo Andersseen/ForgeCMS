@@ -8,6 +8,7 @@
       "@forge-cms/db",
       "@forge-cms/auth",
       "@forge-cms/storage",
+      "@forge-cms/s3",
       "@forge-cms/api",
       "@forge-cms/runtime",
       "@forge-cms/cloudflare",

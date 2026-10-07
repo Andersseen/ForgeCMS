@@ -88,6 +88,14 @@ jobs:
       - name: libSQL portable-profile integration tests
         run: pnpm test:libsql
 
+      # Spec 082 (roadmap 0.10 / P01): the S3 adapter against a real S3-compatible service — an isolated,
+      # throwaway Garage container (pinned dxflrs/garage tag + digest) started and removed by the script,
+      # with random test-only credentials. Runs the shared StorageAdapter contract plus focused cases; it
+      # fails (never skips) without Docker. `release` needs this job, so a package change cannot publish
+      # without it. (MinIO was the original plan; its community images/binaries are no longer published.)
+      - name: S3-compatible storage integration tests (Garage)
+        run: pnpm test:s3
+
       # Roadmap 0.7 release gate (spec 073, M03): installations written by historical releases
       # (committed, hash-checked fixtures — no network) upgrade through planSchema → reviewed
       # migrations on on-disk libSQL and local D1/R2, then are backed up and restored into isolated,

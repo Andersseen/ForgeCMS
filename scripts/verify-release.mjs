@@ -16,6 +16,7 @@ const publicPackages = [
   '@forge-cms/db',
   '@forge-cms/auth',
   '@forge-cms/storage',
+  '@forge-cms/s3',
   '@forge-cms/api',
   '@forge-cms/runtime',
   '@forge-cms/cloudflare',
@@ -148,6 +149,36 @@ function assertPackedContents(pkg, files, packageDir) {
 
   assertRuntimeImportsDeclared(pkg, files, packageDir);
   assertTypeOnlyCoreDependency(pkg, files, packageDir);
+  assertS3Boundary(pkg, files, packageDir);
+}
+
+// Spec 082: the AWS SDK is an implementation detail of @forge-cms/s3 alone. No other public package may
+// depend on it or on @forge-cms/s3 (browser-facing packages must never inherit server credentials code),
+// and the adapter's packed JavaScript may only import what it declares.
+function assertS3Boundary(pkg, files, packageDir) {
+  const declared = new Set(dependencySections(pkg).flatMap((section) => Object.keys(section)));
+  if (pkg.name !== '@forge-cms/s3') {
+    for (const name of declared) {
+      if (name.startsWith('@aws-sdk/') || name === '@forge-cms/s3') {
+        fail(`${pkg.name} must not depend on ${name} (S3/AWS code is confined to @forge-cms/s3)`);
+      }
+    }
+    return;
+  }
+  for (const required of ['@aws-sdk/client-s3', '@forge-cms/storage']) {
+    if (!declared.has(required)) fail(`@forge-cms/s3 must declare ${required} in its dependencies`);
+  }
+  if (declared.has('@forge-cms/s3')) fail('@forge-cms/s3 must not depend on itself');
+  for (const file of files.filter((f) => f.startsWith('dist/') && f.endsWith('.js'))) {
+    const source = readFileSync(join(packageDir, file), 'utf8');
+    for (const match of source.matchAll(/(?:from\s+|import\s*\()\s*['"]([^./'"][^'"]*)['"]/g)) {
+      const parts = match[1].split('/');
+      const packageName = match[1].startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
+      if (!declared.has(packageName) && !match[1].startsWith('node:')) {
+        fail(`@forge-cms/s3 imports ${packageName} from ${file} but does not declare it`);
+      }
+    }
+  }
 }
 
 // Spec 076: `@forge-cms/angular` depends on `@forge-cms/core` for **types only**. Its packed JavaScript
@@ -852,6 +883,64 @@ console.log('runtime consumer ok');
   run('node', ['dist/index.js'], { cwd: dir });
 }
 
+// Spec 082: the packed S3 adapter installs from its tarball (its AWS SDK dependency resolves from the
+// registry) and a strict TypeScript consumer can import and instantiate it as a StorageAdapter. No
+// network I/O — the real-service evidence is `pnpm test:s3`.
+function verifyS3Consumer(tarballs) {
+  const dir = installConsumer('s3-consumer', tarballs, ['typescript@5.9.2']);
+
+  const srcDir = join(dir, 'src');
+  run('mkdir', ['-p', srcDir]);
+  writeBaseTsconfig(dir);
+  writeFileSync(
+    join(srcDir, 'index.ts'),
+    `import { defineCollection, defineField } from '@forge-cms/core';
+import { ForgeCmsRuntime } from '@forge-cms/runtime';
+import { InMemoryAuthAdapter } from '@forge-cms/auth';
+import { InMemoryDatabaseAdapter } from '@forge-cms/db';
+import type { StorageAdapter } from '@forge-cms/storage';
+import { S3StorageAdapter } from '@forge-cms/s3';
+import type { S3StorageAdapterOptions, S3StorageCredentials } from '@forge-cms/s3';
+
+const credentials: S3StorageCredentials = { accessKeyId: 'test-id', secretAccessKey: 'test-secret' };
+const options: S3StorageAdapterOptions = {
+  bucket: 'media',
+  region: 'garage',
+  endpoint: 'http://127.0.0.1:3900',
+  forcePathStyle: true,
+  credentials
+};
+
+const storage: StorageAdapter = new S3StorageAdapter(options);
+if (storage.name !== 's3') throw new Error('unexpected adapter name');
+
+const url = await storage.getPublicUrl('media/id-my photo #1.png');
+if (url !== '/api/media/media/id-my%20photo%20%231.png') throw new Error('unexpected URL ' + url);
+
+for (const bad of [{ ...options, bucket: ' ' }, { ...options, region: '' }, { ...options, endpoint: 'ftp://x' }]) {
+  let threw = false;
+  try {
+    new S3StorageAdapter(bad);
+  } catch {
+    threw = true;
+  }
+  if (!threw) throw new Error('invalid configuration was accepted');
+}
+
+const runtime = new ForgeCmsRuntime({
+  collections: [defineCollection({ slug: 'notes', fields: { title: defineField.text({ required: true }) } })],
+  adapters: { database: new InMemoryDatabaseAdapter(), auth: new InMemoryAuthAdapter(), storage }
+});
+runtime.init();
+
+console.log('s3 consumer ok');
+`
+  );
+
+  run('pnpm', ['exec', 'tsc', '-p', 'tsconfig.json'], { cwd: dir });
+  run('node', ['dist/index.js'], { cwd: dir });
+}
+
 function verifyCloudflareConsumer(tarballs) {
   const dir = installConsumer('cloudflare-consumer', tarballs, ['typescript@5.9.2']);
 
@@ -1301,6 +1390,7 @@ try {
 
   verifyRuntimeConsumer(tarballs);
   verifyCloudflareConsumer(tarballs);
+  verifyS3Consumer(tarballs);
   verifyUpgradeConsumer(tarballs);
   verifyAngularConsumer(tarballs);
   verifyTypedAngularConsumer(tarballs);
