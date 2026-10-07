@@ -3,7 +3,7 @@
 > **2026-10-07 (spec 081):** roadmap **0.9 — SSR and Analog consumption — is complete** (S01–S03). S03 certified
 > the production consumer journey from packed public packages on a built Node server with on-disk libSQL (incl. a
 > restart) and on the Cloudflare Pages output under local workerd + local D1 (local evidence; no remote deployment
-> claim), and made `@forge-cms/db` load libSQL lazily (patch → `0.10.2`, pending). npm `latest` is `0.10.1`.
+> claim), and made `@forge-cms/db` load libSQL lazily (patch, published as `0.10.2`). npm `latest` is `0.10.2`.
 > **Next bounded responsibility: roadmap 0.10 / P01 — Basic S3-compatible StorageAdapter.**
 >
 > **2026-10-07 (spec 080):** roadmap 0.9 **S02** (safe public hydration and transfer) is implemented on

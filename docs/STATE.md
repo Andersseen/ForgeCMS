@@ -2,7 +2,7 @@
 
 > **Last updated: 2026-10-07 (spec 081 / roadmap 0.9 S03 — production SSR consumer journey — COMPLETE; roadmap 0.9
 > (S01–S03) is complete. Core merged in PR #76; close-out on `feature/spec-081-s03-closeout`. npm `latest` =
-> `0.10.1`; `0.10.2` (the lazy-libSQL patch) is only a pending Version Packages PR #77. Next: roadmap 0.10 / P01).**
+> `0.10.2` (the lazy-libSQL patch, PR #77 merged and published). Next: roadmap 0.10 / P01).**
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
@@ -16,7 +16,7 @@ close-out (extra negative controls, docs, CI timeout) on `feature/spec-081-s03-c
 - **`@forge-cms/db`:** `LibSqlDatabaseAdapter` loads `@libsql/client`/`drizzle-orm/libsql` lazily (first operation), so
   an InMemory/D1 consumer needs no Nitro/libSQL workaround (exports unchanged; `init()` no longer opens the DB; failed
   opens are not cached; concurrent first operations share one connection; `lazy-libsql.test.ts`). Patch changeset
-  `lazy-libsql-client.md` → pending `0.10.2` (PR #77, **not published**).
+  `lazy-libsql-client.md` → published as `0.10.2` (PR #77).
 - **`pnpm release:ssr`** (`scripts/ssr-consumer/{shared,technical,journey}.mjs`): the S01/S02 technical fixture
   (unchanged assertions, no workaround) plus the journey — tiny-project's own source in a strict packed consumer:
   bootstrap → sign in → draft → draft hidden (no-JS HTML, transfer state, admin-signed-in browser) → publish → no-JS
@@ -38,8 +38,8 @@ Branch `feature/spec-080-safe-public-hydration-transfer`. Spec:
 [080-safe-public-hydration-transfer.md](specs/080-safe-public-hydration-transfer.md). Guide: `/docs/ssr`
 ("Hydration and public transfer"). (S03 is complete — see above.)
 
-- **Release truth (verified 2026-10-07, at close-out):** npm `latest` = `0.10.1` for the whole fixed group (S02 +
-  earlier); PR #77 (`0.10.2`) open, unpublished. The website's `CURRENT_FORGE_VERSION` says `0.10.1`.
+- **Release truth (verified 2026-10-07, at close-out):** npm `latest` = `0.10.2` for the whole fixed group (lazy-libSQL
+  patch; S02 was `0.10.1`). The website's `CURRENT_FORGE_VERSION` says `0.10.2`.
 - **API:** `collectionResource(params, { transfer: 'public' })` / `documentResource(...)`; new type
   `ForgeResourceOptions`. Default (no option) unchanged. Integrated in `createResource`, not in the
   transport; `CmsApiService`, `ForgeAuthSession` and `/me` never transfer.

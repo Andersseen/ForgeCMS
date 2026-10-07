@@ -225,6 +225,6 @@ vite config, thin routes).
 
 **Public API:** unchanged (`pnpm check:api`). One existing patch changeset suffices (behavior-compatible).
 
-**Release truth:** npm `latest` `0.10.1`; `0.10.2` is a pending Version Packages PR #77, not published.
+**Release truth:** npm `latest` `0.10.2` (PR #77 merged; GitHub releases and npm verified).
 
 **Gates:** see docs/STATE.md and the PR for newly-executed vs inherited results.
