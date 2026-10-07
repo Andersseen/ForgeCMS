@@ -38,11 +38,17 @@ function runtimeOver(database: DatabaseAdapter, collections: CollectionDefinitio
 }
 
 /**
- * The adapter builds its client internally; the transport hook wraps that client's `batch` — the one
- * call every schema/migration batch goes through. Test-only reach into a private field.
+ * The adapter builds its client internally (lazily, on its first operation since spec 081); the transport hook
+ * connects it, then wraps that client's `batch` — the one call every schema/migration batch goes through.
+ * Test-only reach into private members.
  */
-function hookBatches(adapter: LibSqlDatabaseAdapter, hook: MigrationBatchHook): void {
-  const client = (adapter as unknown as { client: Client }).client;
+async function hookBatches(
+  adapter: LibSqlDatabaseAdapter,
+  hook: MigrationBatchHook
+): Promise<void> {
+  const internals = adapter as unknown as { connect(): Promise<void>; client: Client };
+  await internals.connect();
+  const client = internals.client;
   const batch = client.batch.bind(client);
   client.batch = (async (statements: Parameters<Client['batch']>[0], mode) => {
     let result: Awaited<ReturnType<Client['batch']>> = [];
@@ -60,11 +66,11 @@ runMigrationContractTests('LibSqlDatabaseAdapter (on-disk file) via ForgeCmsRunt
   const url = `file:${directory}/migrations-${++files}.db`;
   const raw = createClient({ url });
   return Promise.resolve({
-    open: (collections, hook) => {
+    open: async (collections, hook) => {
       const adapter = new LibSqlDatabaseAdapter(url);
-      const runtime = runtimeOver(adapter, collections); // init() creates the adapter's client
-      if (hook) hookBatches(adapter, hook);
-      return Promise.resolve(runtime as unknown as MigrationContractRuntime);
+      const runtime = runtimeOver(adapter, collections); // init() configures the adapter's client
+      if (hook) await hookBatches(adapter, hook);
+      return runtime as unknown as MigrationContractRuntime;
     },
     query: async (sql) => (await raw.execute(sql)).rows.map((row) => ({ ...row })),
     exec: async (sql) => {

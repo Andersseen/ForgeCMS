@@ -84,10 +84,10 @@ export interface LibSqlEnv {
 async function openConnection(
   url: string
 ): Promise<{ client: Client; db: ReturnType<typeof drizzle> }> {
-  const [{ createClient }, { drizzle: createDrizzle }] = await Promise.all([
-    import('@libsql/client'),
-    import('drizzle-orm/libsql')
-  ]);
+  // Sequential on purpose: both modules load `@libsql/core`, and concurrent first imports of a shared
+  // dependency can fail to link under Vitest's module runner.
+  const { createClient } = await import('@libsql/client');
+  const { drizzle: createDrizzle } = await import('drizzle-orm/libsql');
   const client = createClient({ url });
   return { client, db: createDrizzle(client) };
 }
