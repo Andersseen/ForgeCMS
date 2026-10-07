@@ -35,6 +35,27 @@ export function registerCredentialBoundary(owner: object, token: () => string | 
   boundaries.set(owner, new ForgeCredentialBoundary(token));
 }
 
+/**
+ * Whether one `CmsApiService` is anonymous by construction, and the logical namespace of its API
+ * (spec 080). Internal. `eligible` is `false` whenever the client carries or may carry identity.
+ */
+export interface PublicTransferPolicy {
+  eligible: boolean;
+  /** The configured content base — identical on server and browser (never the resolved server origin). */
+  namespace: string;
+}
+
+const transferPolicies = new WeakMap<object, PublicTransferPolicy>();
+
+export function registerPublicTransferPolicy(owner: object, policy: PublicTransferPolicy): void {
+  transferPolicies.set(owner, policy);
+}
+
+/** Stand-in services (test doubles) never registered one: not eligible. */
+export function publicTransferPolicy(owner: object): PublicTransferPolicy {
+  return transferPolicies.get(owner) ?? { eligible: false, namespace: '' };
+}
+
 /** The boundary of a `CmsApiService` instance. */
 export function credentialBoundary(owner: object): ForgeCredentialBoundary {
   let boundary = boundaries.get(owner);

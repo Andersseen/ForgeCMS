@@ -1,6 +1,6 @@
 # 078 — Request-scoped server transport and SSR identity isolation
 
-- **Status:** done (implemented and verified on the branch; merge pending)
+- **Status:** done (merged in PR #71; published as npm `0.10.0` by PR #72)
 - **Author:** agent draft (implementation requested by the maintainer, 2026-10-05 — "spec 078 — roadmap
   0.9 / S01"; per [SDD.md](../SDD.md) an explicit request to implement counts as approval)
 - **Date:** 2026-10-05

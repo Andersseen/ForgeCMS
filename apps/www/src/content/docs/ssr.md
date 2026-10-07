@@ -1,6 +1,6 @@
 ---
 title: Server rendering
-description: Analog SSR with ForgeCMS — Local API in server routes, a request-scoped CmsApiService in Angular renders, and how identity is forwarded.
+description: Analog SSR with ForgeCMS — Local API in server routes, a request-scoped CmsApiService in Angular renders, how identity is forwarded, and opt-in public hydration transfer.
 group: Client & deploy
 order: 1.5
 ---
@@ -12,10 +12,10 @@ Server code has two ways to read CMS content. Pick per call site; neither is "th
 | A server route, loader or script that already has the `ForgeCmsRuntime`            | [Local API](/docs/local-api)              | Same access/hooks/drafts pipeline, no HTTP hop, no fabricated `Request`. You state the identity.            |
 | An Angular component or resource that renders in the browser **and** on the server | `CmsApiService` + `provideForgeCmsServer` | One client for both platforms; components never import the runtime (it would end up in the browser bundle). |
 
-> **Status (roadmap 0.9 / S01).** Server rendering works with request-scoped identity. Hydration
-> transfer is **not** part of it yet: after the browser boots it fetches the same data again (the
-> server HTML is replaced). Don't add `provideClientHydration()` for Forge content yet — S02 defines
-> what may be transferred and how.
+> **S01 = request-safe SSR. S02 = optional, anonymous public result transfer.** Server rendering
+> works with request-scoped identity (S01). On top of it, a public read can opt in to hydrate the
+> browser from the server's result without repeating the request ([below](#hydration-and-public-transfer)).
+> Nothing is transferred unless you ask.
 
 ## Server routes: the Local API
 
@@ -181,6 +181,56 @@ public site), give those routes their own client — it also works next to `forw
   children: [/* public pages using collectionResource / documentResource */]
 }
 ```
+
+## Hydration and public transfer
+
+Add Angular's hydration to the **shared** app config so the browser reuses the server's DOM. Forge uses
+its own fetch transport, not `HttpClient`, so Angular's `HttpClient` transfer cache has nothing to do:
+
+```ts
+// src/app/app.config.ts
+import { provideClientHydration, withNoHttpTransferCache } from '@angular/platform-browser';
+
+export const appConfig: ApplicationConfig = {
+  providers: [provideClientHydration(withNoHttpTransferCache()) /* … */]
+};
+```
+
+By default the browser still reads the content again after it starts (and the list re-renders from
+empty). A public read can opt in to transfer instead:
+
+```ts
+// the route's own anonymous client (see above): credentials 'omit', no authToken
+providers: [provideForgeCms({ credentials: 'omit' }), CmsApiService],
+
+// in a component under it
+readonly posts = collectionResource(() => ({ collection: 'posts', limit: 10 }), { transfer: 'public' });
+readonly post = documentResource(() => ({ collection: 'posts', id: this.id() }), { transfer: 'public' });
+```
+
+The server serializes the successful result with Angular's own transfer state (escaped by Angular, so
+content like `</script>` is safe); the first browser render of the same logical read uses it with **no
+request**, and the DOM is hydrated, not replaced.
+
+- **Opt-in and anonymous only.** The client must be anonymous by construction: `credentials: 'omit'`,
+  no `authToken`, and (on the server) no forwarded `Authorization`. Anything else throws a `TypeError`
+  when the resource is created (a server render without `provideForgeCmsServer` is refused too) — Forge
+  never serializes a signed-in visitor's response. A custom `transport` that attaches its own identity
+  is outside this guarantee: opt in only when your transport sends none. Keep the public
+  routes on their own client, as in the previous section.
+- **Never transferred:** `ForgeAuthSession`, `/me`, users, login/logout, previews, anything from a
+  resource that did not opt in, errors, cookies, tokens and request/credential state. Authenticated SSR
+  stays request-safe (S01) but has no transfer.
+- **Not a cache.** The result belongs to one server-rendered document and its first hydration. It is
+  dropped when the app first becomes stable. `reload()`, any change of page, offset, sort, `where`,
+  `depth`, `locale` or document id, a later route, and a full page load all make real requests (a full
+  page load gets fresh server data). Identical resources in the first render share one transferred
+  result, so they don't each refetch.
+- **Errors are never transferred.** A failed server read renders the normal error state and writes
+  nothing; the browser fetches after it starts and recovers (that subtree re-renders).
+- **Keys** are the logical read — the configured `baseUrl`, collection or document, and the full query —
+  not the server's absolute origin, so server and browser agree.
+- **Local API server routes** are separate: their results are not bridged into Angular state.
 
 ## What is request-scoped
 

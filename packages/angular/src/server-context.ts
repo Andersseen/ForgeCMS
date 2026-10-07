@@ -140,6 +140,7 @@ export function resolveServerContext(
 
   return Object.freeze({
     origin,
+    forwardsAuthorization: forwardAuthorization,
     transport: serverFetchTransport,
 
     assertCompatible(app: ForgeCmsConfig | null): void {

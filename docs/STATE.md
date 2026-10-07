@@ -1,16 +1,53 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-05 (spec 079 official product web redesign implemented; spec 078 / roadmap 0.9 S01 — request-scoped server transport and SSR identity
-> isolation — implemented on its branch; next is roadmap 0.9 / S02).**
+> **Last updated: 2026-10-07 (spec 080 / roadmap 0.9 S02 — safe public hydration transfer — implemented on its branch; S01 and the
+> web redesign are merged and published as npm `0.10.0`; next is roadmap 0.9 / S03).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
 
+## Safe public hydration and transfer — S02 (spec 080, 2026-10-07)
+
+Branch `feature/spec-080-safe-public-hydration-transfer`. Spec:
+[080-safe-public-hydration-transfer.md](specs/080-safe-public-hydration-transfer.md). Guide: `/docs/ssr`
+("Hydration and public transfer"). **S03 not started; roadmap 0.9 is not complete.**
+
+- **Release truth (verified 2026-10-07):** npm `latest` = `0.10.0` for the whole fixed group; GitHub release
+  `v0.10.0`; PR #72 merged. The website's `CURRENT_FORGE_VERSION` now says `0.10.0`.
+- **API:** `collectionResource(params, { transfer: 'public' })` / `documentResource(...)`; new type
+  `ForgeResourceOptions`. Default (no option) unchanged. Integrated in `createResource`, not in the
+  transport; `CmsApiService`, `ForgeAuthSession` and `/me` never transfer.
+- **Eligibility:** anonymous by construction — `credentials: 'omit'`, no `authToken`, and no forwarded
+  `Authorization` in the render's server context; otherwise the resource constructor throws `TypeError`.
+- **Key:** `forge:public:` + `[configured baseUrl, kind, C03 request key]` — identical on server and browser
+  (never S01's absolute origin). **Lifetime:** server writes only a successful, current attempt into that
+  render's own `TransferState`; the browser may use it for a resource's first request while the app is first
+  stabilizing (shared by identical resources), then every Forge entry is removed. `reload()`, key/route/
+  credential changes and full loads read normally. **Errors** are never written.
+- **tiny-project:** `provideClientHydration(withNoHttpTransferCache())`; home and post pages opt in. e2e
+  asserts zero browser reads, no console problem and the state payload; its helper now waits for hydration
+  before typing (SSR markup is visible before the app attaches).
+- **Packed consumer (`pnpm release:ssr`):** now also builds a `/public` page with an anonymous client and
+  runs the built server in Chromium: HTML + parsed `ng-state` (awkward `</script>` title round-trips, no
+  secrets/A/B data/errors), transferred resource 0 browser reads vs 1 for the default control (the pre-S02
+  count), DOM reused, no console problems, page change/reload read, full reload fresh, injected SSR failure
+  not serialized and recovered with one read, 9 concurrent anonymous/A/B `/public` renders with the same
+  single anonymous entry. CI installs Chromium before this step.
+- **Gates (newly executed 2026-10-07):** lint, typecheck, test (`@forge-cms/angular` 217 = +17 in
+  `transfer.test.ts`/`transfer-server.test.ts`), build, check:api (only `ForgeResourceOptions` added),
+  release:verify, release:compat, release:ssr (incl. the Chromium journey), e2e:www 41/41, e2e:demo 29/29,
+  e2e:tiny-project 15/15. `format:check` fails only on the maintainer's globally-ignored
+  `.claude/settings.local.json` (not in git; all repo files pass). **Not run / inherited:** test:upgrade,
+  test:cloudflare, test:libsql — no backend, adapter, runtime or schema change (inherited from CI).
+- **Findings:** libSQL/Nitro packaging workaround for the packed consumer is
+  unchanged (still isolated, still open); a failed SSR read re-renders that subtree at hydration.
+- **Not done (by design):** auth/session transfer, Local API bridging, event replay, S03.
+
 ## Official product website redesign (spec 079, 2026-10-05)
 
-Implemented on `feature/spec-079-official-web-redesign` — [PR #73](https://github.com/Andersseen/ForgeCMS/pull/73), pending merge. Spec:
+Implemented on `feature/spec-079-official-web-redesign` — [PR #73](https://github.com/Andersseen/ForgeCMS/pull/73), merged. Spec:
 [079-redesign-official-product-web.md](specs/079-redesign-official-product-web.md).
 
 - Official homepage now uses the logo's ink/violet/cyan palette, a large centred product hero and
@@ -25,7 +62,7 @@ Implemented on `feature/spec-079-official-web-redesign` — [PR #73](https://git
 - Copyable install command with success/denial feedback; keyboard-operable tabs, skip link, sticky
   homepage header and mobile Escape/focus handling. Revised capabilities, Lumea invitation, packages,
   readiness and final actions. Marketing styles remain isolated from admin and docs prose.
-- Website release source updated to **0.9.3**, verified with `pnpm view @forge-cms/core version` on
+- Website release source was updated to **0.9.3** at the time (superseded: now `0.10.0`, spec 080), verified with `pnpm view @forge-cms/core version` on
   2026-10-05; reviewed migrations no longer claim they await a patch release. Older release entries
   below remain historical evidence, not the current npm version.
 - Gates: format:check, lint, typecheck, test, build and www e2e **41/41** pass. Visual inspection:

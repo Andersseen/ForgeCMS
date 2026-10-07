@@ -7,12 +7,12 @@
  *
  * Product checkpoints are a separate axis. npm `0.8.x` is the roadmap `0.7` (upgrade safety) line:
  * `0.8.0` carries M01, `0.8.1` added M02's code (its changelog entry is in `0.8.2`); roadmap `0.8`
- * (Angular DX) will publish as npm `0.9.0` — see `ROADMAP_MILESTONES` and docs/STATE.md.
+ * (Angular DX) published as npm `0.9.0`; roadmap `0.9` (SSR) is the npm `0.10.x` line — see `ROADMAP_MILESTONES` and docs/STATE.md.
  *
- * Verified 2026-10-05 (spec 079): `pnpm view @forge-cms/core version` reports `0.9.3`.
+ * Verified 2026-10-07 (spec 080): `npm view @forge-cms/core version` reports `0.10.0` (GitHub release `v0.10.0`).
  * The website reports the published fixed-group release, independently of unmerged roadmap work.
  */
-export const CURRENT_FORGE_VERSION = '0.9.3';
+export const CURRENT_FORGE_VERSION = '0.10.0';
 
 export interface ForgePackage {
   /** The name after `@forge-cms/`. */

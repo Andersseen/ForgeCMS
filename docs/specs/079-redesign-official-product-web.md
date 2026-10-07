@@ -1,6 +1,6 @@
 # 079 — Redesign the official product web
 
-- **Status:** done (implemented and verified; PR #73 pending merge)
+- **Status:** done (merged in PR #73)
 - **Author:** agent draft
 - **Date:** 2026-10-05
 - **Branch:** feature/spec-079-official-web-redesign
@@ -221,7 +221,7 @@ the proposed composition and copy above are concrete defaults for approval.
 
 ## Outcome
 
-Implemented on `feature/spec-079-official-web-redesign`, [PR #73](https://github.com/Andersseen/ForgeCMS/pull/73) pending merge: centred
+Implemented on `feature/spec-079-official-web-redesign`, [PR #73](https://github.com/Andersseen/ForgeCMS/pull/73) (merged): centred
 brand-colour hero, VoltUI Schema/Content/API showcase, Angular Movement opacity transitions,
 Lumen Icons, copy feedback, accessible navigation, Lumea invitation and revised product sections.
 Published version verified with `pnpm view @forge-cms/core version`: `0.9.3`.

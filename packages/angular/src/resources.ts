@@ -2,6 +2,7 @@ import { computed, effect, inject, signal, untracked } from '@angular/core';
 import type { Signal } from '@angular/core';
 import { CmsApiService } from './api.service.js';
 import { credentialBoundary } from './credentials.js';
+import { ForgePublicTransfer, bindPublicTransfer } from './transfer.js';
 import { buildQueryString } from './query.js';
 import type { QueryOptions } from './query.js';
 import type { PaginatedDocuments } from './types.js';
@@ -46,6 +47,20 @@ export interface DocumentRequest<
   depth?: D;
 }
 
+/**
+ * Options of {@link collectionResource} / {@link documentResource}.
+ *
+ * `transfer: 'public'` (spec 080) opts one read into server → browser result transfer: a successful SSR
+ * result is serialized with Angular's `TransferState` and the first browser render reuses it instead of
+ * repeating the request. Only an anonymous client may use it (`provideForgeCms({ credentials: 'omit' })`,
+ * no `authToken`, no forwarded `Authorization`); otherwise creating the resource throws a `TypeError`.
+ * Errors are never transferred. Default: nothing is transferred. A custom `transport` that attaches its
+ * own identity is outside this contract: public transfer assumes the client sends none.
+ */
+export interface ForgeResourceOptions {
+  transfer?: 'public';
+}
+
 function toError(err: unknown): Error {
   return err instanceof Error ? err : new Error(String(err));
 }
@@ -77,7 +92,12 @@ interface ResourceState<TValue> {
 function createResource<TRequest, TValue>(
   params: () => TRequest | undefined,
   keyOf: (request: TRequest) => string,
-  load: (request: TRequest, signal: AbortSignal) => Promise<TValue>
+  load: (request: TRequest, signal: AbortSignal) => Promise<TValue>,
+  transfer?: {
+    hydrating: boolean;
+    keyOf(requestKey: string): string;
+    coordinator: ForgePublicTransfer;
+  }
 ): ForgeResource<TValue | undefined> {
   const credentials = credentialBoundary(inject(CmsApiService)).revision;
   const reloads = signal(0);
@@ -96,6 +116,9 @@ function createResource<TRequest, TValue>(
     if (current.revision === credentials()) return current;
     return { ...current, value: undefined, error: null, isLoading: current.key !== undefined };
   });
+
+  // Initial hydration only: the first request this resource makes may be answered by transferred state.
+  let hydrating = transfer?.hydrating === true;
 
   effect((onCleanup) => {
     const request = params();
@@ -119,13 +142,25 @@ function createResource<TRequest, TValue>(
         error: null
       });
 
+      const transferKey = transfer?.keyOf(key);
+      if (transfer && transferKey !== undefined) {
+        const hit = hydrating ? transfer.coordinator.read(transferKey) : undefined;
+        hydrating = false;
+        if (hit !== undefined) {
+          state.set({ key, revision, value: hit.value as TValue, isLoading: false, error: null });
+          return;
+        }
+      }
+
       const controller = new AbortController();
       onCleanup(() => controller.abort());
       const current = () => !controller.signal.aborted && untracked(credentials) === revision;
 
       load(request, controller.signal).then(
         (value) => {
-          if (current()) state.set({ key, revision, value, isLoading: false, error: null });
+          if (!current()) return;
+          if (transfer && transferKey !== undefined) transfer.coordinator.put(transferKey, value);
+          state.set({ key, revision, value, isLoading: false, error: null });
         },
         (err: unknown) => {
           if (current()) {
@@ -142,6 +177,13 @@ function createResource<TRequest, TValue>(
     error: computed(() => visible().error),
     reload: () => reloads.update((count) => count + 1)
   };
+}
+
+/** The transfer binding of one resource (spec 080): `undefined` unless it opted in; throws when not anonymous. */
+function transferOf(api: object, kind: string, options: ForgeResourceOptions) {
+  if (options.transfer !== 'public') return undefined;
+  const coordinator = inject(ForgePublicTransfer);
+  return { ...bindPublicTransfer(api, kind, coordinator), coordinator };
 }
 
 /**
@@ -163,7 +205,8 @@ export function collectionResource<
   D extends 0 | 1 = 0,
   L extends string | undefined = undefined
 >(
-  params: () => CollectionRequest<S, TSlug, D, L> | undefined
+  params: () => CollectionRequest<S, TSlug, D, L> | undefined,
+  options: ForgeResourceOptions = {}
 ): ForgeResource<PaginatedDocuments<ForgeDocument<S, TSlug, D, L>> | undefined> {
   const api = inject(CmsApiService) as unknown as CmsApiService<S>;
   return createResource(
@@ -174,7 +217,8 @@ export function collectionResource<
     ({ collection, ...query }, signal) =>
       api.listDocuments<TSlug, D, L>(collection, query as ForgeQueryOptions<S, TSlug, D, L>, {
         signal
-      })
+      }),
+    transferOf(api, 'collection', options)
   );
 }
 
@@ -184,7 +228,8 @@ export function documentResource<
   TSlug extends ForgeCollectionSlug<S> = ForgeCollectionSlug<S>,
   D extends 0 | 1 = 0
 >(
-  params: () => DocumentRequest<S, TSlug, D> | undefined
+  params: () => DocumentRequest<S, TSlug, D> | undefined,
+  options: ForgeResourceOptions = {}
 ): ForgeResource<ForgeDocument<S, TSlug, D> | undefined> {
   const api = inject(CmsApiService) as unknown as CmsApiService<S>;
   return createResource(
@@ -193,6 +238,7 @@ export function documentResource<
     ({ collection, id, depth }, signal) =>
       api.getDocument<TSlug, D>(collection, id, depth !== undefined ? { depth } : undefined, {
         signal
-      })
+      }),
+    transferOf(api, 'document', options)
   );
 }
