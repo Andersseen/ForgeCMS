@@ -1,5 +1,15 @@
 # @forge-cms/runtime
 
+## 0.10.1
+
+### Patch Changes
+
+- @forge-cms/core@0.10.1
+- @forge-cms/db@0.10.1
+- @forge-cms/auth@0.10.1
+- @forge-cms/storage@0.10.1
+- @forge-cms/api@0.10.1
+
 ## 0.10.0
 
 ### Patch Changes
