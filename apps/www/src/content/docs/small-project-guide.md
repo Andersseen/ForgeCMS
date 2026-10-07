@@ -258,13 +258,27 @@ media, and `AUTH_SECRET` (at least 32 bytes) in every build; only the dev server
 
 ```ts
 import { LibSqlDatabaseAdapter } from '@forge-cms/db';
-const database = new LibSqlDatabaseAdapter('file:./data.db').init(); // or a real libSQL/Turso URL
+// DATABASE_URL=file:/var/lib/app/forge.db (or a libsql:// URL)
+const database = new LibSqlDatabaseAdapter(process.env['DATABASE_URL']!);
 ```
 
+`@forge-cms/db` loads libSQL on the first operation, so `init()` does not open the database (a bad URL rejects
+the first call) and importing the package for an in-memory or D1 app costs nothing.
+
 Same `UsersCollectionAuthAdapter`, same `collections`, same runtime, same admin. Schema sync,
-first-admin bootstrap, sign-in, users, post CRUD, drafts, and the relation all work unchanged — this
-is proven, not assumed, by `apps/tiny-project`'s own portable-profile integration test in this
-repository.
+first-admin bootstrap, sign-in, users, post CRUD, drafts, and the relation all work unchanged.
+
+### Server rendering and production (S01–S03)
+
+Public pages server-render and hydrate: set `ssr: true` in `analog()`, provide
+`provideForgeCmsServer({ origin })` in `main.server.ts`, read public content with a `credentials: 'omit'`
+client and `collectionResource(params, { transfer: 'public' })`, and build with the public `angularLinker()`
+from `@forge-cms/angular/vite`. [SSR guide](/docs/ssr) has every snippet and the two production setups
+(Cloudflare Pages + D1; `node-server` + libSQL with `nitro: { externals: { trace: false } }` and `node_modules`
+shipped beside `dist/`). The path in this guide — install → collections → runtime → D1 or libSQL → auth
+handlers → admin → first admin → SSR → public client → hydration → build → serve — is exercised end to end, from
+packed public packages only, by `pnpm release:ssr`: Node + on-disk libSQL (with a server restart) and the
+Cloudflare Pages output under local workerd + local D1 (local evidence, not a remote deployment).
 
 **Not yet portable**: file uploads. `@forge-cms/storage`'s only durable adapter today is
 `R2StorageAdapter` (`@forge-cms/cloudflare`) — `InMemoryStorageAdapter` is development/testing only.

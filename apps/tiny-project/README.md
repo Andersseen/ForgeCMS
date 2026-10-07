@@ -28,10 +28,19 @@ pnpm e2e:tiny-project          # full browser golden path (Playwright)
 
 ## Profiles proven here
 
+Database selection (`src/server/api/runtime.ts`): `env.DB` → D1; else `DATABASE_URL` → libSQL; else
+`InMemoryDatabaseAdapter` (ordinary development). Durable **file** storage is not part of this profile
+(`InMemoryStorageAdapter`; portable files are roadmap 0.10).
+
 - **Cloudflare**: `D1DatabaseAdapter` when `env.DB` exists (`wrangler.toml`), proven for real (not
   mocked) by `test/workers/d1-lifecycle.test.ts` via `@cloudflare/vitest-plugin`.
 - **Portable**: `LibSqlDatabaseAdapter` with no Cloudflare binding of any kind, proven for real by
   `src/tests/portable-libsql.integration.test.ts`.
+
+Production (spec 081, roadmap 0.9 S03): `pnpm release:ssr` copies this app's source into a strict packed
+consumer and walks bootstrap → draft → publish → no-JS SSR → hydration → edit → fresh SSR → restart →
+unpublish on **Node `node-server` + on-disk libSQL** and on the **Cloudflare Pages output under local workerd +
+local D1** (local evidence, not a remote deployment).
 
 Both run the identical domain: schema sync, first-admin bootstrap, login, a second user, the full
 post lifecycle (create/draft-hidden/publish/edit/delete), the author relation, and a role boundary
@@ -52,7 +61,8 @@ post lifecycle (create/draft-hidden/publish/edit/delete), the author relation, a
   `provideForgeCmsServer({ origin })` (`FORGE_SSR_ORIGIN`, or `http://127.0.0.1:5175` under `pnpm dev`; a
   production render without it fails). The public pages read through `collectionResource` with their own
   anonymous client (route-level `provideForgeCms({ credentials: 'omit' })`), so the server HTML and the
-  browser both show published content only. No hydration transfer yet (S02): the browser fetches again.
+  browser both show published content only. The detail and list pages use `{ transfer: 'public' }` (spec 080), so
+  hydration reuses the server's result with no duplicate initial request.
   `src/tests/ssr-isolation.integration.test.ts` proves concurrent anonymous / A / B renders stay
   isolated; the e2e checks the no-JS HTML. `/api/site/*` remain the Local API server-route example.
 

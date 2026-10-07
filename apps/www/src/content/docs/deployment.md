@@ -150,8 +150,15 @@ docs: proven against the real engine running on your machine or in CI, not a sim
 **not** the same claim as a verified remote production deployment — that's still only checked by the
 `curl`-and-inspect step above, run by a maintainer after a real deploy.
 
+## Server-rendered production (SSR)
+
+Server-rendered public pages are certified on a built Cloudflare Pages output under local workerd + local D1,
+and on a built `node-server` with an on-disk libSQL database (including a restart). Remote Cloudflare
+deployments are not certified by that gate. See [SSR](/docs/ssr#deployment-notes-two-proven-production-profiles).
+
 ## Other platforms
 
-Nothing outside `@forge-cms/cloudflare` is Cloudflare-specific. Any Nitro preset (Node, Vercel,
-Netlify, Deno) works if you pair it with `LibSqlDatabaseAdapter` (SQLite or Turso) and a storage
-adapter of your own; the contract test suites tell you when your adapter is done.
+Nothing outside `@forge-cms/cloudflare` is Cloudflare-specific. The Node preset with `LibSqlDatabaseAdapter` is
+proven for SSR (needs `nitro: { externals: { trace: false } }` and `node_modules` beside `dist/`; see
+[SSR](/docs/ssr#node--libsql)). Other presets (Vercel, Netlify, Deno) work in principle if you pair them with
+`LibSqlDatabaseAdapter` (SQLite or Turso) and a storage adapter of your own; the contract test suites tell you when your adapter is done.

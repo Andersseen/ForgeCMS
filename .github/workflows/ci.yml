@@ -30,7 +30,10 @@ jobs:
   checks:
     name: Lint · Typecheck · Test · Build · Pack · E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Measured 2026-10-07: 11–12 min before spec 081, 13.5–14 min with the S03 journey (two production
+    # builds + Chromium on Node/libSQL and workerd/D1). 25 keeps ~45% headroom so a slow runner doesn't
+    # kill the release gate.
+    timeout-minutes: 25
 
     steps:
       - name: Checkout repository
@@ -112,6 +115,9 @@ jobs:
       # `node`; concurrent anonymous/A/B renders over real HTTP, linked bundles, no server code in the browser.
       # Spec 080 (S02): the same consumer then runs the built app in Chromium (hydration, request counts,
       # transfer-state inspection), so Playwright's browser must be installed first.
+      # Spec 081 (S03): a second packed consumer (tiny-project's source) walks bootstrap → draft → publish →
+      # no-JS SSR → hydration → edit → fresh SSR → restart → unpublish on a built Node server + on-disk libSQL
+      # and on the Cloudflare Pages output under local workerd + local D1. One gate, one step.
       - name: Packed production SSR consumer
         run: pnpm release:ssr
 

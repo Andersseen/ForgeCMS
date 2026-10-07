@@ -249,11 +249,56 @@ aborted. `ForgeAuthSession` runs its `/me` bootstrap per render: anonymous → `
 session → `'authenticated'`, outage → `'error'`. The admin UI is not meant to be server rendered; its
 guard simply resolves on the server as anonymous and the browser takes over.
 
-## Deployment notes
+## Deployment notes: two proven production profiles
 
-- **Node (`node-server` preset):** proven by `pnpm release:ssr` — a packed consumer built for production
-  and served by `node`, with concurrent anonymous / A / B requests.
-- **Cloudflare Pages:** with `nodejs_compat`, `process.env` carries your bindings (verified with
-  compatibility date 2026-05-15). Rendering
-  fetches your own origin (a subrequest); it is verified locally with `wrangler pages dev`, not yet on a
-  deployed project. Server routes that only need public data can use the Local API instead.
+`pnpm release:ssr` (spec 081, roadmap 0.9 S03) installs a consumer **from packed tarballs only** and walks the
+same journey on **built production servers** — never a dev server: first-admin bootstrap → sign in → create a
+draft in the admin → draft invisible to anonymous SSR and to a signed-in browser's public page → publish →
+no-JS HTML with the real title and body → hydration with **one** server read and **zero** duplicate browser
+reads → edit (the loaded page is _not_ changed) → SPA navigation reads normally → full reload is a fresh SSR
+carrying the edit → server restart (content persists) → back to draft (hidden everywhere). Restricted relation
+data (`author -> users`: email, id, hashes, `_sessionVersion`, roles), cookies, tokens and `AUTH_SECRET` never
+appear in the HTML, the transfer state, the hydrated DOM or any browser bundle.
+
+Both profiles use `provideForgeCmsServer({ origin })`, a public client with `credentials: 'omit'`, Angular
+hydration and `{ transfer: 'public' }` exactly as above.
+
+### Cloudflare Pages + D1
+
+Analog with the `cloudflare-pages` Nitro preset, a `DB` D1 binding, `AUTH_SECRET` (≥ 32 bytes) and
+`FORGE_SSR_ORIGIN`. `D1DatabaseAdapter` needs no native module and no extra bundler configuration. Evidence is
+**local**: the Pages output served by `wrangler pages dev` (workerd) with a real local D1 database persisted on
+disk. It is **not** a remote Cloudflare deployment and S03 does not certify one. With `nodejs_compat`,
+`process.env` carries your bindings (compatibility date 2026-05-15); rendering fetches your own origin (a
+subrequest). Server routes that only need public data can use the Local API instead.
+
+### Node + libSQL
+
+Analog with the `node-server` preset and the portable database:
+
+```ts
+// runtime: the database follows the environment
+const database = env.DATABASE_URL
+  ? new LibSqlDatabaseAdapter(env.DATABASE_URL) // e.g. DATABASE_URL=file:/var/lib/app/forge.db
+  : new InMemoryDatabaseAdapter(); // development only
+```
+
+Configure Nitro so native libSQL stays installed instead of being traced into the server output (Nitro's
+`externals.trace` option: when `false`, externalized dependencies are referenced from `node_modules` instead
+of being traced and copied; checked against nitropack 2.13):
+
+```ts
+// vite.config.ts
+analog({ ssr: true, nitro: { preset: 'node-server', externals: { trace: false } } });
+```
+
+libSQL ships a per-platform native package that Nitro's tracer cannot follow, so **production must ship
+`node_modules` beside `dist/`** (`pnpm install --prod` on the target, then `node dist/analog/server/index.mjs`
+from the project directory with `AUTH_SECRET`, `DATABASE_URL` and `FORGE_SSR_ORIGIN` set). Apps that only use
+`InMemoryDatabaseAdapter` or `D1DatabaseAdapter` need none of this: `@forge-cms/db` loads libSQL on the first
+database operation, so merely importing the package no longer pulls the native module in. Content survives
+process restarts (proven against a real on-disk file).
+
+> **libSQL is the durable _database_. `InMemoryStorageAdapter` is not durable _file_ storage.** Uploaded
+> files on the Node profile are not persistent yet; the complete portable files profile is roadmap 0.10
+> (P01–P03). Do not treat libSQL + `InMemoryStorageAdapter` as the final portable profile.
