@@ -33,9 +33,9 @@ import {
   atomicWriteMustApply,
   toAtomicWriteError
 } from './atomic-write.js';
-import { drizzle } from 'drizzle-orm/libsql';
+import type { drizzle } from 'drizzle-orm/libsql';
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
-import { createClient, type Client, type InStatement, type InValue } from '@libsql/client';
+import type { Client, InStatement, InValue } from '@libsql/client';
 import {
   eq,
   ne,
@@ -74,10 +74,31 @@ export interface LibSqlEnv {
   DATABASE_URL?: string;
 }
 
+/**
+ * `@libsql/client` and `drizzle-orm/libsql` are loaded on the first database operation, never when this
+ * module is imported: `@forge-cms/db`'s entry also serves InMemory-only apps, and a static import would make
+ * every bundler/tracer (Nitro, Vite, wrangler) resolve libSQL's platform-specific native binary for apps that
+ * never open a libSQL database. Each runtime still gets the right client — the specifier resolves through
+ * the app's own conditions (Node build on Node, fetch-based build on workerd/browsers).
+ */
+async function openConnection(
+  url: string
+): Promise<{ client: Client; db: ReturnType<typeof drizzle> }> {
+  // Sequential on purpose: both modules load `@libsql/core`, and concurrent first imports of a shared
+  // dependency can fail to link under Vitest's module runner.
+  const { createClient } = await import('@libsql/client');
+  const { drizzle: createDrizzle } = await import('drizzle-orm/libsql');
+  const client = createClient({ url });
+  return { client, db: createDrizzle(client) };
+}
+
 export class LibSqlDatabaseAdapter implements DatabaseAdapter {
   readonly name = 'libsql';
-  private client?: Client;
-  private db?: ReturnType<typeof drizzle>;
+  /** Set by the first operation after `init()` (see {@link openConnection}). */
+  private client: Client | undefined;
+  private db: ReturnType<typeof drizzle> | undefined;
+  private connection: Promise<void> | undefined;
+  private initialized = false;
   private collections = new Map<string, CollectionDefinition>();
   private url: string;
 
@@ -87,18 +108,40 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
 
   init(env?: unknown): this {
     const envRecord = env as LibSqlEnv | undefined;
-    const url = envRecord?.DATABASE_URL ?? this.url;
-    this.client = createClient({ url });
-    this.db = drizzle(this.client);
+    this.url = envRecord?.DATABASE_URL ?? this.url;
+    this.client = undefined;
+    this.db = undefined;
+    this.connection = undefined;
+    this.initialized = true;
     return this;
   }
 
-  private getDb(): ReturnType<typeof drizzle> {
+  /** Opens the database once per `init()`; a failed attempt (bad URL, missing client) is not cached. */
+  private async connect(): Promise<void> {
+    if (!this.initialized) {
+      throw new Error('LibSqlDatabaseAdapter not initialized. Call init() first.');
+    }
+    if (this.db && this.client) return;
+    const pending = (this.connection ??= openConnection(this.url).then((opened) => {
+      this.client = opened.client;
+      this.db = opened.db;
+    }));
+    try {
+      await pending;
+    } catch (error) {
+      if (this.connection === pending) this.connection = undefined;
+      throw error;
+    }
+  }
+
+  private async getDb(): Promise<ReturnType<typeof drizzle>> {
+    await this.connect();
     if (!this.db) throw new Error('LibSqlDatabaseAdapter not initialized. Call init() first.');
     return this.db;
   }
 
-  private getClient(): Client {
+  private async getClient(): Promise<Client> {
+    await this.connect();
     if (!this.client) throw new Error('LibSqlDatabaseAdapter not initialized. Call init() first.');
     return this.client;
   }
@@ -121,28 +164,28 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
     clearTableCache();
     for (const collection of collections) this.collections.set(collection.slug, collection);
     // Plan first, then one transactional batch of safe DDL — or a SchemaDriftError with nothing run (spec 070).
-    await syncSqliteSchema(this.schemaExecutor(), collections);
+    await syncSqliteSchema(await this.schemaExecutor(), collections);
   }
 
-  planSchema(collections: CollectionDefinition[]): Promise<SchemaPlan> {
-    return planSqliteSchema(this.schemaExecutor(), collections);
+  async planSchema(collections: CollectionDefinition[]): Promise<SchemaPlan> {
+    return planSqliteSchema(await this.schemaExecutor(), collections);
   }
 
   /** Reviewed migrations (spec 072): the shared SQLite engine over this adapter's executor. */
-  runMigrations(
+  async runMigrations(
     migrations: readonly MigrationDefinition[],
     options?: RunMigrationsOptions
   ): Promise<MigrationRunResult[]> {
-    return runSqliteMigrations(this.schemaExecutor(), migrations, options);
+    return runSqliteMigrations(await this.schemaExecutor(), migrations, options);
   }
 
-  readMigrationHistory(): Promise<MigrationRecord[]> {
-    return readSqliteMigrationHistory(this.schemaExecutor());
+  async readMigrationHistory(): Promise<MigrationRecord[]> {
+    return readSqliteMigrationHistory(await this.schemaExecutor());
   }
 
   /** Schema reads through `execute`, schema writes through libSQL's transactional `batch(…, 'write')`. */
-  private schemaExecutor(): SqliteSchemaExecutor {
-    const client = this.getClient();
+  private async schemaExecutor(): Promise<SqliteSchemaExecutor> {
+    const client = await this.getClient();
     return {
       async query(sql, args = []) {
         const result = await client.execute({ sql, args: args as InValue[] });
@@ -158,7 +201,7 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
   }
 
   async findById(collection: string, id: string): Promise<DatabaseRecord | null> {
-    const db = this.getDb();
+    const db = await this.getDb();
     const table = this.getTable(collection);
     const result = await db
       .select()
@@ -244,7 +287,7 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
   }
 
   async findMany(options: FindManyOptions): Promise<DatabaseRecord[]> {
-    const db = this.getDb();
+    const db = await this.getDb();
     const collectionDef = this.getCollectionDef(options.collection);
     const table = this.getTable(options.collection);
     let query = db.select().from(table);
@@ -300,7 +343,7 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
   }
 
   async create(collection: string, data: DatabaseRecord): Promise<DatabaseRecord> {
-    const db = this.getDb();
+    const db = await this.getDb();
     const table = this.getTable(collection);
     const record = this.buildCreateRecord(collection, data);
 
@@ -318,7 +361,7 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
     id: string,
     data: Partial<DatabaseRecord>
   ): Promise<DatabaseRecord> {
-    const db = this.getDb();
+    const db = await this.getDb();
     const table = this.getTable(collection);
     const updates = this.buildUpdateValues(collection, data);
 
@@ -339,7 +382,7 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
   }
 
   async delete(collection: string, id: string): Promise<void> {
-    const db = this.getDb();
+    const db = await this.getDb();
     const table = this.getTable(collection);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await db.delete(table).where(eq((table as any)['id'], id));
@@ -407,7 +450,7 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
     condition: WriteCondition
   ): Promise<ConditionalUpdateResult> {
     assertValidWriteCondition(condition);
-    const db = this.getDb();
+    const db = await this.getDb();
     const table = this.getTable(collection);
     const updates = this.buildUpdateValues(collection, data);
     const where = this.buildWriteCondition(collection, id, condition, table);
@@ -436,7 +479,7 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
     condition: WriteCondition
   ): Promise<ConditionalDeleteResult> {
     assertValidWriteCondition(condition);
-    const db = this.getDb();
+    const db = await this.getDb();
     const table = this.getTable(collection);
     const where = this.buildWriteCondition(collection, id, condition, table);
 
@@ -464,8 +507,8 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
     assertValidAtomicWrite(operations);
     if (operations.length === 0) return [];
 
-    const db = this.getDb();
-    const client = this.getClient();
+    const db = await this.getDb();
+    const client = await this.getClient();
     const statements: InStatement[] = [];
     const toResult: ((rows: DatabaseRecord[]) => AtomicWriteResult)[] = [];
     const resultIndex: number[] = [];
@@ -604,7 +647,7 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
   }
 
   async count(collection: string, where?: DatabaseWhere): Promise<number> {
-    const db = this.getDb();
+    const db = await this.getDb();
     const collectionDef = this.getCollectionDef(collection);
     const table = this.getTable(collection);
     let query = db.select({ count: drizzleCount() }).from(table);

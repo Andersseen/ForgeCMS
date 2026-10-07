@@ -1,4 +1,4 @@
-import { InMemoryDatabaseAdapter } from '@forge-cms/db';
+import { InMemoryDatabaseAdapter, LibSqlDatabaseAdapter } from '@forge-cms/db';
 import { UsersCollectionAuthAdapter } from '@forge-cms/auth';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import { D1DatabaseAdapter, type D1Database } from '@forge-cms/cloudflare';
@@ -6,7 +6,10 @@ import { ForgeCmsRuntime } from '@forge-cms/runtime';
 import { collections } from './collections';
 
 export interface ServerEnv {
+  /** Cloudflare D1 binding: selects the D1 profile. */
   DB?: D1Database;
+  /** A libSQL URL (`file:/data/forge.db`, `libsql://…`): selects the portable libSQL profile. */
+  DATABASE_URL?: string;
   AUTH_SECRET?: string;
   /** Opt-in flag for `POST /api/auth/signup` — unset (disabled) by default, matching apps/www. */
   FORGE_ENABLE_SIGNUP?: string;
@@ -31,13 +34,37 @@ let runtimePromise: Promise<ForgeCmsRuntime<ServerEnv>> | undefined;
  */
 export function getServerRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>> {
   if (!runtimePromise) {
-    runtimePromise = buildRuntime(env);
+    runtimePromise = buildRuntime(env ?? nodeEnv());
   }
   return runtimePromise;
 }
 
+/**
+ * Where a Node server (`node-server` preset, or the dev server) gets its configuration: the process
+ * environment, restricted to the keys this app reads. Cloudflare passes its bindings as `env` instead.
+ */
+function nodeEnv(): ServerEnv | undefined {
+  const processEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } })
+    .process?.env;
+  if (!processEnv) return undefined;
+  const env: ServerEnv = {};
+  if (processEnv['AUTH_SECRET'] !== undefined) env.AUTH_SECRET = processEnv['AUTH_SECRET'];
+  if (processEnv['DATABASE_URL'] !== undefined) env.DATABASE_URL = processEnv['DATABASE_URL'];
+  if (processEnv['FORGE_ENABLE_SIGNUP'] !== undefined) {
+    env.FORGE_ENABLE_SIGNUP = processEnv['FORGE_ENABLE_SIGNUP'];
+  }
+  return env;
+}
+
+/** The content database of the deployment: D1, else libSQL, else in-memory (local development). */
+function selectDatabase(env: ServerEnv | undefined) {
+  if (env?.DB) return new D1DatabaseAdapter();
+  if (env?.DATABASE_URL) return new LibSqlDatabaseAdapter(env.DATABASE_URL);
+  return new InMemoryDatabaseAdapter();
+}
+
 async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>> {
-  const database = env?.DB ? new D1DatabaseAdapter() : new InMemoryDatabaseAdapter();
+  const database = selectDatabase(env);
   const auth = new UsersCollectionAuthAdapter({ devMode: AUTH_DEV_MODE }).init({
     ...env,
     userDatabase: database
