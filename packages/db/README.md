@@ -3,6 +3,15 @@
 Database adapter contract for ForgeCMS, plus `InMemoryDatabaseAdapter` and `LibSqlDatabaseAdapter`
 (libSQL / Turso / a local SQLite file).
 
+## libSQL loads lazily
+
+`LibSqlDatabaseAdapter` loads `@libsql/client` on its first database operation, not when `@forge-cms/db` is
+imported (spec 081), so an app that only uses `InMemoryDatabaseAdapter` (or D1 through `@forge-cms/cloudflare`)
+never touches libSQL's native package. `init()` therefore does not open the database; a bad URL rejects the first
+call. If you serve an app that really opens a `file:` database from Nitro's `node-server` preset, keep the
+dependencies in `node_modules` instead of tracing them into the output (`nitro: { externals: { trace: false } }`):
+Nitro's tracer cannot follow libSQL's per-platform native package. See the SSR guide (`/docs/ssr`).
+
 ## Schema upgrades
 
 `syncSchema(collections)` plans before it changes anything (spec 070). Fresh tables and safe additive

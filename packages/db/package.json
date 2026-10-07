@@ -52,6 +52,7 @@
   },
   "devDependencies": {
     "@forge-cms/testing": "workspace:*",
+    "@types/node": "22.15.3",
     "drizzle-kit": "0.31.10",
     "typescript": "catalog:",
     "vitest": "catalog:"

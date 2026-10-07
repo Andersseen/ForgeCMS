@@ -1,12 +1,32 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-07 (spec 080 / roadmap 0.9 S02 — safe public hydration transfer — implemented on its branch; S01 and the
-> web redesign are merged and published as npm `0.10.0`; next is roadmap 0.9 / S03).**
+> **Last updated: 2026-10-07 (spec 081 / roadmap 0.9 S03 — production SSR consumer journey — IN PROGRESS on
+> `feature/spec-081-production-ssr-consumer-journey`, uncommitted; S01 and S02 are merged, npm `latest` was `0.10.0`
+> with manifests at `0.10.1` pending publish; roadmap 0.9 is NOT yet complete).**
 >
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Production SSR consumer journey — S03 (spec 081, 2026-10-07, in progress)
+
+Branch `feature/spec-081-production-ssr-consumer-journey` (uncommitted). Spec:
+[081-production-ssr-consumer-journey.md](specs/081-production-ssr-consumer-journey.md). **Roadmap 0.9 is not complete
+until this closes out.**
+
+- **Done:** `@forge-cms/db` `LibSqlDatabaseAdapter` loads `@libsql/client`/`drizzle-orm/libsql` lazily (first
+  operation), removing the Nitro/libSQL packaging workaround from the packed consumer (exports unchanged; `init()` no
+  longer opens the DB; regression test `lazy-libsql.test.ts`; patch changeset `lazy-libsql-client.md`). tiny-project
+  runtime selects D1 / libSQL (`DATABASE_URL`) / in-memory and renders the post body. `pnpm release:ssr` is split into
+  `scripts/ssr-consumer/{shared,technical,journey}.mjs`; the technical fixture passes unchanged, and the journey
+  (bootstrap → draft → publish → no-JS SSR → hydrate → edit → fresh SSR → restart → unpublish) passed on Node + on-disk
+  libSQL and on Cloudflare Pages output under **local** workerd + local D1 (not a remote deployment).
+- **Intentional libSQL on Nitro `node-server`** needs `nitro: { externals: { trace: false } }` and a project layout with
+  `node_modules`; recorded in the spec, not yet in the guides.
+- **Left:** extra negative-control assertions in the journey, CI timeout/comments, docs (`/docs/ssr`,
+  small-project guide, deployment, tiny-project README), the full gate list, reviews, changeset/release re-check,
+  mark S01–S03 and roadmap 0.9 complete. Next after that: roadmap 0.10 / P01 (not started).
 
 ## Safe public hydration and transfer — S02 (spec 080, 2026-10-07)
 
