@@ -1,10 +1,10 @@
 # 081 — Production SSR consumer journey (roadmap 0.9 / S03)
 
-- **Status:** in-progress
+- **Status:** done (2026-10-07)
 - **Author:** agent draft (implementation requested by the maintainer, 2026-10-07 — "spec 081 — roadmap
   0.9 / S03"; per [SDD.md](../SDD.md) an explicit request to implement counts as approval)
 - **Date:** 2026-10-07
-- **Branch:** feature/spec-081-production-ssr-consumer-journey
+- **Branch:** feature/spec-081-production-ssr-consumer-journey (PR #76); close-out feature/spec-081-s03-closeout
 - **Affected packages/apps:** @forge-cms/db (libSQL adapter loads its client lazily), apps/tiny-project (the
   journey's app source: libSQL profile + published post body), scripts (`pnpm release:ssr` becomes the S03
   production-consumer gate, split into helper modules), CI, apps/www (`/docs/ssr`,
@@ -153,14 +153,14 @@ Remote Cloudflare, S3, admin a11y, authenticated SSR. Local workerd/D1 evidence 
 ## Implementation plan
 
 - [x] 1. Evidence: reproduce the Nitro/libSQL failure; choose the lazy-load fix; recipe for intentional libSQL.
-- [ ] 2. `@forge-cms/db`: lazy libSQL loading, regression test, README note, changeset (patch).
-- [ ] 3. tiny-project: libSQL/`process.env` profile in `runtime.ts`; published post body on the detail page;
+- [x] 2. `@forge-cms/db`: lazy libSQL loading, regression test, README note, changeset (patch).
+- [x] 3. tiny-project: libSQL/`process.env` profile in `runtime.ts`; published post body on the detail page;
      README reconciled.
-- [ ] 4. `scripts/ssr-consumer/` helper modules; technical fixture moved over **unchanged in assertions** and
+- [x] 4. `scripts/ssr-consumer/` helper modules; technical fixture moved over **unchanged in assertions** and
      without the workaround; journey consumer + both profiles.
-- [ ] 5. CI: timeout and step comments; `pnpm release:ssr` description.
-- [ ] 6. Docs: `/docs/ssr`, `/docs/small-project-guide`, deployment docs, STATE, ROADMAP, `0.9-ssr.md`.
-- [ ] 7. Gates; spec/forge-rules review; close-out.
+- [x] 5. CI: timeout and step comments; `pnpm release:ssr` description.
+- [x] 6. Docs: `/docs/ssr`, `/docs/small-project-guide`, deployment docs, STATE, ROADMAP, `0.9-ssr.md`.
+- [x] 7. Gates; spec/forge-rules review; close-out.
 
 ## Test plan
 
@@ -198,4 +198,33 @@ None blocking.
 
 ## Outcome
 
-_(filled at close-out)_
+**Merged core (PR #76):** lazy libSQL in `@forge-cms/db` (+ `lazy-libsql.test.ts`, patch changeset
+`lazy-libsql-client.md`), tiny-project profiles (`env.DB` → D1, `DATABASE_URL` → libSQL, else InMemory) and post body,
+`scripts/ssr-consumer/{shared,technical,journey}.mjs`, both production profiles passing.
+
+**Close-out PR (`feature/spec-081-s03-closeout`):** extra negative controls in `journey.mjs` — admin email/id,
+`passwordHash`, `_sessionVersion`, role, Bearer, cookie and `AUTH_SECRET` absent from HTML, transfer entry and
+hydrated DOM; restricted `author -> users` relation is redacted to `null` for anonymous readers; no
+`SERVER_ORIGIN_REQUIRED`/JIT/NG0/hydration/native-module diagnostics. (Finding: playwright's `APIRequestContext`
+got `401` for `/api/v1/users` on workerd where the page's own `fetch` succeeds, so the id is read in-page.) CI
+timeout 20 → 25 min (measured 13.5–14 min with the journey, 11–12 before). Docs: `/docs/ssr`, small-project guide,
+deployment, tiny-project README, STATE, ROADMAP, `0.9-ssr.md`.
+
+**Evidence (journey, both profiles):** bootstrap (second attempt 409) → sign in → admin creates a draft → anonymous
+no-JS `/` and `/posts/:slug` and the admin-signed-in browser never show it → publish → no-JS HTML has `<h1>` + body →
+hydration: 1 SSR read, 0 browser reads, server DOM reused → edit: loaded page unchanged, no push/poll → SPA navigation:
+2 normal reads, new content → full reload: fresh SSR (1 read), 0 duplicate browser reads → server restart (same libSQL
+file / same D1 directory): content persisted, same counts → unpublish: hidden in HTML, transfer state, reload and SPA.
+Node = built `node-server` + real on-disk libSQL; Cloudflare = Pages output under **local** workerd + local D1.
+**Remote Cloudflare deployment is not certified by S03.** Durable uploaded files are out of scope (roadmap 0.10).
+
+**Packaging:** the technical consumer builds and passes with no alias/inline workaround. Intentional libSQL on
+`node-server` documented as `nitro: { externals: { trace: false } }` + `node_modules` beside `dist/` (Nitro
+`externals.trace`, nitropack 2.13.4). No `@forge-cms/analog` package needed (glue measured: one `main.server.ts`, one
+vite config, thin routes).
+
+**Public API:** unchanged (`pnpm check:api`). One existing patch changeset suffices (behavior-compatible).
+
+**Release truth:** npm `latest` `0.10.1`; `0.10.2` is a pending Version Packages PR #77, not published.
+
+**Gates:** see docs/STATE.md and the PR for newly-executed vs inherited results.

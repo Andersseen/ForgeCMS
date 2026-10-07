@@ -1,13 +1,18 @@
 # ROADMAP — A small, dependable ForgeCMS 1.0
 
+> **2026-10-07 (spec 081):** roadmap **0.9 — SSR and Analog consumption — is complete** (S01–S03). S03 certified
+> the production consumer journey from packed public packages on a built Node server with on-disk libSQL (incl. a
+> restart) and on the Cloudflare Pages output under local workerd + local D1 (local evidence; no remote deployment
+> claim), and made `@forge-cms/db` load libSQL lazily (patch → `0.10.2`, pending). npm `latest` is `0.10.1`.
+> **Next bounded responsibility: roadmap 0.10 / P01 — Basic S3-compatible StorageAdapter.**
+>
 > **2026-10-07 (spec 080):** roadmap 0.9 **S02** (safe public hydration and transfer) is implemented on
 > its branch. `collectionResource`/`documentResource` accept `{ transfer: 'public' }`: only an anonymous
 > client (`credentials: 'omit'`, no token, no forwarded `Authorization`) may use it, the successful SSR
 > result goes through Angular's `TransferState` under a logical key, the first browser render reuses it
 > with zero requests, it is dropped at first stability, and errors/auth/session are never transferred.
 > Proven in tiny-project and in the packed production consumer's Chromium journey (`pnpm release:ssr`).
-> npm `latest` is **`0.10.0`** (S01, GitHub release `v0.10.0`); S02 is a patch changeset (→ `0.10.1`).
-> **Roadmap 0.9 is not complete — next: S03** (production SSR consumer journey).
+> S02 shipped in npm `0.10.1` (S01 in `0.10.0`).
 >
 > **2026-10-05 (spec 078):** roadmap 0.9 **S01** (request-scoped server transport and SSR identity
 > isolation) shipped in npm `0.10.0` (PR #71, release PR #72). `provideForgeCmsServer({ origin })`

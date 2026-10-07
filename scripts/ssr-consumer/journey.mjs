@@ -54,6 +54,8 @@ const EDITED = {
   title: 'Production journey post (edited)',
   body: 'Edited body, served after a fresh render.'
 };
+/** The bootstrapped admin's user id (read through the authenticated API once signed in); '' until then. */
+let adminId = '';
 const HTML_BODY = 'First version of the body. Café &amp; coffee.';
 
 /** Strings that must never reach a browser bundle (server code, secrets, database drivers). */
@@ -409,10 +411,17 @@ function expectCleanPublicHtml(html, label) {
     'SERVER_ORIGIN_REQUIRED',
     'JIT compiler unavailable',
     'ForgeApiError',
-    'role="alert"'
+    'role="alert"',
+    'Bearer ',
+    'hydration mismatch',
+    'libsql',
+    'Cannot find module'
   ]) {
     if (html.includes(marker)) fail(`${label}: the HTML contains '${marker}'`);
   }
+  const markup = html.replace(/<script[^>]*id="ng-state"[^>]*>[\s\S]*?<\/script>/, '');
+  if (adminId !== '' && markup.includes(adminId))
+    fail(`${label}: the markup renders the admin's id`);
   if (!html.includes('ng-server-context')) fail(`${label}: not server rendered`);
   if (/\bNG0\d+/.test(html)) fail(`${label}: the HTML carries an Angular diagnostic`);
 }
@@ -425,9 +434,27 @@ function publicEntry(html, label) {
   if (entry === undefined) return undefined;
   if (/https?:|127\.0\.0\.1/.test(entry[0])) fail(`${label}: the transfer key embeds an origin`);
   const serialized = JSON.stringify(entry[1]);
-  for (const marker of [ADMIN.email, 'passwordHash', 'role', 'forge_session']) {
+  for (const marker of [
+    ADMIN.email,
+    'passwordHash',
+    '_sessionVersion',
+    'role',
+    'forge_session',
+    'Bearer ',
+    SECRET,
+    '"users"'
+  ]) {
     if (serialized.includes(marker)) fail(`${label}: the transfer entry contains '${marker}'`);
   }
+  // The restricted `author -> users` relation is redacted for an anonymous reader: `null`, not an id and
+  // not a populated record. The admin's id must not appear anywhere in the transfer.
+  for (const doc of entry[1]?.docs ?? []) {
+    if (doc.author !== null && doc.author !== undefined) {
+      fail(`${label}: the transfer entry exposes the author: ${JSON.stringify(doc.author)}`);
+    }
+  }
+  if (adminId !== '' && serialized.includes(adminId))
+    fail(`${label}: the transfer carries the admin's id`);
   return entry[1];
 }
 
@@ -514,6 +541,21 @@ async function expectPublicPage(page, origin, path, expectation, log, label) {
     );
   }
   await expectation(page);
+  // The hydrated DOM must not have gained private data either (it is what a user's browser actually holds).
+  const dom = await page.content();
+  for (const marker of [
+    ADMIN.email,
+    '_sessionVersion',
+    'passwordHash',
+    SECRET,
+    'Bearer ',
+    'SERVER_ORIGIN_REQUIRED'
+  ]) {
+    if (dom.includes(marker)) fail(`${label}: the hydrated DOM contains '${marker}'`);
+  }
+  if (adminId !== '' && dom.includes(adminId))
+    fail(`${label}: the hydrated DOM contains the admin's id`);
+  if (/\bNG0\d+/.test(dom)) fail(`${label}: the hydrated DOM carries an Angular diagnostic`);
   if (log.problems.length > 0) fail(`${label}: browser problems:\n${log.problems.join('\n')}`);
   console.log(`  ✓ ${label}: 1 SSR read, 0 browser reads, hydrated, no console problem`);
 }
@@ -554,6 +596,15 @@ async function journey({ profile, dir, outDir }) {
     await adminPage.getByRole('button', { name: /log out/i }).click();
     await adminPage.waitForURL('**/admin/login**');
     await signIn(adminPage, origin());
+    // Read through the signed-in page itself (same-origin fetch with its session cookie).
+    const usersBody = await adminPage.evaluate(async () => {
+      const response = await fetch('/api/v1/users', { credentials: 'same-origin' });
+      return `${response.status} ${await response.text()}`;
+    });
+    adminId =
+      (JSON.parse(usersBody.slice(4)).data ?? []).find((user) => user.email === ADMIN.email)?.id ??
+      '';
+    if (adminId === '') fail(`could not read the admin user id: ${usersBody}`);
     console.log(
       '  ✓ first admin bootstrapped (second attempt 409); signed in through the admin UI'
     );

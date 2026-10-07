@@ -1,41 +1,45 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-07 (spec 081 / roadmap 0.9 S03 — production SSR consumer journey — IN PROGRESS on
-> `feature/spec-081-production-ssr-consumer-journey`, uncommitted; S01 and S02 are merged, npm `latest` was `0.10.0`
-> with manifests at `0.10.1` pending publish; roadmap 0.9 is NOT yet complete).**
->
+> **Last updated: 2026-10-07 (spec 081 / roadmap 0.9 S03 — production SSR consumer journey — COMPLETE; roadmap 0.9
+> (S01–S03) is complete. Core merged in PR #76; close-out on `feature/spec-081-s03-closeout`. npm `latest` =
+> `0.10.1`; `0.10.2` (the lazy-libSQL patch) is only a pending Version Packages PR #77. Next: roadmap 0.10 / P01).**
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
 
-## Production SSR consumer journey — S03 (spec 081, 2026-10-07, in progress)
+## Production SSR consumer journey — S03 (spec 081, 2026-10-07, complete)
 
-Branch `feature/spec-081-production-ssr-consumer-journey` (uncommitted). Spec:
-[081-production-ssr-consumer-journey.md](specs/081-production-ssr-consumer-journey.md). **Roadmap 0.9 is not complete
-until this closes out.**
+Spec: [081-production-ssr-consumer-journey.md](specs/081-production-ssr-consumer-journey.md). Core in PR #76 (merged),
+close-out (extra negative controls, docs, CI timeout) on `feature/spec-081-s03-closeout`. **Roadmap 0.9 is complete.**
 
-- **Done:** `@forge-cms/db` `LibSqlDatabaseAdapter` loads `@libsql/client`/`drizzle-orm/libsql` lazily (first
-  operation), removing the Nitro/libSQL packaging workaround from the packed consumer (exports unchanged; `init()` no
-  longer opens the DB; regression test `lazy-libsql.test.ts`; patch changeset `lazy-libsql-client.md`). tiny-project
-  runtime selects D1 / libSQL (`DATABASE_URL`) / in-memory and renders the post body. `pnpm release:ssr` is split into
-  `scripts/ssr-consumer/{shared,technical,journey}.mjs`; the technical fixture passes unchanged, and the journey
-  (bootstrap → draft → publish → no-JS SSR → hydrate → edit → fresh SSR → restart → unpublish) passed on Node + on-disk
-  libSQL and on Cloudflare Pages output under **local** workerd + local D1 (not a remote deployment).
-- **Intentional libSQL on Nitro `node-server`** needs `nitro: { externals: { trace: false } }` and a project layout with
-  `node_modules`; recorded in the spec, not yet in the guides.
-- **Left:** extra negative-control assertions in the journey, CI timeout/comments, docs (`/docs/ssr`,
-  small-project guide, deployment, tiny-project README), the full gate list, reviews, changeset/release re-check,
-  mark S01–S03 and roadmap 0.9 complete. Next after that: roadmap 0.10 / P01 (not started).
+- **`@forge-cms/db`:** `LibSqlDatabaseAdapter` loads `@libsql/client`/`drizzle-orm/libsql` lazily (first operation), so
+  an InMemory/D1 consumer needs no Nitro/libSQL workaround (exports unchanged; `init()` no longer opens the DB; failed
+  opens are not cached; concurrent first operations share one connection; `lazy-libsql.test.ts`). Patch changeset
+  `lazy-libsql-client.md` → pending `0.10.2` (PR #77, **not published**).
+- **`pnpm release:ssr`** (`scripts/ssr-consumer/{shared,technical,journey}.mjs`): the S01/S02 technical fixture
+  (unchanged assertions, no workaround) plus the journey — tiny-project's own source in a strict packed consumer:
+  bootstrap → sign in → draft → draft hidden (no-JS HTML, transfer state, admin-signed-in browser) → publish → no-JS
+  SSR → hydration (1 SSR read, 0 browser reads) → edit (loaded page unchanged, no push/poll) → SPA navigation (normal
+  reads) → full reload (fresh SSR, 1 + 0) → server restart → unpublish. Passes on **Node `node-server` + on-disk libSQL**
+  (restart on the same file) and on the **Cloudflare Pages output under local workerd + local D1** (local evidence — not
+  a remote deployment). Close-out negative controls: restricted `author -> users` relation redacted (`null`), no admin
+  email/id/hash/`_sessionVersion`/role/Bearer/cookie/`AUTH_SECRET` in HTML, transfer entry or hydrated DOM; no
+  `SERVER_ORIGIN_REQUIRED`/JIT/NG0/native-module diagnostics.
+- **Intentional libSQL on Node:** `nitro: { externals: { trace: false } }` + `node_modules` shipped beside `dist/`
+  (Nitro `externals.trace`, checked in nitropack 2.13.4); documented in `/docs/ssr`, the small-project guide and
+  deployment. `InMemoryStorageAdapter` is still not durable file storage — portable files are roadmap 0.10 (P01–P03).
+- **CI:** `checks` timeout 20 → 25 min (measured 13.5–14 min with the journey; 11–12 before); one `pnpm release:ssr` step.
+- **Next:** roadmap 0.10 / P01 — Basic S3-compatible StorageAdapter (not started).
 
 ## Safe public hydration and transfer — S02 (spec 080, 2026-10-07)
 
 Branch `feature/spec-080-safe-public-hydration-transfer`. Spec:
 [080-safe-public-hydration-transfer.md](specs/080-safe-public-hydration-transfer.md). Guide: `/docs/ssr`
-("Hydration and public transfer"). **S03 not started; roadmap 0.9 is not complete.**
+("Hydration and public transfer"). (S03 is complete — see above.)
 
-- **Release truth (verified 2026-10-07):** npm `latest` = `0.10.0` for the whole fixed group; GitHub release
-  `v0.10.0`; PR #72 merged. The website's `CURRENT_FORGE_VERSION` now says `0.10.0`.
+- **Release truth (verified 2026-10-07, at close-out):** npm `latest` = `0.10.1` for the whole fixed group (S02 +
+  earlier); PR #77 (`0.10.2`) open, unpublished. The website's `CURRENT_FORGE_VERSION` says `0.10.1`.
 - **API:** `collectionResource(params, { transfer: 'public' })` / `documentResource(...)`; new type
   `ForgeResourceOptions`. Default (no option) unchanged. Integrated in `createResource`, not in the
   transport; `CmsApiService`, `ForgeAuthSession` and `/me` never transfer.
@@ -96,7 +100,7 @@ Implemented on `feature/spec-079-official-web-redesign` — [PR #73](https://git
 
 Branch `feature/spec-078-request-scoped-server-transport`. Spec:
 [docs/specs/078-request-scoped-server-transport.md](specs/078-request-scoped-server-transport.md). Guide:
-`apps/www/src/content/docs/ssr.md` (`/docs/ssr`). **S02 (hydration/transfer) and S03 not started.**
+`apps/www/src/content/docs/ssr.md` (`/docs/ssr`). (S02 and S03 were done later — see above.)
 
 - **Problem found:** nothing in `@forge-cms/angular` had run on a server. Relative `/api/v1` cannot resolve
   without `location` (every resource errored), a server has no cookie jar (identity undefined), the C01
