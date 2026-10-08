@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked
+} from '@angular/core';
 import {
   VoltButton,
   VoltCard,
@@ -25,6 +33,7 @@ import { ErrorStateComponent } from './error-state.component.js';
 import { LoadingStateComponent } from './loading-state.component.js';
 import { PageHeaderComponent } from './page-header.component.js';
 import { ForgeConfirmDialogComponent } from './confirm-dialog.component.js';
+import { describeAdminError, isForbiddenError } from './admin-error.js';
 
 interface UserFormValue {
   name: string;
@@ -152,23 +161,44 @@ function emptyForm(): UserFormValue {
             }
 
             <div class="flex items-center justify-end gap-2 pt-2">
-              <volt-button type="button" variant="outline" size="sm" (click)="cancelForm()">
+              <volt-button
+                type="button"
+                variant="outline"
+                size="sm"
+                [disabled]="saving()"
+                (click)="cancelForm()"
+              >
                 Cancel
               </volt-button>
-              <volt-button type="button" size="sm" (click)="onSubmit($event)">
-                {{ editingUser() ? 'Save' : 'Create' }}
+              <volt-button
+                type="button"
+                size="sm"
+                [disabled]="saving() || !isAdmin()"
+                (click)="onSubmit($event)"
+              >
+                {{ saving() ? 'Saving…' : editingUser() ? 'Save' : 'Create' }}
               </volt-button>
             </div>
           </div>
         </volt-card>
       }
 
-      @if (!isAdmin()) {
-        <forge-error-state
-          title="Access denied"
-          message="You don't have permission to manage users."
-          [showRetry]="false"
-        />
+      @if (session.loading() && !isAdmin()) {
+        <forge-loading-state variant="table" />
+      } @else if (!isAdmin()) {
+        @if (session.expired()) {
+          <forge-error-state
+            title="Session expired"
+            message="Your session expired. Sign in again to manage users."
+            [showRetry]="false"
+          />
+        } @else {
+          <forge-error-state
+            title="Access denied"
+            message="You don't have permission to manage users."
+            [showRetry]="false"
+          />
+        }
       } @else if (loading()) {
         <forge-loading-state variant="table" />
       } @else if (error()) {
@@ -250,6 +280,8 @@ function emptyForm(): UserFormValue {
       [open]="deleteTarget() !== null"
       title="Delete this user?"
       [message]="deleteMessage()"
+      [pending]="deleting()"
+      [error]="deleteError()"
       (confirm)="confirmDelete()"
       (cancel)="cancelDelete()"
     />
@@ -257,7 +289,7 @@ function emptyForm(): UserFormValue {
 })
 export class ForgeUsersWorkspaceComponent {
   private readonly api = inject(CmsApiService);
-  private readonly session = inject(ForgeAuthSession);
+  protected readonly session = inject(ForgeAuthSession);
 
   readonly users = signal<AuthUser[]>([]);
   readonly loading = signal(true);
@@ -268,6 +300,15 @@ export class ForgeUsersWorkspaceComponent {
   readonly form = signal<UserFormValue>(emptyForm());
   readonly formError = signal<string | null>(null);
   readonly deleteTarget = signal<AuthUser | null>(null);
+  readonly saving = signal(false);
+  readonly deleting = signal(false);
+  readonly deleteError = signal<string | null>(null);
+
+  /** Latest-wins: only the newest `load()` may commit, and starting one aborts the previous. */
+  private loadToken = 0;
+  /** Bumped when admin permission is lost: outcomes of earlier mutations are then discarded. */
+  private mutationEpoch = 0;
+  private loadAbort: AbortController | null = null;
 
   private readonly adminCount = computed(
     () => this.users().filter((user) => userRole(user) === 'admin').length
@@ -284,7 +325,31 @@ export class ForgeUsersWorkspaceComponent {
   });
 
   constructor() {
-    void this.load();
+    // The live session decides whether this workspace is actionable. Admin → load the users; the
+    // moment the server says otherwise (demotion, expiry) drop the rows and any open form/dialog so
+    // nothing admin-only stays on screen as something to act on. The server remains the authority.
+    effect(() => {
+      const admin = this.isAdmin();
+      untracked(() => {
+        if (admin) {
+          void this.load();
+          return;
+        }
+        this.loadAbort?.abort();
+        this.loadToken++;
+        this.mutationEpoch++;
+        this.users.set([]);
+        this.loading.set(false);
+        this.error.set(null);
+        this.deleteTarget.set(null);
+        this.deleteError.set(null);
+        this.deleting.set(false);
+        this.saving.set(false);
+        // An expired session keeps the half-typed form (nothing is lost by waiting for sign-in);
+        // a demotion has nothing left to save it to.
+        if (!this.session.expired()) this.cancelForm();
+      });
+    });
   }
 
   isSelf(user: AuthUser): boolean {
@@ -297,15 +362,23 @@ export class ForgeUsersWorkspaceComponent {
   }
 
   async load(): Promise<void> {
+    const token = ++this.loadToken;
+    this.loadAbort?.abort();
+    const abort = new AbortController();
+    this.loadAbort = abort;
+
     this.loading.set(true);
     this.error.set(null);
     try {
-      const users = await this.api.getUsers();
+      const users = await this.api.getUsers({ signal: abort.signal });
+      if (token !== this.loadToken) return;
       this.users.set(users);
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Failed to load users');
+      if (token !== this.loadToken) return;
+      if (isForbiddenError(err)) void this.session.refresh();
+      this.error.set(describeAdminError(err));
     } finally {
-      this.loading.set(false);
+      if (token === this.loadToken) this.loading.set(false);
     }
   }
 
@@ -329,6 +402,7 @@ export class ForgeUsersWorkspaceComponent {
   }
 
   cancelForm(): void {
+    if (this.saving()) return;
     this.showForm.set(false);
     this.editingUser.set(null);
     this.form.set(emptyForm());
@@ -345,6 +419,7 @@ export class ForgeUsersWorkspaceComponent {
 
   async onSubmit(event: Event): Promise<void> {
     event.preventDefault();
+    if (this.saving() || !this.isAdmin()) return;
     this.formError.set(null);
 
     const current = this.form();
@@ -365,36 +440,65 @@ export class ForgeUsersWorkspaceComponent {
       input.password = current.password;
     }
 
+    const epoch = this.mutationEpoch;
+    this.saving.set(true);
     try {
       if (editing) {
         await this.api.updateUser(editing.id, input);
       } else {
         await this.api.createUser(input as CreateUserInput);
       }
-      this.cancelForm();
-      await this.load();
     } catch (err) {
-      this.formError.set(err instanceof Error ? err.message : 'Failed to save user');
+      if (epoch !== this.mutationEpoch) return;
+      // Nothing was saved: the form stays exactly as typed so the editor can correct and retry.
+      if (isForbiddenError(err)) void this.session.refresh();
+      this.formError.set(describeAdminError(err));
+      this.saving.set(false);
+      return;
     }
+
+    if (epoch !== this.mutationEpoch) return;
+    this.saving.set(false);
+    this.cancelForm();
+    // Changing the signed-in user's own role/password changes what the server will let them do next.
+    if (editing && this.isSelf(editing)) void this.session.refresh();
+    await this.load();
   }
 
   requestDelete(user: AuthUser): void {
+    if (this.deleting()) return;
+    this.deleteError.set(null);
     this.deleteTarget.set(user);
   }
 
   cancelDelete(): void {
+    if (this.deleting()) return;
     this.deleteTarget.set(null);
+    this.deleteError.set(null);
   }
 
   async confirmDelete(): Promise<void> {
     const user = this.deleteTarget();
-    if (!user) return;
-    this.deleteTarget.set(null);
+    if (!user || this.deleting()) return;
+
+    const epoch = this.mutationEpoch;
+    this.deleting.set(true);
+    this.deleteError.set(null);
     try {
       await this.api.deleteUser(user.id);
-      await this.load();
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Failed to delete user');
+      if (epoch !== this.mutationEpoch) return;
+      // Not deleted: keep the dialog (and the row) so confirming again is the retry. A refused
+      // last-admin delete (409) keeps the server's own message.
+      if (isForbiddenError(err)) void this.session.refresh();
+      this.deleteError.set(describeAdminError(err));
+      this.deleting.set(false);
+      return;
     }
+
+    if (epoch !== this.mutationEpoch) return;
+    this.deleting.set(false);
+    this.deleteTarget.set(null);
+    await this.load();
   }
 }

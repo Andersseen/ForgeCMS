@@ -561,6 +561,9 @@ importers:
         specifier: workspace:*
         version: link:../angular
     devDependencies:
+      '@analogjs/vite-plugin-angular':
+        specifier: 2.4.8
+        version: 2.4.8(@angular/build@21.2.10(67b0086a5812e394b54d0ac967800108))
       '@angular/compiler':
         specifier: 21.2.10
         version: 21.2.10
@@ -7375,7 +7378,7 @@ snapshots:
       lmdb: 3.5.1
       postcss: 8.5.14
       tailwindcss: 4.3.0
-      vitest: 4.1.6(@types/node@22.15.3)(@vitest/coverage-v8@4.1.6)(jsdom@27.3.0)(vite@7.1.4(@types/node@22.15.3)(jiti@2.7.0)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.48.0)(tsx@4.22.3))
+      vitest: 4.1.6(@types/node@22.15.3)(@vitest/coverage-v8@4.1.6)(jsdom@27.4.0)(vite@7.1.4(@types/node@22.15.3)(jiti@2.7.0)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.48.0)(tsx@4.22.3))
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'

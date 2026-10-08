@@ -46,3 +46,12 @@ export function describeSessionError(error: unknown): string {
   if (error instanceof ApiAuthActionError) return error.message;
   return describeAdminError(error);
 }
+
+/**
+ * True for a `403` — one forbidden operation, which is *not* a lost session. Callers reconcile the
+ * live role through `ForgeAuthSession.refresh()` (the server stays the authority) instead of
+ * treating it as a sign-out (spec 085).
+ */
+export function isForbiddenError(error: unknown): boolean {
+  return error instanceof ForgeApiError && error.status === 403;
+}

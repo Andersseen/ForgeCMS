@@ -5,6 +5,7 @@ import {
   effect,
   inject,
   input,
+  linkedSignal,
   signal
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -29,7 +30,7 @@ import { ErrorStateComponent } from './error-state.component.js';
 import { documentLabel, shortId } from './document-label.js';
 import { buildListQuery, findSearchableField, pageAfterDelete } from './content-query.js';
 import { debounce } from './debounce.js';
-import { describeAdminError } from './admin-error.js';
+import { describeAdminError, isForbiddenError } from './admin-error.js';
 import { ForgeContentRefresh } from './content-refresh.js';
 
 type StatusFilter = 'all' | 'draft' | 'published';
@@ -118,6 +119,7 @@ const STATUS_LABELS: Record<StatusFilter, string> = {
             [readOnly]="readOnly()"
             [meta]="documentsResource.value()?.meta ?? null"
             [sort]="sort()"
+            [pendingIds]="statusPending()"
             (create)="create()"
             (edit)="edit($event)"
             (delete)="requestDelete($event)"
@@ -133,6 +135,8 @@ const STATUS_LABELS: Record<StatusFilter, string> = {
       [open]="deleteTarget() !== null"
       title="Delete this document?"
       [message]="deleteMessage()"
+      [pending]="deleting()"
+      [error]="deleteError()"
       (confirm)="confirmDelete()"
       (cancel)="cancelDelete()"
     />
@@ -161,15 +165,33 @@ export class ForgeCollectionWorkspaceComponent {
   protected readonly metaError = signal<string | null>(null);
   private metaToken = 0;
 
-  protected readonly page = signal(1);
-  protected readonly sort = signal<SortRequest | null>(null);
-  protected readonly status = signal<StatusFilter>('all');
-  protected readonly searchTerm = signal('');
-  private readonly debouncedSearch = signal('');
-  private readonly applyDebouncedSearch = debounce(
-    (term: string) => this.debouncedSearch.set(term),
-    300
-  );
+  // Query state belongs to one collection: the router reuses this component when only `:collection`
+  // changes, so every piece of it resets (synchronously, before the list request is built) to its
+  // default whenever the slug changes — and survives everything else, an editor round trip included.
+  protected readonly page = linkedSignal<string | undefined, number>({
+    source: this.collectionSlug,
+    computation: () => 1
+  });
+  protected readonly sort = linkedSignal<string | undefined, SortRequest | null>({
+    source: this.collectionSlug,
+    computation: () => null
+  });
+  protected readonly status = linkedSignal<string | undefined, StatusFilter>({
+    source: this.collectionSlug,
+    computation: () => 'all'
+  });
+  protected readonly searchTerm = linkedSignal<string | undefined, string>({
+    source: this.collectionSlug,
+    computation: () => ''
+  });
+  private readonly debouncedSearch = linkedSignal<string | undefined, string>({
+    source: this.collectionSlug,
+    computation: () => ''
+  });
+  private readonly applyDebouncedSearch = debounce((term: string, slug: string | undefined) => {
+    // A debounce armed on another collection must not become this collection's query.
+    if (slug === this.collectionSlug()) this.debouncedSearch.set(term);
+  }, 300);
 
   protected readonly statusOptions = STATUS_OPTIONS;
   protected readonly statusLabels = STATUS_LABELS;
@@ -197,8 +219,39 @@ export class ForgeCollectionWorkspaceComponent {
     };
   });
 
-  protected readonly deleteTarget = signal<Record<string, unknown> | null>(null);
-  protected readonly actionError = signal<string | null>(null);
+  /**
+   * Advances whenever the collection changes. A mutation captures it when it starts and discards its
+   * outcome if it moved — a late response for collection A must never touch collection B's view.
+   */
+  private readonly epoch = linkedSignal<string | undefined, number>({
+    source: this.collectionSlug,
+    computation: (_slug, previous) => (previous?.value ?? 0) + 1
+  });
+
+  protected readonly deleteTarget = linkedSignal<
+    string | undefined,
+    Record<string, unknown> | null
+  >({
+    source: this.collectionSlug,
+    computation: () => null
+  });
+  protected readonly deleting = linkedSignal<string | undefined, boolean>({
+    source: this.collectionSlug,
+    computation: () => false
+  });
+  protected readonly deleteError = linkedSignal<string | undefined, string | null>({
+    source: this.collectionSlug,
+    computation: () => null
+  });
+  protected readonly actionError = linkedSignal<string | undefined, string | null>({
+    source: this.collectionSlug,
+    computation: () => null
+  });
+  /** Ids with a publish/unpublish in flight. */
+  protected readonly statusPending = linkedSignal<string | undefined, readonly string[]>({
+    source: this.collectionSlug,
+    computation: () => []
+  });
   protected readonly describeAdminError = describeAdminError;
 
   private readonly session = inject(ForgeAuthSession);
@@ -222,6 +275,12 @@ export class ForgeCollectionWorkspaceComponent {
       const slug = this.collectionSlug();
       if (slug === undefined) return;
       void this.loadMeta();
+    });
+
+    // Tidy only — the debounced callback already refuses a stale slug.
+    effect(() => {
+      this.collectionSlug();
+      this.applyDebouncedSearch.cancel();
     });
   }
 
@@ -250,7 +309,7 @@ export class ForgeCollectionWorkspaceComponent {
   protected onSearchInput(term: string): void {
     this.searchTerm.set(term);
     this.page.set(1);
-    this.applyDebouncedSearch(term);
+    this.applyDebouncedSearch(term, this.collectionSlug());
   }
 
   protected onStatusChange(next: StatusFilter): void {
@@ -276,39 +335,68 @@ export class ForgeCollectionWorkspaceComponent {
   }
 
   protected requestDelete(doc: Record<string, unknown>): void {
+    if (this.deleting()) return;
     this.actionError.set(null);
+    this.deleteError.set(null);
     this.deleteTarget.set(doc);
   }
 
   protected cancelDelete(): void {
+    if (this.deleting()) return;
     this.deleteTarget.set(null);
+    this.deleteError.set(null);
   }
 
   protected async confirmDelete(): Promise<void> {
     const doc = this.deleteTarget();
     const slug = this.collectionSlug();
-    if (doc === null || slug === undefined) return;
-    this.deleteTarget.set(null);
+    if (doc === null || slug === undefined || this.deleting()) return;
+
+    const epoch = this.epoch();
+    this.deleting.set(true);
+    this.deleteError.set(null);
 
     try {
       await this.api.deleteDocument(slug, String(doc['id']));
-      const remainingOnPage = (this.documentsResource.value()?.docs.length ?? 1) - 1;
-      this.page.set(pageAfterDelete(this.page(), remainingOnPage));
-      this.documentsResource.reload();
     } catch (err) {
-      this.actionError.set(describeAdminError(err));
+      if (epoch !== this.epoch()) return;
+      if (isForbiddenError(err)) void this.session.refresh();
+      // The document was not deleted: the dialog stays, so confirming again is the retry.
+      this.deleteError.set(describeAdminError(err));
+      this.deleting.set(false);
+      return;
     }
+
+    // The delete happened whichever collection is on screen now; only the view it belongs to updates.
+    if (epoch !== this.epoch()) return;
+    const remainingOnPage = (this.documentsResource.value()?.docs.length ?? 1) - 1;
+    this.page.set(pageAfterDelete(this.page(), remainingOnPage));
+    this.deleteTarget.set(null);
+    this.deleting.set(false);
+    this.actionError.set(null);
+    this.documentsResource.reload();
   }
 
   protected async onStatusToggle(request: StatusChangeRequest): Promise<void> {
     const slug = this.collectionSlug();
     if (slug === undefined) return;
+    const id = String(request.document['id']);
+    if (this.statusPending().includes(id)) return;
+
+    const epoch = this.epoch();
+    this.statusPending.update((ids) => [...ids, id]);
 
     try {
-      await this.api.setDocumentStatus(slug, String(request.document['id']), request.status);
+      await this.api.setDocumentStatus(slug, id, request.status);
+      if (epoch !== this.epoch()) return;
+      this.actionError.set(null);
       this.documentsResource.reload();
     } catch (err) {
+      if (epoch !== this.epoch()) return;
+      if (isForbiddenError(err)) void this.session.refresh();
       this.actionError.set(describeAdminError(err));
+    } finally {
+      if (epoch === this.epoch()) this.statusPending.update((ids) => ids.filter((x) => x !== id));
     }
   }
 }

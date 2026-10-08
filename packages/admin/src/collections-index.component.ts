@@ -75,18 +75,32 @@ export class ForgeCollectionsIndexComponent implements OnInit {
     void this.load();
   }
 
+  /** Latest-wins: a slow earlier load (a Retry clicked twice) cannot replace a newer result. */
+  private loadToken = 0;
+  private loadAbort: AbortController | null = null;
+
   protected async load(): Promise<void> {
+    const token = ++this.loadToken;
+    this.loadAbort?.abort();
+    const abort = new AbortController();
+    this.loadAbort = abort;
+
     this.loading.set(true);
     this.error.set(null);
 
     try {
-      const all = await this.api.getCollections();
+      const all = await this.api.getCollections({ signal: abort.signal });
+      if (token !== this.loadToken) return;
       const visible = visibleCollections(all, this.config());
 
       const cards = await Promise.all(
         visible.map(async (meta): Promise<CollectionCard> => {
           try {
-            const { meta: listMeta } = await this.api.listDocuments(meta.slug, { limit: 1 });
+            const { meta: listMeta } = await this.api.listDocuments(
+              meta.slug,
+              { limit: 1 },
+              { signal: abort.signal }
+            );
             return { meta, count: listMeta.totalDocs };
           } catch {
             // A count that fails to load costs a "—", not the whole index.
@@ -94,11 +108,13 @@ export class ForgeCollectionsIndexComponent implements OnInit {
           }
         })
       );
+      if (token !== this.loadToken) return;
       this.cards.set(cards);
     } catch (err) {
+      if (token !== this.loadToken) return;
       this.error.set(describeAdminError(err));
     } finally {
-      this.loading.set(false);
+      if (token === this.loadToken) this.loading.set(false);
     }
   }
 }

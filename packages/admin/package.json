@@ -74,6 +74,7 @@
     "@forge-cms/angular": "workspace:*"
   },
   "devDependencies": {
+    "@analogjs/vite-plugin-angular": "2.4.8",
     "@angular/compiler": "21.2.10",
     "@angular/compiler-cli": "21.2.10",
     "@angular/core": "21.2.10",

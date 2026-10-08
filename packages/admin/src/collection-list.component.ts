@@ -183,9 +183,14 @@ export interface StatusChangeRequest {
                           variant="ghost"
                           size="sm"
                           class="h-7 text-xs"
+                          [disabled]="isPending(doc)"
                           (click)="toggleStatus(doc)"
                         >
-                          {{ isPublished(doc) ? 'Unpublish' : 'Publish' }}
+                          @if (isPending(doc)) {
+                            {{ isPublished(doc) ? 'Unpublishing…' : 'Publishing…' }}
+                          } @else {
+                            {{ isPublished(doc) ? 'Unpublish' : 'Publish' }}
+                          }
                         </volt-button>
                       }
                       <volt-button
@@ -254,6 +259,8 @@ export class ForgeCollectionListComponent {
   meta = input<ListMeta | null>(null);
   /** The column currently sorted, so headers can show direction. */
   sort = input<SortRequest | null>(null);
+  /** Ids whose publish/unpublish is in flight; their status control is disabled and says so. */
+  pendingIds = input<readonly string[]>([]);
 
   create = output<void>();
   edit = output<Record<string, unknown>>();
@@ -309,7 +316,12 @@ export class ForgeCollectionListComponent {
     this.sortChange.emit({ field, order });
   }
 
+  protected isPending(doc: Record<string, unknown>): boolean {
+    return this.pendingIds().includes(String(doc['id']));
+  }
+
   protected toggleStatus(doc: Record<string, unknown>): void {
+    if (this.isPending(doc)) return;
     this.statusChange.emit({
       document: doc,
       status: this.isPublished(doc) ? 'draft' : 'published'

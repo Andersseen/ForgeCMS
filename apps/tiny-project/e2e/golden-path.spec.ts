@@ -211,6 +211,150 @@ test('validation error UX: a required field is left blank shows a real message',
   await expect(page).toHaveURL(/\/admin\/collections\/posts\/new$/);
 });
 
+test('U01 (spec 085): a server-rejected save keeps every entered value; the corrected retry succeeds exactly once', async ({
+  page
+}) => {
+  const stamp = Date.now();
+  const title = `Reliable ${stamp}`;
+  const slug = `reliable-${stamp}`;
+  const created: number[] = [];
+  page.on('response', (response) => {
+    if (response.request().method() === 'POST' && /\/api\/v1\/posts$/.test(response.url())) {
+      created.push(response.status());
+    }
+  });
+
+  await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
+  await page.goto('/admin/collections/posts/new');
+  await hydrated(page);
+  await page.locator('input#title').fill(title);
+  await page.locator('input#slug').fill(slug);
+
+  // `author` is a required relation: the real server rejects the first attempt.
+  await page.getByRole('button', { name: 'Create' }).click();
+  await expect(page.getByText('Fix the highlighted fields and try again.')).toBeVisible();
+  await expect(page).toHaveURL(/\/admin\/collections\/posts\/new$/);
+  await expect(page.locator('input#title')).toHaveValue(title);
+  await expect(page.locator('input#slug')).toHaveValue(slug);
+  await expect(page.getByRole('button', { name: 'Create' })).toBeEnabled();
+
+  await page.locator('input#author').fill(ADMIN_EMAIL);
+  await page.getByRole('button', { name: new RegExp(ADMIN_EMAIL.replace('.', '\\.')) }).click();
+  await page.getByRole('button', { name: 'Create' }).click();
+  await expect(page).toHaveURL(/\/admin\/collections\/posts$/);
+  await expect(page.locator('volt-table-row', { hasText: title })).toBeVisible();
+
+  expect(created.filter((status) => status === 201)).toHaveLength(1);
+  expect(created.filter((status) => status >= 400)).toHaveLength(1);
+});
+
+test('U01 (spec 085): search and filter survive an editor round trip; a dirty editor asks before it is left', async ({
+  page
+}) => {
+  await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
+  await page.goto('/admin/collections/posts');
+  await hydrated(page);
+
+  await page.locator('input[placeholder="Search…"]').fill('Reliable');
+  await page.getByRole('button', { name: 'Draft', exact: true }).click();
+  const row = page.locator('volt-table-row', { hasText: 'Reliable' }).first();
+  await expect(row).toBeVisible();
+  await row.getByRole('button', { name: 'Edit' }).click();
+  await expect(page).toHaveURL(/\/admin\/collections\/posts\/[^/]+$/);
+
+  // Clean editor: leaving does not prompt, and the list is exactly as it was left.
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page).toHaveURL(/\/admin\/collections\/posts$/);
+  await expect(page.locator('input[placeholder="Search…"]')).toHaveValue('Reliable');
+  await expect(page.locator('volt-table-row', { hasText: 'Reliable' }).first()).toBeVisible();
+
+  // Dirty editor: dismissing the prompt keeps the editor and the typed value.
+  await page
+    .locator('volt-table-row', { hasText: 'Reliable' })
+    .first()
+    .getByRole('button', { name: 'Edit' })
+    .click();
+  await page.locator('input#title').fill('Reliable but changed');
+  let prompts = 0;
+  page.once('dialog', (dialog) => {
+    prompts += 1;
+    void dialog.dismiss();
+  });
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect.poll(() => prompts).toBe(1);
+  await expect(page).toHaveURL(/\/admin\/collections\/posts\/[^/]+$/);
+  await expect(page.locator('input#title')).toHaveValue('Reliable but changed');
+
+  // Accepting lets go — and the filters are still there on return.
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page).toHaveURL(/\/admin\/collections\/posts$/);
+  await expect(page.locator('input[placeholder="Search…"]')).toHaveValue('Reliable');
+});
+
+test('U01 (spec 085): cancelling a delete sends nothing; the row goes only after the server deletes it', async ({
+  page
+}) => {
+  await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
+  await page.goto('/admin/collections/posts');
+  await hydrated(page);
+
+  const deletes: number[] = [];
+  page.on('response', (response) => {
+    if (response.request().method() === 'DELETE') deletes.push(response.status());
+  });
+  const row = page.locator('volt-table-row', { hasText: 'Reliable' }).first();
+  const label = (await row.innerText()).split('\n')[0] ?? 'Reliable';
+  await expect(row).toBeVisible();
+
+  await row.getByRole('button', { name: 'Delete' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(row).toBeVisible();
+  expect(deletes).toHaveLength(0);
+
+  await row.getByRole('button', { name: 'Delete' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('volt-table-row', { hasText: label })).toHaveCount(0);
+  expect(deletes).toEqual([204]);
+});
+
+test('U01 (spec 085): a session that ends mid-edit is rejected by the real server and the unsaved edit stays on screen', async ({
+  page,
+  context
+}) => {
+  await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
+  await page.goto('/admin/collections/posts');
+  await hydrated(page);
+  await page
+    .locator('volt-table-row')
+    .filter({ has: page.getByRole('button', { name: 'Edit' }) })
+    .first()
+    .getByRole('button', { name: 'Edit' })
+    .click();
+  await expect(page.locator('input#title')).not.toHaveValue('');
+  await page.locator('input#title').fill('Edited as the session ends');
+
+  // Another tab signs this account out (same cookie jar, real server-side logout).
+  const other = await context.newPage();
+  const loggedOut = await other.request.post('/api/auth/logout', { headers: SAME_ORIGIN_HEADERS });
+  expect(loggedOut.ok()).toBe(true);
+  await other.close();
+
+  const writes: number[] = [];
+  page.on('response', (response) => {
+    if (response.request().method() === 'PUT') writes.push(response.status());
+  });
+  await page.getByRole('button', { name: 'Save' }).click();
+
+  await expect(page.getByText(/session expired/i).first()).toBeVisible();
+  await expect(page).toHaveURL(/\/admin\/collections\/posts\/[^/]+$/);
+  await expect(page.locator('input#title')).toHaveValue('Edited as the session ends');
+  await expect(page.getByRole('button', { name: 'Save' })).toBeDisabled();
+  expect(writes).toEqual([401]);
+});
+
 test('users management: admin creates an editor; the editor cannot manage users or delete posts', async ({
   page
 }) => {
