@@ -1,0 +1,835 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "kind": "skill",
+      "path": ".agents/skills/angular-architecture/SKILL.md",
+      "skill": "angular-architecture",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "4ffc2b2003f86329467b53d09cd47cdc7abd5e3c4548ea9e11f9ce1c026b0aa8"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/angular-modern/SKILL.md",
+      "skill": "angular-modern",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "55008e44e2bb6c9a5956fa85a203dc0fe6405e327c7ed7eefdbb84742269e3db"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/angular-signals/SKILL.md",
+      "skill": "angular-signals",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "622176a55c4a13b08ce0bf969fb27437e46b0d999ce901c3a0391ce192ae491f"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/angular-testing/SKILL.md",
+      "skill": "angular-testing",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "a9c74c31f2ed728e2bd556c30e61ee17d666e4ab7607ffc1d9207b71ab5f491c"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/api-design/SKILL.md",
+      "skill": "api-design",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "01b1dc1bf367367097909f3ec6267fe67083053ce1c503d0c34caa42135e70d7"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/auth-patterns/SKILL.md",
+      "skill": "auth-patterns",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "ee37df8a65d8d56b65c7645c954607b00da91b1d7dc5f1c2e7da0334583a1c64"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/brainstorming/SKILL.md",
+      "skill": "brainstorming",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "9e18ebcd4c0a60ee0945283b181a76210d06936da2bb4852a2aea6188130b754"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/branching-strategy/SKILL.md",
+      "skill": "branching-strategy",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "138eda6f5f394a4f009bcaabaa6032d536374afb50797dab13efd7b72bc6740a"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/ci-pipelines/SKILL.md",
+      "skill": "ci-pipelines",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "9474badebf768a298f0952dc96169c16e780f460907548b4ff1d2862d834a4cb"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/code-quality/SKILL.md",
+      "skill": "code-quality",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "c7fef0865643838f0c375d2a7523bbc724d14e45b3329b8ae43215519ba5b12b"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/code-review/SKILL.md",
+      "skill": "code-review",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "87e989466034507de357f2abe0c2b0930304baaa6006bbd6cf24d5723334ce8f"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/commit-hygiene/SKILL.md",
+      "skill": "commit-hygiene",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "ca501d59eeee6e0bda83cc7baf17050ca3740568433490faabd40581346d71b7"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/concise-output/SKILL.md",
+      "skill": "concise-output",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "9393b8594a3fc63a288fb6b4a82312c9cc57d539b7bf49cd709a913937e9e2af"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/containerization/SKILL.md",
+      "skill": "containerization",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "6961c314ef6b5f4720c49e562cf2c38cc6aafd0d8391dd71b18ad307dbba226d"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/context-efficient-development/SKILL.md",
+      "skill": "context-efficient-development",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "3b0279048858e62857f7bab721554690d6601f8dd1d7c208dec2d952ea01370f"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/data-modeling/SKILL.md",
+      "skill": "data-modeling",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "372373a282a90e414b8cad9a4824f23e55d42bb65a7590cdc6c634e8004106c4"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/dependency-security/SKILL.md",
+      "skill": "dependency-security",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "98e26387b89ab4777cc4e751f634dd6d03bf3fc7b147e306ece911e067dfdf92"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/deployment-safety/SKILL.md",
+      "skill": "deployment-safety",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "6ca80c005327918caac27684f95702ffc2b8718d4513c48263c65caa7279d773"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/e2e-testing/SKILL.md",
+      "skill": "e2e-testing",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "f07c9ae381e916d93c6ee67c32be8eac76482f19fcfbbe9ca6116af9c3036113"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/engineering-principles/SKILL.md",
+      "skill": "engineering-principles",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "e7573e73b93fbbce857bbe2927904ebc7022e31b5607edc49586da75751835f2"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/flaky-tests/SKILL.md",
+      "skill": "flaky-tests",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "d567f98325047a258658b44bf8993060256ae1ccf5e8570d183805e533e47481"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/focused-verification/SKILL.md",
+      "skill": "focused-verification",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "af0d9709dc7ad838bf82507785473657fd1620466d4178da351022dee83d39f5"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/infrastructure-as-code/SKILL.md",
+      "skill": "infrastructure-as-code",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "14ef02d1b397841fd245fafe01365f4c5a1cc7bbe43403a355306b288bb03374"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/parallel-work/SKILL.md",
+      "skill": "parallel-work",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "ddf2862b7320095eead3f954ab4dafbcf8324ea644135461362aaf503c28899d"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/planning/SKILL.md",
+      "skill": "planning",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "b1611eaa6a1f454c4c3a698a93afbd6a5f09445e61345ad14496a143ca169790"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/pull-requests/SKILL.md",
+      "skill": "pull-requests",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "23ec8995490bc82cfcff509986bfc968df9f46c6106c907fd8cd94616699e721"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/requesting-code-review/SKILL.md",
+      "skill": "requesting-code-review",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "87a63cba4f1b30db4fe28815d7fc0e94ee260b97ba10c60aef5de84da8b55b1a"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/schema-migrations/SKILL.md",
+      "skill": "schema-migrations",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "253cc93e1b263e123d0b83696ca76c41829a820c66cd881faec08a4f17465f58"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/secrets-handling/SKILL.md",
+      "skill": "secrets-handling",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "61292c74953be9d2a2ec5a29fe97a8ef6b29628d9b5ce52c1cae2289b1981824"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/secure-coding/SKILL.md",
+      "skill": "secure-coding",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "9f5e5141fb0168bff1a009f167f2687e2edd94d70e670feb252edb27ec3aa789"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/subagent-driven-development/SKILL.md",
+      "skill": "subagent-driven-development",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "86695f6c1f346d9399e31bfec0054da47f8d4284110b9f277f28ea5e9e741bda"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/systematic-debugging/SKILL.md",
+      "skill": "systematic-debugging",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "9cfc2371df6cd1d999352131198a44cc2a6456b88a30ad760e2f747dbbeb7a5a"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/targeted-exploration/SKILL.md",
+      "skill": "targeted-exploration",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "f953693a6ac3b874ad0d036e38d1d8a1886d70785db40b8f1a77e24019786116"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/test-doubles/SKILL.md",
+      "skill": "test-doubles",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "928a7ef4e9f8f76ccaaf0b7b577386c974077985fe7fa066dae4276bfc744037"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/test-strategy/SKILL.md",
+      "skill": "test-strategy",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "e68899774dfa833b19e29d6224e8f375b5263b242bf5be1548c342ce2f4e93d3"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/transactions-and-consistency/SKILL.md",
+      "skill": "transactions-and-consistency",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "5b52e8f3a61827bfadfc6471c4c1664edf801f5d3414eeb446536d06a4846246"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/typescript-modeling/SKILL.md",
+      "skill": "typescript-modeling",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "2fb54d99e8374f46b3402d1d16d389c19b86daeb29326ff108bbb01b1ad055c8"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/typescript-modern/SKILL.md",
+      "skill": "typescript-modern",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "180fcced2a14811110a4d3e8762927c60e617fda843c138ee707171a820c2d62"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/typescript-strict/SKILL.md",
+      "skill": "typescript-strict",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "3e1b5e768d18ec1b2ebe7e367cb018849258ca7fc1c946030cc6c5c0713cc76d"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/verification/SKILL.md",
+      "skill": "verification",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "9e44d108ee0c611ceab8acce49e7ffcbfa9ce8f4fcb3075965d99633f3f9789e"
+    },
+    {
+      "kind": "skill",
+      "path": ".agents/skills/worktree-workflow/SKILL.md",
+      "skill": "worktree-workflow",
+      "targets": [
+        "codex",
+        "kimi"
+      ],
+      "hash": "7cc1d9d3a92dcaab15e3fc6c59980628c75b094cff280d698c2c0c9b701b4ba2"
+    },
+    {
+      "kind": "hook",
+      "path": ".claude/settings.json",
+      "hooks": [
+        "session-doctor-bootstrap"
+      ],
+      "targets": [
+        "claude"
+      ],
+      "hash": "38e7a94e2d0ec7a0a6958760c9a7cb34927caf124153b6802ea54363ad4494b2",
+      "created": false
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/angular-architecture/SKILL.md",
+      "skill": "angular-architecture",
+      "targets": [
+        "claude"
+      ],
+      "hash": "4ffc2b2003f86329467b53d09cd47cdc7abd5e3c4548ea9e11f9ce1c026b0aa8"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/angular-modern/SKILL.md",
+      "skill": "angular-modern",
+      "targets": [
+        "claude"
+      ],
+      "hash": "55008e44e2bb6c9a5956fa85a203dc0fe6405e327c7ed7eefdbb84742269e3db"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/angular-signals/SKILL.md",
+      "skill": "angular-signals",
+      "targets": [
+        "claude"
+      ],
+      "hash": "622176a55c4a13b08ce0bf969fb27437e46b0d999ce901c3a0391ce192ae491f"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/angular-testing/SKILL.md",
+      "skill": "angular-testing",
+      "targets": [
+        "claude"
+      ],
+      "hash": "a9c74c31f2ed728e2bd556c30e61ee17d666e4ab7607ffc1d9207b71ab5f491c"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/api-design/SKILL.md",
+      "skill": "api-design",
+      "targets": [
+        "claude"
+      ],
+      "hash": "01b1dc1bf367367097909f3ec6267fe67083053ce1c503d0c34caa42135e70d7"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/auth-patterns/SKILL.md",
+      "skill": "auth-patterns",
+      "targets": [
+        "claude"
+      ],
+      "hash": "ee37df8a65d8d56b65c7645c954607b00da91b1d7dc5f1c2e7da0334583a1c64"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/brainstorming/SKILL.md",
+      "skill": "brainstorming",
+      "targets": [
+        "claude"
+      ],
+      "hash": "9e18ebcd4c0a60ee0945283b181a76210d06936da2bb4852a2aea6188130b754"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/branching-strategy/SKILL.md",
+      "skill": "branching-strategy",
+      "targets": [
+        "claude"
+      ],
+      "hash": "138eda6f5f394a4f009bcaabaa6032d536374afb50797dab13efd7b72bc6740a"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/ci-pipelines/SKILL.md",
+      "skill": "ci-pipelines",
+      "targets": [
+        "claude"
+      ],
+      "hash": "9474badebf768a298f0952dc96169c16e780f460907548b4ff1d2862d834a4cb"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/code-quality/SKILL.md",
+      "skill": "code-quality",
+      "targets": [
+        "claude"
+      ],
+      "hash": "c7fef0865643838f0c375d2a7523bbc724d14e45b3329b8ae43215519ba5b12b"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/code-review/SKILL.md",
+      "skill": "code-review",
+      "targets": [
+        "claude"
+      ],
+      "hash": "87e989466034507de357f2abe0c2b0930304baaa6006bbd6cf24d5723334ce8f"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/commit-hygiene/SKILL.md",
+      "skill": "commit-hygiene",
+      "targets": [
+        "claude"
+      ],
+      "hash": "ca501d59eeee6e0bda83cc7baf17050ca3740568433490faabd40581346d71b7"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/concise-output/SKILL.md",
+      "skill": "concise-output",
+      "targets": [
+        "claude"
+      ],
+      "hash": "9393b8594a3fc63a288fb6b4a82312c9cc57d539b7bf49cd709a913937e9e2af"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/containerization/SKILL.md",
+      "skill": "containerization",
+      "targets": [
+        "claude"
+      ],
+      "hash": "6961c314ef6b5f4720c49e562cf2c38cc6aafd0d8391dd71b18ad307dbba226d"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/context-efficient-development/SKILL.md",
+      "skill": "context-efficient-development",
+      "targets": [
+        "claude"
+      ],
+      "hash": "3b0279048858e62857f7bab721554690d6601f8dd1d7c208dec2d952ea01370f"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/data-modeling/SKILL.md",
+      "skill": "data-modeling",
+      "targets": [
+        "claude"
+      ],
+      "hash": "372373a282a90e414b8cad9a4824f23e55d42bb65a7590cdc6c634e8004106c4"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/dependency-security/SKILL.md",
+      "skill": "dependency-security",
+      "targets": [
+        "claude"
+      ],
+      "hash": "98e26387b89ab4777cc4e751f634dd6d03bf3fc7b147e306ece911e067dfdf92"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/deployment-safety/SKILL.md",
+      "skill": "deployment-safety",
+      "targets": [
+        "claude"
+      ],
+      "hash": "6ca80c005327918caac27684f95702ffc2b8718d4513c48263c65caa7279d773"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/e2e-testing/SKILL.md",
+      "skill": "e2e-testing",
+      "targets": [
+        "claude"
+      ],
+      "hash": "f07c9ae381e916d93c6ee67c32be8eac76482f19fcfbbe9ca6116af9c3036113"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/engineering-principles/SKILL.md",
+      "skill": "engineering-principles",
+      "targets": [
+        "claude"
+      ],
+      "hash": "e7573e73b93fbbce857bbe2927904ebc7022e31b5607edc49586da75751835f2"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/flaky-tests/SKILL.md",
+      "skill": "flaky-tests",
+      "targets": [
+        "claude"
+      ],
+      "hash": "d567f98325047a258658b44bf8993060256ae1ccf5e8570d183805e533e47481"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/focused-verification/SKILL.md",
+      "skill": "focused-verification",
+      "targets": [
+        "claude"
+      ],
+      "hash": "af0d9709dc7ad838bf82507785473657fd1620466d4178da351022dee83d39f5"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/infrastructure-as-code/SKILL.md",
+      "skill": "infrastructure-as-code",
+      "targets": [
+        "claude"
+      ],
+      "hash": "14ef02d1b397841fd245fafe01365f4c5a1cc7bbe43403a355306b288bb03374"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/parallel-work/SKILL.md",
+      "skill": "parallel-work",
+      "targets": [
+        "claude"
+      ],
+      "hash": "ddf2862b7320095eead3f954ab4dafbcf8324ea644135461362aaf503c28899d"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/planning/SKILL.md",
+      "skill": "planning",
+      "targets": [
+        "claude"
+      ],
+      "hash": "b1611eaa6a1f454c4c3a698a93afbd6a5f09445e61345ad14496a143ca169790"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/pull-requests/SKILL.md",
+      "skill": "pull-requests",
+      "targets": [
+        "claude"
+      ],
+      "hash": "23ec8995490bc82cfcff509986bfc968df9f46c6106c907fd8cd94616699e721"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/requesting-code-review/SKILL.md",
+      "skill": "requesting-code-review",
+      "targets": [
+        "claude"
+      ],
+      "hash": "87a63cba4f1b30db4fe28815d7fc0e94ee260b97ba10c60aef5de84da8b55b1a"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/schema-migrations/SKILL.md",
+      "skill": "schema-migrations",
+      "targets": [
+        "claude"
+      ],
+      "hash": "253cc93e1b263e123d0b83696ca76c41829a820c66cd881faec08a4f17465f58"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/secrets-handling/SKILL.md",
+      "skill": "secrets-handling",
+      "targets": [
+        "claude"
+      ],
+      "hash": "61292c74953be9d2a2ec5a29fe97a8ef6b29628d9b5ce52c1cae2289b1981824"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/secure-coding/SKILL.md",
+      "skill": "secure-coding",
+      "targets": [
+        "claude"
+      ],
+      "hash": "9f5e5141fb0168bff1a009f167f2687e2edd94d70e670feb252edb27ec3aa789"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/subagent-driven-development/SKILL.md",
+      "skill": "subagent-driven-development",
+      "targets": [
+        "claude"
+      ],
+      "hash": "86695f6c1f346d9399e31bfec0054da47f8d4284110b9f277f28ea5e9e741bda"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/systematic-debugging/SKILL.md",
+      "skill": "systematic-debugging",
+      "targets": [
+        "claude"
+      ],
+      "hash": "9cfc2371df6cd1d999352131198a44cc2a6456b88a30ad760e2f747dbbeb7a5a"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/targeted-exploration/SKILL.md",
+      "skill": "targeted-exploration",
+      "targets": [
+        "claude"
+      ],
+      "hash": "f953693a6ac3b874ad0d036e38d1d8a1886d70785db40b8f1a77e24019786116"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/test-doubles/SKILL.md",
+      "skill": "test-doubles",
+      "targets": [
+        "claude"
+      ],
+      "hash": "928a7ef4e9f8f76ccaaf0b7b577386c974077985fe7fa066dae4276bfc744037"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/test-strategy/SKILL.md",
+      "skill": "test-strategy",
+      "targets": [
+        "claude"
+      ],
+      "hash": "e68899774dfa833b19e29d6224e8f375b5263b242bf5be1548c342ce2f4e93d3"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/transactions-and-consistency/SKILL.md",
+      "skill": "transactions-and-consistency",
+      "targets": [
+        "claude"
+      ],
+      "hash": "5b52e8f3a61827bfadfc6471c4c1664edf801f5d3414eeb446536d06a4846246"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/typescript-modeling/SKILL.md",
+      "skill": "typescript-modeling",
+      "targets": [
+        "claude"
+      ],
+      "hash": "2fb54d99e8374f46b3402d1d16d389c19b86daeb29326ff108bbb01b1ad055c8"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/typescript-modern/SKILL.md",
+      "skill": "typescript-modern",
+      "targets": [
+        "claude"
+      ],
+      "hash": "180fcced2a14811110a4d3e8762927c60e617fda843c138ee707171a820c2d62"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/typescript-strict/SKILL.md",
+      "skill": "typescript-strict",
+      "targets": [
+        "claude"
+      ],
+      "hash": "3e1b5e768d18ec1b2ebe7e367cb018849258ca7fc1c946030cc6c5c0713cc76d"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/verification/SKILL.md",
+      "skill": "verification",
+      "targets": [
+        "claude"
+      ],
+      "hash": "9e44d108ee0c611ceab8acce49e7ffcbfa9ce8f4fcb3075965d99633f3f9789e"
+    },
+    {
+      "kind": "skill",
+      "path": ".claude/skills/worktree-workflow/SKILL.md",
+      "skill": "worktree-workflow",
+      "targets": [
+        "claude"
+      ],
+      "hash": "7cc1d9d3a92dcaab15e3fc6c59980628c75b094cff280d698c2c0c9b701b4ba2"
+    },
+    {
+      "kind": "mcp",
+      "path": ".codex/config.toml",
+      "servers": [
+        "context7",
+        "playwright"
+      ],
+      "targets": [
+        "codex"
+      ],
+      "hash": "b8242f72496b356307bf9a489f277bc7d803fb2d42e8839c01f9c63e47d93a3b",
+      "created": false
+    },
+    {
+      "kind": "mcp",
+      "path": ".kimi-code/mcp.json",
+      "servers": [
+        "context7",
+        "playwright"
+      ],
+      "targets": [
+        "kimi"
+      ],
+      "hash": "050fa7052337b3447410cd15979e61ea14b378c26a83c37672da281e256193b8",
+      "created": true
+    },
+    {
+      "kind": "mcp",
+      "path": ".mcp.json",
+      "servers": [
+        "context7",
+        "playwright"
+      ],
+      "targets": [
+        "claude"
+      ],
+      "hash": "437101bda2d349cc75a2a5567b79b7e60ea953bf430b34b42105f0cb83a5bc52",
+      "created": false
+    }
+  ]
+}

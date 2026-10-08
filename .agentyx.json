@@ -1,0 +1,16 @@
+{
+  "packs": [
+    "technical",
+    "typescript",
+    "angular",
+    "testing",
+    "security",
+    "data",
+    "git",
+    "devops",
+    "efficiency",
+    "agentic"
+  ],
+  "enable": ["rtk", "playwright"],
+  "targets": ["codex", "claude", "kimi"]
+}
