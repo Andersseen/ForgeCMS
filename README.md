@@ -19,7 +19,7 @@
 ---
 
 > [!WARNING]
-> ForgeCMS is pre-1.0 (npm `0.8.3`). The fundamentals — schema DSL, Local API, HTTP handlers, access
+> ForgeCMS is pre-1.0 (npm `0.11.0`). The fundamentals — schema DSL, Local API, HTTP handlers, access
 > control, hooks, drafts, versions, globals, live preview, localization, relations, and a reusable
 > Angular admin — are usable and exercised by real consumer apps in this repo, but API stability is
 > not guaranteed before `1.0`. See [docs/STATE.md](docs/STATE.md) for exactly what is implemented and
@@ -45,6 +45,7 @@ Optional integrations:
 
 ```sh
 pnpm add @forge-cms/cloudflare   # D1 and R2 adapters
+pnpm add @forge-cms/s3           # S3-compatible storage adapter (portable Node profile)
 pnpm add @forge-cms/angular      # Angular client SDK
 pnpm add @forge-cms/admin        # Angular admin components
 ```
@@ -162,7 +163,7 @@ All public packages are versioned together.
 | [`@forge-cms/admin`](packages/admin)           | Reusable Angular admin components (content, users, auth)            |
 | [`@forge-cms/testing`](packages/testing)       | Adapter contract test suites                                        |
 
-They share one version (currently `0.8.3` on npm); see each package's `CHANGELOG.md` for what
+They share one version (currently `0.11.0` on npm); see each package's `CHANGELOG.md` for what
 changed.
 
 ## Schema Synchronization

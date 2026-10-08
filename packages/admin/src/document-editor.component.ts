@@ -5,6 +5,7 @@ import {
   effect,
   inject,
   input,
+  linkedSignal,
   signal,
   untracked
 } from '@angular/core';
@@ -12,12 +13,18 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import type { CanDeactivateFn } from '@angular/router';
 import { map } from 'rxjs';
-import { ApiValidationError, CmsApiService, documentResource } from '@forge-cms/angular';
+import {
+  ApiValidationError,
+  CmsApiService,
+  ForgeAuthSession,
+  canWriteContent,
+  documentResource
+} from '@forge-cms/angular';
 import type { CollectionMeta } from '@forge-cms/angular';
 import { ForgeCollectionFormComponent } from './collection-form.component.js';
 import { LoadingStateComponent } from './loading-state.component.js';
 import { ErrorStateComponent } from './error-state.component.js';
-import { describeAdminError } from './admin-error.js';
+import { describeAdminError, isForbiddenError } from './admin-error.js';
 import { ForgeContentRefresh } from './content-refresh.js';
 
 /**
@@ -45,28 +52,37 @@ import { ForgeContentRefresh } from './content-refresh.js';
         (retry)="loadMeta()"
       />
     } @else if (meta(); as collectionMeta) {
-      @if (!isCreate() && documentRef.isLoading() && !documentRef.value()) {
+      @if (!isCreate() && loadedDocument() === undefined && documentRef.isLoading()) {
         <forge-loading-state variant="blocks" />
-      } @else if (documentRef.error(); as error) {
+      } @else if (loadedDocument() === undefined && !isCreate() && documentRef.error(); as error) {
         <forge-error-state
           title="Couldn't load this document"
           [message]="describeAdminError(error)"
           (retry)="documentRef.reload()"
         />
       } @else {
-        @if (saveError(); as message) {
-          <p class="text-xs text-destructive mb-2">{{ message }}</p>
+        @if (blockedMessage(); as message) {
+          <p class="text-xs text-destructive mb-2" role="alert">{{ message }}</p>
+        } @else if (saveError(); as message) {
+          <p class="text-xs text-destructive mb-2" role="alert">{{ message }}</p>
         }
-        <forge-collection-form
-          [fields]="collectionMeta.fieldDefinitions"
-          [initialValue]="initialValue()"
-          [fieldErrors]="fieldErrors()"
-          [submitLabel]="isCreate() ? 'Create' : 'Save'"
-          [locales]="collectionMeta.locales ?? []"
-          (dirtyChange)="dirty.set($event)"
-          (save)="onSave($event)"
-          (cancel)="onCancel()"
-        />
+        <!-- One form per collection + document identity (create mode is its own identity): local
+             edits belong to exactly that identity and never leak into another, while a failed save
+             or a remote refresh of the *same* document keeps them. -->
+        @for (identity of identities(); track identity) {
+          <forge-collection-form
+            [fields]="collectionMeta.fieldDefinitions"
+            [initialValue]="initialValue()"
+            [fieldErrors]="fieldErrors()"
+            [submitLabel]="isCreate() ? 'Create' : 'Save'"
+            [locales]="collectionMeta.locales ?? []"
+            [submitting]="saving()"
+            [submitDisabled]="blockedMessage() !== null"
+            (dirtyChange)="dirty.set($event)"
+            (save)="onSave($event)"
+            (cancel)="onCancel()"
+          />
+        }
       }
     }
   `
@@ -76,6 +92,7 @@ export class ForgeDocumentEditorComponent {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly refresh = inject(ForgeContentRefresh, { optional: true });
+  private readonly session = inject(ForgeAuthSession);
 
   /** Both fall back to route params, for standalone embedding outside the route helper. */
   collection = input<string | undefined>(undefined);
@@ -100,6 +117,16 @@ export class ForgeDocumentEditorComponent {
   protected readonly collectionSlug = computed(() => this.collection() ?? this.routeCollection());
   protected readonly effectiveId = computed(() => this.documentId() ?? this.routeId());
   protected readonly isCreate = computed(() => this.effectiveId() === undefined);
+  /** The collection + document the local draft belongs to; create mode is `#new`. */
+  private readonly identityKey = computed(
+    () => `${this.collectionSlug() ?? ''}/${this.effectiveId() ?? '#new'}`
+  );
+  protected readonly identities = computed(() => [this.identityKey()]);
+  /** Advances on every identity change (A → B → A included), so a write can tell "still this visit". */
+  private readonly visit = linkedSignal<string, number>({
+    source: this.identityKey,
+    computation: (_key, previous) => (previous?.value ?? 0) + 1
+  });
 
   protected readonly meta = signal<CollectionMeta | null>(null);
   protected readonly metaLoading = signal(true);
@@ -113,13 +140,53 @@ export class ForgeDocumentEditorComponent {
     return { collection, id };
   });
 
+  /**
+   * The server document for the identity on screen. Unlike `documentRef.value()` it survives the
+   * resource resetting for the *same* document — a session expiring (credential revision) or a
+   * remote refresh reloads the resource, and that must not unmount the form and its unsaved edits.
+   * A different identity starts from nothing.
+   */
+  protected readonly loadedDocument = linkedSignal<
+    { key: string; user: string | null; value: Record<string, unknown> | undefined },
+    Record<string, unknown> | undefined
+  >({
+    source: () => ({
+      key: this.identityKey(),
+      user: this.session.user()?.id ?? null,
+      value: this.documentRef.value()
+    }),
+    // Carried over only for the same document and either the same user or a session that *expired*
+    // (the form must survive that). Another user signing in, or a plain logout, never inherits it.
+    computation: (source, previous) =>
+      source.value ??
+      (previous?.source.key === source.key &&
+      (previous.source.user === source.user || this.session.expired())
+        ? previous.value
+        : undefined)
+  });
+
   protected readonly initialValue = computed<Record<string, unknown>>(
-    () => this.documentRef.value() ?? {}
+    () => this.loadedDocument() ?? {}
   );
 
   protected readonly fieldErrors = signal<Record<string, string>>({});
   protected readonly saveError = signal<string | null>(null);
   protected readonly dirty = signal(false);
+  protected readonly saving = signal(false);
+
+  /** Saving is pointless while the server has said the session ended or the role cannot write. The
+   *  entered values stay on screen; only a signed-in role known to be read-only blocks (anonymous
+   *  writes are the server's call). */
+  protected readonly blockedMessage = computed<string | null>(() => {
+    if (this.session.expired()) {
+      return "Your session expired. Your changes are still here, but they can't be saved until you sign in again.";
+    }
+    const user = this.session.user();
+    if (user !== null && !canWriteContent(user)) {
+      return "Your account can't edit content. Your changes are still here but can't be saved.";
+    }
+    return null;
+  });
   protected readonly describeAdminError = describeAdminError;
 
   constructor() {
@@ -137,6 +204,7 @@ export class ForgeDocumentEditorComponent {
       this.effectiveId();
       untracked(() => {
         this.dirty.set(false);
+        this.saving.set(false);
         this.saveError.set(null);
         this.fieldErrors.set({});
       });
@@ -167,8 +235,10 @@ export class ForgeDocumentEditorComponent {
 
   protected async onSave(data: Record<string, unknown>): Promise<void> {
     const slug = this.collectionSlug();
-    if (slug === undefined) return;
+    if (slug === undefined || this.saving() || this.blockedMessage() !== null) return;
 
+    const visit = this.visit();
+    this.saving.set(true);
     this.saveError.set(null);
     this.fieldErrors.set({});
 
@@ -179,16 +249,22 @@ export class ForgeDocumentEditorComponent {
       } else {
         await this.api.updateDocument(slug, id, data);
       }
-      this.dirty.set(false);
+      // The write happened whichever document is on screen now; only the one that was saved is done.
       this.refresh?.bump();
+      if (visit !== this.visit()) return;
+      this.dirty.set(false);
       void this.router.navigate(['..'], { relativeTo: this.route });
     } catch (err) {
+      if (visit !== this.visit()) return;
+      if (isForbiddenError(err)) void this.session.refresh();
       if (err instanceof ApiValidationError) {
         const fieldErrors: Record<string, string> = {};
         for (const detail of err.details) fieldErrors[detail.field] = detail.message;
         this.fieldErrors.set(fieldErrors);
       }
       this.saveError.set(describeAdminError(err));
+    } finally {
+      if (visit === this.visit()) this.saving.set(false);
     }
   }
 

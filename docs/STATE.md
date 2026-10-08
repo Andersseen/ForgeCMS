@@ -1,16 +1,43 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-08 (spec 084 / roadmap 0.10 P03 — complete deployment and recovery profiles — COMPLETE on branch
-> `feature/spec-084-deployment-recovery-profiles`, PR pending; **roadmap 0.10 — Portable storage and deployment
-> profiles — is complete**). Published npm `latest` is `0.11.0` (whole fixed group, incl. `@forge-cms/s3`); P03
-> changes no `packages/*` and adds no changeset. Next bounded responsibility: roadmap 0.11 / U01 — Reliable content
-> state and failure recovery (not started).**
+> **Last updated: 2026-10-08 (spec 085 / roadmap 0.11 U01 — reliable content state and failure recovery — COMPLETE on
+> branch `feature/spec-085-admin-reliability`, PR pending; roadmap 0.11 is **not** complete: U02 and U03 pending).
+> Roadmap 0.10 (P01–P03, spec 084, PR #83, main CI `37776352995` ✓) is merged and complete. Published npm `latest` is
+> `0.11.0`; U01 adds `.changeset/reliable-admin-content-state.md` (`@forge-cms/admin` minor → fixed family `0.12.0`).
+> Next bounded responsibility: roadmap 0.11 / U02 — Keyboard, focus and existing field interactions (not started).**
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
 
-## Deployment and recovery profiles — P03 (spec 084, 2026-10-08, complete; closes roadmap 0.10)
+## Admin reliability — U01 (spec 085, 2026-10-08, complete; first packet of roadmap 0.11)
+
+Spec: [085-admin-reliable-content-state.md](specs/085-admin-reliable-content-state.md). The existing reusable admin is
+now dependable under ordinary failure and concurrency; no redesign.
+
+- **Editor:** one logical save = one write ("Saving…", submit/cancel disabled); dirty clears only after success and
+  before navigation; any failed save keeps values, dirty and field errors; the form is keyed by
+  collection + document (create = own identity), so A → B / edit → new / X → Y start clean while same-document
+  failures and reloads keep edits; the last loaded document is retained so a session expiry no longer unmounts the form.
+- **Workspace:** search/status/sort/page and per-collection UI state are `linkedSignal`s on the collection slug (survive
+  editor round trips, reset on collection change, stale debounce refused); mutations carry an epoch so late responses
+  for another collection are dropped. Delete keeps its dialog (pending/error) until the server confirms; publish/unpublish
+  is per-document pending, never optimistic.
+- **Users workspace / collections index:** latest-wins loads (token + abort), single writes, form/dialog retained on
+  failure, `describeAdminError` everywhere (409 text preserved), self-edit and `403` re-read the session, permission
+  loss clears rows (and the form unless the session merely expired).
+- **Session:** `401` → existing `ForgeAuthSession` (`expired`) → notice, Save disabled, edits kept; `403` →
+  `session.refresh()`. No second auth store. Last-admin invariant remains server-side.
+- **Tests:** `@analogjs/vite-plugin-angular` added to `packages/admin` devDependencies + `vitest.config.ts` so signal inputs
+  render under `TestBed`; `*.reliability.test.ts` (editor, workspace, users, index; 32 new tests); tiny-project
+  Playwright +4 journeys (19/19).
+- **API/release:** no new exports; optional inputs `submitting`/`submitDisabled` (form), `pending`/`pendingLabel`/`error`
+  (confirm dialog), `pendingIds` (list). Changeset minor → `0.12.0`. README corrected (`0.11.0`, `@forge-cms/s3` install).
+- **Gates (final tree):** format, lint, typecheck, test, build, check:api, test:cloudflare/libsql/upgrade/s3, release:verify/compat/ssr, e2e www (41) / www:prod (11) / tiny-project (19) / demo (29) all ✓ — see spec 085 Outcome for cached vs executed.
+- **Left for U02/U03:** keyboard/focus/dialog semantics (the unsaved-changes prompt is still the native `confirm`),
+  relation/upload picker interactions, custom-mount certification and the 1.0 surface freeze.
+
+## Deployment and recovery profiles — P03 (spec 084, 2026-10-08, complete, PR #83; closes roadmap 0.10)
 
 Spec: [084-complete-deployment-recovery-profiles.md](specs/084-complete-deployment-recovery-profiles.md). **Two
 official durable profiles**, both production-built from packed public packages and walked through auth/admin, SSR,

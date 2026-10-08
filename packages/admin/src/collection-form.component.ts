@@ -25,8 +25,8 @@ import { toSubmitPayload } from './form-payload.js';
       aria-modal="true"
       aria-labelledby="forge-collection-form-title"
       tabindex="-1"
-      (keydown.escape)="cancel.emit()"
-      (click)="cancel.emit()"
+      (keydown.escape)="onCancel()"
+      (click)="onCancel()"
     >
       <volt-card
         class="w-full max-w-lg p-6 space-y-4 max-h-[85vh] overflow-y-auto"
@@ -49,10 +49,18 @@ import { toSubmitPayload } from './form-payload.js';
           }
 
           <div class="flex items-center justify-end gap-2 pt-2">
-            <volt-button type="button" variant="outline" size="sm" (click)="cancel.emit()">
+            <volt-button
+              type="button"
+              variant="outline"
+              size="sm"
+              [disabled]="submitting()"
+              (click)="onCancel()"
+            >
               Cancel
             </volt-button>
-            <volt-button type="submit" size="sm">{{ submitLabel() }}</volt-button>
+            <volt-button type="submit" size="sm" [disabled]="submitting() || submitDisabled()">
+              {{ submitting() ? 'Saving…' : submitLabel() }}
+            </volt-button>
           </div>
         </form>
       </volt-card>
@@ -66,6 +74,10 @@ export class ForgeCollectionFormComponent {
   submitLabel = input('Save');
   /** Locales the owning collection supports; forwarded so localized fields can offer a picker. */
   locales = input<string[]>([]);
+  /** A save is in flight: the submit control shows "Saving…" and neither it nor cancel can fire. */
+  submitting = input(false);
+  /** Saving is not currently possible (e.g. the session expired); the entered values stay editable. */
+  submitDisabled = input(false);
 
   save = output<Record<string, unknown>>();
   cancel = output<void>();
@@ -92,8 +104,14 @@ export class ForgeCollectionFormComponent {
     }
   }
 
+  protected onCancel(): void {
+    // Cancelling mid-save would leave "was it written?" ambiguous, so it waits for the outcome.
+    if (!this.submitting()) this.cancel.emit();
+  }
+
   onSubmit(event: Event): void {
     event.preventDefault();
+    if (this.submitting() || this.submitDisabled()) return;
     // Field controls emit already-typed values (numbers as numbers, relations as arrays, composite
     // fields as objects/arrays), so there is nothing left to coerce here. Forge-owned metadata the
     // document was loaded with is not submitted (spec 063).
