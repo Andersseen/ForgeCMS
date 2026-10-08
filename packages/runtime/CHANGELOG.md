@@ -1,5 +1,16 @@
 # @forge-cms/runtime
 
+## 0.11.0
+
+### Patch Changes
+
+- Updated dependencies [0c1b62c]
+  - @forge-cms/storage@0.11.0
+  - @forge-cms/auth@0.11.0
+  - @forge-cms/db@0.11.0
+  - @forge-cms/core@0.11.0
+  - @forge-cms/api@0.11.0
+
 ## 0.10.2
 
 ### Patch Changes

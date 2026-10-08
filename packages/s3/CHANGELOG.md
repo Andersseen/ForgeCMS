@@ -1,4 +1,4 @@
-# @forge-cms/storage
+# @forge-cms/s3
 
 ## 0.11.0
 
@@ -8,50 +8,7 @@
 
   `getPublicUrl()` of `InMemoryStorageAdapter` and `R2StorageAdapter` now percent-encodes each key segment (keys containing `#`, `?`, `%`, spaces or Unicode previously produced URLs that did not resolve back to the key). The shared `runStorageAdapterContractTests` suite is stronger: binary/empty bytes, every body shape, content type + metadata, idempotent delete, prefix listing and URL-sensitive keys.
 
-## 0.10.2
+### Patch Changes
 
-## 0.10.1
-
-## 0.10.0
-
-## 0.9.3
-
-## 0.9.2
-
-## 0.9.1
-
-## 0.9.0
-
-## 0.8.3
-
-## 0.8.2
-
-## 0.8.1
-
-## 0.8.0
-
-## 0.7.0
-
-## 0.6.0
-
-## 0.5.0
-
-## 0.4.0
-
-## 0.3.0
-
-## 0.2.0
-
-## 0.1.2
-
-## 0.1.1
-
-## 0.1.0
-
-## 0.0.2
-
-## 0.1.0
-
-### Minor Changes
-
-- 83f3b66: Normalize all package versions to 0.1.0 before the first npm publish.
+- Updated dependencies [0c1b62c]
+  - @forge-cms/storage@0.11.0
