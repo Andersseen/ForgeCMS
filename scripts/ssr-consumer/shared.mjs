@@ -33,6 +33,7 @@ export const FORGE_PACKAGES = [
   '@forge-cms/db',
   '@forge-cms/auth',
   '@forge-cms/storage',
+  '@forge-cms/s3',
   '@forge-cms/api',
   '@forge-cms/runtime',
   '@forge-cms/cloudflare',
@@ -63,11 +64,11 @@ export function write(dir, files) {
   }
 }
 
-/** Packs every Forge package once; the result maps package name → `file:` tarball. */
-export function pack(dir) {
+/** Packs the given Forge packages (default: all) once; the result maps package name → `file:` tarball. */
+export function pack(dir, names = FORGE_PACKAGES) {
   mkdirSync(dir, { recursive: true });
   const tarballs = {};
-  for (const name of FORGE_PACKAGES) {
+  for (const name of names) {
     run('pnpm', ['--filter', name, 'pack', '--pack-destination', dir], repoRoot);
     const prefix = `${name.replace('@', '').replace('/', '-')}-`;
     const file = readdirSync(dir).find(

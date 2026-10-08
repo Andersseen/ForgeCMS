@@ -1,11 +1,11 @@
 import { InMemoryDatabaseAdapter, LibSqlDatabaseAdapter } from '@forge-cms/db';
 import { UsersCollectionAuthAdapter } from '@forge-cms/auth';
-import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import { D1DatabaseAdapter, type D1Database } from '@forge-cms/cloudflare';
 import { ForgeCmsRuntime } from '@forge-cms/runtime';
 import { collections } from './collections';
+import { S3_ENV_KEYS, selectStorage, type S3Env } from './storage';
 
-export interface ServerEnv {
+export interface ServerEnv extends S3Env {
   /** Cloudflare D1 binding: selects the D1 profile. */
   DB?: D1Database;
   /** A libSQL URL (`file:/data/forge.db`, `libsql://…`): selects the portable libSQL profile. */
@@ -53,6 +53,9 @@ function nodeEnv(): ServerEnv | undefined {
   if (processEnv['FORGE_ENABLE_SIGNUP'] !== undefined) {
     env.FORGE_ENABLE_SIGNUP = processEnv['FORGE_ENABLE_SIGNUP'];
   }
+  for (const key of S3_ENV_KEYS) {
+    if (processEnv[key] !== undefined) env[key] = processEnv[key];
+  }
   return env;
 }
 
@@ -75,7 +78,7 @@ async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>
     adapters: {
       database,
       auth,
-      storage: new InMemoryStorageAdapter()
+      storage: await selectStorage(env)
     },
     ...(env !== undefined && { env })
   });

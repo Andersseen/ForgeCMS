@@ -89,6 +89,32 @@ the route:
 new R2StorageAdapter({ publicUrlBase: 'https://cdn.example.com' });
 ```
 
+## Portable files: libSQL + S3
+
+Off Cloudflare, the same pipeline runs on an on-disk libSQL database and an S3-compatible bucket
+(`@forge-cms/s3`, server-side only). Nothing else changes: the same multipart `handleCreate`, the same
+`handleFile` route, the same storage intents and `reconcileStorage()`.
+
+```ts
+import { S3StorageAdapter } from '@forge-cms/s3';
+
+const storage = new S3StorageAdapter({
+  bucket: process.env.S3_BUCKET!,
+  region: process.env.S3_REGION!,
+  endpoint: process.env.S3_ENDPOINT, // omit for AWS S3
+  forcePathStyle: true // most S3-compatible services
+  // credentials: omit to use the AWS SDK's provider chain
+});
+```
+
+Keep the default public URL base (`/api/media`) so every read passes through `handleFile`'s access check.
+This combination is proven end to end against a real Garage service: upload, anonymous and protected
+reads, restart persistence, delete, and recovery of a failed object delete or a failed database commit
+through `reconcileStorage()`. A missing object is a `404`; an unreachable bucket or rejected credentials
+are a generic `500` that names no bucket, endpoint or key. There is still no transaction across the
+database and the bucket. Only Garage is certified; AWS S3, Backblaze B2 and Wasabi are configuration
+examples. Deployment and backup/restore guides are still to come (roadmap 0.10 / P03).
+
 ## When storage and the database disagree
 
 A database transaction cannot include your bucket. So Forge writes a **storage intent** row, in the
