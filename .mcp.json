@@ -8,9 +8,17 @@
       "type": "http",
       "url": "https://observability.mcp.cloudflare.com/mcp"
     },
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp"
+    },
     "playwright": {
-      "command": "pnpm",
-      "args": ["dlx", "@playwright/mcp@latest"]
+      "args": [
+        "@playwright/mcp@0.0.81"
+      ],
+      "command": "npx",
+      "env": {},
+      "type": "stdio"
     }
   }
 }

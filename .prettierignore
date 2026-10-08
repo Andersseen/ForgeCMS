@@ -10,3 +10,10 @@ pnpm-lock.yaml
 
 # Historical upgrade fixtures are hashed evidence (spec 073): never reformat them.
 apps/upgrade-rehearsal/fixtures/
+
+# Agentyx-managed (re-serialised by `agentyx install`; prettier would make doctor report drift)
+.agentyx.json
+.agentyx.lock.json
+.kimi-code/
+.mcp.json
+.claude/settings.json

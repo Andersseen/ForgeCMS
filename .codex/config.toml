@@ -4,9 +4,12 @@ url = "https://bindings.mcp.cloudflare.com/mcp"
 [mcp_servers.cloudflare-observability]
 url = "https://observability.mcp.cloudflare.com/mcp"
 
+[mcp_servers.context7]
+enabled = true
+url = "https://mcp.context7.com/mcp"
+
 [mcp_servers.playwright]
-command = "pnpm"
-args = [
-    "dlx",
-    "@playwright/mcp@latest",
-]
+args = [ "@playwright/mcp@0.0.81" ]
+command = "npx"
+enabled = true
+env = { }
