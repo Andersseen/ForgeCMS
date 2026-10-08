@@ -10,7 +10,9 @@ surface, with no host CRUD pages and no repository-internal imports. See
 this app's own code is the proof of.
 
 Content model: `users` (`defineUsersCollection()`) + `posts` (`title`/`slug`/`body`/`author ->
-users`, `drafts: true`, role-gated writes). Nothing else — no media, no second collection.
+users`, `drafts: true`, role-gated writes) + one small upload-enabled `media` collection (spec 083: `filename`,
+`url`, `contentType`, `filesize`, `alt`, `visibility`; staff read everything, everyone else only `public` rows;
+staff write). Nothing else — no second content collection, no media UI of its own.
 
 Unlike every other app in this repo, **this one seeds nothing**. First run means zero rows, zero
 users — `POST /api/bootstrap-admin` (an app-local route, not a new Forge capability; see its own
@@ -23,19 +25,37 @@ pnpm dev:tiny-project          # dev server at http://127.0.0.1:5175
 pnpm test:tiny-project         # unit tests (InMemory adapters)
 pnpm --filter @forge-cms/tiny-project test:libsql   # portable profile: real libSQL, no Cloudflare
 pnpm test:cloudflare           # includes this app's real local D1 lifecycle proof
+pnpm test:s3                   # real Garage (Docker): S3 adapter, libSQL + S3 upload lifecycle, packed consumer
 pnpm e2e:tiny-project          # full browser golden path (Playwright)
 ```
 
 ## Profiles proven here
 
 Database selection (`src/server/api/runtime.ts`): `env.DB` → D1; else `DATABASE_URL` → libSQL; else
-`InMemoryDatabaseAdapter` (ordinary development). Durable **file** storage is not part of this profile
-(`InMemoryStorageAdapter`; portable files are roadmap 0.10).
+`InMemoryDatabaseAdapter` (ordinary development). Storage selection (`src/server/api/storage.ts`): when any
+`S3_*` setting is present → `S3StorageAdapter` (`@forge-cms/s3`), else `InMemoryStorageAdapter`. A
+half-configured profile throws at startup instead of silently falling back.
+
+| Variable                                   | Meaning                                                     |
+| ------------------------------------------ | ----------------------------------------------------------- |
+| `S3_BUCKET`, `S3_REGION`                   | required together once any `S3_*` is set                    |
+| `S3_ENDPOINT`                              | S3-compatible service URL; omit for AWS S3                  |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | a pair; omit both to use the AWS SDK provider chain         |
+| `S3_SESSION_TOKEN`                         | optional, with the pair                                     |
+| `S3_FORCE_PATH_STYLE`                      | `true` / `false` (default `false`)                          |
+| `S3_PUBLIC_URL_BASE`                       | default `/api/media`, the access-checked `handleFile` route |
+
+These are server-side only (read in `nodeEnv()` / Cloudflare bindings) and never reach browser code. Files are
+served by `GET /api/media/[...key]`, a thin `handleFile` route. The S3 profile is _optional_: the
+"never silently use in-memory in production" policy is roadmap 0.10 / P03.
 
 - **Cloudflare**: `D1DatabaseAdapter` when `env.DB` exists (`wrangler.toml`), proven for real (not
   mocked) by `test/workers/d1-lifecycle.test.ts` via `@cloudflare/vitest-plugin`.
 - **Portable**: `LibSqlDatabaseAdapter` with no Cloudflare binding of any kind, proven for real by
   `src/tests/portable-libsql.integration.test.ts`.
+- **Portable files** (spec 083): on-disk libSQL + `S3StorageAdapter` against a real Garage service, through the
+  normal multipart handler and `handleFile`, with restart persistence, delete and storage-intent recovery:
+  `src/tests/portable-storage.integration.test.ts` (run by `pnpm test:s3`).
 
 Production (spec 081, roadmap 0.9 S03): `pnpm release:ssr` copies this app's source into a strict packed
 consumer and walks bootstrap → draft → publish → no-JS SSR → hydration → edit → fresh SSR → restart →

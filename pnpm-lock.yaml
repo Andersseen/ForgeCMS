@@ -290,6 +290,9 @@ importers:
       '@forge-cms/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
+      '@forge-cms/s3':
+        specifier: workspace:*
+        version: link:../../packages/s3
       '@forge-cms/storage':
         specifier: workspace:*
         version: link:../../packages/storage

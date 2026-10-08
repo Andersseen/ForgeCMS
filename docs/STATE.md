@@ -1,13 +1,27 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-07 (spec 082 / roadmap 0.10 P01 — basic S3-compatible StorageAdapter — COMPLETE on branch
-> `feature/spec-082-s3-storage-adapter`, PR pending; roadmap 0.10 is NOT complete (P02, P03 remain). Published npm
-> `latest` is still `0.10.2`: `@forge-cms/s3` is on `main` only after merge and ships with the Version Packages PR
-> (`0.11.0`)). Next: roadmap 0.10 / P02 — portable upload lifecycle and access).**
+> **Last updated: 2026-10-08 (spec 083 / roadmap 0.10 P02 — portable upload lifecycle and access — COMPLETE on branch
+> `feature/spec-083-portable-upload-lifecycle`, PR pending; roadmap 0.10 is NOT complete (P03 remains). Published npm
+> `latest` is still `0.10.2`; P01's pending minor Changeset (Version Packages PR #80) ships `@forge-cms/s3` as `0.11.0`;
+> P02 changes no `packages/*`). Next: roadmap 0.10 / P03 — complete deployment and recovery guides).**
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Portable upload lifecycle — P02 (spec 083, 2026-10-08, complete)
+
+Spec: [083-portable-upload-lifecycle-and-access.md](specs/083-portable-upload-lifecycle-and-access.md). On-disk libSQL +
+`@forge-cms/s3` + real Garage `v2.4.1` driven through Forge's own `handleCreate` (multipart), `handleFile` and
+`handleDelete`: exact bytes in S3, `_storageKey` ownership, public vs protected reads (anonymous 200 / 404, staff
+200, authenticated `private, no-store`), stray objects 404, MIME/size/validation parity with R2, DB failure after
+put (compensated; with a failed cleanup a durable intent that `reconcileStorage()` clears), object-delete failure
+(intent, reconcile, idempotent), missing object 404 vs outage/forbidden generic 500, restart persistence (new
+runtime on the same file + bucket) and a two-process packed consumer. **No runtime defect found; no `packages/*`
+change.** `apps/tiny-project` gained a small `media` upload collection, `GET /api/media/[...key]` and optional
+`S3_*` storage selection (`src/server/api/storage.ts`, partial config throws). `pnpm test:s3` now runs three
+stages against one Garage container. **Not done (P03):** deployment/recovery guides, S3 backup/restore, the
+production no-silent-in-memory policy, remote/AWS validation.
 
 ## S3-compatible storage adapter — P01 (spec 082, 2026-10-07, complete)
 
@@ -46,7 +60,7 @@ close-out (extra negative controls, docs, CI timeout) on `feature/spec-081-s03-c
   (Nitro `externals.trace`, checked in nitropack 2.13.4); documented in `/docs/ssr`, the small-project guide and
   deployment. `InMemoryStorageAdapter` is still not durable file storage — portable files are roadmap 0.10 (P01–P03).
 - **CI:** `checks` timeout 20 → 25 min (measured 13.5–14 min with the journey; 11–12 before); one `pnpm release:ssr` step.
-- **Next:** roadmap 0.10 / P01 — Basic S3-compatible StorageAdapter (not started).
+- **Next:** roadmap 0.10 / P01 — Basic S3-compatible StorageAdapter (done in spec 082).
 
 ## Safe public hydration and transfer — S02 (spec 080, 2026-10-07)
 

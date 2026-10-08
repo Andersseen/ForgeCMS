@@ -1,9 +1,15 @@
 # ROADMAP — A small, dependable ForgeCMS 1.0
 
+> **2026-10-08 (spec 083):** roadmap 0.10 **P02 — Portable upload lifecycle and access — is complete**: on-disk libSQL
+>
+> - `@forge-cms/s3` + a real Garage service, driven through Forge's own multipart handler and `handleFile`, with
+>   restart persistence (workspace test and a two-process packed consumer), delete, and storage-intent recovery.
+>   Roadmap 0.10 is **not** complete. **Next bounded responsibility: roadmap 0.10 / P03 — Complete deployment and
+>   recovery guides.**
+>
 > **2026-10-07 (spec 082):** roadmap 0.10 **P01 — Basic S3-compatible StorageAdapter — is complete**
 > (`@forge-cms/s3`, certified against a real Garage service; MinIO was replaced because its community images are no
-> longer published). Roadmap 0.10 is **not** complete. **Next bounded responsibility: roadmap 0.10 / P02 — Portable
-> upload lifecycle and access.**
+> longer published). Roadmap 0.10 is **not** complete. _(Superseded: P02 is complete — see above.)_
 >
 > **2026-10-07 (spec 081):** roadmap **0.9 — SSR and Analog consumption — is complete** (S01–S03). S03 certified
 > the production consumer journey from packed public packages on a built Node server with on-disk libSQL (incl. a

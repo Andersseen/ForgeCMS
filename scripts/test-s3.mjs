@@ -5,10 +5,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 /**
- * Spec 082 (roadmap 0.10 / P01): runs the real-service integration suite of @forge-cms/s3 against an
- * isolated, throwaway Garage container. Repository tooling only — not a Forge package API.
+ * Spec 082 (roadmap 0.10 / P01) and spec 083 (P02): runs every real-service portable-storage suite against
+ * ONE isolated, throwaway Garage container. Repository tooling only — not a Forge package API.
  *
- *   pnpm test:s3
+ *   pnpm test:s3                      # all stages, in order
+ *   pnpm test:s3 adapter lifecycle    # only the named stages
+ *
+ * Stages (each gets the same FORGE_S3_TEST_* environment):
+ *   adapter    @forge-cms/s3 against Garage (the shared StorageAdapter contract + focused cases)   — P01
+ *   lifecycle  on-disk libSQL + S3StorageAdapter through Forge's own upload/serve/delete handlers  — P02
+ *   consumer   the same journey from PACKED public packages, in two separate Node processes        — P02
  *
  * Needs a running Docker daemon and fails clearly without one; it never skips. The container, its
  * config and its (random, test-only) credentials exist only for this run.
@@ -30,6 +36,27 @@ function fail(message) {
   cleanup();
   process.exit(1);
 }
+
+const STAGES = [
+  {
+    name: 'adapter',
+    command: ['pnpm', '--filter', '@forge-cms/s3', 'test:integration']
+  },
+  {
+    name: 'lifecycle',
+    command: ['pnpm', '--filter', '@forge-cms/tiny-project', 'test:portable-storage']
+  },
+  { name: 'consumer', command: ['node', 'scripts/verify-portable-storage-consumer.mjs'] }
+];
+const requested = process.argv.slice(2);
+const unknown = requested.filter((name) => !STAGES.some((stage) => stage.name === name));
+if (unknown.length > 0) {
+  console.error(
+    `✗ test:s3 — unknown stage ${unknown.join(', ')} (known: ${STAGES.map((s) => s.name).join(', ')})`
+  );
+  process.exit(1);
+}
+const selected = STAGES.filter((stage) => requested.length === 0 || requested.includes(stage.name));
 
 let cleanup = () => {};
 
@@ -131,25 +158,33 @@ try {
   }
 
   console.log(`Garage ready at ${endpoint} (region ${GARAGE_REGION}, bucket ${BUCKET})`);
-  const child = spawn('pnpm', ['--filter', '@forge-cms/s3', 'test:integration'], {
-    stdio: 'inherit',
-    env: {
-      ...process.env,
-      FORGE_S3_TEST_ENDPOINT: endpoint,
-      FORGE_S3_TEST_REGION: GARAGE_REGION,
-      FORGE_S3_TEST_BUCKET: BUCKET,
-      FORGE_S3_TEST_ACCESS_KEY_ID: accessKeyId,
-      FORGE_S3_TEST_SECRET_ACCESS_KEY: secretAccessKey,
-      FORGE_S3_TEST_IMAGE: GARAGE_IMAGE
-    }
-  });
-  const code = await new Promise((resolve) => {
-    child.on('error', (err) => {
-      console.error(`could not run the integration suite: ${err.message}`);
-      resolve(1);
+  const env = {
+    ...process.env,
+    FORGE_S3_TEST_ENDPOINT: endpoint,
+    FORGE_S3_TEST_REGION: GARAGE_REGION,
+    FORGE_S3_TEST_BUCKET: BUCKET,
+    FORGE_S3_TEST_ACCESS_KEY_ID: accessKeyId,
+    FORGE_S3_TEST_SECRET_ACCESS_KEY: secretAccessKey,
+    FORGE_S3_TEST_IMAGE: GARAGE_IMAGE
+  };
+  let code = 0;
+  for (const stage of selected) {
+    console.log(`\n▶ test:s3 stage '${stage.name}' — ${stage.command.join(' ')}`);
+    const started = Date.now();
+    const [command, ...args] = stage.command;
+    const child = spawn(command, args, { stdio: 'inherit', env });
+    code = await new Promise((resolve) => {
+      child.on('error', (err) => {
+        console.error(`could not run stage '${stage.name}': ${err.message}`);
+        resolve(1);
+      });
+      child.on('exit', (c) => resolve(c ?? 1));
     });
-    child.on('exit', (c) => resolve(c ?? 1));
-  });
+    console.log(
+      `◀ stage '${stage.name}' ${code === 0 ? 'passed' : 'FAILED'} in ${Math.round((Date.now() - started) / 1000)}s`
+    );
+    if (code !== 0) break;
+  }
   cleanup();
   process.exit(code);
 } catch (err) {

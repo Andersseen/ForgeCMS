@@ -68,7 +68,11 @@ const BROWSER_FORBIDDEN = [
   'LibSqlDatabaseAdapter',
   'D1DatabaseAdapter',
   '@libsql',
-  'DATABASE_URL'
+  'DATABASE_URL',
+  // Spec 083: the optional S3 storage profile is server-side configuration only.
+  'S3StorageAdapter',
+  '@aws-sdk',
+  'S3_SECRET_ACCESS_KEY'
 ];
 
 /** The tiny-project sources that make up the consumer app (everything but its tests and Strata plugin). */
