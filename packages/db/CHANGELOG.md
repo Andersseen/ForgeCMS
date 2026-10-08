@@ -1,5 +1,11 @@
 # @forge-cms/db
 
+## 0.12.0
+
+### Patch Changes
+
+- @forge-cms/core@0.12.0
+
 ## 0.11.0
 
 ### Patch Changes

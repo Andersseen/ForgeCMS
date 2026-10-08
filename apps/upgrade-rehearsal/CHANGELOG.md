@@ -1,5 +1,17 @@
 # @forge-cms/upgrade-rehearsal
 
+## 0.0.10
+
+### Patch Changes
+
+- @forge-cms/core@0.12.0
+- @forge-cms/db@0.12.0
+- @forge-cms/auth@0.12.0
+- @forge-cms/storage@0.12.0
+- @forge-cms/s3@0.12.0
+- @forge-cms/runtime@0.12.0
+- @forge-cms/cloudflare@0.12.0
+
 ## 0.0.9
 
 ### Patch Changes
