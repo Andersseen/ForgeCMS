@@ -12,7 +12,7 @@ import { sha256Hex } from './fixtures.js';
 export interface BackupManifest {
   format: 1;
   createdAt: string;
-  profile: 'libsql' | 'd1-r2';
+  profile: 'libsql' | 'libsql-s3' | 'd1-r2';
   forgeVersion: string;
   database: { file: string; sha256: string; size: number };
   objects: BackupObject[];

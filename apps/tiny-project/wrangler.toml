@@ -6,13 +6,18 @@ compatibility_date = "2026-05-15"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "dist/analog/public"
 
-# `getServerRuntime` in src/server/api/runtime.ts checks `env.DB` and falls back to
-# `InMemoryDatabaseAdapter` when it is missing. Not created in any real Cloudflare account — local
-# `wrangler pages dev` provisions a local D1 automatically from this binding name.
+# The Cloudflare durable profile (spec 084) needs BOTH bindings: `DB` (D1) and `BUCKET` (R2). A production build
+# with only one of them — or with neither — refuses to start (src/server/api/profile.ts); it never falls back
+# to in-memory. Not created in any real Cloudflare account: local `wrangler pages dev` provisions a local D1
+# and a local R2 bucket automatically from these binding names.
 [[d1_databases]]
 binding = "DB"
 database_name = "forge-cms-tiny-project"
 database_id = "00000000-0000-0000-0000-000000000001"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "forge-cms-tiny-project"
 
 # SSR (spec 078): where the server render reaches this app's own `/api/*` routes — `wrangler pages dev`'s
 # default address. A production render without it fails instead of guessing from the Host header.

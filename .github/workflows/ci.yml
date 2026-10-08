@@ -88,14 +88,6 @@ jobs:
       - name: libSQL portable-profile integration tests
         run: pnpm test:libsql
 
-      # Spec 082 (roadmap 0.10 / P01): the S3 adapter against a real S3-compatible service — an isolated,
-      # throwaway Garage container (pinned dxflrs/garage tag + digest) started and removed by the script,
-      # with random test-only credentials. Runs the shared StorageAdapter contract plus focused cases; it
-      # fails (never skips) without Docker. `release` needs this job, so a package change cannot publish
-      # without it. (MinIO was the original plan; its community images/binaries are no longer published.)
-      - name: S3-compatible storage integration tests (Garage)
-        run: pnpm test:s3
-
       # Roadmap 0.7 release gate (spec 073, M03): installations written by historical releases
       # (committed, hash-checked fixtures — no network) upgrade through planSchema → reviewed
       # migrations on on-disk libSQL and local D1/R2, then are backed up and restored into isolated,
@@ -123,11 +115,20 @@ jobs:
       # `node`; concurrent anonymous/A/B renders over real HTTP, linked bundles, no server code in the browser.
       # Spec 080 (S02): the same consumer then runs the built app in Chromium (hydration, request counts,
       # transfer-state inspection), so Playwright's browser must be installed first.
-      # Spec 081 (S03): a second packed consumer (tiny-project's source) walks bootstrap → draft → publish →
-      # no-JS SSR → hydration → edit → fresh SSR → restart → unpublish on a built Node server + on-disk libSQL
-      # and on the Cloudflare Pages output under local workerd + local D1. One gate, one step.
       - name: Packed production SSR consumer
         run: pnpm release:ssr
+
+      # Every real-service durable-storage gate, against ONE throwaway Garage container (pinned dxflrs/garage
+      # tag + digest, random test-only credentials; the script starts and removes it). It fails — never
+      # skips — without Docker, and `release` needs this job, so a package change cannot publish without it.
+      # Stages: adapter (spec 082, P01) · lifecycle + consumer (spec 083, P02) · recovery (spec 084, P03: historical
+      # fixtures → upgrade → cold libSQL backup → restore into an isolated EMPTY S3 bucket) · profiles (spec 084:
+      # the two COMPLETE durable production profiles, packed and production-built — Node + libSQL + S3, and
+      # Cloudflare Pages under local workerd + local D1 + local R2 — each walking bootstrap → draft → publish →
+      # no-JS SSR → hydration → edit → restart → unpublish, then a multipart upload → handleFile → restart →
+      # delete journey). Needs Chromium (installed above) and the build.
+      - name: Durable profiles — S3 (Garage), recovery and packed production journeys
+        run: pnpm test:s3
 
       - name: E2E tests — apps/www
         run: pnpm e2e:www

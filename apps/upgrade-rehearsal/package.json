@@ -2,11 +2,12 @@
   "name": "@forge-cms/upgrade-rehearsal",
   "version": "0.0.9",
   "private": true,
-  "description": "Roadmap 0.7 M03 release gate: historical-fixture upgrades and backup/restore rehearsals on real libSQL and local D1/R2 (spec 073). Not deployed.",
+  "description": "Roadmap 0.7 M03 release gate: historical-fixture upgrades and backup/restore rehearsals on real libSQL and local D1/R2 (spec 073) and on libSQL + a real S3 service (spec 084). Not deployed.",
   "type": "module",
   "scripts": {
     "test": "vitest run test/fixtures.test.ts test/backup.test.ts",
     "test:upgrade": "vitest run",
+    "test:s3-recovery": "vitest run -c vitest.s3.config.ts",
     "fixtures:generate": "node generator/generate.mjs",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -18,6 +19,7 @@
     "@forge-cms/core": "workspace:*",
     "@forge-cms/db": "workspace:*",
     "@forge-cms/runtime": "workspace:*",
+    "@forge-cms/s3": "workspace:*",
     "@forge-cms/storage": "workspace:*",
     "@libsql/client": "0.17.3"
   },

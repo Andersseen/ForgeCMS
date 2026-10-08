@@ -4,10 +4,19 @@ How to back up a ForgeCMS installation, restore it into a clean environment, and
 forward fix and a restore when an upgrade goes wrong. It complements
 [SCHEMA-UPGRADES.md](SCHEMA-UPGRADES.md) (drift plans and reviewed migrations).
 
-Everything marked **tested** is exercised by `pnpm test:upgrade` on every CI run (roadmap 0.7 M03,
-[spec 073](specs/073-historical-upgrade-and-backup-restore-rehearsal.md)) against on-disk libSQL and
-local D1/R2 (workerd). Commands marked **documented, not executed in CI** target real Cloudflare
-resources; the test suite never touches a remote account.
+There are **two official durable profiles** and both have a tested recovery path:
+
+| Profile                    | Database       | Objects                | Tested by (every CI run)                                     |
+| -------------------------- | -------------- | ---------------------- | ------------------------------------------------------------ |
+| **Cloudflare**             | D1             | R2                     | `pnpm test:upgrade` — local Wrangler D1 + local R2 (workerd) |
+| **Portable** (libSQL + S3) | on-disk libSQL | S3-compatible (Garage) | `pnpm test:s3 recovery` — real Garage, isolated buckets      |
+
+Everything marked **tested** is exercised by those commands (roadmap 0.7 M03,
+[spec 073](specs/073-historical-upgrade-and-backup-restore-rehearsal.md); roadmap 0.10 P03,
+[spec 084](specs/084-complete-deployment-recovery-profiles.md)). Commands marked **documented, not executed in
+CI** target real Cloudflare or cloud resources; the test suite never touches a remote account. Only Garage
+`v2.4.1` is a CI-certified S3 service; AWS S3, Backblaze B2 and Wasabi use the same procedure but are not
+certified.
 
 ## What a backup must contain
 
@@ -62,8 +71,49 @@ provider offers).
 
 Remote libSQL (Turso) has its own backup features; they are not exercised by this repository.
 
-The portable profile has no durable object store until roadmap 0.10 (S3, P01–P03). The rehearsal runs
-the same object backup code against `InMemoryStorageAdapter`; P03 extends it to S3.
+## libSQL + S3 — the portable profile (tested)
+
+The tested sequence, with real on-disk libSQL and a real S3 service (`apps/upgrade-rehearsal`,
+`test/s3/backup-libsql-s3.test.ts`):
+
+```text
+QUIESCE WRITES                      stop every process that writes to the database file
+→ cold libSQL snapshot              checksummed byte copy of the quiesced file (above)
+→ read the _storageKey values FROM THE SNAPSHOT
+→ fetch exactly those objects from S3, with content type and custom metadata
+→ hash (SHA-256) and write each into the backup; write the manifest LAST
+→ verify the whole backup (database + every object) before anything is restored
+→ restore the database file to a NEW path
+→ restore the objects into an EMPTY bucket (a different bucket from the source)
+→ read every object back: bytes, content type, metadata
+→ start the application OFFLINE against the restored file and bucket
+→ planSchema / migration ledger / auth / content / files checks (below)
+→ reconcile pending storage intents; one representative write
+→ enable traffic
+```
+
+- **Derive the object list from the snapshot, never from the bucket.** `StorageAdapter.list()` also returns
+  orphans and objects a pending intent is about to delete; those are not live content. A key the snapshot
+  references but the bucket lacks **fails the backup** and no manifest is written.
+- **Restore refuses a non-empty target** (it never overwrites an object), and a corrupt or missing backup
+  file is rejected **before** the target bucket is touched. After the restore each object is read back and
+  compared; any mismatch fails the restore.
+- **The backup manifest carries no credentials** (no `AUTH_SECRET`, S3 keys, tokens, cookies, passwords or
+  endpoint). Password hashes and API-key digests live in the database snapshot, as always.
+- **Isolation.** The bucket is infrastructure you provision (ForgeCMS never creates buckets). The rehearsal uses
+  separate source and target buckets, empties the source after the backup, and starts the restored runtime
+  configured only with the target, so a restore that leaned on the source would fail.
+- The rehearsal runs this for the committed `0.4.0`, `0.6.0` and `0.8.0` installations after upgrading them with
+  the reviewed migrations, with a pending storage intent left in the data: ids, relations, users, password
+  logins, drafts, localized values, globals, version history, the migration ledger, the schema baseline, every
+  `_storageKey` and every file (through `handleFile`) survive, migrations rerun as `already-applied`, the
+  restored intent reconciles once (a second run is a no-op) and the restored installation accepts a write.
+- **Provider caveats (documented, not CI-tested):** versioned buckets keep deleted objects; for AWS S3, B2 and
+  Wasabi use the provider's own tooling or any S3 client that preserves content type and metadata, and run the
+  same verification. The runbook above is the contract, not a specific copy tool.
+
+An on-disk libSQL file must live on durable storage in the first place (a persistent volume, not an ephemeral
+container filesystem), and the quiesce step must also cover the process that holds the file open.
 
 ## Cloudflare D1 (tested locally; remote commands documented, not executed in CI)
 
@@ -92,7 +142,7 @@ restored environment cannot lean on it. The export contains no `BEGIN`/`COMMIT`,
 feature, useful for a mistake you notice quickly; ForgeCMS does not exercise it and this runbook does
 not depend on it.
 
-## R2 objects (tested locally; remote copy documented)
+## R2 objects (Cloudflare profile; tested locally, remote copy documented)
 
 1. From the **database snapshot**, list the keys the content needs. With the exported SQL loaded into
    any SQLite (for example `sqlite3 snapshot.db < backup/database.sql`), for every upload-enabled
@@ -187,7 +237,8 @@ new data. There are no down migrations.
 - No remote D1/R2 rehearsal: local evidence does not prove a remote Cloudflare configuration.
 - No online, atomic database + object-storage snapshot; writes must be quiesced.
 - No point-in-time recovery beyond the snapshot (Time Travel is a separate provider feature).
-- No S3 yet (roadmap 0.10, P01–P03).
+- Only Garage `v2.4.1` is a CI-certified S3 service; AWS S3, Backblaze B2 and Wasabi are not CI-tested.
+- The S3 half of the rehearsal uses one throwaway local Garage node; it does not test multi-node or cross-region behavior.
 - An auth adapter backed by a **separate** database is neither migrated nor covered by this backup
   procedure; the tested profile keeps users on the runtime's database.
 - `date` fields are stored and returned as ISO strings (DEMO-FINDINGS finding 24, roadmap 0.8 C02);
@@ -197,7 +248,8 @@ new data. There are no down migrations.
 
 ```bash
 pnpm build
-pnpm test:upgrade
+pnpm test:upgrade            # libSQL + local D1/R2 (offline)
+pnpm test:s3 recovery        # libSQL + real S3 (needs Docker; starts a throwaway Garage)
 ```
 
 `pnpm fixtures:upgrade:generate <version>` regenerates a historical fixture from the published npm

@@ -9,6 +9,7 @@
     "test/**/*.ts",
     "ops/**/*.ts",
     "../www/src/server/import-meta.d.ts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "vitest.s3.config.ts"
   ]
 }

@@ -113,7 +113,10 @@ reads, restart persistence, delete, and recovery of a failed object delete or a 
 through `reconcileStorage()`. A missing object is a `404`; an unreachable bucket or rejected credentials
 are a generic `500` that names no bucket, endpoint or key. There is still no transaction across the
 database and the bucket. Only Garage is certified; AWS S3, Backblaze B2 and Wasabi are configuration
-examples. Deployment and backup/restore guides are still to come (roadmap 0.10 / P03).
+examples. Complete setups for both durable profiles (Cloudflare D1 + R2, and libSQL + S3) and the backup/restore
+runbook are in [Deployment](/docs/deployment); the CI journeys upload a file, serve it through `handleFile`, restart
+the server and delete it on each profile. A direct bucket or CDN `publicUrlBase` bypasses `handleFile` and its access
+checks — use it only for media that is public by design.
 
 ## When storage and the database disagree
 

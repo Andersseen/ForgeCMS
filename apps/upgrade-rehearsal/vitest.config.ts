@@ -6,6 +6,8 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['test/**/*.test.ts'],
+    // Needs the Garage service: run by `pnpm test:s3 recovery` (spec 084), never silently skipped.
+    exclude: ['test/s3/**', '**/node_modules/**'],
     fileParallelism: false,
     testTimeout: 120_000,
     hookTimeout: 120_000

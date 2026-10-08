@@ -117,9 +117,14 @@ durable history, and a release-gating rehearsal (`pnpm test:upgrade`): databases
 restored into an empty environment. See [docs/SCHEMA-UPGRADES.md](docs/SCHEMA-UPGRADES.md) and
 [docs/BACKUP-RESTORE.md](docs/BACKUP-RESTORE.md).
 
-Roadmap 0.10 / P01: `@forge-cms/s3` (an S3-API `StorageAdapter`, certified in CI against a real Garage service) is
-added by this change and ships with the next release (`0.11.0`); the libSQL + S3 upload lifecycle and the
-complete deployment guides (P02/P03) are not delivered yet — see [docs/ROADMAP.md](docs/ROADMAP.md).
+Portable storage and deployment profiles (roadmap 0.10, complete): `@forge-cms/s3` (an S3-API `StorageAdapter`,
+published in `0.11.0`) completes **two durable production profiles** — **Cloudflare** (D1 + R2) and **portable
+Node** (on-disk libSQL + S3-compatible storage). Each is built from packed public packages, production-built, and
+walked through auth, admin, SSR, a multipart upload, access-checked file serving, a restart and an isolated
+backup/restore. CI certifies Cloudflare against local workerd + local D1 + local R2 (not a remote deployment) and
+S3 against Garage `v2.4.1`; AWS S3, Backblaze B2 and Wasabi are configurable but not CI-certified. A production
+build never silently falls back to in-memory adapters. See
+[Deployment](apps/www/src/content/docs/deployment.md) and [docs/BACKUP-RESTORE.md](docs/BACKUP-RESTORE.md).
 
 Try it: the [Lumea clinic demo](https://forge-cms-demo.pages.dev) (a real site built on the CMS,
 source in [`apps/demo-aesthetics`](apps/demo-aesthetics)) and the docs at
@@ -129,36 +134,33 @@ source in [`apps/demo-aesthetics`](apps/demo-aesthetics)) and the docs at
 
 Two separate numbering schemes:
 
-- **npm versions.** The ten public packages are one fixed Changesets group; they always share a
-  version. The current release is **`0.8.3`**. **npm `0.8.x` is the roadmap 0.7 (upgrade safety)
-  line**: M01 shipped in `0.8.0`, M02 in `0.8.1` (its changelog entry landed in `0.8.2`), M03's
-  package fix in `0.8.3`. `0.8.3` was published from `main` after roadmap 0.8 C01 merged, so it
-  already contains C01's code; its changelog entry is a pending minor and lands with `0.9.0`.
-- **Roadmap checkpoints** ([docs/ROADMAP.md](docs/ROADMAP.md)) are product guarantees. **0.6 and 0.7
-  (upgrade safety: M01 drift detection, M02 reviewed migrations, M03 upgrade and backup/restore
-  rehearsal) are complete.** Roadmap 0.8 (the Angular client and DX) is in progress: C01 (transport
-  and errors) is merged and C02 (schema-aware wire types, spec 076) is implemented on its branch.
+- **npm versions.** The eleven public packages are one fixed Changesets group; they always share a
+  version. The current release is **`0.11.0`** (adds `@forge-cms/s3`). The numbers are offset from the
+  roadmap: npm `0.8.x` was roadmap 0.7 (upgrade safety), `0.9.0` roadmap 0.8 (Angular DX), `0.10.x` roadmap 0.9
+  (SSR) and `0.11.x` is roadmap 0.10 (portable storage and deployment profiles).
+- **Roadmap checkpoints** ([docs/ROADMAP.md](docs/ROADMAP.md)) are product guarantees. Roadmaps 0.6 – 0.10
+  are complete; the next bounded responsibility is roadmap 0.11 / U01 (reliable content state and failure
+  recovery).
 
-A package version does not certify a roadmap checkpoint, and since `0.8.0` the numbers are offset by
-one: roadmap 0.8 (Angular client/DX) will publish as npm `0.9.0`.
+A package version does not certify a roadmap checkpoint; the offset above is deliberate and documented.
 
 ## Packages
 
 All public packages are versioned together.
 
-| Package                                        | Purpose                                                              |
-| ---------------------------------------------- | -------------------------------------------------------------------- |
-| [`@forge-cms/core`](packages/core)             | Schema DSL, collection/global definitions, validation, base types    |
-| [`@forge-cms/db`](packages/db)                 | Database contract, InMemory and LibSQL adapters, SQL schema helpers  |
-| [`@forge-cms/auth`](packages/auth)             | Auth contract and built-in auth adapters                             |
-| [`@forge-cms/storage`](packages/storage)       | Storage contract and InMemory adapter                                |
-| [`@forge-cms/api`](packages/api)               | `ApiContext` and HTTP handler contracts                              |
-| [`@forge-cms/runtime`](packages/runtime)       | Runtime orchestrator, Local API, HTTP handlers                       |
-| [`@forge-cms/s3`](packages/s3)                 | S3-compatible storage adapter (added in 0.10 P01; ships in `0.11.0`) |
-| [`@forge-cms/cloudflare`](packages/cloudflare) | Cloudflare D1 and R2 adapters                                        |
-| [`@forge-cms/angular`](packages/angular)       | Angular client SDK                                                   |
-| [`@forge-cms/admin`](packages/admin)           | Reusable Angular admin components (content, users, auth)             |
-| [`@forge-cms/testing`](packages/testing)       | Adapter contract test suites                                         |
+| Package                                        | Purpose                                                             |
+| ---------------------------------------------- | ------------------------------------------------------------------- |
+| [`@forge-cms/core`](packages/core)             | Schema DSL, collection/global definitions, validation, base types   |
+| [`@forge-cms/db`](packages/db)                 | Database contract, InMemory and LibSQL adapters, SQL schema helpers |
+| [`@forge-cms/auth`](packages/auth)             | Auth contract and built-in auth adapters                            |
+| [`@forge-cms/storage`](packages/storage)       | Storage contract and InMemory adapter                               |
+| [`@forge-cms/api`](packages/api)               | `ApiContext` and HTTP handler contracts                             |
+| [`@forge-cms/runtime`](packages/runtime)       | Runtime orchestrator, Local API, HTTP handlers                      |
+| [`@forge-cms/s3`](packages/s3)                 | S3-compatible storage adapter (since `0.11.0`)                      |
+| [`@forge-cms/cloudflare`](packages/cloudflare) | Cloudflare D1 and R2 adapters                                       |
+| [`@forge-cms/angular`](packages/angular)       | Angular client SDK                                                  |
+| [`@forge-cms/admin`](packages/admin)           | Reusable Angular admin components (content, users, auth)            |
+| [`@forge-cms/testing`](packages/testing)       | Adapter contract test suites                                        |
 
 They share one version (currently `0.8.3` on npm); see each package's `CHANGELOG.md` for what
 changed.

@@ -109,9 +109,9 @@ export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
       { title: 'Resource reliability and peer compatibility', status: 'complete' }
     ]
   },
-  { version: '0.9', title: 'SSR for Analog', status: 'next' },
-  { version: '0.10', title: 'Portable S3 storage', status: 'planned' },
-  { version: '0.11', title: 'Admin certification', status: 'planned' },
+  { version: '0.9', title: 'SSR for Analog', status: 'complete' },
+  { version: '0.10', title: 'Portable storage and deployment profiles', status: 'complete' },
+  { version: '0.11', title: 'Admin certification', status: 'next' },
   { version: '0.12', title: 'Release-candidate preparation', status: 'planned' }
 ];
 

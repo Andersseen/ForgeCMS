@@ -1,8 +1,8 @@
-import { InMemoryStorageAdapter, type StorageAdapter } from '@forge-cms/storage';
+import type { StorageAdapter } from '@forge-cms/storage';
 
 /**
  * Host-owned configuration of the optional portable S3 storage profile (spec 083). Server-side only: these
- * values never reach browser code. Unset → ordinary in-memory development storage.
+ * values never reach browser code. Which storage a deployment uses is decided by `profile.ts`.
  */
 export interface S3Env {
   S3_BUCKET?: string;
@@ -93,10 +93,11 @@ export function parseS3Config(env: S3Env | undefined): S3Config | null {
   };
 }
 
-/** The file storage of the deployment: S3-compatible when configured, else in-memory (development). */
-export async function selectStorage(env: S3Env | undefined): Promise<StorageAdapter> {
-  const config = parseS3Config(env);
-  if (!config) return new InMemoryStorageAdapter();
+/**
+ * Builds the S3 adapter for a validated configuration. The in-memory / R2 choices are made by the deployment
+ * profile (`profile.ts`), which is also what refuses a production build without durable storage.
+ */
+export async function createS3Storage(config: S3Config): Promise<StorageAdapter> {
   // Loaded only when configured, so the AWS SDK is never evaluated by a deployment that does not use it.
   const { S3StorageAdapter } = await import('@forge-cms/s3');
   return new S3StorageAdapter(config);

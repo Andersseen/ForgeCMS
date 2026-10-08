@@ -47,7 +47,7 @@ export class SwitchableStorage implements StorageAdapter {
 
 /** One running installation the rehearsal verifies: the current ForgeCMS over some environment. */
 export interface Installation {
-  profile: 'libsql' | 'd1-r2';
+  profile: 'libsql' | 'libsql-s3' | 'd1-r2';
   runtime: ForgeCmsRuntime;
   users: UsersCollectionAuthAdapter;
   apiKeys: ApiKeyAuthAdapter;

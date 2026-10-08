@@ -45,7 +45,7 @@ import {
 
 // Spec 073 (roadmap 0.7 M03) — the portable profile: a real on-disk libSQL database, no InMemory
 // database anywhere. Objects go through the same adapter-neutral backup code as R2, against
-// InMemoryStorageAdapter: the libSQL profile has no durable object store before P01/P03 (S3).
+// InMemoryStorageAdapter here; the same flow with a real S3 service is test/s3/backup-libsql-s3.test.ts (spec 084).
 
 const scratch: string[] = [];
 afterEach(() => {
