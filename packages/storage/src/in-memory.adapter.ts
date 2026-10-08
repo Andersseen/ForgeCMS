@@ -89,7 +89,8 @@ export class InMemoryStorageAdapter implements StorageAdapter {
   }
 
   async getPublicUrl(key: string): Promise<string> {
-    return `${this.publicUrlBase}/${key}`;
+    // Per-segment encoding keeps `/` as the hierarchy; `handleFile` decodes it (spec 082).
+    return `${this.publicUrlBase}/${key.split('/').map(encodeURIComponent).join('/')}`;
   }
 
   async list(prefix?: string): Promise<StorageObject[]> {

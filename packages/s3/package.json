@@ -1,0 +1,56 @@
+{
+  "name": "@forge-cms/s3",
+  "version": "0.10.2",
+  "description": "S3-compatible StorageAdapter for ForgeCMS (AWS S3, Garage, Backblaze B2, Wasabi and other S3 API services).",
+  "author": "ForgeCMS contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Andersseen/ForgeCMS.git",
+    "directory": "packages/s3"
+  },
+  "bugs": {
+    "url": "https://github.com/Andersseen/ForgeCMS/issues"
+  },
+  "homepage": "https://github.com/Andersseen/ForgeCMS/tree/main/packages/s3#readme",
+  "keywords": [
+    "cms",
+    "storage",
+    "s3",
+    "adapter",
+    "typescript"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run --dir .",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:watch": "vitest --dir .",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist coverage"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1147.0",
+    "@forge-cms/storage": "workspace:*"
+  },
+  "devDependencies": {
+    "@forge-cms/testing": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

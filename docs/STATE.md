@@ -1,12 +1,28 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-07 (spec 081 / roadmap 0.9 S03 — production SSR consumer journey — COMPLETE; roadmap 0.9
-> (S01–S03) is complete. Core merged in PR #76; close-out on `feature/spec-081-s03-closeout`. npm `latest` =
-> `0.10.2` (the lazy-libSQL patch, PR #77 merged and published). Next: roadmap 0.10 / P01).**
+> **Last updated: 2026-10-07 (spec 082 / roadmap 0.10 P01 — basic S3-compatible StorageAdapter — COMPLETE on branch
+> `feature/spec-082-s3-storage-adapter`, PR pending; roadmap 0.10 is NOT complete (P02, P03 remain). Published npm
+> `latest` is still `0.10.2`: `@forge-cms/s3` is on `main` only after merge and ships with the Version Packages PR
+> (`0.11.0`)). Next: roadmap 0.10 / P02 — portable upload lifecycle and access).**
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## S3-compatible storage adapter — P01 (spec 082, 2026-10-07, complete)
+
+Spec: [082-s3-compatible-storage-adapter.md](specs/082-s3-compatible-storage-adapter.md). New public package
+`@forge-cms/s3` (`S3StorageAdapter`, AWS SDK v3 `3.1147.0`, server-side only) implementing the unchanged
+`StorageAdapter`: explicit bucket + region, optional endpoint / credentials / `forcePathStyle`, default public
+URL base `/api/media` (a direct bucket/CDN base is opt-in and bypasses `handleFile` access checks). `get` returns
+`null` only for `NoSuchKey`/`NotFound`; everything else rejects. `list` follows every provider page. The shared
+`runStorageAdapterContractTests` is much stronger and also found a real bug, fixed in InMemory and R2: URLs for
+keys containing `#`, `?`, `%` did not resolve back to the key (`getPublicUrl` now encodes per segment).
+Certified provider: **Garage `v2.4.1`** in Docker (`pnpm test:s3`, a CI step) — the planned MinIO community
+server/images are no longer published. AWS S3, Backblaze B2 and Wasabi are configuration examples, not
+CI-certified. **Not done (P02/P03):** libSQL + S3 upload lifecycle/access/restart, S3 fault injection, backup /
+restore of objects, deployment guides. Release: fixed family → `0.11.0` via the changeset; the website's
+`CURRENT_FORGE_VERSION` and package cards are deliberately unchanged until it is published.
 
 ## Production SSR consumer journey — S03 (spec 081, 2026-10-07, complete)
 

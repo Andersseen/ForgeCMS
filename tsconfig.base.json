@@ -22,6 +22,7 @@
       "@forge-cms/db": ["packages/db/dist/index.d.ts"],
       "@forge-cms/auth": ["packages/auth/dist/index.d.ts"],
       "@forge-cms/storage": ["packages/storage/dist/index.d.ts"],
+      "@forge-cms/s3": ["packages/s3/dist/index.d.ts"],
       "@forge-cms/api": ["packages/api/dist/index.d.ts"],
       "@forge-cms/admin": ["packages/admin/dist/index.d.ts"],
       "@forge-cms/testing": ["packages/testing/dist/index.d.ts"],
