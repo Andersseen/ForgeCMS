@@ -1,5 +1,11 @@
 # @forge-cms/admin
 
+## 0.11.0
+
+### Patch Changes
+
+- @forge-cms/angular@0.11.0
+
 ## 0.10.2
 
 ### Patch Changes
