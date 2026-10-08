@@ -1,11 +1,17 @@
 # ROADMAP — A small, dependable ForgeCMS 1.0
 
-> **2026-10-08 (spec 083):** roadmap 0.10 **P02 — Portable upload lifecycle and access — is complete**: on-disk libSQL
+> **2026-10-08 (spec 084):** **Roadmap 0.10 — Portable storage and deployment profiles is complete** (P01–P03). Two
+> durable production profiles — Cloudflare (D1 + R2) and portable Node (on-disk libSQL + `@forge-cms/s3`) — are
+> production-built from packed public packages and walked through auth/admin, SSR, multipart upload, access-checked
+> file serving, restart, delete and isolated backup/restore (Cloudflare evidence is local workerd/D1/R2; the S3
+> service is Garage `v2.4.1`; other S3 providers are configurable, not certified). A production build never
+> silently falls back to InMemory. npm `latest` is `0.11.0` (roadmap 0.10 = npm `0.11.x`). **Next bounded
+> responsibility: roadmap 0.11 / U01 — Reliable content state and failure recovery.**
 >
-> - `@forge-cms/s3` + a real Garage service, driven through Forge's own multipart handler and `handleFile`, with
->   restart persistence (workspace test and a two-process packed consumer), delete, and storage-intent recovery.
->   Roadmap 0.10 is **not** complete. **Next bounded responsibility: roadmap 0.10 / P03 — Complete deployment and
->   recovery guides.**
+> **2026-10-08 (spec 083):** _(P02)_ roadmap 0.10 **P02 — Portable upload lifecycle and access — is complete**: on-disk libSQL +
+> `@forge-cms/s3` + a real Garage service, driven through Forge's own multipart handler and `handleFile`, with
+> restart persistence (workspace test and a two-process packed consumer), delete, and storage-intent recovery.
+> _(Superseded: P03 completed roadmap 0.10 — see above.)_
 >
 > **2026-10-07 (spec 082):** roadmap 0.10 **P01 — Basic S3-compatible StorageAdapter — is complete**
 > (`@forge-cms/s3`, certified against a real Garage service; MinIO was replaced because its community images are no
@@ -200,8 +206,7 @@ Spec 056 is **done**, with safe auth redirects, improved dialogs/empty states, r
 admin chrome and external avatars, clearer beginner docs/homepage, and demo navigation/E2E polish.
 Commits since its implementation added planning documentation only. Do not schedule another redesign.
 
-Remaining gaps are specific: durable storage is R2 only; no S3 adapter exists. All three apps still
-configure `ssr: false`. Angular auth paths/configuration and browser schema inference need work.
+_(Historical, written before roadmap 0.5; since then SSR (0.9) and S3/portable profiles (0.10) shipped.)_ Remaining gaps were: durable storage was R2 only and all three apps configured `ssr: false`. Angular auth paths/configuration and browser schema inference needed work.
 Existing advanced content/auth paths need more consistent access and concurrency guarantees.
 See [AUDIT.md](roadmap/v1/AUDIT.md) for preserved evidence and unproven interleavings.
 
@@ -225,18 +230,18 @@ PRs may belong to a minor. **Packet ≠ release; packet ≠ necessarily a public
 coherent implementation is preferred; split only oversized or independently risky responsibilities.
 Do not build an entire minor on one giant branch or force a separate PR for each test/file change.
 
-| Release                                      | Product / engineering outcome                          | Packets                        | Release prerequisite                    |
-| -------------------------------------------- | ------------------------------------------------------ | ------------------------------ | --------------------------------------- |
-| 0.4.x                                        | Patch confirmed defects; spec 056 is already complete  | Current-line fixes/bookkeeping | Verified baseline                       |
-| [0.5](roadmap/v1/0.5-contract-baseline.md)   | Contract + access foundation                           | B01–B04, A01–A04               | 0.4.x baseline                          |
-| [0.6](roadmap/v1/0.6-auth-data-integrity.md) | Safe auth and data lifecycle under mutation/failure    | H01–H04, D01–D04               | 0.5 contracts/access                    |
-| [0.7](roadmap/v1/0.7-schema-upgrades.md)     | Schema upgrade, backup and recovery path               | M01–M03                        | 0.6 schema decisions                    |
-| [0.8](roadmap/v1/0.8-angular-client.md)      | First-class typed Angular client and DX                | C01–C03                        | Server contracts; 0.7 upgrade readiness |
-| [0.9](roadmap/v1/0.9-ssr.md)                 | Analog Local API + safe public SSR/hydration           | S01–S03                        | 0.8 transport/types                     |
-| [0.10](roadmap/v1/0.10-portable-storage.md)  | Complete D1/R2 and libSQL/S3 deployment profiles       | P01–P03                        | Storage/access/upgrades; 0.9 consumer   |
-| [0.11](roadmap/v1/0.11-admin.md)             | Existing admin is reliable, accessible and reusable    | U01–U03                        | SDK, SSR and durable profiles           |
-| [0.12](roadmap/v1/0.12-certification.md)     | Final artifact/profile certification + RC preparation  | R01–R04, L01 preparation       | Prior outcomes and U03 surface freeze   |
-| [1.0 RC → 1.0](roadmap/v1/1.0-release.md)    | Defect-only observation, then compatibility commitment | L01 candidate, L02–L03         | Accepted candidate evidence             |
+| Release                                      | Product / engineering outcome                                   | Packets                        | Release prerequisite                    |
+| -------------------------------------------- | --------------------------------------------------------------- | ------------------------------ | --------------------------------------- |
+| 0.4.x                                        | Patch confirmed defects; spec 056 is already complete           | Current-line fixes/bookkeeping | Verified baseline                       |
+| [0.5](roadmap/v1/0.5-contract-baseline.md)   | Contract + access foundation                                    | B01–B04, A01–A04               | 0.4.x baseline                          |
+| [0.6](roadmap/v1/0.6-auth-data-integrity.md) | Safe auth and data lifecycle under mutation/failure             | H01–H04, D01–D04               | 0.5 contracts/access                    |
+| [0.7](roadmap/v1/0.7-schema-upgrades.md)     | Schema upgrade, backup and recovery path                        | M01–M03                        | 0.6 schema decisions                    |
+| [0.8](roadmap/v1/0.8-angular-client.md)      | First-class typed Angular client and DX                         | C01–C03                        | Server contracts; 0.7 upgrade readiness |
+| [0.9](roadmap/v1/0.9-ssr.md)                 | Analog Local API + safe public SSR/hydration                    | S01–S03                        | 0.8 transport/types                     |
+| [0.10](roadmap/v1/0.10-portable-storage.md)  | Complete D1/R2 and libSQL/S3 deployment profiles — **complete** | P01–P03 (done)                 | Storage/access/upgrades; 0.9 consumer   |
+| [0.11](roadmap/v1/0.11-admin.md)             | Existing admin is reliable, accessible and reusable             | U01–U03                        | SDK, SSR and durable profiles           |
+| [0.12](roadmap/v1/0.12-certification.md)     | Final artifact/profile certification + RC preparation           | R01–R04, L01 preparation       | Prior outcomes and U03 surface freeze   |
+| [1.0 RC → 1.0](roadmap/v1/1.0-release.md)    | Defect-only observation, then compatibility commitment          | L01 candidate, L02–L03         | Accepted candidate evidence             |
 
 This is eight meaningful pre-1.0 checkpoints instead of nine, while adding durable portable files.
 0.12 is a readiness checkpoint: do not publish an extra minor solely to say certification finished

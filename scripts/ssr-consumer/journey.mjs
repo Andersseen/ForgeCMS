@@ -5,12 +5,15 @@
 // from packed tarballs (strict peers). Only the manifest, `vite.config.ts` (the public `angularLinker` and a
 // Nitro preset), `tsconfig`, `wrangler.toml` and a request observer are consumer-specific.
 //
-// It is built twice and each build is served by its **production** server, never a dev server:
-//   - node:       Nitro `node-server`, an on-disk libSQL database, started with plain `node`;
-//   - cloudflare: the Cloudflare Pages output under local workerd (`wrangler pages dev`) with a local D1 binding
-//                 (local evidence — not a remote deployment).
+// It is built twice and each build is served by its **production** server, never a dev server. Both are COMPLETE
+// durable profiles (spec 084, roadmap 0.10 / P03) — the app refuses to start in production without one:
+//   - node:       Nitro `node-server`, an on-disk libSQL database and the real S3 StorageAdapter against Garage
+//                 (supplied by `pnpm test:s3 profiles` as FORGE_S3_TEST_*), started with plain `node`;
+//   - cloudflare: the Cloudflare Pages output under local workerd (`wrangler pages dev`) with local D1 + local R2
+//                 bindings (local evidence — not a remote deployment).
 // The same browser journey then walks bootstrap → draft → publish → SSR → hydrate → edit → fresh SSR → draft,
-// with a server restart in the middle (same database file / D1 directory).
+// with a server restart in the middle (same database file / D1 + R2 directory), and finally the durable-file
+// journey of `files.mjs` (multipart upload → handleFile → restart → delete).
 
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -42,6 +45,7 @@ import {
   transferState,
   write
 } from './shared.mjs';
+import { durableFileJourney } from './files.mjs';
 
 const ADMIN = { email: 'admin@journey.test', password: 'journey-admin-password-123' };
 const SECRET = randomBytes(48).toString('base64'); // ≥ 32 bytes; per run, localhost only
@@ -69,10 +73,14 @@ const BROWSER_FORBIDDEN = [
   'D1DatabaseAdapter',
   '@libsql',
   'DATABASE_URL',
-  // Spec 083: the optional S3 storage profile is server-side configuration only.
+  // Specs 083/084: durable-profile adapters and their configuration are server-side only.
   'S3StorageAdapter',
+  'R2StorageAdapter',
   '@aws-sdk',
-  'S3_SECRET_ACCESS_KEY'
+  'S3_SECRET_ACCESS_KEY',
+  'S3_ACCESS_KEY_ID',
+  'AUTH_SECRET',
+  'resolveProfile'
 ];
 
 /** The tiny-project sources that make up the consumer app (everything but its tests and Strata plugin). */
@@ -90,14 +98,14 @@ const APP_SOURCES = [
 const PROFILES = [
   {
     id: 'node',
-    label: 'Node (node-server) + on-disk libSQL',
+    label: 'Node (node-server) + on-disk libSQL + S3 (Garage)',
     // Nitro's tracer cannot follow libSQL's per-platform native package, so a consumer that really opens a
     // `file:` database keeps its dependencies in node_modules instead of tracing them (spec 081).
     nitro: `{ preset: 'node-server', externals: { trace: false } }`
   },
   {
     id: 'cloudflare',
-    label: 'Cloudflare Pages output under local workerd + local D1',
+    label: 'Cloudflare Pages output under local workerd + local D1 + local R2',
     nitro: `{ preset: 'cloudflare-pages' }`
   }
 ];
@@ -160,6 +168,10 @@ pages_build_output_dir = "dist/analog/public"
 binding = "DB"
 database_name = "forge-journey-consumer"
 database_id = "00000000-0000-0000-0000-000000000081"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "forge-journey-consumer"
 `;
 
 /**
@@ -303,7 +315,7 @@ function build(dir, profile) {
 // Production servers
 
 /** A started production server; `stop()` and `start()` again to restart on the same port and storage. */
-async function launch(dir, profile, outDir, state) {
+async function launch(dir, profile, outDir, state, s3) {
   const port = state.port ?? (await freePort());
   state.port = port;
   const origin = `http://127.0.0.1:${port}`;
@@ -322,7 +334,13 @@ async function launch(dir, profile, outDir, state) {
       NODE_ENV: 'production',
       AUTH_SECRET: SECRET,
       FORGE_SSR_ORIGIN: origin,
-      DATABASE_URL: `file:${join(state.storage, 'forge.db')}`
+      DATABASE_URL: `file:${join(state.storage, 'forge.db')}`,
+      S3_BUCKET: s3.bucket,
+      S3_REGION: s3.region,
+      S3_ENDPOINT: s3.endpoint,
+      S3_ACCESS_KEY_ID: s3.accessKeyId,
+      S3_SECRET_ACCESS_KEY: s3.secretAccessKey,
+      S3_FORCE_PATH_STYLE: 'true'
     };
   } else {
     command = join(dir, 'node_modules', '.bin', 'wrangler');
@@ -564,11 +582,11 @@ async function expectPublicPage(page, origin, path, expectation, log, label) {
   console.log(`  ✓ ${label}: 1 SSR read, 0 browser reads, hydrated, no console problem`);
 }
 
-async function journey({ profile, dir, outDir }) {
+async function journey({ profile, dir, outDir, s3 }) {
   const chromium = await loadChromium();
   const state = { storage: join(dir, `state-${profile.id}`) };
   mkdirSync(state.storage, { recursive: true });
-  let server = await launch(dir, profile, outDir, state);
+  let server = await launch(dir, profile, outDir, state, s3);
   const browser = await chromium.launch();
   const origin = () => server.origin;
   try {
@@ -735,7 +753,7 @@ async function journey({ profile, dir, outDir }) {
     // --- 9. restart the production server (same database / D1 directory) -------------------------------------
     await clearObserved(origin());
     await server.stop();
-    server = await launch(dir, profile, outDir, state);
+    server = await launch(dir, profile, outDir, state, s3);
     html = await noJs(origin(), `/posts/${POST.slug}`);
     expectPublished(html, { title: EDITED.title, bodyHtml: EDITED.body }, 'after restart (no JS)');
     await expectPublicPage(
@@ -775,11 +793,29 @@ async function journey({ profile, dir, outDir }) {
       '  ✓ unpublished: no-JS HTML, transfer state, reload and SPA navigation all hide it'
     );
 
+    // --- 11. durable files: multipart upload → handleFile → restart → delete (spec 084) -----------------------
+    await adminPage.goto(`${origin()}/admin/collections/posts`);
+    await durableFileJourney({
+      profile,
+      browser,
+      adminPage,
+      origin,
+      state,
+      s3,
+      restart: async () => {
+        await server.stop();
+        server = await launch(dir, profile, outDir, state, s3);
+      }
+    });
+
     if (adminLog.problems.length > 0)
       fail(`admin browser problems:\n${adminLog.problems.join('\n')}`);
     await context.close();
 
     const output = server.logs.join('');
+    if (profile.id === 'node' && output.includes(s3.secretAccessKey)) {
+      fail('node: the production server logged the S3 secret');
+    }
     for (const problem of [
       'JIT compiler unavailable',
       'NG0',
@@ -795,8 +831,92 @@ async function journey({ profile, dir, outDir }) {
   }
 }
 
+/**
+ * Spec 084: the BUILT production server refuses an incomplete durable profile instead of falling back to
+ * memory. A libSQL database with no S3 storage (and a bare process) must answer 500, name what is missing, and
+ * never print a secret value.
+ */
+async function expectProductionFailsClosed(dir, outDir, s3) {
+  const entry = join(dir, outDir, 'analog', 'server', 'index.mjs');
+  const cases = [
+    {
+      label: 'no durable profile at all',
+      env: {},
+      expect: /No durable deployment profile/
+    },
+    {
+      label: 'libSQL without S3 storage',
+      env: { DATABASE_URL: `file:${join(dir, 'never-created.db')}` },
+      expect: /Incomplete portable profile: missing S3_BUCKET and S3_REGION/
+    },
+    {
+      label: 'libSQL with a partial S3 configuration (secret only)',
+      env: {
+        DATABASE_URL: `file:${join(dir, 'never-created.db')}`,
+        S3_SECRET_ACCESS_KEY: s3.secretAccessKey
+      },
+      expect: /S3_BUCKET and S3_REGION/
+    },
+    {
+      label: 'S3 storage without a durable database',
+      env: {
+        S3_BUCKET: s3.bucket,
+        S3_REGION: s3.region,
+        S3_ACCESS_KEY_ID: s3.accessKeyId,
+        S3_SECRET_ACCESS_KEY: s3.secretAccessKey
+      },
+      expect: /Incomplete portable profile: missing DATABASE_URL/
+    }
+  ];
+  for (const testCase of cases) {
+    const port = await freePort();
+    const logs = [];
+    const child = spawn(process.execPath, [entry], {
+      cwd: dir,
+      env: {
+        PATH: process.env.PATH,
+        PORT: String(port),
+        HOST: '127.0.0.1',
+        NODE_ENV: 'production',
+        AUTH_SECRET: SECRET,
+        FORGE_SSR_ORIGIN: `http://127.0.0.1:${port}`,
+        ...testCase.env
+      },
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    child.stdout.on('data', (chunk) => logs.push(String(chunk)));
+    child.stderr.on('data', (chunk) => logs.push(String(chunk)));
+    try {
+      let status = 0;
+      let body = '';
+      for (let attempt = 0; attempt < 100 && status === 0; attempt++) {
+        try {
+          const response = await fetch(`http://127.0.0.1:${port}/api/v1/posts`);
+          status = response.status;
+          body = await response.text();
+        } catch {
+          await sleep(200);
+        }
+      }
+      const output = logs.join('') + body;
+      if (status !== 500) fail(`fail-closed (${testCase.label}): answered ${status}, expected 500`);
+      if (!testCase.expect.test(output)) {
+        fail(`fail-closed (${testCase.label}): the error does not name the problem:\n${output}`);
+      }
+      if (output.includes(s3.secretAccessKey) || output.includes(SECRET)) {
+        fail(`fail-closed (${testCase.label}): a secret value reached the output`);
+      }
+    } finally {
+      child.kill('SIGKILL');
+    }
+  }
+  console.log(
+    '  ✓ fail closed: the production server refuses no profile / libSQL without S3 / S3 without a database (500, names the missing variables, no secret)'
+  );
+}
+
 /** Installs the journey consumer once, then builds and walks each profile. */
-export async function verifyJourneyConsumer({ workDir, tarballs }) {
+export async function verifyJourneyConsumer({ workDir, tarballs, s3 }) {
   const dir = join(workDir, 'journey-app');
   mkdirSync(dir, { recursive: true });
   assembleApp(dir, tarballs);
@@ -808,9 +928,10 @@ export async function verifyJourneyConsumer({ workDir, tarballs }) {
   for (const profile of PROFILES) {
     console.log(`\nJourney — ${profile.label}`);
     const outDir = build(dir, profile);
-    await journey({ profile, dir, outDir });
+    await journey({ profile, dir, outDir, s3 });
+    if (profile.id === 'node') await expectProductionFailsClosed(dir, outDir, s3);
   }
   console.log(
-    `\nProduction SSR journey passed on Node + libSQL and on Cloudflare Pages output under local workerd + D1 (Angular ${VERSIONS.angular}, Analog ${VERSIONS.analog}).`
+    `\nProduction SSR + durable-file journey passed on Node + libSQL + S3 (Garage) and on Cloudflare Pages output under local workerd + local D1 + local R2 (Angular ${VERSIONS.angular}, Analog ${VERSIONS.analog}).`
   );
 }

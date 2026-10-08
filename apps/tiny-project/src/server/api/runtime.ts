@@ -1,14 +1,23 @@
 import { InMemoryDatabaseAdapter, LibSqlDatabaseAdapter } from '@forge-cms/db';
 import { UsersCollectionAuthAdapter } from '@forge-cms/auth';
-import { D1DatabaseAdapter, type D1Database } from '@forge-cms/cloudflare';
+import { InMemoryStorageAdapter, type StorageAdapter } from '@forge-cms/storage';
+import {
+  D1DatabaseAdapter,
+  R2StorageAdapter,
+  type D1Database,
+  type R2Bucket
+} from '@forge-cms/cloudflare';
 import { ForgeCmsRuntime } from '@forge-cms/runtime';
 import { collections } from './collections';
-import { S3_ENV_KEYS, selectStorage, type S3Env } from './storage';
+import { resolveProfile, type ProfileEnv, type ResolvedProfile } from './profile';
+import { S3_ENV_KEYS, createS3Storage, type S3Env } from './storage';
 
-export interface ServerEnv extends S3Env {
-  /** Cloudflare D1 binding: selects the D1 profile. */
+export interface ServerEnv extends S3Env, ProfileEnv {
+  /** Cloudflare D1 binding: with `BUCKET`, selects the Cloudflare profile (D1 + R2). */
   DB?: D1Database;
-  /** A libSQL URL (`file:/data/forge.db`, `libsql://…`): selects the portable libSQL profile. */
+  /** Cloudflare R2 binding for uploaded files: the other half of the Cloudflare profile. */
+  BUCKET?: R2Bucket;
+  /** A libSQL URL (`file:/data/forge.db`, `libsql://…`): with S3, selects the portable profile (libSQL + S3). */
   DATABASE_URL?: string;
   AUTH_SECRET?: string;
   /** Opt-in flag for `POST /api/auth/signup` — unset (disabled) by default, matching apps/www. */
@@ -22,6 +31,14 @@ export interface ServerEnv extends S3Env {
  * bytes) therefore refuses to start instead of signing sessions with Forge's public dev secret.
  */
 const AUTH_DEV_MODE = import.meta.dev === true;
+
+/**
+ * Spec 084: only development may use the in-memory adapters. Every other build must select a complete durable
+ * profile (`profile.ts`) or refuse to start. Tests that deliberately run in memory opt in through
+ * `resetServerRuntimeForTests({ development: true })`.
+ */
+let developmentOverride: boolean | undefined;
+const isDevelopment = () => developmentOverride ?? AUTH_DEV_MODE;
 
 let runtimePromise: Promise<ForgeCmsRuntime<ServerEnv>> | undefined;
 
@@ -59,15 +76,22 @@ function nodeEnv(): ServerEnv | undefined {
   return env;
 }
 
-/** The content database of the deployment: D1, else libSQL, else in-memory (local development). */
-function selectDatabase(env: ServerEnv | undefined) {
-  if (env?.DB) return new D1DatabaseAdapter();
-  if (env?.DATABASE_URL) return new LibSqlDatabaseAdapter(env.DATABASE_URL);
+/** The content database of the deployment, as decided by its profile. */
+function createDatabase(profile: ResolvedProfile, env: ServerEnv | undefined) {
+  if (profile.database === 'd1') return new D1DatabaseAdapter();
+  if (profile.database === 'libsql') return new LibSqlDatabaseAdapter(env?.DATABASE_URL ?? '');
   return new InMemoryDatabaseAdapter();
 }
 
+async function createStorage(profile: ResolvedProfile): Promise<StorageAdapter> {
+  if (profile.storage === 'r2') return new R2StorageAdapter();
+  if (profile.storage === 's3' && profile.s3) return createS3Storage(profile.s3);
+  return new InMemoryStorageAdapter();
+}
+
 async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>> {
-  const database = selectDatabase(env);
+  const profile = resolveProfile(env, { development: isDevelopment() });
+  const database = createDatabase(profile, env);
   const auth = new UsersCollectionAuthAdapter({ devMode: AUTH_DEV_MODE }).init({
     ...env,
     userDatabase: database
@@ -78,7 +102,7 @@ async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>
     adapters: {
       database,
       auth,
-      storage: await selectStorage(env)
+      storage: await createStorage(profile)
     },
     ...(env !== undefined && { env })
   });
@@ -90,6 +114,7 @@ async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>
 }
 
 /** Test-only: lets a test rebuild the runtime instead of reusing the module-level singleton. */
-export function resetServerRuntimeForTests(): void {
+export function resetServerRuntimeForTests(options: { development?: boolean } = {}): void {
   runtimePromise = undefined;
+  developmentOverride = options.development;
 }

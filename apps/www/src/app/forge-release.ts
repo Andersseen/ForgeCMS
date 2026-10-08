@@ -7,12 +7,12 @@
  *
  * Product checkpoints are a separate axis. npm `0.8.x` is the roadmap `0.7` (upgrade safety) line:
  * `0.8.0` carries M01, `0.8.1` added M02's code (its changelog entry is in `0.8.2`); roadmap `0.8`
- * (Angular DX) published as npm `0.9.0`; roadmap `0.9` (SSR) is the npm `0.10.x` line — see `ROADMAP_MILESTONES` and docs/STATE.md.
+ * (Angular DX) published as npm `0.9.0`; roadmap `0.9` (SSR) is the npm `0.10.x` line; roadmap `0.10` (portable storage) is the npm `0.11.x` line (`0.11.0` added `@forge-cms/s3`) — see `ROADMAP_MILESTONES` and docs/STATE.md.
  *
- * Verified 2026-10-07 (spec 081 close-out): `npm view @forge-cms/core version` reports `0.10.2`.
+ * Verified 2026-10-08 (spec 084): `npm view @forge-cms/core version` and `npm view @forge-cms/s3 version` report `0.11.0`.
  * The website reports the published fixed-group release, independently of unmerged roadmap work.
  */
-export const CURRENT_FORGE_VERSION = '0.10.2';
+export const CURRENT_FORGE_VERSION = '0.11.0';
 
 export interface ForgePackage {
   /** The name after `@forge-cms/`. */
@@ -26,6 +26,7 @@ export const FORGE_PACKAGES: readonly ForgePackage[] = [
   { name: 'db', purpose: 'Database contract, InMemory and libSQL adapters, schema sync' },
   { name: 'auth', purpose: 'Users collection auth, sessions, API keys' },
   { name: 'storage', purpose: 'Storage contract and InMemory adapter' },
+  { name: 's3', purpose: 'S3-compatible StorageAdapter for portable durable file storage' },
   { name: 'api', purpose: 'ApiContext and HTTP handler contracts' },
   { name: 'runtime', purpose: 'Local API, access, hooks, drafts, HTTP handlers' },
   { name: 'cloudflare', purpose: 'D1 database and R2 storage adapters' },

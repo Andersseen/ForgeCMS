@@ -14,6 +14,12 @@ pnpm test:upgrade   # from the repo root; offline, deterministic, ~20 s
 
 `pnpm test` runs only the fast part (fixture integrity + backup helper failure modes).
 
+Spec 084 (roadmap 0.10 / P03) adds the portable profile's recovery with **real object storage**:
+`pnpm test:s3 recovery` upgrades each historical fixture on on-disk libSQL with its objects in a real Garage S3
+bucket, backs up from the database snapshot, empties the source and restores into an isolated, empty bucket
+(`test/s3/backup-libsql-s3.test.ts`, plus real-S3 failure controls). It needs Docker, so it is a stage of
+`pnpm test:s3` rather than part of the Docker-free `pnpm test:upgrade`; CI runs both.
+
 ## Layout
 
 | Path                                 | What it is                                                                                          |

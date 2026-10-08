@@ -22,12 +22,13 @@ describe('landing content', () => {
     expect(new Set(packages.map((pkg) => pkg.version))).toEqual(new Set([CURRENT_FORGE_VERSION]));
   });
 
-  it('lists all ten public packages', () => {
+  it('lists all eleven public packages', () => {
     expect(packages.map((pkg) => pkg.name)).toEqual([
       'core',
       'db',
       'auth',
       'storage',
+      's3',
       'api',
       'runtime',
       'cloudflare',
@@ -59,7 +60,7 @@ describe('landing content', () => {
       'complete'
     ]);
     expect(ROADMAP_MILESTONES.find((milestone) => milestone.version === '0.9')?.status).toBe(
-      'next'
+      'complete'
     );
     expect(ROADMAP_MILESTONES.find((milestone) => milestone.version === '0.6')?.status).toBe(
       'complete'

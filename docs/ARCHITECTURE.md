@@ -33,6 +33,14 @@ Arrows point from dependent to dependency. Everything ultimately rests on `core`
    testing ──► used by all packages in *.test.ts (contract suites)
 ```
 
+Durable deployment profiles (spec 084) — the only two certified combinations; in-memory adapters are
+development/test only and a production consumer must not fall back to them:
+
+| Profile    | Database                | Files                     | Runtime                    | CI evidence                         |
+| ---------- | ----------------------- | ------------------------- | -------------------------- | ----------------------------------- |
+| Cloudflare | `D1DatabaseAdapter`     | `R2StorageAdapter`        | Cloudflare Pages / Workers | local workerd + local D1 + local R2 |
+| Portable   | `LibSqlDatabaseAdapter` | `S3StorageAdapter` (`s3`) | Node (Nitro `node-server`) | on-disk libSQL + Garage `v2.4.1`    |
+
 Rules encoded in this graph:
 
 - `core` imports nothing from the workspace.

@@ -26,11 +26,12 @@ export async function createDatabaseFromSql(path: string, sql: string): Promise<
 /** The current ForgeCMS over an on-disk libSQL file, plus a separate read-only client for raw SQL. */
 export function openLibsqlInstallation(
   path: string,
-  storage: StorageAdapter
+  storage: StorageAdapter,
+  profile: Installation['profile'] = 'libsql'
 ): Installation & { close(): void } {
   const raw: Client = createClient({ url: fileUrl(path) });
   const installation = createInstallation({
-    profile: 'libsql',
+    profile,
     database: new LibSqlDatabaseAdapter(fileUrl(path)),
     storage,
     sql: libsqlRows(raw)

@@ -12,7 +12,7 @@ import type { ApiContext } from '@forge-cms/api';
 import type { UsersCollectionAuthAdapter } from '@forge-cms/auth';
 import { handleList, handleRead } from '@forge-cms/runtime';
 import strataPlugin from '../plugins/strata';
-import { getServerRuntime, type ServerEnv } from '../api/runtime';
+import { getServerRuntime, resetServerRuntimeForTests, type ServerEnv } from '../api/runtime';
 
 /**
  * H3 ↔ Strata parity for the two read routes, with no duplicate live route.
@@ -95,6 +95,8 @@ beforeAll(async () => {
   strataPlugin({ router: strataRouter });
   strata = toWebHandler(createApp().use(strataRouter));
 
+  // This suite is deliberately in-memory: opt in to the development profile (spec 084).
+  resetServerRuntimeForTests({ development: true });
   const runtime = await getServerRuntime(ENV);
   const auth = runtime.adapters.auth as UsersCollectionAuthAdapter;
   const admin = await auth.createUser({

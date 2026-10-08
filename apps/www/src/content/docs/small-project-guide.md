@@ -17,10 +17,11 @@ pnpm add @forge-cms/core @forge-cms/runtime @forge-cms/auth @forge-cms/db @forge
   @forge-cms/angular @forge-cms/admin
 ```
 
-Add the Cloudflare adapters only if you're deploying there (see [§9](#9-cloudflare-vs-portable)):
+Add the adapters of your durable profile (see [§9](#9-cloudflare-vs-portable)):
 
 ```sh
-pnpm add @forge-cms/cloudflare
+pnpm add @forge-cms/cloudflare   # Cloudflare: D1 + R2
+pnpm add @forge-cms/s3           # portable: libSQL (in @forge-cms/db) + S3
 ```
 
 ## 2. Define users + posts
@@ -65,6 +66,10 @@ you write by hand — but it is the fastest path and what this guide uses throug
 
 ## 3. Choose adapters and create the runtime
 
+This is the **development** factory: in-memory adapters, nothing durable. It is what you want while learning
+and in tests. A production build must use a durable profile factory instead (D1 + R2, or libSQL + S3) that
+throws on an incomplete configuration — see [§9](#9-cloudflare-vs-portable) and [Deployment](/docs/deployment).
+
 ```ts
 // server/runtime.ts
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
@@ -87,6 +92,7 @@ export function getServerRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<Serve
 }
 
 async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>> {
+  // DEVELOPMENT ONLY — never ship this selector: a missing binding silently becomes in-memory.
   const database = env?.DB ? new D1DatabaseAdapter() : new InMemoryDatabaseAdapter();
   // Explicit dev mode (never inferred from a missing secret): `true` only under the dev server.
   const auth = new UsersCollectionAuthAdapter({ devMode: import.meta.dev === true }).init({
@@ -107,10 +113,10 @@ async function buildRuntime(env?: ServerEnv): Promise<ForgeCmsRuntime<ServerEnv>
 ```
 
 Build this lazily, on first request, not at module load — a Cloudflare Worker forbids async I/O at
-module scope, and this shape works identically outside Cloudflare too. `env?.DB` picks the adapter:
-D1 when the binding exists, in-memory otherwise, so the same code runs in local dev and in
-production. Swap `D1DatabaseAdapter` for `LibSqlDatabaseAdapter` (`@forge-cms/db`) for the fully
-portable profile — see [§9](#9-cloudflare-vs-portable).
+module scope, and this shape works identically outside Cloudflare too. In this development factory `env?.DB`
+picks D1 when the binding exists and in-memory otherwise — which is exactly why it is **not** a production
+selector: a missing or misnamed binding would silently lose data. Production uses the profile factory of
+[§9](#9-cloudflare-vs-portable).
 
 ## 4. Mount the server API
 
@@ -239,34 +245,47 @@ picker against `users`, not a text box for pasting an id. Nothing here is host c
 
 ## 9. Cloudflare vs. portable
 
-Both profiles run the identical domain from [§2](#2-define-users--posts) — only the database
-adapter changes.
+Both durable profiles run the identical domain from [§2](#2-define-users--posts); only the database and file
+adapters change. Production selects **exactly one complete profile** and refuses to start otherwise (never an
+in-memory fallback). `apps/tiny-project`'s `profile.ts` is the tested reference; [Deployment](/docs/deployment)
+has the runnable recipes.
 
-**Cloudflare** (the best-supported path):
+**Cloudflare — D1 + R2** (the best-supported path):
 
 ```ts
-import { D1DatabaseAdapter } from '@forge-cms/cloudflare';
+import { D1DatabaseAdapter, R2StorageAdapter } from '@forge-cms/cloudflare';
+if (!env.DB || !env.BUCKET)
+  throw new Error('Incomplete Cloudflare profile: DB and BUCKET are required');
 const database = new D1DatabaseAdapter(); // .init(env) happens inside runtime.init()
+const storage = new R2StorageAdapter();
 ```
 
-Config: a D1 binding (`DB` in `wrangler.toml`), optionally an R2 binding (`BUCKET`) if you add
-media, and `AUTH_SECRET` (at least 32 bytes) in every build; only the dev server, through an explicit
-`devMode: true`, falls back to Forge's public dev secret. See [Deployment](/docs/deployment) and
+Config: a D1 binding (`DB`) and an R2 binding (`BUCKET`) in `wrangler.toml`, and `AUTH_SECRET` (at least 32
+bytes) in every build; only the dev server, through an explicit `devMode: true`, falls back to Forge's public dev
+secret. See [Deployment](/docs/deployment) and
 [Browser auth](/docs/browser-auth#production-configuration-and-abuse-limits).
 
-**Portable** (no Cloudflare account, no binding of any kind):
+**Portable — libSQL + S3** (no Cloudflare account, no binding of any kind):
 
 ```ts
 import { LibSqlDatabaseAdapter } from '@forge-cms/db';
-// DATABASE_URL=file:/var/lib/app/forge.db (or a libsql:// URL)
+import { S3StorageAdapter } from '@forge-cms/s3';
+// DATABASE_URL=file:/data/forge.db (a persistent volume!) or a libsql:// URL; S3_BUCKET, S3_REGION, …
 const database = new LibSqlDatabaseAdapter(process.env['DATABASE_URL']!);
+const storage = new S3StorageAdapter({ bucket, region, endpoint, forcePathStyle, credentials });
 ```
 
-`@forge-cms/db` loads libSQL on the first operation, so `init()` does not open the database (a bad URL rejects
-the first call) and importing the package for an in-memory or D1 app costs nothing.
+`pnpm add @forge-cms/s3` adds it. `@forge-cms/db` loads libSQL on the first operation, so `init()` does not open
+the database (a bad URL rejects the first call). The S3 bucket must already exist.
 
-Same `UsersCollectionAuthAdapter`, same `collections`, same runtime, same admin. Schema sync,
-first-admin bootstrap, sign-in, users, post CRUD, drafts, and the relation all work unchanged.
+Same `UsersCollectionAuthAdapter`, same `collections`, same runtime, same admin. Schema sync, first-admin
+bootstrap, sign-in, users, post CRUD, drafts, the relation and **file uploads** work unchanged.
+
+### Uploads and files
+
+Add an `upload: true` collection (see [Uploads](/docs/uploads)), mount `POST /api/v1/[collection]` and the
+file route `GET /api/media/[...key]` → `handleFile`. Both profiles store files durably (R2 or S3) and serve them
+through `handleFile`, which applies the owning document's access rules. Keep buckets private.
 
 ### Server rendering and production (S01–S03)
 
@@ -274,17 +293,12 @@ Public pages server-render and hydrate: set `ssr: true` in `analog()`, provide
 `provideForgeCmsServer({ origin })` in `main.server.ts`, read public content with a `credentials: 'omit'`
 client and `collectionResource(params, { transfer: 'public' })`, and build with the public `angularLinker()`
 from `@forge-cms/angular/vite`. [SSR guide](/docs/ssr) has every snippet and the two production setups
-(Cloudflare Pages + D1; `node-server` + libSQL with `nitro: { externals: { trace: false } }` and `node_modules`
-shipped beside `dist/`). The path in this guide — install → collections → runtime → D1 or libSQL → auth
-handlers → admin → first admin → SSR → public client → hydration → build → serve — is exercised end to end, from
-packed public packages only, by `pnpm release:ssr`: Node + on-disk libSQL (with a server restart) and the
-Cloudflare Pages output under local workerd + local D1 (local evidence, not a remote deployment).
-
-**Not yet portable**: file uploads. `@forge-cms/storage`'s only durable adapter today is
-`R2StorageAdapter` (`@forge-cms/cloudflare`) — `InMemoryStorageAdapter` is development/testing only.
-A small project on the portable profile that needs persistent uploads currently has no first-class
-non-Cloudflare option; an S3-compatible adapter is a reasonable next step but does not exist yet.
-Text/content, users, auth, relations, and drafts need no Cloudflare binding at all.
+(Cloudflare Pages + D1 + R2; `node-server` + libSQL + S3 with `nitro: { externals: { trace: false } }` and
+`node_modules` shipped beside `dist/`). The path in this guide — install → collections → profile factory → auth
+handlers → admin → first admin → SSR → public client → hydration → upload → build → serve → restart → recover — is
+exercised end to end, from packed public packages only, by `pnpm test:s3 profiles` (production-built Node +
+on-disk libSQL + Garage S3, and the Cloudflare Pages output under local workerd + local D1 + local R2 — local
+evidence, not a remote deployment) and `pnpm release:ssr` (the technical SSR consumer).
 
 ## Next
 
@@ -292,4 +306,4 @@ Text/content, users, auth, relations, and drafts need no Cloudflare binding at a
 - [Browser auth](/docs/browser-auth) — the cookie session, CSRF, and signup contract this guide
   builds on.
 - [Admin UI](/docs/admin-ui) — every component `@forge-cms/admin` exports.
-- [Deployment](/docs/deployment) — the Cloudflare path in full.
+- [Deployment](/docs/deployment) — both durable profiles in full, plus backup and recovery.

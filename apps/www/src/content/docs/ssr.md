@@ -251,7 +251,7 @@ guard simply resolves on the server as anonymous and the browser takes over.
 
 ## Deployment notes: two proven production profiles
 
-`pnpm release:ssr` (spec 081, roadmap 0.9 S03) installs a consumer **from packed tarballs only** and walks the
+`pnpm test:s3 profiles` (specs 081 and 084; needs Docker for Garage) installs a consumer **from packed tarballs only** and walks the
 same journey on **built production servers** — never a dev server: first-admin bootstrap → sign in → create a
 draft in the admin → draft invisible to anonymous SSR and to a signed-in browser's public page → publish →
 no-JS HTML with the real title and body → hydration with **one** server read and **zero** duplicate browser
@@ -263,24 +263,28 @@ appear in the HTML, the transfer state, the hydrated DOM or any browser bundle.
 Both profiles use `provideForgeCmsServer({ origin })`, a public client with `credentials: 'omit'`, Angular
 hydration and `{ transfer: 'public' }` exactly as above.
 
-### Cloudflare Pages + D1
+Both are **complete durable profiles** (database _and_ file storage; a production build refuses to start
+otherwise — see [Deployment](/docs/deployment)). After the SSR journey each profile uploads a file through the
+multipart handler, loads it in a browser from `/api/media/…`, restarts the server, still serves the same bytes,
+and deletes it (document, object and storage intents).
 
-Analog with the `cloudflare-pages` Nitro preset, a `DB` D1 binding, `AUTH_SECRET` (≥ 32 bytes) and
+### Cloudflare Pages + D1 + R2
+
+Analog with the `cloudflare-pages` Nitro preset, `DB` (D1) and `BUCKET` (R2) bindings, `AUTH_SECRET` (≥ 32 bytes) and
 `FORGE_SSR_ORIGIN`. `D1DatabaseAdapter` needs no native module and no extra bundler configuration. Evidence is
-**local**: the Pages output served by `wrangler pages dev` (workerd) with a real local D1 database persisted on
+**local**: the Pages output served by `wrangler pages dev` (workerd) with a real local D1 database and a real local R2 bucket persisted on
 disk. It is **not** a remote Cloudflare deployment and S03 does not certify one. With `nodejs_compat`,
 `process.env` carries your bindings (compatibility date 2026-05-15); rendering fetches your own origin (a
 subrequest). Server routes that only need public data can use the Local API instead.
 
-### Node + libSQL
+### Node + libSQL + S3
 
 Analog with the `node-server` preset and the portable database:
 
 ```ts
-// runtime: the database follows the environment
-const database = env.DATABASE_URL
-  ? new LibSqlDatabaseAdapter(env.DATABASE_URL) // e.g. DATABASE_URL=file:/var/lib/app/forge.db
-  : new InMemoryDatabaseAdapter(); // development only
+// runtime (durable profile): DATABASE_URL and the S3_* settings are required — see Deployment
+const database = new LibSqlDatabaseAdapter(env.DATABASE_URL); // e.g. file:/data/forge.db on a persistent volume
+const storage = new S3StorageAdapter({ bucket, region, endpoint, forcePathStyle, credentials });
 ```
 
 Configure Nitro so native libSQL stays installed instead of being traced into the server output (Nitro's
@@ -299,6 +303,8 @@ from the project directory with `AUTH_SECRET`, `DATABASE_URL` and `FORGE_SSR_ORI
 database operation, so merely importing the package no longer pulls the native module in. Content survives
 process restarts (proven against a real on-disk file).
 
-> **libSQL is the durable _database_. `InMemoryStorageAdapter` is not durable _file_ storage.** Uploaded
-> files on the Node profile are not persistent yet; the complete portable files profile is roadmap 0.10
-> (P01–P03). Do not treat libSQL + `InMemoryStorageAdapter` as the final portable profile.
+> **libSQL is the durable _database_ and `@forge-cms/s3` the durable _file storage_ of the portable profile.**
+> `InMemoryStorageAdapter` is not durable and is for development only; a production build of the tiny-project
+> fixture refuses to start without a complete profile. An on-disk libSQL file must live on persistent storage
+> (a mounted volume, not an ephemeral container filesystem). Setup, environment variables and recovery:
+> [Deployment](/docs/deployment#profile-b--portable-node-libsql--s3).

@@ -31,10 +31,19 @@ pnpm e2e:tiny-project          # full browser golden path (Playwright)
 
 ## Profiles proven here
 
-Database selection (`src/server/api/runtime.ts`): `env.DB` → D1; else `DATABASE_URL` → libSQL; else
-`InMemoryDatabaseAdapter` (ordinary development). Storage selection (`src/server/api/storage.ts`): when any
-`S3_*` setting is present → `S3StorageAdapter` (`@forge-cms/s3`), else `InMemoryStorageAdapter`. A
-half-configured profile throws at startup instead of silently falling back.
+Deployment profile (`src/server/api/profile.ts`, spec 084). Only **development** (`import.meta.dev`) may use the
+in-memory adapters; every other build must select exactly one complete durable profile or refuse to start,
+naming the missing bindings/variables (never their values):
+
+| Profile        | Requires                                         | Adapters                                     |
+| -------------- | ------------------------------------------------ | -------------------------------------------- |
+| **Cloudflare** | `DB` (D1) **and** `BUCKET` (R2)                  | `D1DatabaseAdapter` + `R2StorageAdapter`     |
+| **Portable**   | `DATABASE_URL` **and** `S3_BUCKET` + `S3_REGION` | `LibSqlDatabaseAdapter` + `S3StorageAdapter` |
+
+D1 + libSQL/S3 (or any Cloudflare setting next to any portable one) is rejected as ambiguous; a database without
+its matching durable storage, or storage without its database, is rejected. This policy lives in this fixture,
+not in ForgeCMS, which still accepts any adapter combination. `pnpm dev` with no configuration keeps using
+in-memory adapters (no durability claim).
 
 | Variable                                   | Meaning                                                     |
 | ------------------------------------------ | ----------------------------------------------------------- |
@@ -46,8 +55,7 @@ half-configured profile throws at startup instead of silently falling back.
 | `S3_PUBLIC_URL_BASE`                       | default `/api/media`, the access-checked `handleFile` route |
 
 These are server-side only (read in `nodeEnv()` / Cloudflare bindings) and never reach browser code. Files are
-served by `GET /api/media/[...key]`, a thin `handleFile` route. The S3 profile is _optional_: the
-"never silently use in-memory in production" policy is roadmap 0.10 / P03.
+served by `GET /api/media/[...key]`, a thin `handleFile` route (the same for R2 and S3).
 
 - **Cloudflare**: `D1DatabaseAdapter` when `env.DB` exists (`wrangler.toml`), proven for real (not
   mocked) by `test/workers/d1-lifecycle.test.ts` via `@cloudflare/vitest-plugin`.
@@ -57,10 +65,13 @@ served by `GET /api/media/[...key]`, a thin `handleFile` route. The S3 profile i
   normal multipart handler and `handleFile`, with restart persistence, delete and storage-intent recovery:
   `src/tests/portable-storage.integration.test.ts` (run by `pnpm test:s3`).
 
-Production (spec 081, roadmap 0.9 S03): `pnpm release:ssr` copies this app's source into a strict packed
-consumer and walks bootstrap → draft → publish → no-JS SSR → hydration → edit → fresh SSR → restart →
-unpublish on **Node `node-server` + on-disk libSQL** and on the **Cloudflare Pages output under local workerd +
-local D1** (local evidence, not a remote deployment).
+Production (specs 081 and 084): `pnpm test:s3 profiles` (needs Docker for Garage) copies this app's source into a
+strict packed consumer, builds it for production and, on **Node `node-server` + on-disk libSQL + S3 (Garage)**
+and on the **Cloudflare Pages output under local workerd + local D1 + local R2** (local evidence, not a remote
+deployment), walks bootstrap → draft → publish → no-JS SSR → hydration → edit → fresh SSR → restart → unpublish,
+then a multipart upload → `handleFile` → restart → delete journey, and checks that the built Node server refuses an
+incomplete profile. `pnpm test:s3 recovery` restores a backed-up libSQL + S3 installation into an isolated, empty
+bucket (see `apps/upgrade-rehearsal`).
 
 Both run the identical domain: schema sync, first-admin bootstrap, login, a second user, the full
 post lifecycle (create/draft-hidden/publish/edit/delete), the author relation, and a role boundary

@@ -1,13 +1,40 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-08 (spec 083 / roadmap 0.10 P02 — portable upload lifecycle and access — COMPLETE on branch
-> `feature/spec-083-portable-upload-lifecycle`, PR pending; roadmap 0.10 is NOT complete (P03 remains). Published npm
-> `latest` is still `0.10.2`; P01's pending minor Changeset (Version Packages PR #80) ships `@forge-cms/s3` as `0.11.0`;
-> P02 changes no `packages/*`). Next: roadmap 0.10 / P03 — complete deployment and recovery guides).**
+> **Last updated: 2026-10-08 (spec 084 / roadmap 0.10 P03 — complete deployment and recovery profiles — COMPLETE on branch
+> `feature/spec-084-deployment-recovery-profiles`, PR pending; **roadmap 0.10 — Portable storage and deployment
+> profiles — is complete**). Published npm `latest` is `0.11.0` (whole fixed group, incl. `@forge-cms/s3`); P03
+> changes no `packages/*` and adds no changeset. Next bounded responsibility: roadmap 0.11 / U01 — Reliable content
+> state and failure recovery (not started).**
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Deployment and recovery profiles — P03 (spec 084, 2026-10-08, complete; closes roadmap 0.10)
+
+Spec: [084-complete-deployment-recovery-profiles.md](specs/084-complete-deployment-recovery-profiles.md). **Two
+official durable profiles**, both production-built from packed public packages and walked through auth/admin, SSR,
+multipart upload, `handleFile` serving, restart, delete and isolated recovery:
+
+- **Cloudflare:** `DB` (D1) + `BUCKET` (R2) → `D1DatabaseAdapter` + `R2StorageAdapter`. Evidence is **local** workerd
+  - local D1 + local R2 (no remote Cloudflare deployment is certified or was created).
+- **Portable:** `DATABASE_URL` (on-disk libSQL) + `S3_*` → `LibSqlDatabaseAdapter` + `S3StorageAdapter`, Nitro
+  `node-server` with `externals.trace: false`. Certified S3 service: **Garage `v2.4.1`** only; AWS S3, B2 and Wasabi
+  are configurable, not CI-certified.
+- **Production never silently uses in-memory** — a policy of the `apps/tiny-project` fixture (`profile.ts`), not of
+  ForgeCMS: only `import.meta.dev` may use InMemory; a production build must have exactly one complete profile or it
+  refuses to start (names variables, never values; mixed Cloudflare + portable is ambiguous → rejected).
+- **CI/test layout:** `pnpm test:s3` = one Garage container, stages `adapter · lifecycle · consumer · recovery ·
+profiles` (`scripts/s3-fixture.mjs` is the repo-private fixture). `pnpm release:ssr` = technical SSR consumer only.
+  `pnpm test:upgrade` stays Docker-free (libSQL/InMemory + local D1/R2).
+- **Recovery:** `apps/upgrade-rehearsal/test/s3/backup-libsql-s3.test.ts` — historical fixtures 0.4.0/0.6.0/0.8.0 →
+  upgrade → cold libSQL snapshot → keys derived from the snapshot → exact S3 objects backed up → source deleted and
+  bucket emptied → restore to a new path and an isolated EMPTY bucket → full verification; plus real-S3 failure
+  controls. D1/R2 lane unchanged and green. Runbook: [BACKUP-RESTORE.md](BACKUP-RESTORE.md).
+- **Release truth:** website `CURRENT_FORGE_VERSION = '0.11.0'`, `s3` in the package list. npm `0.11.x` is roadmap
+  0.10 — the offset is deliberate; no `0.12` is created by this packet.
+- **Remaining limits:** no remote/AWS/B2/Wasabi validation, no atomic database + object snapshot (writes must be
+  quiesced), no point-in-time recovery. An on-disk libSQL file needs a persistent volume.
 
 ## Portable upload lifecycle — P02 (spec 083, 2026-10-08, complete)
 
@@ -20,8 +47,7 @@ put (compensated; with a failed cleanup a durable intent that `reconcileStorage(
 runtime on the same file + bucket) and a two-process packed consumer. **No runtime defect found; no `packages/*`
 change.** `apps/tiny-project` gained a small `media` upload collection, `GET /api/media/[...key]` and optional
 `S3_*` storage selection (`src/server/api/storage.ts`, partial config throws). `pnpm test:s3` now runs three
-stages against one Garage container. **Not done (P03):** deployment/recovery guides, S3 backup/restore, the
-production no-silent-in-memory policy, remote/AWS validation.
+stages against one Garage container. _(Delivered by P03 — see above; remote/AWS validation remains out of scope.)_
 
 ## S3-compatible storage adapter — P01 (spec 082, 2026-10-07, complete)
 

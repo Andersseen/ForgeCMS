@@ -75,9 +75,10 @@ Be honest with yourself about this list before adopting it for something that ma
   [Schema upgrades](/docs/schema-upgrades).
 - **Relation population is one level deep** (`depth: 1`), and composite JSON values cannot be queried
   inside.
-- **No SSR-safe client fetch.** The Angular client is browser-first; a content site that needs SSR
-  has to call the Local API from a server route instead (which is the better pattern anyway).
-- **Storage is R2 or in-memory.** An S3-compatible adapter is planned, not shipped.
+- **SSR uses an explicit server origin.** Public pages render and hydrate with `provideForgeCmsServer` and a
+  `credentials: 'omit'` client (see [SSR](/docs/ssr)); server routes can still call the Local API directly.
+- **Durable storage is R2 or S3.** `@forge-cms/s3` covers S3-compatible services (Garage is CI-certified; AWS S3,
+  B2 and Wasabi are configurable, not certified). In-memory storage is development-only.
 - **No email adapter, plugin system, or CLI.**
 
 ## How the pieces fit

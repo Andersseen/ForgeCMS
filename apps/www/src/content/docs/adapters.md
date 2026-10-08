@@ -20,8 +20,9 @@ hooks, access, validation — is the same whether you are on SQLite in a file, D
 | `AuthAdapter`     | `SignedTokenAuthAdapter`     | `@forge-cms/auth`       | Signed tokens, no user store            |
 | `AuthAdapter`     | `ExternalAuthAdapter`        | `@forge-cms/auth`       | Delegates validation to another service |
 | `AuthAdapter`     | `InMemoryAuthAdapter`        | `@forge-cms/auth`       | Tests                                   |
-| `StorageAdapter`  | `InMemoryStorageAdapter`     | `@forge-cms/storage`    | Local dev and tests                     |
-| `StorageAdapter`  | `R2StorageAdapter`           | `@forge-cms/cloudflare` | Cloudflare R2                           |
+| `StorageAdapter`  | `InMemoryStorageAdapter`     | `@forge-cms/storage`    | Local dev and tests only; not durable   |
+| `StorageAdapter`  | `R2StorageAdapter`           | `@forge-cms/cloudflare` | Cloudflare R2 (durable)                 |
+| `StorageAdapter`  | `S3StorageAdapter`           | `@forge-cms/s3`         | S3-compatible storage (durable)         |
 
 There is no KV adapter, despite what older notes may suggest.
 
@@ -151,7 +152,7 @@ claims.
 ### `UsersCollectionAuthAdapter`
 
 ```ts
-const database = env?.DB ? new D1DatabaseAdapter() : new InMemoryDatabaseAdapter();
+const database = new D1DatabaseAdapter(); // or LibSqlDatabaseAdapter; in-memory only in development
 const auth = new UsersCollectionAuthAdapter().init({ ...env, userDatabase: database });
 ```
 
@@ -196,12 +197,20 @@ new R2StorageAdapter({ binding: 'BUCKET', publicUrlBase: 'https://cdn.example.co
 
 ## Selecting adapters at runtime
 
-Bindings only exist on the deployed Worker, so pick per request:
+`InMemoryDatabaseAdapter` and `InMemoryStorageAdapter` are development and test adapters. They are not durability
+evidence and must not be a production fallback: a selector like `env.DB ? D1 : InMemory` deploys a site that
+silently forgets everything when a binding is missing or misnamed. Keep a **development** factory and a
+**durable-profile** factory, and make the latter throw on an incomplete profile. The two official durable
+profiles are D1 + R2 and libSQL + S3 — see [Deployment](/docs/deployment).
+
+Bindings only exist on the deployed Worker, so build the durable runtime per request environment:
 
 ```ts
-export async function getServerRuntime(env?: ServerEnv) {
-  const database = env?.DB ? new D1DatabaseAdapter() : new InMemoryDatabaseAdapter();
-  const storage = env?.BUCKET ? new R2StorageAdapter() : new InMemoryStorageAdapter();
+export async function getServerRuntime(env: ServerEnv) {
+  if (!env.DB || !env.BUCKET)
+    throw new Error('Incomplete Cloudflare profile: DB and BUCKET are required');
+  const database = new D1DatabaseAdapter();
+  const storage = new R2StorageAdapter();
   const auth = new UsersCollectionAuthAdapter().init({ ...env, userDatabase: database });
 
   const runtime = new ForgeCmsRuntime({ collections, adapters: { database, auth, storage }, env });
