@@ -1,4 +1,5 @@
 import type { APIRequestContext, Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
 /**
@@ -167,7 +168,7 @@ test('content admin: create a post with a relation, verify draft is hidden, publ
 
   await page.goto('/admin/collections/posts');
   const rowAgain = page.locator('volt-table-row', { hasText: title });
-  await rowAgain.getByRole('button', { name: 'Publish' }).click();
+  await rowAgain.getByRole('button', { name: /^Publish/ }).click();
   await expect(rowAgain.getByText('Published', { exact: true })).toBeVisible();
 
   // Now visible on the public site. The public route reads as an anonymous user, and population
@@ -191,7 +192,7 @@ test('content admin: create a post with a relation, verify draft is hidden, publ
   await page.goto('/admin/collections/posts');
   await page
     .locator('volt-table-row', { hasText: title })
-    .getByRole('button', { name: 'Edit' })
+    .getByRole('button', { name: /^Edit/ })
     .click();
   await expect(page.locator('input#title')).toHaveValue(title);
   await page.locator('input#title').fill(updatedTitle);
@@ -259,7 +260,7 @@ test('U01 (spec 085): search and filter survive an editor round trip; a dirty ed
   await page.getByRole('button', { name: 'Draft', exact: true }).click();
   const row = page.locator('volt-table-row', { hasText: 'Reliable' }).first();
   await expect(row).toBeVisible();
-  await row.getByRole('button', { name: 'Edit' }).click();
+  await row.getByRole('button', { name: /^Edit/ }).click();
   await expect(page).toHaveURL(/\/admin\/collections\/posts\/[^/]+$/);
 
   // Clean editor: leaving does not prompt, and the list is exactly as it was left.
@@ -268,28 +269,32 @@ test('U01 (spec 085): search and filter survive an editor round trip; a dirty ed
   await expect(page.locator('input[placeholder="Search…"]')).toHaveValue('Reliable');
   await expect(page.locator('volt-table-row', { hasText: 'Reliable' }).first()).toBeVisible();
 
-  // Dirty editor: dismissing the prompt keeps the editor and the typed value.
+  // Dirty editor: staying keeps the editor and the typed value (spec 086: a Forge dialog, not window.confirm).
   await page
     .locator('volt-table-row', { hasText: 'Reliable' })
     .first()
-    .getByRole('button', { name: 'Edit' })
+    .getByRole('button', { name: /^Edit/ })
     .click();
   await page.locator('input#title').fill('Reliable but changed');
-  let prompts = 0;
-  page.once('dialog', (dialog) => {
-    prompts += 1;
+  let nativePrompts = 0;
+  page.on('dialog', (dialog) => {
+    nativePrompts += 1;
     void dialog.dismiss();
   });
+  const leave = page.getByRole('dialog', { name: 'Leave without saving?' });
   await page.getByRole('button', { name: 'Cancel' }).click();
-  await expect.poll(() => prompts).toBe(1);
+  await expect(leave).toBeVisible();
+  await leave.getByRole('button', { name: 'Stay' }).click();
+  await expect(leave).toHaveCount(0);
   await expect(page).toHaveURL(/\/admin\/collections\/posts\/[^/]+$/);
   await expect(page.locator('input#title')).toHaveValue('Reliable but changed');
 
-  // Accepting lets go — and the filters are still there on return.
-  page.once('dialog', (dialog) => void dialog.accept());
+  // Leaving lets go — and the filters are still there on return.
   await page.getByRole('button', { name: 'Cancel' }).click();
+  await leave.getByRole('button', { name: 'Leave without saving' }).click();
   await expect(page).toHaveURL(/\/admin\/collections\/posts$/);
   await expect(page.locator('input[placeholder="Search…"]')).toHaveValue('Reliable');
+  expect(nativePrompts).toBe(0);
 });
 
 test('U01 (spec 085): cancelling a delete sends nothing; the row goes only after the server deletes it', async ({
@@ -307,19 +312,269 @@ test('U01 (spec 085): cancelling a delete sends nothing; the row goes only after
   const label = (await row.innerText()).split('\n')[0] ?? 'Reliable';
   await expect(row).toBeVisible();
 
-  await row.getByRole('button', { name: 'Delete' }).click();
+  await row.getByRole('button', { name: /^Delete/ }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(row).toBeVisible();
   expect(deletes).toHaveLength(0);
 
-  await row.getByRole('button', { name: 'Delete' }).click();
+  await row.getByRole('button', { name: /^Delete/ }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.locator('volt-table-row', { hasText: label })).toHaveCount(0);
   expect(deletes).toEqual([204]);
 });
 
+// ---------------------------------------------------------------------------------------------------
+// Spec 086 (roadmap 0.11 / U02): keyboard, focus and automated accessibility evidence.
+// ---------------------------------------------------------------------------------------------------
+
+/** WCAG 2.2 AA (and the A / 2.1 levels it includes) — the one rule set every scan uses. */
+const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
+
+/**
+ * The ONE excluded rule, documented in spec 086: `target-size` (WCAG 2.2 · 2.5.8). This fixture ships no
+ * stylesheet at all (spec 055: "deliberately minimal"), so every control is at its browser-default size
+ * rather than the admin's design — a measurement of that says nothing about the admin. The same rule runs,
+ * unexcluded, against the styled consumer (`apps/demo-aesthetics/e2e/accessibility.spec.ts`).
+ */
+const UNSTYLED_FIXTURE_EXCLUSIONS = ['target-size'];
+
+/**
+ * Scans the page as it is right now. Every other rule in the tag set runs, and a violation fails with
+ * its rule id and the offending selectors.
+ */
+async function expectAccessible(page: Page, state: string) {
+  const results = await new AxeBuilder({ page })
+    .withTags(WCAG_TAGS)
+    .disableRules(UNSTYLED_FIXTURE_EXCLUSIONS)
+    .analyze();
+  const summary = results.violations.map((violation) => ({
+    state,
+    rule: violation.id,
+    impact: violation.impact,
+    targets: violation.nodes.map((node) => node.target.join(' '))
+  }));
+  expect(summary, `axe violations in: ${state}`).toEqual([]);
+}
+
+const focused = (page: Page) => page.locator(':focus');
+
+/** The element with focus is inside `selector` (a modal's root). */
+async function focusIsWithin(page: Page, selector: string): Promise<boolean> {
+  return page.evaluate(
+    (css) => document.querySelector(css)?.contains(document.activeElement) === true,
+    selector
+  );
+}
+
+test('U02 (spec 086): a keyboard-only editor signs in, corrects a server validation error, picks the required relation, publishes, guards unsaved edits, deletes and signs out', async ({
+  page
+}) => {
+  const stamp = Date.now();
+  const title = `Keyboard ${stamp}`;
+  const slug = `keyboard-${stamp}`;
+  const row = () => page.locator('volt-table-row', { hasText: title });
+
+  // --- sign in, with Tab and Enter only ---------------------------------------------------------
+  await page.goto('/admin/login');
+  await hydrated(page);
+  await page.locator('input#forge-signin-email').focus();
+  await page.keyboard.type(ADMIN_EMAIL);
+  await page.keyboard.press('Tab');
+  await expect(focused(page)).toHaveAttribute('id', 'forge-signin-password');
+  await page.keyboard.type(ADMIN_PASSWORD);
+  await page.keyboard.press('Enter');
+  await page.waitForURL('**/admin/collections**');
+
+  // --- Posts → New (Enter on real controls) -----------------------------------------------------
+  await page.getByRole('link', { name: /Posts/ }).first().focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/admin\/collections\/posts$/);
+  const newButton = page.getByRole('button', { name: 'New', exact: true });
+  await newButton.focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/admin\/collections\/posts\/new$/);
+
+  // Modal focus: inside on open, and Tab / Shift+Tab never leave it.
+  const dialog = '[role="dialog"][aria-labelledby="forge-collection-form-title"]';
+  await expect(page.locator(dialog)).toBeVisible();
+  await expect(focused(page)).toHaveAttribute('id', 'title');
+  for (let i = 0; i < 14; i += 1) {
+    await page.keyboard.press('Tab');
+    expect(await focusIsWithin(page, dialog), `Tab #${i + 1} stayed in the dialog`).toBe(true);
+  }
+  for (let i = 0; i < 16; i += 1) {
+    await page.keyboard.press('Shift+Tab');
+    expect(await focusIsWithin(page, dialog), `Shift+Tab #${i + 1} stayed in the dialog`).toBe(
+      true
+    );
+  }
+
+  // --- a real server validation error: title and author are missing -----------------------------
+  await page.locator('input#slug').focus();
+  await page.keyboard.type(slug);
+  await page.keyboard.press('Enter'); // implicit submit
+  await expect(page.getByText('Fix the highlighted fields and try again.')).toBeVisible();
+
+  // Focus went to the FIRST invalid field, which is named, invalid and described by its error.
+  await expect(focused(page)).toHaveAttribute('id', 'title');
+  await expect(page.locator('input#title')).toHaveAttribute('aria-invalid', 'true');
+  const describedBy = await page.locator('input#title').getAttribute('aria-describedby');
+  expect(describedBy).toBeTruthy();
+  await expect(page.locator(`[id="${describedBy}"]`)).not.toBeEmpty();
+  await expect(page.locator('input#slug')).toHaveValue(slug); // what was typed survives
+  await expectAccessible(page, 'document editor with server validation errors');
+
+  // --- correct the title, then pick the required author with the keyboard -----------------------
+  await page.keyboard.type(title);
+  await page.locator('input#author').focus();
+  await page.keyboard.type('admin@tiny');
+  await page.keyboard.press('Enter'); // from the search box to the first result
+  const result = page.getByRole('button', { name: /admin@tiny\.e2e\.test/ });
+  await expect(result).toBeFocused();
+  await expectAccessible(page, 'relation picker with results');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: /^Choose another/ })).toBeFocused();
+
+  // The selection can be removed by keyboard too, and chosen again.
+  const removeAuthor = page.getByRole('button', {
+    name: /^Remove .* from Author$/
+  });
+  await removeAuthor.focus();
+  await page.keyboard.press('Space');
+  await expect(page.locator('input#author')).toBeFocused();
+  await page.keyboard.type('admin@tiny');
+  await page.keyboard.press('Enter');
+  await expect(result).toBeFocused();
+  await page.keyboard.press('Space');
+  await expect(page.getByRole('button', { name: /^Choose another/ })).toBeFocused();
+
+  // --- save (Enter in a field), publish, edit ---------------------------------------------------
+  await page.locator('input#title').focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/admin\/collections\/posts$/);
+  await expect(row()).toBeVisible();
+  await expectAccessible(page, 'collection workspace');
+
+  await row()
+    .getByRole('button', { name: /^Publish/ })
+    .focus();
+  await page.keyboard.press('Enter');
+  await expect(row().getByText('Published', { exact: true })).toBeVisible();
+
+  const editButton = row().getByRole('button', { name: /^Edit/ });
+  await editButton.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('input#title')).toHaveValue(title);
+  await expect(focused(page)).toHaveAttribute('id', 'title');
+
+  // --- unsaved changes: an accessible dialog, Stay keeps everything, Leave lets go --------------
+  await page.keyboard.type(' (edited)');
+  const leave = page.getByRole('dialog', { name: 'Leave without saving?' });
+  await page.keyboard.press('Escape'); // Escape on the editor asks to leave
+  await expect(leave).toBeVisible();
+  await expect(leave.getByRole('button', { name: 'Stay' })).toBeFocused();
+  await expectAccessible(page, 'unsaved-changes confirmation dialog');
+  for (let i = 0; i < 4; i += 1) {
+    await page.keyboard.press('Tab');
+    expect(
+      await focusIsWithin(page, '[aria-labelledby="forge-confirm-dialog-title"]'),
+      `Tab #${i + 1} stayed in the confirmation`
+    ).toBe(true);
+  }
+  await leave.getByRole('button', { name: 'Stay' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(leave).toHaveCount(0);
+  await expect(page).toHaveURL(/\/admin\/collections\/posts\/[^/]+$/);
+  await expect(page.locator('input#title')).toHaveValue(`${title} (edited)`);
+  await expect(page.locator('input#title')).toBeFocused(); // back where the editor pressed Escape
+
+  const cancel = page.locator(dialog).getByRole('button', { name: 'Cancel' });
+  await cancel.focus();
+  await page.keyboard.press('Enter');
+  await expect(leave).toBeVisible();
+  await leave.getByRole('button', { name: 'Leave without saving' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/admin\/collections\/posts$/);
+  await expect(row()).toBeVisible();
+  await expect(row().getByRole('button', { name: /^Edit/ })).toBeFocused(); // what opened the editor
+  await expect(page.locator('volt-table-row', { hasText: `${title} (edited)` })).toHaveCount(0);
+
+  // --- delete: Cancel returns focus; Confirm removes the row and focus lands on the heading -----
+  const deleteButton = row().getByRole('button', { name: /^Delete/ });
+  await deleteButton.focus();
+  await page.keyboard.press('Enter');
+  const confirm = page.getByRole('dialog', { name: 'Delete this document?' });
+  await expect(confirm.getByRole('button', { name: 'Cancel' })).toBeFocused();
+  await expectAccessible(page, 'delete confirmation dialog');
+  await page.keyboard.press('Escape');
+  await expect(confirm).toHaveCount(0);
+  await expect(deleteButton).toBeFocused();
+
+  await page.keyboard.press('Enter');
+  await expect(confirm).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(confirm.getByRole('button', { name: 'Delete' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(row()).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Posts', level: 1 })).toBeFocused();
+
+  // --- sign out ---------------------------------------------------------------------------------
+  const logoutButton = page.getByRole('button', { name: /log out/i });
+  await logoutButton.focus();
+  await page.keyboard.press('Enter');
+  await page.waitForURL('**/admin/login**');
+});
+
+test('U02 (spec 086): sign-in, the content list and the users workspace have no WCAG AA violations', async ({
+  page
+}) => {
+  await page.goto('/admin/login');
+  await hydrated(page);
+  await expectAccessible(page, 'sign in');
+
+  // A failed attempt: announced, and focus is somewhere usable.
+  await page.locator('input#forge-signin-email').fill(ADMIN_EMAIL);
+  await page.locator('input#forge-signin-password').fill('definitely-wrong');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.locator('input#forge-signin-password')).toBeFocused();
+  await expectAccessible(page, 'sign in with an error');
+
+  await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expectAccessible(page, 'collections index');
+
+  await page.goto('/admin/collections/posts');
+  await hydrated(page);
+  await expect(page.locator('volt-table-row').nth(1)).toBeVisible();
+  await expectAccessible(page, 'collection workspace');
+
+  await page.goto('/admin/users');
+  await hydrated(page);
+  await expect(page.getByRole('heading', { name: 'Users', level: 1 })).toBeVisible();
+  await expect(page.locator('volt-table-row').nth(1)).toBeVisible();
+  await expectAccessible(page, 'users workspace');
+
+  await page.getByRole('button', { name: 'New User' }).click();
+  await expect(page.locator('input#forge-user-name')).toBeFocused();
+  await expectAccessible(page, 'users workspace with the user form open');
+});
+
+test('U02 (spec 086): the empty editor and its error state have no WCAG AA violations', async ({
+  page
+}) => {
+  await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
+  await page.goto('/admin/collections/posts/new');
+  await hydrated(page);
+  await expectAccessible(page, 'document editor');
+
+  await page.getByRole('button', { name: 'Create' }).click();
+  await expect(page.getByText('Fix the highlighted fields and try again.')).toBeVisible();
+  await expect(page.locator('input#title')).toBeFocused();
+  await expectAccessible(page, 'document editor with errors');
+});
 test('U01 (spec 085): a session that ends mid-edit is rejected by the real server and the unsaved edit stays on screen', async ({
   page,
   context
@@ -329,9 +584,9 @@ test('U01 (spec 085): a session that ends mid-edit is rejected by the real serve
   await hydrated(page);
   await page
     .locator('volt-table-row')
-    .filter({ has: page.getByRole('button', { name: 'Edit' }) })
+    .filter({ has: page.getByRole('button', { name: /^Edit/ }) })
     .first()
-    .getByRole('button', { name: 'Edit' })
+    .getByRole('button', { name: /^Edit/ })
     .click();
   await expect(page.locator('input#title')).not.toHaveValue('');
   await page.locator('input#title').fill('Edited as the session ends');
@@ -385,9 +640,9 @@ test('users management: admin creates an editor; the editor cannot manage users 
   await page.goto('/admin/collections/posts');
   const anyRow = page
     .locator('volt-table-row')
-    .filter({ has: page.getByRole('button', { name: 'Edit' }) })
+    .filter({ has: page.getByRole('button', { name: /^Edit/ }) })
     .first();
-  await anyRow.getByRole('button', { name: 'Edit' }).click();
+  await anyRow.getByRole('button', { name: /^Edit/ }).click();
   await expect(page).toHaveURL(/\/admin\/collections\/posts\/[^/]+$/);
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page).toHaveURL(/\/admin\/collections\/posts$/);

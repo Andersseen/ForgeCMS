@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { VoltButton, VoltCard } from '@voltui/components';
+import { ForgeModalFocusDirective } from './modal-focus.directive.js';
 
 /**
  * A generic "are you sure?" overlay — the workspace's delete flow needs one (spec 052 §16: a single
@@ -7,11 +8,14 @@ import { VoltButton, VoltCard } from '@voltui/components';
  *
  * Same hand-rolled overlay chrome as `ForgeCollectionFormComponent`, for the reason documented
  * there: VoltDialog's trigger+TemplateRef composition pattern could not be visually verified here.
+ *
+ * Focus (spec 086): opening moves focus to the safe choice (Cancel), Tab/Shift+Tab stay inside, and
+ * closing restores focus to whatever opened it (see `ForgeModalFocusDirective`).
  */
 @Component({
   selector: 'forge-confirm-dialog',
   standalone: true,
-  imports: [VoltButton, VoltCard],
+  imports: [VoltButton, VoltCard, ForgeModalFocusDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (open()) {
@@ -19,6 +23,7 @@ import { VoltButton, VoltCard } from '@voltui/components';
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
         role="dialog"
         aria-modal="true"
+        forgeModalFocus="[data-forge-initial] button"
         aria-labelledby="forge-confirm-dialog-title"
         aria-describedby="forge-confirm-dialog-message"
         tabindex="-1"
@@ -34,9 +39,12 @@ import { VoltButton, VoltCard } from '@voltui/components';
           @if (error(); as message) {
             <p class="text-xs text-destructive" role="alert">{{ message }}</p>
           }
+          <!-- Neutral progress, announced politely; always present so the change is observed. -->
+          <p class="sr-only" role="status">{{ pending() ? pendingLabel() : '' }}</p>
 
           <div class="flex items-center justify-end gap-2 pt-2">
             <volt-button
+              data-forge-initial
               type="button"
               variant="outline"
               size="sm"

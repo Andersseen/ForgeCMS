@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   computed,
   effect,
   inject,
@@ -22,6 +23,7 @@ import {
 } from '@forge-cms/angular';
 import type { CollectionMeta } from '@forge-cms/angular';
 import { ForgeCollectionFormComponent } from './collection-form.component.js';
+import { ForgeConfirmDialogComponent } from './confirm-dialog.component.js';
 import { LoadingStateComponent } from './loading-state.component.js';
 import { ErrorStateComponent } from './error-state.component.js';
 import { describeAdminError, isForbiddenError } from './admin-error.js';
@@ -40,7 +42,12 @@ import { ForgeContentRefresh } from './content-refresh.js';
 @Component({
   selector: 'forge-document-editor',
   standalone: true,
-  imports: [ForgeCollectionFormComponent, LoadingStateComponent, ErrorStateComponent],
+  imports: [
+    ForgeCollectionFormComponent,
+    ForgeConfirmDialogComponent,
+    LoadingStateComponent,
+    ErrorStateComponent
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (metaLoading()) {
@@ -61,11 +68,6 @@ import { ForgeContentRefresh } from './content-refresh.js';
           (retry)="documentRef.reload()"
         />
       } @else {
-        @if (blockedMessage(); as message) {
-          <p class="text-xs text-destructive mb-2" role="alert">{{ message }}</p>
-        } @else if (saveError(); as message) {
-          <p class="text-xs text-destructive mb-2" role="alert">{{ message }}</p>
-        }
         <!-- One form per collection + document identity (create mode is its own identity): local
              edits belong to exactly that identity and never leak into another, while a failed save
              or a remote refresh of the *same* document keeps them. -->
@@ -78,6 +80,7 @@ import { ForgeContentRefresh } from './content-refresh.js';
             [locales]="collectionMeta.locales ?? []"
             [submitting]="saving()"
             [submitDisabled]="blockedMessage() !== null"
+            [error]="blockedMessage() ?? saveError()"
             (dirtyChange)="dirty.set($event)"
             (save)="onSave($event)"
             (cancel)="onCancel()"
@@ -85,6 +88,17 @@ import { ForgeContentRefresh } from './content-refresh.js';
         }
       }
     }
+
+    <!-- The unsaved-changes prompt (spec 086): the same accessible dialog as delete, not window.confirm. -->
+    <forge-confirm-dialog
+      [open]="leavePrompt()"
+      title="Leave without saving?"
+      message="You have unsaved changes. If you leave now, they will be lost."
+      confirmLabel="Leave without saving"
+      cancelLabel="Stay"
+      (confirm)="answerLeave(true)"
+      (cancel)="answerLeave(false)"
+    />
   `
 })
 export class ForgeDocumentEditorComponent {
@@ -190,6 +204,9 @@ export class ForgeDocumentEditorComponent {
   protected readonly describeAdminError = describeAdminError;
 
   constructor() {
+    // A navigation that outlives the editor must not hang on an unanswered prompt.
+    inject(DestroyRef).onDestroy(() => this.pendingLeave?.resolve(false));
+
     effect(() => {
       const slug = this.collectionSlug();
       if (slug === undefined) return;
@@ -272,10 +289,35 @@ export class ForgeDocumentEditorComponent {
     void this.router.navigate(['..'], { relativeTo: this.route });
   }
 
-  /** Called by {@link canDeactivateForgeDocumentEditor}. */
-  canDeactivate(): boolean {
+  /** The unsaved-changes dialog is showing. */
+  protected readonly leavePrompt = signal(false);
+  /** The one outstanding "may I leave?" answer; further attempts share it instead of stacking prompts. */
+  private pendingLeave: { promise: Promise<boolean>; resolve: (leave: boolean) => void } | null =
+    null;
+
+  /**
+   * Called by {@link canDeactivateForgeDocumentEditor}. A clean editor may be left at once; a dirty one
+   * asks through Forge's confirmation dialog (Angular awaits the returned promise). Stay → `false`,
+   * the editor and every value stay; Leave → `true`.
+   */
+  canDeactivate(): boolean | Promise<boolean> {
     if (!this.dirty()) return true;
-    return window.confirm('You have unsaved changes. Leave without saving?');
+    if (this.pendingLeave !== null) return this.pendingLeave.promise;
+
+    let resolve!: (leave: boolean) => void;
+    const promise = new Promise<boolean>((done) => {
+      resolve = done;
+    });
+    this.pendingLeave = { promise, resolve };
+    this.leavePrompt.set(true);
+    return promise;
+  }
+
+  protected answerLeave(leave: boolean): void {
+    const pending = this.pendingLeave;
+    this.pendingLeave = null;
+    this.leavePrompt.set(false);
+    pending?.resolve(leave);
   }
 }
 

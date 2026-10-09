@@ -49,4 +49,20 @@ describe('describeCollection', () => {
 
     expect(describeCollection(posts).defaultColumns).toBeUndefined();
   });
+
+  it('exposes withTime for date-time fields only', () => {
+    const events = defineCollection({
+      slug: 'events',
+      fields: {
+        day: defineField.date(),
+        startsAt: defineField.date({ withTime: true }),
+        endsAt: defineField.date({ withTime: false })
+      }
+    });
+
+    const [day, startsAt, endsAt] = describeCollection(events).fieldDefinitions;
+    expect(day).not.toHaveProperty('withTime');
+    expect(startsAt?.withTime).toBe(true);
+    expect(endsAt).not.toHaveProperty('withTime');
+  });
 });

@@ -47,6 +47,7 @@
     "clean": "rm -rf dist coverage"
   },
   "peerDependencies": {
+    "@angular/cdk": "^21.2.0",
     "@angular/common": "^21.2.0",
     "@angular/compiler-cli": "^21.2.0",
     "@angular/core": "^21.2.0",
@@ -75,6 +76,7 @@
   },
   "devDependencies": {
     "@analogjs/vite-plugin-angular": "2.4.8",
+    "@angular/cdk": "21.2.11",
     "@angular/compiler": "21.2.10",
     "@angular/compiler-cli": "21.2.10",
     "@angular/core": "21.2.10",

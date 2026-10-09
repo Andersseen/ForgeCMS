@@ -70,8 +70,8 @@ describe('save state', () => {
     expect(h.text(fixture)).toContain('Saving…');
     expect(submitButton(fixture).disabled).toBe(true);
     const editor = fixture.componentInstance;
-    expect(editor.canDeactivate()).toBe(true);
-    expect(confirmSpy).toHaveBeenCalledTimes(1); // still dirty while the write is in flight
+    expect(editor.canDeactivate()).toBeInstanceOf(Promise); // still dirty while the write is in flight
+    expect(confirmSpy).not.toHaveBeenCalled(); // spec 086: the prompt is a Forge dialog, never window.confirm
 
     ctx.transport.last('/posts/a', 'PUT').resolve({ data: { id: 'a', title: 'A2' } });
     await h.settle();
@@ -109,8 +109,8 @@ describe('recoverable failures keep the work', () => {
     expect(h.text(fixture)).toContain('Title is required');
     expect(input(fixture, 'summary').value).toBe('keep me');
     expect(submitButton(fixture).disabled).toBe(false);
-    expect(fixture.componentInstance.canDeactivate()).toBe(true);
-    expect(confirmSpy).toHaveBeenCalledTimes(1); // still dirty → prompted
+    expect(fixture.componentInstance.canDeactivate()).toBeInstanceOf(Promise); // still dirty → prompted
+    expect(confirmSpy).not.toHaveBeenCalled();
     expect(ctx.navigate).not.toHaveBeenCalled();
 
     await h.typeInto(input(fixture, 'title'), 'Fixed');
@@ -222,19 +222,35 @@ describe('document identity', () => {
 });
 
 describe('unsaved-changes guard', () => {
-  it('prompts only when dirty; declining keeps the editor and values, accepting lets go', async () => {
+  it('prompts only when dirty; Stay keeps the editor and values, Leave lets go (spec 086: no window.confirm)', async () => {
     const { fixture } = await openEditor('a', { id: 'a', title: 'A' });
     expect(fixture.componentInstance.canDeactivate()).toBe(true);
-    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(
+      h.q(fixture, '[role="dialog"][aria-labelledby="forge-confirm-dialog-title"]')
+    ).toBeNull();
 
     await h.typeInto(input(fixture, 'title'), 'Mine');
-    confirmSpy.mockReturnValueOnce(false);
-    expect(fixture.componentInstance.canDeactivate()).toBe(false);
+    const stay = fixture.componentInstance.canDeactivate() as Promise<boolean>;
+    await h.settle();
+    const dialogButtons = h.qa<HTMLButtonElement>(
+      fixture,
+      '#forge-confirm-dialog-title ~ div button'
+    );
+    expect(dialogButtons.map((button) => button.textContent?.trim())).toEqual([
+      'Stay',
+      'Leave without saving'
+    ]);
+    dialogButtons[0]?.click();
+    await h.settle();
+    await expect(stay).resolves.toBe(false);
     expect(input(fixture, 'title').value).toBe('Mine');
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
 
-    expect(fixture.componentInstance.canDeactivate()).toBe(true); // confirm → true
-    expect(confirmSpy).toHaveBeenCalledTimes(2);
+    const leave = fixture.componentInstance.canDeactivate() as Promise<boolean>;
+    await h.settle();
+    h.qa<HTMLButtonElement>(fixture, '#forge-confirm-dialog-title ~ div button')[1]?.click();
+    await h.settle();
+    await expect(leave).resolves.toBe(true);
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 });
 
