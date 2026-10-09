@@ -1,5 +1,11 @@
 # @forge-cms/s3
 
+## 0.12.1
+
+### Patch Changes
+
+- @forge-cms/storage@0.12.1
+
 ## 0.12.0
 
 ### Patch Changes
