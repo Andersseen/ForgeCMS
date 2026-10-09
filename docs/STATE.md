@@ -2,8 +2,8 @@
 
 > **Last updated: 2026-10-09 (spec 087 / roadmap 0.11 U03 — admin reuse certified, 1.0 surface frozen — COMPLETE on
 > branch `feature/spec-087-admin-reuse-surface-freeze`, PR pending; roadmap 0.11 is **complete**).** Published release is
-> still `0.12.0`; pending changesets (U02 patches + U03 admin minor) → expected `0.13.0`. Website
-> `CURRENT_FORGE_VERSION` stays `0.12.0` until that publishes. **Next: roadmap 0.12 / R01 (not started).**
+> `0.12.1` (U02); the pending U03 admin changeset is a minor → expected `0.13.0`. Website
+> `CURRENT_FORGE_VERSION` is `0.12.1`. **Next: roadmap 0.12 / R01 (not started).**
 > _Previous header:_ 2026-10-09 (spec 086 / roadmap 0.11 U02 — keyboard, focus and existing field interactions — COMPLETE
 > on branch `feature/spec-086-admin-keyboard-focus`, PR pending; roadmap 0.11 is **not** complete: U03 pending).
 > U01 (spec 085, PR #84, main CI `37826074960` ✓) and its release PR #85 (CI `37830311591` ✓) are merged; npm `latest`

@@ -9,10 +9,10 @@
  * `0.8.0` carries M01, `0.8.1` added M02's code (its changelog entry is in `0.8.2`); roadmap `0.8`
  * (Angular DX) published as npm `0.9.0`; roadmap `0.9` (SSR) is the npm `0.10.x` line; roadmap `0.10` (portable storage) is the npm `0.11.x` line (`0.11.0` added `@forge-cms/s3`); roadmap `0.11` (admin) is the npm `0.12.x` line (`0.12.0` = U01) — see `ROADMAP_MILESTONES` and docs/STATE.md.
  *
- * Verified 2026-10-09 (spec 086): `npm view @forge-cms/core version` and `npm view @forge-cms/admin version` report `0.12.0` (GitHub release `v0.12.0`).
+ * Verified 2026-10-09 (spec 087): `npm view @forge-cms/core version` and `npm view @forge-cms/admin version` report `0.12.1` (GitHub release `v0.12.1`, U02).
  * The website reports the published fixed-group release, independently of unmerged roadmap work.
  */
-export const CURRENT_FORGE_VERSION = '0.12.0';
+export const CURRENT_FORGE_VERSION = '0.12.1';
 
 export interface ForgePackage {
   /** The name after `@forge-cms/`. */

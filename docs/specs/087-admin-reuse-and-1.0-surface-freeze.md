@@ -147,9 +147,9 @@ None blocking. Admin on Angular 22 stays out of scope (VoltUI 1.x).
 ## Outcome
 
 **Release truth.** Started from main `b616005` (PR #86 merge); PR #86's main CI `37904507111` completed ✓. Published at
-start and end: `0.12.0` (npm + GitHub `v0.12.0`). A Version Packages PR (#87) was open for the U02 patches
-(`0.12.1`); it was not touched. The U03 changeset is an `@forge-cms/admin` **minor** (default nav shrank, `collections`
-literal typing narrowed), so the pending release becomes **`0.13.0`**. `CURRENT_FORGE_VERSION` stays `0.12.0`.
+start: `0.12.0`; during the task Version Packages PR #87 (U02 patches) merged and `0.12.1` was published (npm + GitHub
+release, verified) — the end state. The U03 changeset is an `@forge-cms/admin` **minor** (default nav shrank, `collections`
+literal typing narrowed), so the next release is **`0.13.0`**. `CURRENT_FORGE_VERSION` updated to `0.12.1` (published).
 
 **Mount and endpoints.** Admin certified at `/studio` (tiny-project) with `/api/content` + `/api/account`
 (Analog serves only `/api/**` through Nitro; a literal `/content-api`/`/account-api` Analog route is unreachable). Those
