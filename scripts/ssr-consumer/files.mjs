@@ -1,7 +1,7 @@
 // The minimal durable-file production journey (spec 084, roadmap 0.10 / P03), shared by both packed profiles.
 //
 // No new UI: the signed-in admin page of the production-built app uploads one file through the real multipart
-// Forge handler (`POST /api/v1/media` → `handleCreate`), and a browser then loads it from `/api/media/…`
+// Forge handler (`POST /api/content/media` → `handleCreate`), and a browser then loads it from `/api/media/…`
 // (`handleFile`). Physical evidence is read straight from the durable stores —
 //   node:       libSQL file + the real Garage bucket (GetObject through the AWS SDK)
 //   cloudflare: the local D1 SQLite file + the local R2 object index Miniflare persists under `--persist-to`
@@ -118,7 +118,7 @@ async function upload(adminPage, { name, type, bytes, visibility }) {
       const form = new FormData();
       form.set('file', new File([new Uint8Array(bytes)], name, { type }));
       form.set('visibility', visibility);
-      const response = await fetch('/api/v1/media', {
+      const response = await fetch('/api/content/media', {
         method: 'POST',
         body: form,
         credentials: 'same-origin'
@@ -244,13 +244,13 @@ export async function durableFileJourney(ctx) {
     // --- 4. the canonical delete removes document and physical object ------------------------------------
     for (const doc of [publicDoc, privateDoc]) {
       const status = await ctx.adminPage.evaluate(async (id) => {
-        const response = await fetch(`/api/v1/media/${id}`, {
+        const response = await fetch(`/api/content/media/${id}`, {
           method: 'DELETE',
           credentials: 'same-origin'
         });
         return response.status;
       }, doc.id);
-      if (status !== 204) fail(`DELETE /api/v1/media/${doc.id} answered ${status}`);
+      if (status !== 204) fail(`DELETE /api/content/media/${doc.id} answered ${status}`);
     }
     const gone = await anonymousGet(browser, ctx.origin(), publicDoc.url);
     if (gone.status !== 404) fail(`a deleted file answered ${gone.status}`);

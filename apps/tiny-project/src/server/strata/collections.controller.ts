@@ -10,11 +10,11 @@ import { createForgeReadContext } from './forge-read-context';
  * pagination and the response envelope all stay in `@forge-cms/runtime`; the returned `Response`
  * goes back to Nitro untouched.
  *
- * Reads only. `POST /api/v1/:collection` and `PUT`/`DELETE /api/v1/:collection/:id` stay H3 file
+ * Reads only. `POST /api/content/:collection` and `PUT`/`DELETE /api/content/:collection/:id` stay H3 file
  * routes: they need the request body and a real origin for CSRF, which Strata 0.1.0 cannot provide
  * (see `createForgeReadContext`).
  */
-@Controller('/api/v1')
+@Controller('/api/content')
 export class CollectionsController {
   @Get('/:collection')
   async list(request: StrataAnalogRequest): Promise<Response> {

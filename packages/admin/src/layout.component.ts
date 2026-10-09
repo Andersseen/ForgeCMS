@@ -28,8 +28,9 @@ import {
   LmnSunIcon,
   LmnUsersIcon
 } from 'lumen-icons';
-import { DEFAULT_ADMIN_NAV } from './config.js';
+import { adminNavFor } from './config.js';
 import type { ForgeAdminConfig, ForgeAdminNavGroup, ForgeAdminNavItem } from './config.js';
+import { isUnderPath, normalizeAdminBasePath } from './mount-path.js';
 import { ThemeService } from './theme.service.js';
 
 interface BreadcrumbItem {
@@ -240,11 +241,16 @@ export class ForgeAdminLayoutComponent {
 
   /** Configured navigation, or the built-in default. */
   protected readonly navGroups = computed<ForgeAdminNavGroup[]>(
-    () => this.config()?.nav ?? DEFAULT_ADMIN_NAV
+    () => this.config()?.nav ?? adminNavFor(this.basePath())
   );
 
+  /** The mount root — see `ForgeAdminConfig.basePath`. */
+  protected readonly basePath = computed(() => normalizeAdminBasePath(this.config()?.basePath));
+
   /** Where "Log in" and post-logout redirect go — see `ForgeAdminConfig.signInPath`. */
-  protected readonly signInPath = computed(() => this.config()?.signInPath ?? '/admin/login');
+  protected readonly signInPath = computed(
+    () => this.config()?.signInPath ?? `${this.basePath()}/login`
+  );
 
   /** Hides admin-only entries from editors and viewers. */
   protected visibleItems(group: ForgeAdminNavGroup): ForgeAdminNavItem[] {
@@ -274,16 +280,16 @@ export class ForgeAdminLayoutComponent {
 
   protected readonly canManageUsers = canManageUsers;
 
-  private routeChanges = toSignal(
+  private readonly url = toSignal(
     this.router.events.pipe(
       filter((e): e is NavigationEnd => e instanceof NavigationEnd),
-      startWith(null),
-      map((): BreadcrumbItem[] => this.buildBreadcrumbs())
+      map(() => this.router.url),
+      startWith(this.router.url)
     ),
-    { initialValue: [{ label: 'Dashboard' }] as BreadcrumbItem[] }
+    { initialValue: this.router.url }
   );
 
-  breadcrumbs = computed<BreadcrumbItem[]>(() => this.routeChanges());
+  breadcrumbs = computed<BreadcrumbItem[]>(() => this.buildBreadcrumbs(this.url()));
 
   /** Clears the session (server cookie + local state) and returns to sign-in. */
   protected async logout(): Promise<void> {
@@ -291,24 +297,30 @@ export class ForgeAdminLayoutComponent {
     await this.router.navigateByUrl(this.signInPath());
   }
 
-  private buildBreadcrumbs(): BreadcrumbItem[] {
-    const crumbs: BreadcrumbItem[] = [{ label: 'Admin', routerLink: '/admin' }];
-    const url = this.router.url;
+  private buildBreadcrumbs(url: string): BreadcrumbItem[] {
+    const base = this.basePath();
+    const crumbs: BreadcrumbItem[] = [{ label: 'Admin', routerLink: base }];
+    const pathname = url.split(/[?#]/, 1)[0] ?? url;
 
-    if (url === '/admin') {
+    if (pathname === base || pathname === `${base}/`) {
       crumbs.push({ label: 'Dashboard' });
-    } else if (url.startsWith('/admin/collections')) {
-      crumbs.push({ label: 'Collections', routerLink: '/admin/collections' });
-    } else if (url.startsWith('/admin/media')) {
-      crumbs.push({ label: 'Media Library', routerLink: '/admin/media' });
-    } else if (url.startsWith('/admin/users')) {
-      crumbs.push({ label: 'Users', routerLink: '/admin/users' });
-    } else if (url.startsWith('/admin/api')) {
-      crumbs.push({ label: 'API Keys', routerLink: '/admin/api' });
-    } else if (url.startsWith('/admin/settings')) {
-      crumbs.push({ label: 'Settings', routerLink: '/admin/settings' });
+      return crumbs;
     }
 
+    const sections: Array<[string, string]> = [
+      ['collections', 'Collections'],
+      ['media', 'Media Library'],
+      ['users', 'Users'],
+      ['api', 'API Keys'],
+      ['settings', 'Settings']
+    ];
+    for (const [segment, label] of sections) {
+      const target = `${base}/${segment}`;
+      if (isUnderPath(pathname, target)) {
+        crumbs.push({ label, routerLink: target });
+        break;
+      }
+    }
     return crumbs;
   }
 }

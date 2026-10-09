@@ -20,7 +20,7 @@ export interface ServerEnv extends S3Env, ProfileEnv {
   /** A libSQL URL (`file:/data/forge.db`, `libsql://…`): with S3, selects the portable profile (libSQL + S3). */
   DATABASE_URL?: string;
   AUTH_SECRET?: string;
-  /** Opt-in flag for `POST /api/auth/signup` — unset (disabled) by default, matching apps/www. */
+  /** Opt-in flag for `POST /api/account/signup` — unset (disabled) by default, matching apps/www. */
   FORGE_ENABLE_SIGNUP?: string;
 }
 

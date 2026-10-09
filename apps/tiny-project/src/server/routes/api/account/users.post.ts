@@ -7,7 +7,7 @@ import {
   requireAdminAuth
 } from '../../../api/auth-request';
 
-/** POST /api/auth/users — creates a new user. Admin-only. */
+/** POST /api/account/users — creates a new user. Admin-only. */
 export default defineEventHandler(async (event) => {
   // Authenticate first (headers only), then read a bounded body: an anonymous caller can no longer
   // make this route buffer a body at all (spec 069).

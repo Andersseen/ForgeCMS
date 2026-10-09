@@ -86,7 +86,7 @@ post lifecycle (create/draft-hidden/publish/edit/delete), the author relation, a
   (`e2e/golden-path.spec.ts`).
 - **Admin:** `@forge-cms/admin`'s auth, content and users routes, with no host CRUD pages.
 - **Relations:** `post.author -> users`, populated with `depth=1` according to the caller's access.
-- **Strata read controllers:** `GET /api/v1/:collection` and `GET /api/v1/:collection/:id`.
+- **Strata read controllers:** `GET /api/content/:collection` and `GET /api/content/:collection/:id`.
 - **Server rendering (spec 078):** `ssr: true`. `src/main.server.ts` renders each request with
   Angular's `renderApplication`, the request's headers as `REQUEST`, and
   `provideForgeCmsServer({ origin })` (`FORGE_SSR_ORIGIN`, or `http://127.0.0.1:5175` under `pnpm dev`; a
@@ -103,8 +103,8 @@ ForgeCMS does not depend on Strata; this app does, from npm (`@strata-sc/core` a
 `@strata-sc/analog` 0.1.0), as an external consumer. Strata owns transport; Forge owns CMS behaviour.
 
 ```
-GET /api/v1/:collection      → CollectionsController.list → handleList
-GET /api/v1/:collection/:id  → CollectionsController.read → handleRead
+GET /api/content/:collection      → CollectionsController.list → handleList
+GET /api/content/:collection/:id  → CollectionsController.read → handleRead
 POST/PUT/DELETE, auth, bootstrap → H3 file routes (unchanged)
 ```
 

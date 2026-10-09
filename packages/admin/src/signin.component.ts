@@ -14,6 +14,7 @@ import { ForgeAuthSession } from '@forge-cms/angular';
 import { VoltButton, VoltCard, VoltInput } from '@voltui/components';
 import { LmnEyeIcon, LmnEyeSlashIcon } from 'lumen-icons';
 import { describeSessionError } from './admin-error.js';
+import { normalizeAdminBasePath } from './mount-path.js';
 import { safeAdminRedirect } from './safe-redirect.js';
 
 /**
@@ -108,12 +109,15 @@ export class ForgeSignInComponent {
   /** Route to a sign-up page. Omit (the default) to render no sign-up link at all. */
   readonly signUpPath = input<string>();
   /** Where to land after a successful sign-in when no `returnUrl` query param is present. Defaults
-   *  to `/admin`. Deliberately not an `input()` default value: Angular Router's
+   *  to the mount root (`/admin` by default). Deliberately not an `input()` default value: Angular Router's
    *  `withComponentInputBinding()` calls `setInput(name, data[name])` for every declared input on
    *  every route-data emission, which overwrites an `input()` default with `undefined` the moment a
    *  route-instantiated component like this one activates with no matching route data/param/query key
    *  — the fallback has to be applied on read instead. */
   readonly redirectTo = input<string>();
+  /** The admin mount root (`forgeAdminAuthRoutes({ basePath })` supplies it). Defaults to `/admin`;
+   *  `returnUrl` and `redirectTo` must stay under it. Applied on read, like `redirectTo`. */
+  readonly basePath = input<string>();
 
   protected readonly session = inject(ForgeAuthSession);
   protected readonly describeError = describeSessionError;
@@ -141,8 +145,9 @@ export class ForgeSignInComponent {
     }
     if (this.session.authenticated()) {
       const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
-      const fallback = safeAdminRedirect(this.redirectTo(), '/admin');
-      await this.router.navigateByUrl(safeAdminRedirect(returnUrl, fallback));
+      const root = normalizeAdminBasePath(this.basePath());
+      const fallback = safeAdminRedirect(this.redirectTo(), root, root);
+      await this.router.navigateByUrl(safeAdminRedirect(returnUrl, fallback, root));
     }
   }
 }

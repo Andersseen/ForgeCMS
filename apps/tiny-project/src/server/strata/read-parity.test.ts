@@ -87,8 +87,8 @@ async function expectParity(path: string, headers: HeadersInit = {}) {
 
 beforeAll(async () => {
   const legacyRouter = createRouter()
-    .get('/api/v1/:collection', legacyH3List)
-    .get('/api/v1/:collection/:id', legacyH3Read);
+    .get('/api/content/:collection', legacyH3List)
+    .get('/api/content/:collection/:id', legacyH3Read);
   h3 = toWebHandler(createApp().use(legacyRouter));
 
   const strataRouter = createRouter();
@@ -120,19 +120,19 @@ beforeAll(async () => {
   draftId = String(draft.id);
 });
 
-describe('GET /api/v1/:collection/:id — Strata matches H3', () => {
+describe('GET /api/content/:collection/:id — Strata matches H3', () => {
   it('a published document, anonymously', async () => {
-    const result = await expectParity(`/api/v1/posts/${publishedId}`);
+    const result = await expectParity(`/api/content/posts/${publishedId}`);
     expect(result.status).toBe(200);
     expect(result.body).toMatchObject({ data: { id: publishedId, title: 'Parity published' } });
   });
 
   it("with relation depth: population follows the caller's access to the target", async () => {
     // `users` is not publicly readable, so an anonymous caller gets `author: null`, not the user.
-    const anonymous = await expectParity(`/api/v1/posts/${publishedId}?depth=1`);
+    const anonymous = await expectParity(`/api/content/posts/${publishedId}?depth=1`);
     expect(anonymous.body).toMatchObject({ data: { author: null } });
 
-    const admin = await expectParity(`/api/v1/posts/${publishedId}?depth=1`, {
+    const admin = await expectParity(`/api/content/posts/${publishedId}?depth=1`, {
       authorization: `Bearer ${adminToken}`
     });
     expect(admin.body).toMatchObject({ data: { author: { email: 'parity-admin@example.com' } } });
@@ -141,16 +141,16 @@ describe('GET /api/v1/:collection/:id — Strata matches H3', () => {
   });
 
   it('a draft is a 404 for an anonymous caller', async () => {
-    const result = await expectParity(`/api/v1/posts/${draftId}`);
+    const result = await expectParity(`/api/content/posts/${draftId}`);
     expect(result.status).toBe(404);
     expect(result.body).toEqual({ error: expect.objectContaining({ code: 'NOT_FOUND' }) });
   });
 
   it('a draft is readable with a Bearer token and with the session cookie', async () => {
-    const bearer = await expectParity(`/api/v1/posts/${draftId}?status=all`, {
+    const bearer = await expectParity(`/api/content/posts/${draftId}?status=all`, {
       authorization: `Bearer ${adminToken}`
     });
-    const cookie = await expectParity(`/api/v1/posts/${draftId}?status=all`, {
+    const cookie = await expectParity(`/api/content/posts/${draftId}?status=all`, {
       cookie: `forge_session=${adminToken}`
     });
     expect(bearer.status).toBe(200);
@@ -158,19 +158,19 @@ describe('GET /api/v1/:collection/:id — Strata matches H3', () => {
   });
 
   it('an unverifiable token is treated the same way: as anonymous, never as the admin', async () => {
-    const published = await expectParity(`/api/v1/posts/${publishedId}`, {
+    const published = await expectParity(`/api/content/posts/${publishedId}`, {
       authorization: 'Bearer not-a-real-token'
     });
     expect(published.status).toBe(200);
-    const draft = await expectParity(`/api/v1/posts/${draftId}?status=all`, {
+    const draft = await expectParity(`/api/content/posts/${draftId}?status=all`, {
       authorization: 'Bearer not-a-real-token'
     });
     expect(draft.status).not.toBe(200);
   });
 
   it('a missing id and an unknown collection', async () => {
-    expect((await expectParity('/api/v1/posts/does-not-exist')).status).toBe(404);
-    const unknown = await expectParity(`/api/v1/nope/${publishedId}`);
+    expect((await expectParity('/api/content/posts/does-not-exist')).status).toBe(404);
+    const unknown = await expectParity(`/api/content/nope/${publishedId}`);
     expect(unknown.status).toBe(404);
     expect(unknown.body).toEqual({
       error: { code: 'NOT_FOUND', message: "Collection 'nope' not found" }
@@ -182,9 +182,9 @@ describe('GET /api/v1/:collection/:id — Strata matches H3', () => {
     const users = await runtime.find({ collection: 'users', limit: 1 });
     const userId = String(users.docs[0]?.id);
 
-    const anonymous = await expectParity(`/api/v1/users/${userId}`);
+    const anonymous = await expectParity(`/api/content/users/${userId}`);
     expect(anonymous.status).not.toBe(200);
-    const admin = await expectParity(`/api/v1/users/${userId}`, {
+    const admin = await expectParity(`/api/content/users/${userId}`, {
       authorization: `Bearer ${adminToken}`
     });
     expect(admin.status).toBe(200);
@@ -192,10 +192,10 @@ describe('GET /api/v1/:collection/:id — Strata matches H3', () => {
   });
 });
 
-describe('GET /api/v1/:collection — Strata still matches H3', () => {
+describe('GET /api/content/:collection — Strata still matches H3', () => {
   it('query string, filters, sort, pagination and the envelope', async () => {
     const result = await expectParity(
-      '/api/v1/posts?status=all&sort=title&order=asc&limit=1&offset=0',
+      '/api/content/posts?status=all&sort=title&order=asc&limit=1&offset=0',
       { authorization: `Bearer ${adminToken}` }
     );
     expect(result.status).toBe(200);
@@ -203,9 +203,9 @@ describe('GET /api/v1/:collection — Strata still matches H3', () => {
   });
 
   it('drafts stay hidden from an anonymous list; bad queries are the same 400', async () => {
-    const anonymous = await expectParity('/api/v1/posts?title=Parity%20draft');
+    const anonymous = await expectParity('/api/content/posts?title=Parity%20draft');
     expect(anonymous.body).toMatchObject({ data: [] });
-    const invalid = await expectParity('/api/v1/posts?limit=abc');
+    const invalid = await expectParity('/api/content/posts?limit=abc');
     expect(invalid.status).toBe(400);
   });
 });

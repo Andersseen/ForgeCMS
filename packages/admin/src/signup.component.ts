@@ -14,6 +14,7 @@ import { ForgeAuthSession } from '@forge-cms/angular';
 import { VoltButton, VoltCard, VoltInput } from '@voltui/components';
 import { LmnEyeIcon, LmnEyeSlashIcon } from 'lumen-icons';
 import { describeSessionError } from './admin-error.js';
+import { normalizeAdminBasePath } from './mount-path.js';
 
 /**
  * Reusable, optional sign-up page for `@forge-cms/admin` consumers (spec 054). Has no `role` field —
@@ -105,9 +106,12 @@ import { describeSessionError } from './admin-error.js';
   `
 })
 export class ForgeSignUpComponent {
-  /** Where to land after a successful signup. Defaults to `/admin`. Not an `input()` default value —
+  /** Where to land after a successful signup. Defaults to the mount root (`/admin`). Not an `input()` default value —
    *  see `ForgeSignInComponent.redirectTo`'s doc comment for why. */
   readonly redirectTo = input<string>();
+  /** The admin mount root (`forgeAdminAuthRoutes({ basePath })` supplies it). Defaults to `/admin`;
+   *  it is where signup lands when `redirectTo` is not set. */
+  readonly basePath = input<string>();
 
   protected readonly session = inject(ForgeAuthSession);
   protected readonly describeError = describeSessionError;
@@ -132,7 +136,7 @@ export class ForgeSignUpComponent {
       ...(name && { name })
     });
     if (this.session.authenticated()) {
-      await this.router.navigateByUrl(this.redirectTo() ?? '/admin');
+      await this.router.navigateByUrl(this.redirectTo() ?? normalizeAdminBasePath(this.basePath()));
       return;
     }
     // The submit button was disabled while the request ran, which dropped focus: put it back on the form.

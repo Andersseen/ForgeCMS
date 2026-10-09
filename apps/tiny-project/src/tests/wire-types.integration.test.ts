@@ -123,11 +123,11 @@ function router(runtime: ForgeCmsRuntime) {
       params,
       env: undefined
     });
-    if (url.pathname === '/api/auth/login' && request.method === 'POST') {
+    if (url.pathname === '/api/account/login' && request.method === 'POST') {
       return handleLogin(context(), { runtime, cookie: { secure: false } });
     }
     const [collection, id] = url.pathname
-      .replace(/^\/api\/v1\//, '')
+      .replace(/^\/api\/content\//, '')
       .split('/')
       .map((segment) => decodeURIComponent(segment));
     if (collection === 'globals' && id !== undefined) {
@@ -174,8 +174,8 @@ function clients(origin: string) {
       {
         provide: FORGE_CMS_CONFIG,
         useValue: {
-          baseUrl: `${origin}/api/v1`,
-          authBaseUrl: `${origin}/api/auth`,
+          baseUrl: `${origin}/api/content`,
+          authBaseUrl: `${origin}/api/account`,
           trustedOrigins: [origin],
           transport: browserTransport(origin)
         }

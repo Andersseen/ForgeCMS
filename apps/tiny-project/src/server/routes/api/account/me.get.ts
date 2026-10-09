@@ -3,7 +3,7 @@ import type { ApiContext } from '@forge-cms/api';
 import { handleMe } from '@forge-cms/runtime';
 import { getServerRuntime } from '../../../api/runtime';
 
-/** GET /api/auth/me — thin wrapper over `handleMe`. */
+/** GET /api/account/me — thin wrapper over `handleMe`. */
 export default defineEventHandler(async (event) => {
   const runtime = await getServerRuntime(event.context.cloudflare?.env);
   const context: ApiContext = {

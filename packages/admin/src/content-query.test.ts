@@ -147,10 +147,7 @@ describe('visibleCollections', () => {
 
   it('filters and orders by the restriction, dropping slugs the API never returned', () => {
     const result = visibleCollections([posts, pages], {
-      collections: [
-        { slug: 'pages', fields: {} },
-        { slug: 'missing', fields: {} }
-      ]
+      collections: [{ slug: 'pages' }, { slug: 'missing' }]
     });
     expect(result).toEqual([pages]);
   });

@@ -1,4 +1,3 @@
-import type { CollectionDefinition } from '@forge-cms/core';
 import type { CollectionMeta, QueryOptions } from '@forge-cms/angular';
 import type { ForgeAdminConfig } from './config.js';
 import type { SortRequest } from './collection-list.component.js';
@@ -72,6 +71,6 @@ export function visibleCollections(
 
   const bySlug = new Map(all.map((meta) => [meta.slug, meta]));
   return restriction
-    .map((collection: CollectionDefinition) => bySlug.get(collection.slug))
+    .map((collection) => bySlug.get(collection.slug))
     .filter((meta): meta is CollectionMeta => meta !== undefined);
 }

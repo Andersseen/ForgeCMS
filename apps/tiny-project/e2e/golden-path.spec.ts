@@ -37,24 +37,24 @@ async function hydrated(page: Page) {
 }
 
 async function loginAs(page: Page, email: string, password: string) {
-  await page.goto('/admin/login');
+  await page.goto('/studio/login');
   await hydrated(page);
   await page.locator('input#forge-signin-email').fill(email);
   await page.locator('input#forge-signin-password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL('**/admin/collections**');
+  await page.waitForURL('**/studio/collections**');
 }
 
 async function logout(page: Page) {
   await page.getByRole('button', { name: /log out/i }).click();
-  await page.waitForURL('**/admin/login**');
+  await page.waitForURL('**/studio/login**');
 }
 
 test('anonymous cannot reach a nested admin URL; the public site shows no posts yet', async ({
   page
 }) => {
-  await page.goto('/admin/collections/posts');
-  await page.waitForURL('**/admin/login**');
+  await page.goto('/studio/collections/posts');
+  await page.waitForURL('**/studio/login**');
 
   await page.goto('/');
   await expect(page.getByText('No published posts yet.')).toBeVisible();
@@ -90,7 +90,7 @@ test('hydration (spec 080): the browser reuses the server-rendered public read �
   page.on('pageerror', (error) => problems.push(error.message));
   const reads: string[] = [];
   page.on('request', (request) => {
-    if (new URL(request.url()).pathname.startsWith('/api/v1/posts')) reads.push(request.url());
+    if (new URL(request.url()).pathname.startsWith('/api/content/posts')) reads.push(request.url());
   });
 
   await page.goto('/');
@@ -114,15 +114,15 @@ test('first-run bootstrap creates the admin and signs them straight in', async (
   await page.locator('input[name="password"]').fill(ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Create admin' }).click();
 
-  await page.waitForURL('**/admin/collections**');
+  await page.waitForURL('**/studio/collections**');
 
   // Cookie session survives a real reload.
   await page.reload();
-  await expect(page).toHaveURL(/\/admin\/collections$/);
+  await expect(page).toHaveURL(/\/studio\/collections$/);
 
   // Direct refresh of a nested admin URL while authenticated works, not just SPA navigation.
-  await page.goto('/admin/collections/posts');
-  await expect(page).toHaveURL(/\/admin\/collections\/posts$/);
+  await page.goto('/studio/collections/posts');
+  await expect(page).toHaveURL(/\/studio\/collections\/posts$/);
 });
 
 test('a second bootstrap attempt is refused once an admin exists', async ({ page }) => {
@@ -143,9 +143,9 @@ test('content admin: create a post with a relation, verify draft is hidden, publ
 
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
 
-  await page.goto('/admin/collections/posts');
+  await page.goto('/studio/collections/posts');
   await page.getByRole('button', { name: 'New' }).click();
-  await expect(page).toHaveURL(/\/admin\/collections\/posts\/new$/);
+  await expect(page).toHaveURL(/\/studio\/collections\/posts\/new$/);
 
   await page.locator('input#title').fill(title);
   await page.locator('input#slug').fill(slug);
@@ -155,7 +155,7 @@ test('content admin: create a post with a relation, verify draft is hidden, publ
   await page.getByRole('button', { name: /admin@tiny\.e2e\.test/ }).click();
 
   await page.getByRole('button', { name: 'Create' }).click();
-  await expect(page).toHaveURL(/\/admin\/collections\/posts$/);
+  await expect(page).toHaveURL(/\/studio\/collections\/posts$/);
 
   const row = page.locator('volt-table-row', { hasText: title });
   await expect(row).toBeVisible();
@@ -166,7 +166,7 @@ test('content admin: create a post with a relation, verify draft is hidden, publ
   await page.goto('/');
   await expect(page.getByRole('link', { name: title })).toHaveCount(0);
 
-  await page.goto('/admin/collections/posts');
+  await page.goto('/studio/collections/posts');
   const rowAgain = page.locator('volt-table-row', { hasText: title });
   await rowAgain.getByRole('button', { name: /^Publish/ }).click();
   await expect(rowAgain.getByText('Published', { exact: true })).toBeVisible();
@@ -189,7 +189,7 @@ test('content admin: create a post with a relation, verify draft is hidden, publ
   await anonymous.dispose();
 
   // Edit.
-  await page.goto('/admin/collections/posts');
+  await page.goto('/studio/collections/posts');
   await page
     .locator('volt-table-row', { hasText: title })
     .getByRole('button', { name: /^Edit/ })
@@ -204,12 +204,12 @@ test('validation error UX: a required field is left blank shows a real message',
   page
 }) => {
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
-  await page.goto('/admin/collections/posts/new');
+  await page.goto('/studio/collections/posts/new');
   await page.getByRole('button', { name: 'Create' }).click();
 
   // A human-readable message, not "[object Object]", raw SQL, or a silent no-op.
   await expect(page.getByText('[object Object]')).toHaveCount(0);
-  await expect(page).toHaveURL(/\/admin\/collections\/posts\/new$/);
+  await expect(page).toHaveURL(/\/studio\/collections\/posts\/new$/);
 });
 
 test('U01 (spec 085): a server-rejected save keeps every entered value; the corrected retry succeeds exactly once', async ({
@@ -220,13 +220,13 @@ test('U01 (spec 085): a server-rejected save keeps every entered value; the corr
   const slug = `reliable-${stamp}`;
   const created: number[] = [];
   page.on('response', (response) => {
-    if (response.request().method() === 'POST' && /\/api\/v1\/posts$/.test(response.url())) {
+    if (response.request().method() === 'POST' && /\/api\/content\/posts$/.test(response.url())) {
       created.push(response.status());
     }
   });
 
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
-  await page.goto('/admin/collections/posts/new');
+  await page.goto('/studio/collections/posts/new');
   await hydrated(page);
   await page.locator('input#title').fill(title);
   await page.locator('input#slug').fill(slug);
@@ -234,7 +234,7 @@ test('U01 (spec 085): a server-rejected save keeps every entered value; the corr
   // `author` is a required relation: the real server rejects the first attempt.
   await page.getByRole('button', { name: 'Create' }).click();
   await expect(page.getByText('Fix the highlighted fields and try again.')).toBeVisible();
-  await expect(page).toHaveURL(/\/admin\/collections\/posts\/new$/);
+  await expect(page).toHaveURL(/\/studio\/collections\/posts\/new$/);
   await expect(page.locator('input#title')).toHaveValue(title);
   await expect(page.locator('input#slug')).toHaveValue(slug);
   await expect(page.getByRole('button', { name: 'Create' })).toBeEnabled();
@@ -242,7 +242,7 @@ test('U01 (spec 085): a server-rejected save keeps every entered value; the corr
   await page.locator('input#author').fill(ADMIN_EMAIL);
   await page.getByRole('button', { name: new RegExp(ADMIN_EMAIL.replace('.', '\\.')) }).click();
   await page.getByRole('button', { name: 'Create' }).click();
-  await expect(page).toHaveURL(/\/admin\/collections\/posts$/);
+  await expect(page).toHaveURL(/\/studio\/collections\/posts$/);
   await expect(page.locator('volt-table-row', { hasText: title })).toBeVisible();
 
   expect(created.filter((status) => status === 201)).toHaveLength(1);
@@ -253,7 +253,7 @@ test('U01 (spec 085): search and filter survive an editor round trip; a dirty ed
   page
 }) => {
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
-  await page.goto('/admin/collections/posts');
+  await page.goto('/studio/collections/posts');
   await hydrated(page);
 
   await page.locator('input[placeholder="Search…"]').fill('Reliable');
@@ -261,11 +261,11 @@ test('U01 (spec 085): search and filter survive an editor round trip; a dirty ed
   const row = page.locator('volt-table-row', { hasText: 'Reliable' }).first();
   await expect(row).toBeVisible();
   await row.getByRole('button', { name: /^Edit/ }).click();
-  await expect(page).toHaveURL(/\/admin\/collections\/posts\/[^/]+$/);
+  await expect(page).toHaveURL(/\/studio\/collections\/posts\/[^/]+$/);
 
   // Clean editor: leaving does not prompt, and the list is exactly as it was left.
   await page.getByRole('button', { name: 'Cancel' }).click();
-  await expect(page).toHaveURL(/\/admin\/collections\/posts$/);
+  await expect(page).toHaveURL(/\/studio\/collections\/posts$/);
   await expect(page.locator('input[placeholder="Search…"]')).toHaveValue('Reliable');
   await expect(page.locator('volt-table-row', { hasText: 'Reliable' }).first()).toBeVisible();
 
@@ -286,13 +286,13 @@ test('U01 (spec 085): search and filter survive an editor round trip; a dirty ed
   await expect(leave).toBeVisible();
   await leave.getByRole('button', { name: 'Stay' }).click();
   await expect(leave).toHaveCount(0);
-  await expect(page).toHaveURL(/\/admin\/collections\/posts\/[^/]+$/);
+  await expect(page).toHaveURL(/\/studio\/collections\/posts\/[^/]+$/);
   await expect(page.locator('input#title')).toHaveValue('Reliable but changed');
 
   // Leaving lets go — and the filters are still there on return.
   await page.getByRole('button', { name: 'Cancel' }).click();
   await leave.getByRole('button', { name: 'Leave without saving' }).click();
-  await expect(page).toHaveURL(/\/admin\/collections\/posts$/);
+  await expect(page).toHaveURL(/\/studio\/collections\/posts$/);
   await expect(page.locator('input[placeholder="Search…"]')).toHaveValue('Reliable');
   expect(nativePrompts).toBe(0);
 });
@@ -301,7 +301,7 @@ test('U01 (spec 085): cancelling a delete sends nothing; the row goes only after
   page
 }) => {
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
-  await page.goto('/admin/collections/posts');
+  await page.goto('/studio/collections/posts');
   await hydrated(page);
 
   const deletes: number[] = [];
@@ -377,7 +377,7 @@ test('U02 (spec 086): a keyboard-only editor signs in, corrects a server validat
   const row = () => page.locator('volt-table-row', { hasText: title });
 
   // --- sign in, with Tab and Enter only ---------------------------------------------------------
-  await page.goto('/admin/login');
+  await page.goto('/studio/login');
   await hydrated(page);
   await page.locator('input#forge-signin-email').focus();
   await page.keyboard.type(ADMIN_EMAIL);
@@ -385,16 +385,16 @@ test('U02 (spec 086): a keyboard-only editor signs in, corrects a server validat
   await expect(focused(page)).toHaveAttribute('id', 'forge-signin-password');
   await page.keyboard.type(ADMIN_PASSWORD);
   await page.keyboard.press('Enter');
-  await page.waitForURL('**/admin/collections**');
+  await page.waitForURL('**/studio/collections**');
 
   // --- Posts → New (Enter on real controls) -----------------------------------------------------
   await page.getByRole('link', { name: /Posts/ }).first().focus();
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/admin\/collections\/posts$/);
+  await expect(page).toHaveURL(/\/studio\/collections\/posts$/);
   const newButton = page.getByRole('button', { name: 'New', exact: true });
   await newButton.focus();
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/admin\/collections\/posts\/new$/);
+  await expect(page).toHaveURL(/\/studio\/collections\/posts\/new$/);
 
   // Modal focus: inside on open, and Tab / Shift+Tab never leave it.
   const dialog = '[role="dialog"][aria-labelledby="forge-collection-form-title"]';
@@ -453,7 +453,7 @@ test('U02 (spec 086): a keyboard-only editor signs in, corrects a server validat
   // --- save (Enter in a field), publish, edit ---------------------------------------------------
   await page.locator('input#title').focus();
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/admin\/collections\/posts$/);
+  await expect(page).toHaveURL(/\/studio\/collections\/posts$/);
   await expect(row()).toBeVisible();
   await expectAccessible(page, 'collection workspace');
 
@@ -486,7 +486,7 @@ test('U02 (spec 086): a keyboard-only editor signs in, corrects a server validat
   await leave.getByRole('button', { name: 'Stay' }).focus();
   await page.keyboard.press('Enter');
   await expect(leave).toHaveCount(0);
-  await expect(page).toHaveURL(/\/admin\/collections\/posts\/[^/]+$/);
+  await expect(page).toHaveURL(/\/studio\/collections\/posts\/[^/]+$/);
   await expect(page.locator('input#title')).toHaveValue(`${title} (edited)`);
   await expect(page.locator('input#title')).toBeFocused(); // back where the editor pressed Escape
 
@@ -496,7 +496,7 @@ test('U02 (spec 086): a keyboard-only editor signs in, corrects a server validat
   await expect(leave).toBeVisible();
   await leave.getByRole('button', { name: 'Leave without saving' }).focus();
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/admin\/collections\/posts$/);
+  await expect(page).toHaveURL(/\/studio\/collections\/posts$/);
   await expect(row()).toBeVisible();
   await expect(row().getByRole('button', { name: /^Edit/ })).toBeFocused(); // what opened the editor
   await expect(page.locator('volt-table-row', { hasText: `${title} (edited)` })).toHaveCount(0);
@@ -524,13 +524,13 @@ test('U02 (spec 086): a keyboard-only editor signs in, corrects a server validat
   const logoutButton = page.getByRole('button', { name: /log out/i });
   await logoutButton.focus();
   await page.keyboard.press('Enter');
-  await page.waitForURL('**/admin/login**');
+  await page.waitForURL('**/studio/login**');
 });
 
 test('U02 (spec 086): sign-in, the content list and the users workspace have no WCAG AA violations', async ({
   page
 }) => {
-  await page.goto('/admin/login');
+  await page.goto('/studio/login');
   await hydrated(page);
   await expectAccessible(page, 'sign in');
 
@@ -546,12 +546,12 @@ test('U02 (spec 086): sign-in, the content list and the users workspace have no 
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await expectAccessible(page, 'collections index');
 
-  await page.goto('/admin/collections/posts');
+  await page.goto('/studio/collections/posts');
   await hydrated(page);
   await expect(page.locator('volt-table-row').nth(1)).toBeVisible();
   await expectAccessible(page, 'collection workspace');
 
-  await page.goto('/admin/users');
+  await page.goto('/studio/users');
   await hydrated(page);
   await expect(page.getByRole('heading', { name: 'Users', level: 1 })).toBeVisible();
   await expect(page.locator('volt-table-row').nth(1)).toBeVisible();
@@ -566,7 +566,7 @@ test('U02 (spec 086): the empty editor and its error state have no WCAG AA viola
   page
 }) => {
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
-  await page.goto('/admin/collections/posts/new');
+  await page.goto('/studio/collections/posts/new');
   await hydrated(page);
   await expectAccessible(page, 'document editor');
 
@@ -580,7 +580,7 @@ test('U01 (spec 085): a session that ends mid-edit is rejected by the real serve
   context
 }) => {
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
-  await page.goto('/admin/collections/posts');
+  await page.goto('/studio/collections/posts');
   await hydrated(page);
   await page
     .locator('volt-table-row')
@@ -593,7 +593,9 @@ test('U01 (spec 085): a session that ends mid-edit is rejected by the real serve
 
   // Another tab signs this account out (same cookie jar, real server-side logout).
   const other = await context.newPage();
-  const loggedOut = await other.request.post('/api/auth/logout', { headers: SAME_ORIGIN_HEADERS });
+  const loggedOut = await other.request.post('/api/account/logout', {
+    headers: SAME_ORIGIN_HEADERS
+  });
   expect(loggedOut.ok()).toBe(true);
   await other.close();
 
@@ -604,7 +606,7 @@ test('U01 (spec 085): a session that ends mid-edit is rejected by the real serve
   await page.getByRole('button', { name: 'Save' }).click();
 
   await expect(page.getByText(/session expired/i).first()).toBeVisible();
-  await expect(page).toHaveURL(/\/admin\/collections\/posts\/[^/]+$/);
+  await expect(page).toHaveURL(/\/studio\/collections\/posts\/[^/]+$/);
   await expect(page.locator('input#title')).toHaveValue('Edited as the session ends');
   await expect(page.getByRole('button', { name: 'Save' })).toBeDisabled();
   expect(writes).toEqual([401]);
@@ -615,7 +617,7 @@ test('users management: admin creates an editor; the editor cannot manage users 
 }) => {
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
 
-  await page.goto('/admin/users');
+  await page.goto('/studio/users');
   await page.getByRole('button', { name: 'New User' }).click();
   await page.locator('input#forge-user-email').fill(EDITOR_EMAIL);
   await page.locator('select#forge-user-role').selectOption('editor');
@@ -623,7 +625,7 @@ test('users management: admin creates an editor; the editor cannot manage users 
   await page.getByRole('button', { name: 'Create' }).click();
   await expect(page.locator('volt-table-row', { hasText: EDITOR_EMAIL })).toBeVisible();
 
-  const postsBeforeLogout = await page.request.get('/api/v1/posts');
+  const postsBeforeLogout = await page.request.get('/api/content/posts');
   const { data: posts } = (await postsBeforeLogout.json()) as { data: { id: string }[] };
   const postId = posts[0]?.id;
   expect(postId).toBeTruthy();
@@ -632,25 +634,25 @@ test('users management: admin creates an editor; the editor cannot manage users 
   await loginAs(page, EDITOR_EMAIL, EDITOR_PASSWORD);
 
   // Direct nav to an admin-only nested URL redirects the editor away instead of showing the page.
-  await page.goto('/admin/users');
-  await expect(page).not.toHaveURL(/\/admin\/users$/);
+  await page.goto('/studio/users');
+  await expect(page).not.toHaveURL(/\/studio\/users$/);
 
   // Editor may write content... `volt-table-row` is also the header row's tag, which has no
   // "Edit" button — filter to a row that actually has one instead of assuming row order.
-  await page.goto('/admin/collections/posts');
+  await page.goto('/studio/collections/posts');
   const anyRow = page
     .locator('volt-table-row')
     .filter({ has: page.getByRole('button', { name: /^Edit/ }) })
     .first();
   await anyRow.getByRole('button', { name: /^Edit/ }).click();
-  await expect(page).toHaveURL(/\/admin\/collections\/posts\/[^/]+$/);
+  await expect(page).toHaveURL(/\/studio\/collections\/posts\/[^/]+$/);
   await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page).toHaveURL(/\/admin\/collections\/posts$/);
+  await expect(page).toHaveURL(/\/studio\/collections\/posts$/);
 
   // ...but this fixture's own `posts.access.delete` restricts delete to admins only — a
   // collection-specific rule the generic admin UI has no reason to know about, so it is proven at
   // the API boundary (the real backstop) rather than assumed from button visibility.
-  const deleteAttempt = await page.request.delete(`/api/v1/posts/${postId}`, {
+  const deleteAttempt = await page.request.delete(`/api/content/posts/${postId}`, {
     headers: SAME_ORIGIN_HEADERS
   });
   expect(deleteAttempt.status()).toBe(403);
@@ -664,16 +666,16 @@ test('last-admin invariant: the sole admin cannot demote or delete themselves; a
   page
 }) => {
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
-  const me = await (await page.request.get('/api/auth/me')).json();
+  const me = await (await page.request.get('/api/account/me')).json();
   const adminId = me.data.id as string;
 
-  const selfDemote = await page.request.put(`/api/auth/users/${adminId}`, {
+  const selfDemote = await page.request.put(`/api/account/users/${adminId}`, {
     data: { role: 'viewer' },
     headers: { 'content-type': 'application/json', ...SAME_ORIGIN_HEADERS }
   });
   expect(selfDemote.status()).toBe(409);
 
-  const selfDelete = await page.request.delete(`/api/auth/users/${adminId}`, {
+  const selfDelete = await page.request.delete(`/api/account/users/${adminId}`, {
     headers: SAME_ORIGIN_HEADERS
   });
   expect(selfDelete.status()).toBe(409);
@@ -684,12 +686,12 @@ test('last-admin invariant: the sole admin cannot demote or delete themselves; a
   // check. Reads on the same collection keep working and never expose auth-owned fields.
   const jsonHeaders = { 'content-type': 'application/json', ...SAME_ORIGIN_HEADERS };
   const genericAttempts = [
-    await page.request.put(`/api/v1/users/${adminId}`, {
+    await page.request.put(`/api/content/users/${adminId}`, {
       data: { role: 'viewer' },
       headers: jsonHeaders
     }),
-    await page.request.delete(`/api/v1/users/${adminId}`, { headers: SAME_ORIGIN_HEADERS }),
-    await page.request.post('/api/v1/users', {
+    await page.request.delete(`/api/content/users/${adminId}`, { headers: SAME_ORIGIN_HEADERS }),
+    await page.request.post('/api/content/users', {
       data: { email: 'rogue@tiny.e2e.test', role: 'admin' },
       headers: jsonHeaders
     })
@@ -700,7 +702,7 @@ test('last-admin invariant: the sole admin cannot demote or delete themselves; a
     expect(body.error.code).toBe('AUTH_MANAGED_COLLECTION');
     expect(body.error.message).toContain('managed by the configured auth adapter');
   }
-  const usersRead = await page.request.get('/api/v1/users');
+  const usersRead = await page.request.get('/api/content/users');
   expect(usersRead.status()).toBe(200);
   const usersBody = (await usersRead.json()) as { data: Record<string, unknown>[] };
   expect(usersBody.data.some((user) => user['id'] === adminId)).toBe(true);
@@ -710,7 +712,7 @@ test('last-admin invariant: the sole admin cannot demote or delete themselves; a
   }
 
   // A second admin makes both operations legitimate again.
-  await page.goto('/admin/users');
+  await page.goto('/studio/users');
   await page.getByRole('button', { name: 'New User' }).click();
   await page.locator('input#forge-user-email').fill(SECOND_ADMIN_EMAIL);
   await page.locator('select#forge-user-role').selectOption('admin');
@@ -718,7 +720,7 @@ test('last-admin invariant: the sole admin cannot demote or delete themselves; a
   await page.getByRole('button', { name: 'Create' }).click();
   await expect(page.locator('volt-table-row', { hasText: SECOND_ADMIN_EMAIL })).toBeVisible();
 
-  const demoteNowAllowed = await page.request.put(`/api/auth/users/${adminId}`, {
+  const demoteNowAllowed = await page.request.put(`/api/account/users/${adminId}`, {
     data: { role: 'editor' },
     headers: { 'content-type': 'application/json', ...SAME_ORIGIN_HEADERS }
   });
@@ -730,7 +732,7 @@ test('last-admin invariant: the sole admin cannot demote or delete themselves; a
 test('signup is opt-in, cannot select a role, and never elevates past the second-user default', async ({
   page
 }) => {
-  await page.goto('/admin/signup');
+  await page.goto('/studio/signup');
   await hydrated(page);
   await expect(page.locator('select, input[name="role"]')).toHaveCount(0);
 
@@ -738,9 +740,9 @@ test('signup is opt-in, cannot select a role, and never elevates past the second
   await page.locator('input#forge-signup-email').fill(email);
   await page.locator('input#forge-signup-password').fill('viewer-password-123');
   await page.getByRole('button', { name: 'Create account' }).click();
-  await page.waitForURL('**/admin/collections**');
+  await page.waitForURL('**/studio/collections**');
 
-  const me = await page.request.get('/api/auth/me');
+  const me = await page.request.get('/api/account/me');
   expect(me.status()).toBe(200);
   const body = (await me.json()) as { data: { email: string; role: string } };
   expect(body.data.email).toBe(email);
@@ -757,7 +759,7 @@ test('H04: a signup smuggling role/roles/_sessionVersion/passwordHash becomes a 
   request
 }) => {
   const email = `mallory-${Date.now()}@tiny.e2e.test`;
-  const signup = await request.post('/api/auth/signup', {
+  const signup = await request.post('/api/account/signup', {
     data: {
       email,
       password: 'mallory-password-123',
@@ -779,13 +781,13 @@ test('H04: a signup smuggling role/roles/_sessionVersion/passwordHash becomes a 
 
   // The session the cookie carries is live (so `_sessionVersion` was not taken from the body) and is
   // a viewer's: user management stays out of reach.
-  const me = await request.get('/api/auth/me');
+  const me = await request.get('/api/account/me');
   expect(((await me.json()) as { data: { role: string } }).data.role).toBe('viewer');
-  const users = await request.get('/api/auth/users');
+  const users = await request.get('/api/account/users');
   expect(users.status()).toBe(403);
 
   // The submitted password — not the smuggled hash — is the account's password.
-  const login = await request.post('/api/auth/login', {
+  const login = await request.post('/api/account/login', {
     data: { email, password: 'mallory-password-123' },
     headers: { 'content-type': 'application/json' }
   });
@@ -795,7 +797,7 @@ test('H04: a signup smuggling role/roles/_sessionVersion/passwordHash becomes a 
 test('H04: auth bodies are bounded and login failures do not reveal accounts', async ({
   request
 }) => {
-  const oversized = await request.post('/api/auth/login', {
+  const oversized = await request.post('/api/account/login', {
     data: JSON.stringify({ email: ADMIN_EMAIL, password: 'x'.repeat(20_000) }),
     headers: { 'content-type': 'application/json' }
   });
@@ -804,7 +806,7 @@ test('H04: auth bodies are bounded and login failures do not reveal accounts', a
     error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body is too large' }
   });
 
-  const malformed = await request.post('/api/auth/login', {
+  const malformed = await request.post('/api/account/login', {
     data: '{not json',
     headers: { 'content-type': 'application/json' }
   });
@@ -814,7 +816,7 @@ test('H04: auth bodies are bounded and login failures do not reveal accounts', a
   );
 
   const attempt = async (email: string) => {
-    const response = await request.post('/api/auth/login', {
+    const response = await request.post('/api/account/login', {
       data: { email, password: 'definitely-wrong-password' },
       headers: { 'content-type': 'application/json' }
     });
@@ -829,7 +831,7 @@ test('H04: admin user routes authenticate before reading a bounded body; logout 
   page,
   request
 }) => {
-  const anonymous = await request.post('/api/auth/users', {
+  const anonymous = await request.post('/api/account/users', {
     data: JSON.stringify({ email: 'x@tiny.e2e.test', password: 'y'.repeat(20_000) }),
     headers: { 'content-type': 'application/json' }
   });
@@ -837,41 +839,41 @@ test('H04: admin user routes authenticate before reading a bounded body; logout 
 
   // The first admin was demoted by the last-admin test above; the second admin is the admin now.
   await loginAs(page, SECOND_ADMIN_EMAIL, SECOND_ADMIN_PASSWORD);
-  const oversized = await page.request.post('/api/auth/users', {
+  const oversized = await page.request.post('/api/account/users', {
     data: JSON.stringify({ email: 'x@tiny.e2e.test', password: 'y'.repeat(20_000) }),
     headers: { 'content-type': 'application/json', ...SAME_ORIGIN_HEADERS }
   });
   expect(oversized.status()).toBe(413);
 
-  const tooLong = await page.request.post('/api/auth/users', {
+  const tooLong = await page.request.post('/api/account/users', {
     data: { email: `long-${Date.now()}@tiny.e2e.test`, password: 'z'.repeat(1025) },
     headers: { 'content-type': 'application/json', ...SAME_ORIGIN_HEADERS }
   });
   expect(tooLong.status()).toBe(400);
 
-  const forgedLogout = await page.request.post('/api/auth/logout', {
+  const forgedLogout = await page.request.post('/api/account/logout', {
     headers: { origin: 'https://evil.example' }
   });
   expect(forgedLogout.status()).toBe(403);
   // Still signed in: the forged logout changed nothing.
-  expect((await page.request.get('/api/auth/me')).status()).toBe(200);
+  expect((await page.request.get('/api/account/me')).status()).toBe(200);
   await logout(page);
 });
 
-// The HTTP contract of `GET /api/v1/:collection`, asserted purely at the wire — it knows nothing
+// The HTTP contract of `GET /api/content/:collection`, asserted purely at the wire — it knows nothing
 // about which transport wrapper serves the route, so it must pass unchanged across a transport swap.
 test('read API contract (list + single document, both served by Strata): query, pagination, filter, sort, depth, errors and read access are preserved', async ({
   page,
   request
 }) => {
   await loginAs(page, SECOND_ADMIN_EMAIL, SECOND_ADMIN_PASSWORD);
-  const me = (await (await page.request.get('/api/auth/me')).json()) as { data: { id: string } };
+  const me = (await (await page.request.get('/api/account/me')).json()) as { data: { id: string } };
   const authorId = me.data.id;
 
   const stamp = Date.now();
   const slugs = [`list-contract-a-${stamp}`, `list-contract-b-${stamp}`];
   for (const [index, slug] of slugs.entries()) {
-    const created = await page.request.post('/api/v1/posts', {
+    const created = await page.request.post('/api/content/posts', {
       data: { title: `List Contract ${index === 0 ? 'A' : 'B'} ${stamp}`, slug, author: authorId },
       headers: { 'content-type': 'application/json', ...SAME_ORIGIN_HEADERS }
     });
@@ -883,7 +885,7 @@ test('read API contract (list + single document, both served by Strata): query, 
     meta: Record<string, unknown>;
   };
   const list = async (query: string) => {
-    const response = await page.request.get(`/api/v1/posts${query}`);
+    const response = await page.request.get(`/api/content/posts${query}`);
     expect(response.status()).toBe(200);
     expect(response.headers()['content-type']).toContain('application/json');
     return (await response.json()) as ListBody;
@@ -920,10 +922,10 @@ test('read API contract (list + single document, both served by Strata): query, 
   expect(populated.data[0]?.author).toMatchObject({ id: authorId });
 
   // Error contract: invalid query and unknown collection.
-  const invalid = await page.request.get('/api/v1/posts?limit=abc');
+  const invalid = await page.request.get('/api/content/posts?limit=abc');
   expect(invalid.status()).toBe(400);
   expect(((await invalid.json()) as { error: { code: string } }).error.code).toBe('INVALID_QUERY');
-  const unknown = await page.request.get('/api/v1/does-not-exist');
+  const unknown = await page.request.get('/api/content/does-not-exist');
   expect(unknown.status()).toBe(404);
   expect(await unknown.json()).toEqual({
     error: { code: 'NOT_FOUND', message: "Collection 'does-not-exist' not found" }
@@ -931,38 +933,38 @@ test('read API contract (list + single document, both served by Strata): query, 
 
   // Read access follows the caller's credentials: drafts and auth-only collections are the
   // authenticated view; the anonymous `request` fixture carries no session cookie.
-  const anonymousDrafts = await request.get(`/api/v1/posts?slug=${slugs[0]}`);
+  const anonymousDrafts = await request.get(`/api/content/posts?slug=${slugs[0]}`);
   expect(anonymousDrafts.status()).toBe(200);
   expect(((await anonymousDrafts.json()) as ListBody).data).toEqual([]);
-  const anonymousUsers = await request.get('/api/v1/users');
-  const authenticatedUsers = await page.request.get('/api/v1/users');
+  const anonymousUsers = await request.get('/api/content/users');
+  const authenticatedUsers = await page.request.get('/api/content/users');
   expect(authenticatedUsers.status()).toBe(200);
   expect(anonymousUsers.status()).not.toBe(200);
 
-  // Single document (`GET /api/v1/:collection/:id`, a Strata controller since spec 071).
+  // Single document (`GET /api/content/:collection/:id`, a Strata controller since spec 071).
   const draftDoc = filtered.data[0];
   expect(draftDoc).toBeDefined();
   const draftId = draftDoc?.id ?? '';
-  const one = await page.request.get(`/api/v1/posts/${draftId}?status=all&depth=1`);
+  const one = await page.request.get(`/api/content/posts/${draftId}?status=all&depth=1`);
   expect(one.status()).toBe(200);
   const oneBody = (await one.json()) as { data: { id: string; author: { id: string } } };
   expect(Object.keys(oneBody)).toEqual(['data']);
   expect(oneBody.data.id).toBe(draftId);
   expect(oneBody.data.author).toMatchObject({ id: authorId });
   // The draft is invisible to an anonymous caller, and missing ids/collections are the usual 404s.
-  expect((await request.get(`/api/v1/posts/${draftId}`)).status()).toBe(404);
-  expect((await page.request.get('/api/v1/posts/does-not-exist')).status()).toBe(404);
-  const unknownOne = await page.request.get(`/api/v1/does-not-exist/${draftId}`);
+  expect((await request.get(`/api/content/posts/${draftId}`)).status()).toBe(404);
+  expect((await page.request.get('/api/content/posts/does-not-exist')).status()).toBe(404);
+  const unknownOne = await page.request.get(`/api/content/does-not-exist/${draftId}`);
   expect(await unknownOne.json()).toEqual({
     error: { code: 'NOT_FOUND', message: "Collection 'does-not-exist' not found" }
   });
   // Mutations on the same URL are still the H3 file routes, CSRF and all.
-  const renamed = await page.request.put(`/api/v1/posts/${draftId}`, {
+  const renamed = await page.request.put(`/api/content/posts/${draftId}`, {
     data: { title: `List Contract A renamed ${stamp}` },
     headers: { 'content-type': 'application/json', ...SAME_ORIGIN_HEADERS }
   });
   expect(renamed.status()).toBe(200);
-  const forged = await page.request.put(`/api/v1/posts/${draftId}`, {
+  const forged = await page.request.put(`/api/content/posts/${draftId}`, {
     data: { title: 'forged' },
     headers: { 'content-type': 'application/json', origin: 'https://evil.example' }
   });
@@ -977,7 +979,7 @@ test('CSRF: a cross-site forged cookie mutation is rejected; unauthenticated wri
 }) => {
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
 
-  const forged = await page.request.post('/api/v1/posts', {
+  const forged = await page.request.post('/api/content/posts', {
     data: { title: 'Should not be created', slug: `csrf-${Date.now()}` },
     headers: { 'content-type': 'application/json', origin: 'https://evil.example' }
   });
@@ -985,9 +987,369 @@ test('CSRF: a cross-site forged cookie mutation is rejected; unauthenticated wri
 
   await logout(page);
 
-  const unauthenticated = await request.post('/api/v1/posts', {
+  const unauthenticated = await request.post('/api/content/posts', {
     data: { title: 'Should not be created either', slug: `anon-${Date.now()}` },
     headers: { 'content-type': 'application/json' }
   });
   expect(unauthenticated.status()).toBe(401);
+});
+
+// ---------------------------------------------------------------------------------------------------
+// Spec 087 (roadmap 0.11 / U03): the reusable admin certified at a non-default mount. This app mounts
+// it at `/studio` with its APIs at `/api/content` and `/api/account`; nothing below may ever reach
+// `/admin`, `/api/v1` or `/api/auth`. By here `SECOND_ADMIN_EMAIL` is the sole admin (the original admin
+// was demoted to editor above).
+// ---------------------------------------------------------------------------------------------------
+
+const BASE_URL = 'http://127.0.0.1:5175';
+const JSON_SAME_ORIGIN = { 'content-type': 'application/json', ...SAME_ORIGIN_HEADERS };
+
+/** Every `href` on the page that is an in-app path. */
+async function appHrefs(page: Page): Promise<string[]> {
+  return page.$$eval('a[href]', (anchors) =>
+    anchors
+      .map((anchor) => new URL((anchor as HTMLAnchorElement).href))
+      .filter((url) => url.origin === location.origin)
+      .map((url) => url.pathname)
+  );
+}
+
+test('U03 (spec 087): the shell, nav, breadcrumbs and every deep link stay inside /studio; refresh keeps the route', async ({
+  page
+}) => {
+  const left: string[] = [];
+  page.on('framenavigated', (frame) => {
+    if (frame === page.mainFrame() && new URL(frame.url()).pathname.startsWith('/admin')) {
+      left.push(frame.url());
+    }
+  });
+  await page.goto('/studio/login?returnUrl=%2Fstudio%2Fcollections%2Fposts');
+  await hydrated(page);
+  await page.locator('input#forge-signin-email').fill(SECOND_ADMIN_EMAIL);
+  await page.locator('input#forge-signin-password').fill(SECOND_ADMIN_PASSWORD);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  // The deep returnUrl is restored, not the mount root.
+  await page.waitForURL('**/studio/collections/posts');
+  await hydrated(page);
+
+  const hrefs = await appHrefs(page);
+  expect(hrefs).toEqual(
+    expect.arrayContaining(['/studio', '/studio/collections', '/studio/users'])
+  );
+  expect(hrefs.filter((href) => href.startsWith('/admin'))).toEqual([]);
+  // Only package-owned destinations are in the default nav: no dead dashboard/media/API/settings links.
+  const sidebar = page.locator('volt-sidebar');
+  await expect(sidebar.getByRole('link')).toHaveCount(2);
+  await expect(sidebar.getByRole('link', { name: 'Collections' })).toHaveAttribute(
+    'href',
+    /\/studio\/collections$/
+  );
+  await expect(sidebar.getByRole('link', { name: 'Users' })).toHaveAttribute(
+    'href',
+    /\/studio\/users$/
+  );
+
+  const firstPost = (await (await page.request.get('/api/content/posts?limit=1')).json()) as {
+    data: { id: string }[];
+  };
+  const someId = firstPost.data[0]?.id;
+  expect(someId).toBeTruthy();
+  for (const path of [
+    '/studio',
+    '/studio/collections',
+    '/studio/collections/posts',
+    `/studio/collections/posts/${someId}`,
+    '/studio/users'
+  ]) {
+    await page.goto(path);
+    await page.reload();
+    await hydrated(page);
+    const landed = new URL(page.url()).pathname;
+    // `/studio` itself redirects to its collections index; everything else keeps its route.
+    expect(landed, path).toBe(path === '/studio' ? '/studio/collections' : path);
+  }
+
+  // Breadcrumbs: root and section both live under the mount.
+  await page.goto('/studio/collections/posts');
+  await hydrated(page);
+  await expect(page.getByRole('link', { name: 'Admin', exact: true })).toHaveAttribute(
+    'href',
+    /\/studio$/
+  );
+  await expect(page.locator('a[href$="/studio/collections"]').first()).toBeVisible();
+
+  // Clicking the root crumb stays in the mount; the layout's Log out returns to /studio/login.
+  await page.getByRole('link', { name: 'Admin', exact: true }).click();
+  await expect(page).toHaveURL(/\/studio\/collections$/);
+  await logout(page);
+  await expect(page).toHaveURL(/\/studio\/login$/);
+  expect(left).toEqual([]);
+
+  // A protected route sends an anonymous visitor to the custom sign-in path, carrying where they were.
+  await page.goto('/studio/collections/posts');
+  await page.waitForURL('**/studio/login?returnUrl=*');
+  expect(new URL(page.url()).searchParams.get('returnUrl')).toBe('/studio/collections/posts');
+});
+
+test('U03 (spec 087): sign-in cannot be turned into an open redirect or an /admin jump', async ({
+  page
+}) => {
+  for (const returnUrl of [
+    'https://evil.example/steal',
+    '//evil.example',
+    '/admin/collections/posts',
+    '/studio-evil',
+    '/public-page',
+    '/studio%5C..%5Cevil'
+  ]) {
+    await page.goto(`/studio/login?returnUrl=${encodeURIComponent(returnUrl)}`);
+    await hydrated(page);
+    await page.locator('input#forge-signin-email').fill(SECOND_ADMIN_EMAIL);
+    await page.locator('input#forge-signin-password').fill(SECOND_ADMIN_PASSWORD);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await page.waitForURL('**/studio/collections**');
+    expect(new URL(page.url()).origin, returnUrl).toBe(BASE_URL);
+    expect(new URL(page.url()).pathname, returnUrl).toBe('/studio/collections');
+    await logout(page);
+  }
+});
+
+test('U03 (spec 087): first-party journey through the mounted admin — draft hidden, publish, edit, delete, public reflects each', async ({
+  page,
+  playwright
+}) => {
+  const anonymous = await playwright.request.newContext({ baseURL: BASE_URL });
+  const publicTitles = async (): Promise<string[]> => {
+    const response = await anonymous.get('/api/content/posts?limit=100');
+    expect(response.status()).toBe(200);
+    return ((await response.json()) as { data: { title: string }[] }).data.map((d) => d.title);
+  };
+  const title = `Journey ${Date.now()}`;
+  const edited = `${title} edited`;
+
+  await loginAs(page, SECOND_ADMIN_EMAIL, SECOND_ADMIN_PASSWORD);
+  await page.goto('/studio/collections/posts');
+  await hydrated(page);
+  await page.getByRole('button', { name: 'New' }).click();
+  await page.locator('input#title').fill(title);
+  await page.locator('input#slug').fill(`journey-${Date.now()}`);
+  await page.locator('input#author').fill(SECOND_ADMIN_EMAIL);
+  await page
+    .getByRole('button', { name: new RegExp(SECOND_ADMIN_EMAIL.replace('.', '\\.')) })
+    .click();
+  await page.getByRole('button', { name: 'Create' }).click();
+  await expect(page).toHaveURL(/\/studio\/collections\/posts$/);
+
+  expect(await publicTitles()).not.toContain(title);
+
+  const row = () => page.locator('volt-table-row', { hasText: title });
+  await row()
+    .getByRole('button', { name: /^Publish/ })
+    .click();
+  await expect(row().getByText('Published', { exact: true })).toBeVisible();
+  expect(await publicTitles()).toContain(title);
+
+  await row().getByRole('button', { name: /^Edit/ }).click();
+  await page.locator('input#title').fill(edited);
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.locator('volt-table-row', { hasText: edited })).toBeVisible();
+  const afterEdit = await publicTitles();
+  expect(afterEdit).toContain(edited);
+  expect(afterEdit).not.toContain(title);
+
+  await page
+    .locator('volt-table-row', { hasText: edited })
+    .getByRole('button', { name: /^Delete/ })
+    .click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+  await expect(page.locator('volt-table-row', { hasText: edited })).toHaveCount(0);
+  expect(await publicTitles()).not.toContain(edited);
+
+  await logout(page);
+  await anonymous.dispose();
+});
+
+test('U03 (spec 087): role matrix — the UI hides what the server independently refuses', async ({
+  page
+}) => {
+  // The sole admin (via the real API) creates a viewer.
+  const viewerEmail = `matrix-viewer-${Date.now()}@tiny.e2e.test`;
+  const viewerPassword = 'matrix-viewer-pass-123';
+  await loginAs(page, SECOND_ADMIN_EMAIL, SECOND_ADMIN_PASSWORD);
+  const created = await page.request.post('/api/account/users', {
+    data: { email: viewerEmail, password: viewerPassword, role: 'viewer' },
+    headers: JSON_SAME_ORIGIN
+  });
+  expect(created.status()).toBe(200);
+  const viewerId = ((await created.json()) as { data: { id: string } }).data.id;
+  const adminPosts = (await (await page.request.get('/api/content/posts?limit=1')).json()) as {
+    data: { id: string }[];
+  };
+  const postId = adminPosts.data[0]?.id ?? '';
+  const adminId = (
+    (await (await page.request.get('/api/account/me')).json()) as {
+      data: { id: string };
+    }
+  ).data.id;
+
+  // ADMIN: Users is visible and reachable.
+  await page.goto('/studio/collections');
+  await expect(page.locator('volt-sidebar').getByRole('link', { name: 'Users' })).toBeVisible();
+  await logout(page);
+
+  for (const [role, email, password] of [
+    ['editor', EDITOR_EMAIL, EDITOR_PASSWORD],
+    ['viewer', viewerEmail, viewerPassword]
+  ] as const) {
+    await loginAs(page, email, password);
+    // UI: no Users entry, and the guarded route falls back inside the mount (never /admin).
+    await expect(page.locator('volt-sidebar').getByRole('link', { name: 'Users' })).toHaveCount(0);
+    await page.goto('/studio/users');
+    await page.waitForURL(
+      (url) => url.pathname.startsWith('/studio') && url.pathname !== '/studio/users'
+    );
+    expect(new URL(page.url()).pathname, role).toMatch(/^\/studio(\/collections)?$/);
+
+    // Server: user management is refused with a safe envelope, whatever the UI showed.
+    const probes = [
+      await page.request.get('/api/account/users'),
+      await page.request.post('/api/account/users', {
+        data: { email: `x-${role}@tiny.e2e.test`, password: 'whatever-pass-123', role: 'admin' },
+        headers: JSON_SAME_ORIGIN
+      }),
+      await page.request.put(`/api/account/users/${viewerId}`, {
+        data: { role: 'admin' },
+        headers: JSON_SAME_ORIGIN
+      }),
+      await page.request.delete(`/api/account/users/${adminId}`, { headers: SAME_ORIGIN_HEADERS })
+    ];
+    for (const probe of probes) {
+      expect(probe.status(), role).toBe(403);
+      const body = (await probe.json()) as { error?: unknown };
+      expect(body.error, role).toBeTruthy();
+      expect(JSON.stringify(body)).not.toMatch(/passwordHash|_sessionVersion/);
+    }
+
+    if (role === 'editor') {
+      // Editors write content but this fixture reserves delete for admins.
+      const del = await page.request.delete(`/api/content/posts/${postId}`, {
+        headers: SAME_ORIGIN_HEADERS
+      });
+      expect(del.status()).toBe(403);
+    } else {
+      // Viewers cannot mutate content at all.
+      const create = await page.request.post('/api/content/posts', {
+        data: { title: 'nope', slug: 'nope' },
+        headers: JSON_SAME_ORIGIN
+      });
+      expect(create.status()).toBe(403);
+      const update = await page.request.put(`/api/content/posts/${postId}`, {
+        data: { title: 'nope' },
+        headers: JSON_SAME_ORIGIN
+      });
+      expect(update.status()).toBe(403);
+      const del = await page.request.delete(`/api/content/posts/${postId}`, {
+        headers: SAME_ORIGIN_HEADERS
+      });
+      expect(del.status()).toBe(403);
+    }
+    await logout(page);
+  }
+
+  // Sole admin: the server refuses to demote or delete them, UI or not.
+  await loginAs(page, SECOND_ADMIN_EMAIL, SECOND_ADMIN_PASSWORD);
+  expect(
+    (
+      await page.request.put(`/api/account/users/${adminId}`, {
+        data: { role: 'editor' },
+        headers: JSON_SAME_ORIGIN
+      })
+    ).status()
+  ).toBe(409);
+  expect(
+    (
+      await page.request.delete(`/api/account/users/${adminId}`, { headers: SAME_ORIGIN_HEADERS })
+    ).status()
+  ).toBe(409);
+
+  // Users workspace through the mount: edit then delete a non-protected user.
+  await page.goto('/studio/users');
+  await hydrated(page);
+  const viewerRow = page.locator('volt-table-row', { hasText: viewerEmail });
+  await expect(viewerRow).toBeVisible();
+  await viewerRow.getByRole('button', { name: /^Edit/ }).click();
+  await page.locator('select#forge-user-role').selectOption('editor');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.locator('volt-table-row', { hasText: viewerEmail })).toContainText('editor');
+  await page
+    .locator('volt-table-row', { hasText: viewerEmail })
+    .getByRole('button', { name: /^Delete/ })
+    .click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+  await expect(page.locator('volt-table-row', { hasText: viewerEmail })).toHaveCount(0);
+  await logout(page);
+});
+
+test('U03 (spec 087): a session invalidated by another admin is refused by the real server and recovers through /studio/login', async ({
+  browser
+}) => {
+  const email = `rotating-${Date.now()}@tiny.e2e.test`;
+  const oldPassword = 'rotating-old-pass-123';
+  const newPassword = 'rotating-new-pass-456';
+
+  const adminContext = await browser.newContext({ baseURL: BASE_URL });
+  const admin = await adminContext.newPage();
+  await loginAs(admin, SECOND_ADMIN_EMAIL, SECOND_ADMIN_PASSWORD);
+  const created = await admin.request.post('/api/account/users', {
+    data: { email, password: oldPassword, role: 'editor' },
+    headers: JSON_SAME_ORIGIN
+  });
+  expect(created.status()).toBe(200);
+  const userId = ((await created.json()) as { data: { id: string } }).data.id;
+
+  const editorContext = await browser.newContext({ baseURL: BASE_URL });
+  const editor = await editorContext.newPage();
+  await loginAs(editor, email, oldPassword);
+  await editor.goto('/studio/collections/posts');
+  await hydrated(editor);
+  await editor
+    .locator('volt-table-row')
+    .filter({ has: editor.getByRole('button', { name: /^Edit/ }) })
+    .first()
+    .getByRole('button', { name: /^Edit/ })
+    .click();
+  await expect(editor.locator('input#title')).not.toHaveValue('');
+  await editor.locator('input#title').fill('Unsaved while the password rotates');
+
+  // A second, real actor rotates this user's password — the server bumps their session version.
+  const rotated = await admin.request.put(`/api/account/users/${userId}`, {
+    data: { password: newPassword },
+    headers: JSON_SAME_ORIGIN
+  });
+  expect(rotated.status()).toBe(200);
+
+  const writes: number[] = [];
+  editor.on('response', (response) => {
+    if (response.request().method() === 'PUT') writes.push(response.status());
+  });
+  await editor.getByRole('button', { name: 'Save' }).click();
+  await expect(editor.getByText(/session expired/i).first()).toBeVisible();
+  await expect(editor.locator('input#title')).toHaveValue('Unsaved while the password rotates');
+  expect(writes).toEqual([401]);
+
+  // Leaving for any protected route lands on the custom sign-in path; the new password signs in again.
+  await editor.goto('/studio/collections');
+  await editor.waitForURL('**/studio/login**');
+  await hydrated(editor);
+  await editor.locator('input#forge-signin-email').fill(email);
+  await editor.locator('input#forge-signin-password').fill(oldPassword);
+  await editor.getByRole('button', { name: 'Sign in' }).click();
+  await expect(editor.locator('[role="alert"]').first()).toBeVisible();
+  await editor.locator('input#forge-signin-password').fill(newPassword);
+  await editor.getByRole('button', { name: 'Sign in' }).click();
+  await editor.waitForURL('**/studio/collections**');
+  await expect(editor.getByRole('button', { name: /log out/i })).toBeVisible();
+
+  await editorContext.close();
+  await adminContext.close();
 });

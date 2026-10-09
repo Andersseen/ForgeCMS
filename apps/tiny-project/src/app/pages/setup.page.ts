@@ -15,7 +15,7 @@ import { Router } from '@angular/router';
     <h1>Create the first admin</h1>
 
     @if (alreadyInitialized()) {
-      <p>This installation already has an admin. <a href="/admin/login">Sign in</a> instead.</p>
+      <p>This installation already has an admin. <a href="/studio/login">Sign in</a> instead.</p>
     } @else {
       <form class="tiny-form" (submit)="submit($event)">
         <label>
@@ -76,7 +76,7 @@ export class SetupPage {
         throw new Error(body?.error?.message ?? `Request failed: ${res.status}`);
       }
 
-      await this.router.navigateByUrl('/admin');
+      await this.router.navigateByUrl('/studio');
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Unknown error');
     } finally {

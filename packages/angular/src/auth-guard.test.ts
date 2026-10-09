@@ -117,6 +117,27 @@ describe('forgeAuthGuard', () => {
     expect(router.createUrlTree).toHaveBeenCalledWith(['/admin']);
   });
 
+  it('composes with a custom admin mount through the existing options (spec 087)', async () => {
+    const options = { signInPath: '/studio/login', forbiddenPath: '/studio' };
+    const anonymous = createFakeRouter();
+    const anonymousInjector = createInjector(anonymous);
+    await runInInjectionContext(anonymousInjector, () =>
+      forgeAuthGuard({ ...options, roles: ['admin'] })(fakeRoute, fakeState('/studio/users'))
+    );
+    expect(anonymous.createUrlTree).toHaveBeenCalledWith(['/studio/login'], {
+      queryParams: { returnUrl: '/studio/users' }
+    });
+
+    respond = () => jsonResponse({ data: EDITOR });
+    const editor = createFakeRouter();
+    const editorInjector = createInjector(editor);
+    await runInInjectionContext(editorInjector, () => editorInjector.get(ForgeAuthSession).ready());
+    await runInInjectionContext(editorInjector, () =>
+      forgeAuthGuard({ ...options, roles: ['admin'] })(fakeRoute, fakeState('/studio/users'))
+    );
+    expect(editor.createUrlTree).toHaveBeenCalledWith(['/studio']);
+  });
+
   it('waits for the session bootstrap instead of redirecting mid-load', async () => {
     let resolveMe!: (r: Response) => void;
     vi.stubGlobal(

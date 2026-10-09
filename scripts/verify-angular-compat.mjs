@@ -308,6 +308,10 @@ export async function rejected(cms: CmsApiService<Schema>): Promise<void> {
 `;
 
 function appFiles(combination) {
+  // Spec 087: the admin fixtures also use non-default API prefixes through the one client provider.
+  const provide = combination.admin
+    ? "provideForgeCms({ baseUrl: '/content-api', authBaseUrl: '/account-api', credentials: 'include' })"
+    : 'provideForgeCms()';
   const adminImports = combination.admin
     ? `import {
   ForgeAdminLayoutComponent,
@@ -326,17 +330,25 @@ import { forgeAuthGuard } from '@forge-cms/angular';
   template: '<forge-admin-layout [config]="config"><router-outlet /></forge-admin-layout>'
 })
 export class AdminShellComponent {
-  protected readonly config: ForgeAdminConfig = { title: 'Compat', nav: [], signInPath: '/admin/login' };
+  // Spec 087: a deliberately non-default mount (\`/studio\`), not the \`/admin\` default.
+  protected readonly config: ForgeAdminConfig = {
+    title: 'Compat',
+    basePath: '/studio',
+    collections: [{ slug: 'posts' }],
+    signInPath: '/studio/login'
+  };
 }
 `
     : '';
   const adminRoutes = combination.admin
     ? `
-  ...forgeAdminAuthRoutes({ signup: true }),
+  { path: 'studio', children: forgeAdminAuthRoutes({ signup: true, basePath: '/studio' }) },
   {
-    path: 'admin',
+    path: 'studio',
     component: AdminShellComponent,
-    canActivate: [forgeAuthGuard({ roles: ['admin', 'editor'] })],
+    canActivate: [
+      forgeAuthGuard({ roles: ['admin', 'editor'], signInPath: '/studio/login', forbiddenPath: '/studio' })
+    ],
     children: forgeAdminContentRoutes()
   },`
     : '';
@@ -356,6 +368,17 @@ import { RouterOutlet, provideRouter, type Routes } from '@angular/router';
 import { ForgeAuthSession, provideForgeCms } from '@forge-cms/angular';
 ${adminImports}import { PostsComponent } from './posts.component';
 ${adminShell}
+${
+  combination.admin
+    ? `
+// The default \`/admin\` composition keeps compiling unchanged (spec 087 backwards compatibility).
+export const legacyAdminRoutes: Routes = [
+  ...forgeAdminAuthRoutes({ signup: true }),
+  { path: 'admin', canActivate: [forgeAuthGuard()], children: forgeAdminContentRoutes() }
+];
+`
+    : ''
+}
 const routes: Routes = [${adminRoutes}
   { path: '', component: PostsComponent }
 ];
@@ -370,7 +393,11 @@ export class AppComponent {
 }
 
 bootstrapApplication(AppComponent, {
-  providers: [provideZonelessChangeDetection(), provideRouter(routes), provideForgeCms()]
+  providers: [
+    provideZonelessChangeDetection(),
+    provideRouter(routes),
+    ${provide}
+  ]
 }).catch((error: unknown) => console.error(error));
 `.replace(
       "import { Component, provideZonelessChangeDetection } from '@angular/core';",

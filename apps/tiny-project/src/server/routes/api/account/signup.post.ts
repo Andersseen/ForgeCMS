@@ -1,15 +1,25 @@
 import { defineEventHandler } from 'h3';
 import type { ApiContext } from '@forge-cms/api';
-import { handleLogin } from '@forge-cms/runtime';
+import { handleSignup } from '@forge-cms/runtime';
 import { getServerRuntime } from '../../../api/runtime';
 import { toCancellableWebRequest } from '../../../api/auth-request';
 
-/** POST /api/auth/login — thin wrapper over `@forge-cms/runtime`'s `handleLogin`. */
+/**
+ * POST /api/account/signup — thin wrapper over `handleSignup`. Disabled (404) unless
+ * `FORGE_ENABLE_SIGNUP=1`, matching `apps/www`'s convention.
+ */
 export default defineEventHandler(async (event) => {
   const runtime = await getServerRuntime(event.context.cloudflare?.env);
   const context: ApiContext = {
     request: toCancellableWebRequest(event),
     env: event.context.cloudflare?.env
   };
-  return handleLogin(context, { runtime, cookie: { secure: !!event.context.cloudflare?.env } });
+  const enabled =
+    event.context.cloudflare?.env?.FORGE_ENABLE_SIGNUP === '1' ||
+    process.env['FORGE_ENABLE_SIGNUP'] === '1';
+  return handleSignup(context, {
+    runtime,
+    enabled,
+    cookie: { secure: !!event.context.cloudflare?.env }
+  });
 });

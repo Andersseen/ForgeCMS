@@ -31,4 +31,15 @@ describe('forgeAdminAuthRoutes', () => {
     // registered route) instead of reaching the sibling. Real bug, found building spec 055's fixture.
     expect(login?.data).toEqual({ signUpPath: '../signup' });
   });
+
+  it('threads a custom basePath into both pages and rejects an invalid one (spec 087)', () => {
+    const routes = forgeAdminAuthRoutes({ signup: true, basePath: '/studio/' });
+    expect(routes.find((r) => r.path === 'login')?.data).toEqual({
+      signUpPath: '../signup',
+      basePath: '/studio'
+    });
+    expect(routes.find((r) => r.path === 'signup')?.data).toEqual({ basePath: '/studio' });
+    expect(() => forgeAdminAuthRoutes({ basePath: 'https://evil.example' })).toThrow(/basePath/);
+    expect(forgeAdminAuthRoutes()[0]?.data).toBeUndefined();
+  });
 });
