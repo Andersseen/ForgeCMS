@@ -1,5 +1,0 @@
----
-'@forge-cms/admin': patch
----
-
-Keyboard, focus and field interactions in the admin (spec 086, roadmap 0.11 / U02). Modals trap and restore focus (`@angular/cdk/a11y` is now a declared peer, `^21.2.0`); unsaved-change navigation asks in Forge's own dialog instead of `window.confirm`; every field is named by a real `<label for>` and its rendered control carries `required`/`aria-invalid`/`aria-describedby`; a server validation error focuses the first invalid field; composite errors render with their fieldset; `minRows` is respected on removal; rows address the correct row (a nested-`@for` index bug edited row 0 when a later row's first field changed); unknown stored block types are kept untouched; `date`/`withTime` fields use the right native control; the locale selector, relation picker, upload picker and richtext editor are keyboard operable with named controls; the editor keeps Save/Cancel on screen on a phone. Adds optional inputs `error` (form), `label` (relation and upload pickers) and `label`/`idPrefix` (richtext). `ForgeDocumentEditorComponent.canDeactivate()` now returns `boolean | Promise<boolean>`; hosts composing their own guard must await it.
