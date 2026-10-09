@@ -38,7 +38,11 @@ async function openWorkspace(
 function button(fixture: ComponentFixture<unknown>, label: string, index = 0): HTMLButtonElement {
   const found = h
     .qa<HTMLButtonElement>(fixture, 'button')
-    .filter((el) => (el.textContent ?? '').trim() === label);
+    // Row actions carry the row's title as sr-only text ("Publish First"), so match the leading word.
+    .filter((el) => {
+      const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+      return text === label || text.startsWith(`${label} `);
+    });
   const el = found[index];
   if (el === undefined) throw new Error(`no button "${label}" (#${index})`);
   return el;
@@ -53,7 +57,10 @@ async function click(el: HTMLElement): Promise<void> {
 const deleteButtons = (fixture: ComponentFixture<unknown>): HTMLButtonElement[] =>
   h
     .qa<HTMLButtonElement>(fixture, 'button')
-    .filter((el) => (el.textContent ?? '').trim() === 'Delete');
+    .filter(
+      (el) =>
+        /^Delete \S/.test((el.textContent ?? '').trim()) && el.closest('[role="dialog"]') === null
+    );
 
 const dialogConfirm = (fixture: ComponentFixture<unknown>): HTMLButtonElement =>
   h

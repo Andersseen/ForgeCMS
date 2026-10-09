@@ -1,24 +1,27 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
+  Injector,
+  DestroyRef,
   computed,
   effect,
   inject,
   signal,
   untracked
 } from '@angular/core';
+import { afterNextRenderIfAlive } from './after-render.js';
 import {
   VoltButton,
   VoltCard,
-  VoltError,
   VoltInput,
-  VoltLabel,
   VoltTable,
   VoltTableBody,
   VoltTableCell,
   VoltTableHead,
   VoltTableHeader,
-  VoltTableRow
+  VoltTableRow,
+  buttonVariants
 } from '@voltui/components';
 import { LmnPencilIcon, LmnPlusIcon, LmnTrashIcon, LmnUsersIcon } from 'lumen-icons';
 import {
@@ -63,8 +66,7 @@ function emptyForm(): UserFormValue {
     VoltCard,
     VoltButton,
     VoltInput,
-    VoltLabel,
-    VoltError,
+
     VoltTable,
     VoltTableHeader,
     VoltTableBody,
@@ -86,7 +88,7 @@ function emptyForm(): UserFormValue {
       <forge-page-header title="Users" subtitle="Manage team members and their roles.">
         <div actions>
           @if (!showForm()) {
-            <volt-button size="sm" (click)="startCreate()">
+            <volt-button data-forge-new size="sm" (click)="startCreate()">
               <lmn-plus [size]="14" class="mr-1.5" />
               New User
             </volt-button>
@@ -100,20 +102,29 @@ function emptyForm(): UserFormValue {
             {{ editingUser() ? 'Edit user' : 'New user' }}
           </h2>
 
-          <div class="space-y-4">
+          <!-- A real form: Enter submits through the same guarded onSubmit as the button. -->
+          <form class="space-y-4" novalidate (submit)="onSubmit($event)">
             <div class="grid gap-4 md:grid-cols-2">
               <div class="space-y-1.5">
-                <volt-label htmlFor="forge-user-name">Name</volt-label>
+                <label
+                  for="forge-user-name"
+                  class="text-sm font-medium leading-none text-foreground"
+                  >Name</label
+                >
                 <volt-input
-                  id="forge-user-name"
+                  [id]="'forge-user-name'"
                   [value]="form().name"
                   (valueChange)="update('name', $event)"
                 />
               </div>
               <div class="space-y-1.5">
-                <volt-label htmlFor="forge-user-email">Email</volt-label>
+                <label
+                  for="forge-user-email"
+                  class="text-sm font-medium leading-none text-foreground"
+                  >Email</label
+                >
                 <volt-input
-                  id="forge-user-email"
+                  [id]="'forge-user-email'"
                   type="email"
                   [value]="form().email"
                   (valueChange)="update('email', $event)"
@@ -123,12 +134,16 @@ function emptyForm(): UserFormValue {
 
             <div class="grid gap-4 md:grid-cols-2">
               <div class="space-y-1.5">
-                <volt-label htmlFor="forge-user-role">Role</volt-label>
+                <label
+                  for="forge-user-role"
+                  class="text-sm font-medium leading-none text-foreground"
+                  >Role</label
+                >
                 <select
                   id="forge-user-role"
-                  class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   [value]="form().role"
-                  [disabled]="isEditingSoleAdmin()"
+                  [attr.aria-disabled]="isEditingSoleAdmin() ? 'true' : null"
                   [attr.aria-describedby]="isEditingSoleAdmin() ? 'forge-user-role-hint' : null"
                   (change)="onRoleChange($event)"
                 >
@@ -143,11 +158,14 @@ function emptyForm(): UserFormValue {
                 }
               </div>
               <div class="space-y-1.5">
-                <volt-label htmlFor="forge-user-password">
+                <label
+                  for="forge-user-password"
+                  class="text-sm font-medium leading-none text-foreground"
+                >
                   {{ editingUser() ? 'New password (leave blank to keep)' : 'Password' }}
-                </volt-label>
+                </label>
                 <volt-input
-                  id="forge-user-password"
+                  [id]="'forge-user-password'"
                   type="password"
                   autocomplete="new-password"
                   [value]="form().password"
@@ -157,8 +175,9 @@ function emptyForm(): UserFormValue {
             </div>
 
             @if (formError(); as message) {
-              <volt-error role="alert">{{ message }}</volt-error>
+              <p class="text-sm font-medium text-error" role="alert">{{ message }}</p>
             }
+            <p class="sr-only" role="status">{{ saving() ? 'Saving…' : '' }}</p>
 
             <div class="flex items-center justify-end gap-2 pt-2">
               <volt-button
@@ -166,21 +185,22 @@ function emptyForm(): UserFormValue {
                 variant="outline"
                 size="sm"
                 [disabled]="saving()"
-                (click)="cancelForm()"
+                (click)="onCancelClick()"
               >
                 Cancel
               </volt-button>
-              <volt-button
-                type="button"
-                size="sm"
-                [disabled]="saving() || !isAdmin()"
-                (click)="onSubmit($event)"
-              >
+              <volt-button type="submit" size="sm" [disabled]="saving() || !isAdmin()">
                 {{ saving() ? 'Saving…' : editingUser() ? 'Save' : 'Create' }}
               </volt-button>
             </div>
-          </div>
+          </form>
         </volt-card>
+      }
+
+      @if (hasSoleAdmin()) {
+        <p id="forge-sole-admin-hint" class="text-xs text-muted-foreground">
+          The only admin can't be deleted or demoted until another admin exists.
+        </p>
       }
 
       @if (session.loading() && !isAdmin()) {
@@ -248,23 +268,21 @@ function emptyForm(): UserFormValue {
                           <lmn-pencil [size]="14" />
                           <span class="sr-only">Edit {{ user.name || user.email }}</span>
                         </volt-button>
-                        <volt-button
-                          variant="ghost"
-                          size="icon"
-                          class="h-7 w-7"
-                          [disabled]="isSoleAdmin(user)"
-                          [title]="isSoleAdmin(user) ? 'The only admin can\\'t be deleted' : ''"
+                        <!-- Focusable on purpose: a disabled button can't be reached by keyboard, so the
+                             reason (the last-admin rule) would only exist for a mouse hover. The server
+                             still refuses it; this only avoids a round trip. -->
+                        <button
+                          type="button"
+                          [class]="deleteButtonClass(user)"
+                          [attr.aria-disabled]="isSoleAdmin(user) ? 'true' : null"
+                          [attr.aria-describedby]="
+                            isSoleAdmin(user) ? 'forge-sole-admin-hint' : null
+                          "
                           (click)="requestDelete(user)"
                         >
                           <lmn-trash [size]="14" />
-                          <span class="sr-only">
-                            {{
-                              isSoleAdmin(user)
-                                ? 'Cannot delete the only admin'
-                                : 'Delete ' + (user.name || user.email)
-                            }}
-                          </span>
-                        </volt-button>
+                          <span class="sr-only">Delete {{ user.name || user.email }}</span>
+                        </button>
                       </div>
                     </volt-table-cell>
                   </volt-table-row>
@@ -289,6 +307,9 @@ function emptyForm(): UserFormValue {
 })
 export class ForgeUsersWorkspaceComponent {
   private readonly api = inject(CmsApiService);
+  private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef, { optional: true });
   protected readonly session = inject(ForgeAuthSession);
 
   readonly users = signal<AuthUser[]>([]);
@@ -313,6 +334,8 @@ export class ForgeUsersWorkspaceComponent {
   private readonly adminCount = computed(
     () => this.users().filter((user) => userRole(user) === 'admin').length
   );
+
+  readonly hasSoleAdmin = computed(() => this.users().some((user) => this.isSoleAdmin(user)));
 
   readonly isEditingSoleAdmin = computed(() => {
     const editing = this.editingUser();
@@ -356,6 +379,12 @@ export class ForgeUsersWorkspaceComponent {
     return user.id === this.session.user()?.id;
   }
 
+  /** Volt's ghost/icon look on a native button, dimmed when the last-admin rule applies. */
+  protected deleteButtonClass(user: AuthUser): string {
+    const base = `${buttonVariants({ variant: 'ghost', size: 'icon' })} h-7 w-7`;
+    return this.isSoleAdmin(user) ? `${base} cursor-not-allowed opacity-50` : base;
+  }
+
   /** True when `user` is an admin and no other admin exists — the last-admin invariant's UI mirror. */
   isSoleAdmin(user: AuthUser): boolean {
     return userRole(user) === 'admin' && this.adminCount() === 1;
@@ -387,6 +416,7 @@ export class ForgeUsersWorkspaceComponent {
     this.form.set(emptyForm());
     this.formError.set(null);
     this.showForm.set(true);
+    this.focusAfterRender('#forge-user-name');
   }
 
   startEdit(user: AuthUser): void {
@@ -399,6 +429,14 @@ export class ForgeUsersWorkspaceComponent {
     });
     this.formError.set(null);
     this.showForm.set(true);
+    this.focusAfterRender('#forge-user-name');
+  }
+
+  /** Moves focus once the form (or the page again) has rendered; the control that had it is gone. */
+  private focusAfterRender(selector: string): void {
+    afterNextRenderIfAlive(this.injector, this.destroyRef, () => {
+      this.host?.nativeElement.querySelector<HTMLElement>(selector)?.focus();
+    });
   }
 
   cancelForm(): void {
@@ -409,11 +447,23 @@ export class ForgeUsersWorkspaceComponent {
     this.formError.set(null);
   }
 
+  /** Cancel is a deliberate choice: the form closes and focus goes back to "New User". */
+  protected onCancelClick(): void {
+    if (this.saving()) return;
+    this.cancelForm();
+    this.focusAfterRender('[data-forge-new] button');
+  }
+
   update(field: keyof UserFormValue, value: string): void {
     this.form.update((current) => ({ ...current, [field]: value }));
   }
 
   onRoleChange(event: Event): void {
+    if (this.isEditingSoleAdmin()) {
+      // The only admin keeps the role; the control stays focusable so the reason can be read.
+      (event.target as HTMLSelectElement).value = this.form().role;
+      return;
+    }
     this.update('role', (event.target as HTMLSelectElement).value as UserFormValue['role']);
   }
 
@@ -460,13 +510,14 @@ export class ForgeUsersWorkspaceComponent {
     if (epoch !== this.mutationEpoch) return;
     this.saving.set(false);
     this.cancelForm();
+    this.focusAfterRender('h1');
     // Changing the signed-in user's own role/password changes what the server will let them do next.
     if (editing && this.isSelf(editing)) void this.session.refresh();
     await this.load();
   }
 
   requestDelete(user: AuthUser): void {
-    if (this.deleting()) return;
+    if (this.deleting() || this.isSoleAdmin(user)) return;
     this.deleteError.set(null);
     this.deleteTarget.set(user);
   }
@@ -499,6 +550,8 @@ export class ForgeUsersWorkspaceComponent {
     if (epoch !== this.mutationEpoch) return;
     this.deleting.set(false);
     this.deleteTarget.set(null);
+    // The row that opened the dialog is gone: land on the page heading.
+    this.focusAfterRender('h1');
     await this.load();
   }
 }

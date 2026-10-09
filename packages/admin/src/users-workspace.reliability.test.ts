@@ -49,15 +49,15 @@ async function click(el: HTMLElement): Promise<void> {
 async function fillCreateForm(fixture: ComponentFixture<unknown>): Promise<void> {
   await click(btn(fixture, /New User/));
   await h.typeInto(
-    h.q<HTMLInputElement>(fixture, '#forge-user-name input') as HTMLInputElement,
+    h.q<HTMLInputElement>(fixture, 'input#forge-user-name') as HTMLInputElement,
     'New'
   );
   await h.typeInto(
-    h.q<HTMLInputElement>(fixture, '#forge-user-email input') as HTMLInputElement,
+    h.q<HTMLInputElement>(fixture, 'input#forge-user-email') as HTMLInputElement,
     'new@example.com'
   );
   await h.typeInto(
-    h.q<HTMLInputElement>(fixture, '#forge-user-password input') as HTMLInputElement,
+    h.q<HTMLInputElement>(fixture, 'input#forge-user-password') as HTMLInputElement,
     'correct horse'
   );
 }
@@ -106,10 +106,10 @@ describe('create / update', () => {
 
     expect(h.text(fixture)).toContain('Something went wrong on the server');
     expect(h.text(fixture)).not.toContain('SQLITE');
-    expect((h.q(fixture, '#forge-user-email input') as HTMLInputElement).value).toBe(
+    expect((h.q(fixture, 'input#forge-user-email') as HTMLInputElement).value).toBe(
       'new@example.com'
     );
-    expect((h.q(fixture, '#forge-user-name input') as HTMLInputElement).value).toBe('New');
+    expect((h.q(fixture, 'input#forge-user-name') as HTMLInputElement).value).toBe('New');
 
     const before = usersGets();
     await click(btn(fixture, 'Create'));
@@ -250,7 +250,7 @@ describe('session and permission changes', () => {
     await h.settle();
 
     expect(session.expired()).toBe(true);
-    expect((h.q(fixture, '#forge-user-email input') as HTMLInputElement | null)?.value).toBe(
+    expect((h.q(fixture, 'input#forge-user-email') as HTMLInputElement | null)?.value).toBe(
       'new@example.com'
     );
     expect(h.text(fixture)).toContain('session expired');

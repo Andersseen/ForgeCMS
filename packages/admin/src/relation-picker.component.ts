@@ -1,17 +1,22 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  Injector,
+  DestroyRef,
   computed,
   inject,
   input,
   output,
-  signal
+  signal,
+  viewChild
 } from '@angular/core';
-import type { OnInit } from '@angular/core';
+import { afterNextRenderIfAlive } from './after-render.js';
+import type { OnInit, ElementRef } from '@angular/core';
 import { CmsApiService } from '@forge-cms/angular';
 import type { CollectionMeta } from '@forge-cms/angular';
 import { VoltButton, VoltInput } from '@voltui/components';
 import { documentLabel, shortId } from './document-label.js';
+import { describeAdminError } from './admin-error.js';
 
 const SEARCHABLE_KINDS = new Set(['text', 'slug', 'email']);
 const RESULT_LIMIT = 12;
@@ -39,50 +44,60 @@ function isEmptySelection(value: unknown): boolean {
   imports: [VoltInput, VoltButton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="space-y-2">
+    <div #root class="space-y-2">
       @if (selected().length > 0) {
-        <div class="flex flex-wrap gap-1.5">
+        <ul
+          class="flex flex-wrap gap-1.5"
+          [attr.aria-label]="(label() || collection()) + ' selected'"
+        >
           @for (option of selected(); track option.id) {
-            <span
+            <li
               class="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs"
               [title]="option.id"
             >
               {{ option.label }}
               <button
                 type="button"
-                class="text-muted-foreground hover:text-destructive"
+                class="rounded text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 (click)="remove(option.id)"
-                aria-label="Remove"
+                [attr.aria-label]="'Remove ' + option.label + (label() ? ' from ' + label() : '')"
               >
-                ×
+                <span aria-hidden="true">×</span>
               </button>
-            </span>
+            </li>
           }
-        </div>
+        </ul>
       }
 
       @if (many() || selected().length === 0) {
+        <!-- Enter chooses nothing here and must not submit the surrounding document form. -->
         <volt-input
           [id]="inputId()"
           type="text"
           [value]="term()"
+          [ariaLabel]="label() === '' ? 'Search ' + collection() : ''"
           (valueChange)="search($event)"
+          (keydown.enter)="onSearchEnter($event)"
           [placeholder]="'Search ' + collection() + '…'"
         />
 
-        @if (loading()) {
-          <p class="text-xs text-muted-foreground">Searching…</p>
-        } @else if (error()) {
-          <p class="text-xs text-destructive">{{ error() }}</p>
-        } @else if (results().length > 0) {
+        <p class="text-xs text-muted-foreground" role="status">{{ status() }}</p>
+
+        @if (error(); as message) {
+          <p class="text-xs text-destructive" role="alert">{{ message }}</p>
+        }
+
+        @if (!loading() && !error() && results().length > 0) {
           <ul
+            data-forge-results
             class="max-h-48 divide-y divide-border overflow-y-auto rounded-md border border-border"
+            [attr.aria-label]="'Search results for ' + (label() || collection())"
           >
             @for (option of results(); track option.id) {
               <li>
                 <button
                   type="button"
-                  class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted"
+                  class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   (click)="choose(option)"
                 >
                   <span class="truncate">{{ option.label }}</span>
@@ -93,12 +108,10 @@ function isEmptySelection(value: unknown): boolean {
               </li>
             }
           </ul>
-        } @else if (term() !== '') {
-          <p class="text-xs text-muted-foreground">No matches.</p>
         }
       } @else {
-        <volt-button type="button" variant="outline" size="sm" (click)="clear()">
-          Choose another
+        <volt-button data-forge-clear type="button" variant="outline" size="sm" (click)="clear()">
+          Choose another<span class="sr-only"> {{ label() || collection() }}</span>
         </volt-button>
       }
     </div>
@@ -112,6 +125,8 @@ export class ForgeRelationPickerComponent implements OnInit {
   /** An id, a list of ids, or the populated document(s) when the caller fetched with `depth: 1`. */
   value = input<unknown>();
   inputId = input('');
+  /** The owning field's label; names the search box (via the form's `<label>`), chips and results. */
+  label = input('');
 
   valueChange = output<string | string[]>();
 
@@ -120,11 +135,23 @@ export class ForgeRelationPickerComponent implements OnInit {
   protected readonly results = signal<Option[]>([]);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
+  /** Polite status for the search: progress, then how it ended. */
+  protected readonly status = computed(() => {
+    if (this.loading()) return 'Searching…';
+    if (this.error() !== null || this.term().trim() === '') return '';
+    const count = this.results().length;
+    return count === 0 ? 'No matches.' : `${count} ${count === 1 ? 'result' : 'results'}.`;
+  });
+
+  private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly root = viewChild<ElementRef<HTMLElement>>('root');
 
   /** Labels resolved for ids we only know as strings, so a chip is never a bare UUID. */
   private readonly resolved = signal<Record<string, string>>({});
   private searchField: string | null = null;
   private searchToken = 0;
+  private focusResultsWhenReady = false;
 
   protected readonly selected = computed<Option[]>(() => {
     const value = this.value();
@@ -179,6 +206,7 @@ export class ForgeRelationPickerComponent implements OnInit {
 
   protected async search(term: string): Promise<void> {
     this.term.set(term);
+    this.focusResultsWhenReady = false;
     if (term.trim() === '') {
       this.results.set([]);
       return;
@@ -205,9 +233,13 @@ export class ForgeRelationPickerComponent implements OnInit {
         : options.filter((option) => option.label.toLowerCase().includes(term.toLowerCase()));
 
       this.results.set(filtered.filter((option) => !this.isSelected(option.id)));
+      if (this.focusResultsWhenReady) {
+        this.focusResultsWhenReady = false;
+        afterNextRenderIfAlive(this.injector, this.destroyRef, () => this.focusFirstResult());
+      }
     } catch (err) {
       if (token !== this.searchToken) return;
-      this.error.set(err instanceof Error ? err.message : 'Search failed');
+      this.error.set(describeAdminError(err));
     } finally {
       if (token === this.searchToken) this.loading.set(false);
     }
@@ -220,25 +252,53 @@ export class ForgeRelationPickerComponent implements OnInit {
 
     if (!this.many()) {
       this.valueChange.emit(option.id);
+      // The search box is replaced by the chip and "Choose another": keep focus inside the picker.
+      this.focusAfterRender('[data-forge-clear] button');
       return;
     }
     this.valueChange.emit([...this.selected().map((entry) => entry.id), option.id]);
+    this.focusAfterRender('input');
   }
 
   protected remove(id: string): void {
     if (!this.many()) {
       this.valueChange.emit('');
-      return;
+    } else {
+      this.valueChange.emit(
+        this.selected()
+          .map((entry) => entry.id)
+          .filter((entry) => entry !== id)
+      );
     }
-    this.valueChange.emit(
-      this.selected()
-        .map((entry) => entry.id)
-        .filter((entry) => entry !== id)
-    );
+    this.focusAfterRender('input');
   }
 
   protected clear(): void {
     this.valueChange.emit(this.many() ? [] : '');
+    this.focusAfterRender('input');
+  }
+
+  /**
+   * Enter in the search box never submits the form. It moves to the first result — or, when the answer
+   * is still on its way, remembers to do so the moment it arrives.
+   */
+  protected onSearchEnter(event: Event): void {
+    event.preventDefault();
+    if (this.loading() && this.term().trim() !== '') {
+      this.focusResultsWhenReady = true;
+      return;
+    }
+    this.focusFirstResult();
+  }
+
+  private focusFirstResult(): void {
+    this.root()?.nativeElement.querySelector<HTMLElement>('[data-forge-results] button')?.focus();
+  }
+
+  private focusAfterRender(selector: string): void {
+    afterNextRenderIfAlive(this.injector, this.destroyRef, () =>
+      this.root()?.nativeElement.querySelector<HTMLElement>(selector)?.focus()
+    );
   }
 
   private isSelected(id: string): boolean {

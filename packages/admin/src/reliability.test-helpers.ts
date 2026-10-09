@@ -175,7 +175,10 @@ export function qa<T extends Element = HTMLElement>(
 }
 
 /** Types into the `<input>` inside the control labelled/identified by `selector`. */
-export async function typeInto(input: HTMLInputElement, value: string): Promise<void> {
+export async function typeInto(
+  input: HTMLInputElement | HTMLTextAreaElement,
+  value: string
+): Promise<void> {
   input.value = value;
   input.dispatchEvent(new Event('input', { bubbles: true }));
   await settle();
@@ -189,4 +192,63 @@ export function submitForm(fixture: ComponentFixture<unknown>): void {
 
 export function text(fixture: ComponentFixture<unknown>): string {
   return ((fixture.nativeElement as HTMLElement).textContent ?? '').replace(/\s+/g, ' ');
+}
+
+/**
+ * jsdom has no layout, so every element looks hidden and CDK's focus trap finds nothing tabbable.
+ * Gives elements a geometry for the duration of a test file (spec 086 accessibility tests).
+ */
+export function stubLayout(): void {
+  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+    configurable: true,
+    get: () => 10
+  });
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+    configurable: true,
+    get: () => 10
+  });
+  HTMLElement.prototype.getClientRects = function getClientRects() {
+    return [{ width: 10, height: 10 }] as unknown as DOMRectList;
+  };
+}
+
+/** The element that currently has focus. */
+export function active(): Element | null {
+  return document.activeElement;
+}
+
+export const focusables = (root: ParentNode): HTMLElement[] =>
+  Array.from(
+    root.querySelectorAll<HTMLElement>(
+      'input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled])'
+    )
+  );
+
+/** Dispatches a keydown for `key` on `target` (bubbling), as the browser would. */
+export function press(target: Element, key: string): void {
+  target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+}
+
+/** Picks `value` in a native `<select>` the way a user would. */
+export async function choose(select: HTMLSelectElement, value: string): Promise<void> {
+  select.value = value;
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+  await settle();
+}
+
+/** The `<label for>` text naming `control`, or `null` when no label actually points at it. */
+export function labelFor(control: Element): string | null {
+  const label = Array.from(document.querySelectorAll('label')).find(
+    (candidate) => candidate.getAttribute('for') === control.id && control.id !== ''
+  );
+  return label === undefined ? null : (label.textContent ?? '').replace(/\s+/g, ' ').trim();
+}
+
+/** The text of the elements `control` points at with `aria-describedby`. */
+export function describedBy(control: Element): string {
+  return (control.getAttribute('aria-describedby') ?? '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((id) => (document.getElementById(id)?.textContent ?? '').trim())
+    .join(' ');
 }

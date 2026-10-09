@@ -1,17 +1,23 @@
 # ROADMAP — A small, dependable ForgeCMS 1.0
 
-> **2026-10-08 (spec 085):** **Roadmap 0.11 / U01 — Reliable content state and failure recovery — is complete.** The existing
-> admin saves once, keeps work through recoverable failures, keeps list state per collection, reports delete/publish
-> outcomes honestly and reacts to real `401`/`403` through `ForgeAuthSession`. **0.11 is not complete: U02 and U03
-> pending.** Expected next release `0.12.0` (admin minor, fixed family). **Next bounded responsibility: roadmap 0.11 /
-> U02 — Keyboard, focus and existing field interactions.**
+> **2026-10-09 (spec 086):** **Roadmap 0.11 / U02 — Keyboard, focus and existing field interactions — is complete.** A
+> keyboard-only editor can sign in, create/edit/publish/delete content, correct a real server validation error (focus
+> goes to the first invalid field), pick a relation, guard unsaved edits in an accessible dialog (no more
+> `window.confirm`) and sign out; modal focus is trapped and restored, every control is really labelled and carries its
+> own error, and Save/Cancel stay on screen on a phone. axe (WCAG 2.2 AA) now runs in CI against the real admin.
+> **0.11 is not complete: U03 pending.** Published baseline is `0.12.0` (U01); U02 is patch work → expected next
+> release `0.12.1`. **Next bounded responsibility: roadmap 0.11 / U03 — Certify admin reuse and freeze the 1.0 surface.**
+>
+> **2026-10-08 (spec 085):** **Roadmap 0.11 / U01 — Reliable content state and failure recovery — is complete** and
+> published as `0.12.0`. The existing admin saves once, keeps work through recoverable failures, keeps list state per
+> collection, reports delete/publish outcomes honestly and reacts to real `401`/`403` through `ForgeAuthSession`.
 >
 > **2026-10-08 (spec 084):** **Roadmap 0.10 — Portable storage and deployment profiles is complete** (P01–P03). Two
 > durable production profiles — Cloudflare (D1 + R2) and portable Node (on-disk libSQL + `@forge-cms/s3`) — are
 > production-built from packed public packages and walked through auth/admin, SSR, multipart upload, access-checked
 > file serving, restart, delete and isolated backup/restore (Cloudflare evidence is local workerd/D1/R2; the S3
 > service is Garage `v2.4.1`; other S3 providers are configurable, not certified). A production build never
-> silently falls back to InMemory. npm `latest` is `0.11.0` (roadmap 0.10 = npm `0.11.x`).
+> silently falls back to InMemory. npm `latest` was `0.11.0` then (roadmap 0.10 = npm `0.11.x`); it is `0.12.0` now.
 >
 > **2026-10-08 (spec 083):** _(P02)_ roadmap 0.10 **P02 — Portable upload lifecycle and access — is complete**: on-disk libSQL +
 > `@forge-cms/s3` + a real Garage service, driven through Forge's own multipart handler and `handleFile`, with
@@ -244,7 +250,7 @@ Do not build an entire minor on one giant branch or force a separate PR for each
 | [0.8](roadmap/v1/0.8-angular-client.md)      | First-class typed Angular client and DX                         | C01–C03                        | Server contracts; 0.7 upgrade readiness |
 | [0.9](roadmap/v1/0.9-ssr.md)                 | Analog Local API + safe public SSR/hydration                    | S01–S03                        | 0.8 transport/types                     |
 | [0.10](roadmap/v1/0.10-portable-storage.md)  | Complete D1/R2 and libSQL/S3 deployment profiles — **complete** | P01–P03 (done)                 | Storage/access/upgrades; 0.9 consumer   |
-| [0.11](roadmap/v1/0.11-admin.md)             | Existing admin is reliable, accessible and reusable             | U01 (done), U02–U03            | SDK, SSR and durable profiles           |
+| [0.11](roadmap/v1/0.11-admin.md)             | Existing admin is reliable, accessible and reusable             | U01–U02 (done), U03            | SDK, SSR and durable profiles           |
 | [0.12](roadmap/v1/0.12-certification.md)     | Final artifact/profile certification + RC preparation           | R01–R04, L01 preparation       | Prior outcomes and U03 surface freeze   |
 | [1.0 RC → 1.0](roadmap/v1/1.0-release.md)    | Defect-only observation, then compatibility commitment          | L01 candidate, L02–L03         | Accepted candidate evidence             |
 

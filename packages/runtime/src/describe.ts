@@ -3,6 +3,7 @@ import type {
   ArrayFieldOptions,
   BlocksFieldOptions,
   CollectionDefinition,
+  DateFieldOptions,
   FieldMap,
   GlobalDefinition,
   GroupFieldOptions,
@@ -34,6 +35,8 @@ export interface FieldDescription {
   blocks?: BlockDescription[];
   minRows?: number;
   maxRows?: number;
+  /** `date` fields only: the value is a date-time, not a calendar date (core `withTime`). */
+  withTime?: boolean;
   localized?: boolean;
 }
 
@@ -87,6 +90,11 @@ function describeField(name: string, field: AnyField): FieldDescription {
   switch (field.kind) {
     case 'select':
       return { ...base, options: (field.options as SelectFieldOptions).options };
+
+    case 'date':
+      return (field.options as DateFieldOptions).withTime === true
+        ? { ...base, withTime: true }
+        : base;
 
     case 'relation': {
       const options = field.options as RelationFieldOptions;

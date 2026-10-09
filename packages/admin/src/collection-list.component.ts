@@ -102,13 +102,16 @@ export interface StatusChangeRequest {
                   @if (sortable()) {
                     <button
                       type="button"
-                      class="inline-flex items-center gap-1 hover:text-foreground"
+                      class="inline-flex items-center gap-1 rounded hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       (click)="toggleSort(field.name)"
                     >
                       {{ field.label }}
-                      <span class="text-xs text-muted-foreground">{{
+                      <span class="text-xs text-muted-foreground" aria-hidden="true">{{
                         sortIndicator(field.name)
                       }}</span>
+                      @if (sortDescription(field.name); as description) {
+                        <span class="sr-only">({{ description }})</span>
+                      }
                     </button>
                   } @else {
                     {{ field.label }}
@@ -191,6 +194,7 @@ export interface StatusChangeRequest {
                           } @else {
                             {{ isPublished(doc) ? 'Unpublish' : 'Publish' }}
                           }
+                          <span class="sr-only"> {{ labelFor(doc) }}</span>
                         </volt-button>
                       }
                       <volt-button
@@ -200,7 +204,7 @@ export interface StatusChangeRequest {
                         (click)="edit.emit(doc)"
                       >
                         <lmn-pencil [size]="14" />
-                        <span class="sr-only">Edit</span>
+                        <span class="sr-only">Edit {{ labelFor(doc) }}</span>
                       </volt-button>
                       <volt-button
                         variant="ghost"
@@ -209,7 +213,7 @@ export interface StatusChangeRequest {
                         (click)="delete.emit(doc)"
                       >
                         <lmn-trash [size]="14" />
-                        <span class="sr-only">Delete</span>
+                        <span class="sr-only">Delete {{ labelFor(doc) }}</span>
                       </volt-button>
                     </div>
                   }
@@ -272,6 +276,17 @@ export class ForgeCollectionListComponent {
 
   protected readonly shortId = shortId;
   protected readonly documentLabel = documentLabel;
+  /** What names a row's actions: its title, else a short id (so "Edit" is never ambiguous). */
+  protected labelFor(doc: Record<string, unknown>): string {
+    return documentLabel(doc, this.collection().useAsTitle);
+  }
+
+  protected sortDescription(field: string): string {
+    const sort = this.sort();
+    if (!sort || sort.field !== field) return '';
+    return sort.order === 'asc' ? 'sorted ascending' : 'sorted descending';
+  }
+
   protected readonly asString = (value: unknown): string =>
     value === undefined ? '' : String(value);
 

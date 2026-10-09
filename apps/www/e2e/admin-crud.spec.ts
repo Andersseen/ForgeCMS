@@ -46,7 +46,7 @@ test('content admin: create, list, edit, publish, filter, delete', async ({ page
   await expect(row.getByText('Draft', { exact: true })).toBeVisible();
 
   // Edit: routed editor, pre-filled with the existing value.
-  await row.getByRole('button', { name: 'Edit' }).click();
+  await row.getByRole('button', { name: /^Edit/ }).click();
   await expect(page).toHaveURL(/\/admin\/collections\/posts\/[^/]+$/);
   await expect(page.locator('input#title')).toHaveValue(title);
   await page.locator('input#title').fill(updatedTitle);
@@ -57,7 +57,7 @@ test('content admin: create, list, edit, publish, filter, delete', async ({ page
   await expect(editedRow).toBeVisible();
 
   // Publish, then filter by Published/Draft to prove the status filter actually queries the API.
-  await editedRow.getByRole('button', { name: 'Publish' }).click();
+  await editedRow.getByRole('button', { name: /^Publish/ }).click();
   await expect(editedRow.getByText('Published', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'Draft', exact: true }).click();
@@ -70,7 +70,7 @@ test('content admin: create, list, edit, publish, filter, delete', async ({ page
   const finalRow = page.locator('volt-table-row', { hasText: updatedTitle });
 
   // Delete requires a styled confirmation, not a single icon click.
-  await finalRow.getByRole('button', { name: 'Delete' }).click();
+  await finalRow.getByRole('button', { name: /^Delete/ }).click();
   const confirmDialog = page.getByRole('dialog', { name: 'Delete this document?' });
   await expect(confirmDialog).toBeVisible();
   await confirmDialog.getByRole('button', { name: 'Delete', exact: true }).click();
@@ -84,15 +84,14 @@ test('unsaved changes in the document editor prompt before navigating away', asy
   await page.goto('/admin/collections/posts/new');
   await page.locator('input#title').fill('Should prompt before leaving');
 
-  let dialogSeen = false;
-  page.once('dialog', (dialog) => {
-    dialogSeen = true;
-    void dialog.dismiss();
-  });
+  // Spec 086: the prompt is Forge's own dialog, not window.confirm.
+  const leave = page.getByRole('dialog', { name: 'Leave without saving?' });
   await page.getByRole('button', { name: 'Cancel' }).click();
-
-  await expect.poll(() => dialogSeen).toBe(true);
+  await expect(leave).toBeVisible();
+  await leave.getByRole('button', { name: 'Stay' }).click();
+  await expect(leave).toHaveCount(0);
   await expect(page).toHaveURL(/\/admin\/collections\/posts\/new$/);
+  await expect(page.locator('input#title')).toHaveValue('Should prompt before leaving');
 });
 
 test('the API still rejects an anonymous write even if the client were bypassed', async ({

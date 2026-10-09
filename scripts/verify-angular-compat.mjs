@@ -191,7 +191,8 @@ function manifest(combination, tarballs) {
     ...Object.fromEntries(['common', 'compiler', 'core', 'platform-browser', 'router'].map(ng)),
     ...(combination.admin && {
       ...Object.fromEntries([ng('forms')]),
-      // Not a Forge peer: VoltUI's own dependency (ng-primitives) requires it.
+      // A direct peer of `@forge-cms/admin` (its modal focus trap, spec 086) as well as of VoltUI's
+      // own dependency (ng-primitives).
       '@angular/cdk': resolveVersion('@angular/cdk', combination.cdk),
       '@voltui/components': resolveVersion('@voltui/components', combination.voltui),
       'lumen-icons': resolveVersion('lumen-icons', combination.lumenIcons)

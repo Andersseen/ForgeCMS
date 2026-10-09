@@ -1,6 +1,9 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
+  Injector,
+  DestroyRef,
   computed,
   effect,
   inject,
@@ -8,6 +11,7 @@ import {
   linkedSignal,
   signal
 } from '@angular/core';
+import { afterNextRenderIfAlive } from './after-render.js';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterOutlet } from '@angular/router';
 import { map } from 'rxjs';
@@ -81,16 +85,22 @@ const STATUS_LABELS: Record<StatusFilter, string> = {
               [value]="searchTerm()"
               (valueChange)="onSearchInput($event)"
               placeholder="Search…"
+              [ariaLabel]="'Search ' + collectionMeta.name"
               class="max-w-xs"
             />
           }
           @if (collectionMeta.drafts) {
-            <div class="inline-flex rounded-md border border-border p-0.5 text-xs">
+            <div
+              role="group"
+              aria-label="Filter by status"
+              class="inline-flex rounded-md border border-border p-0.5 text-xs"
+            >
               @for (option of statusOptions; track option) {
                 <button
                   type="button"
-                  class="rounded px-2.5 py-1"
+                  class="rounded px-2.5 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   [class.bg-muted]="status() === option"
+                  [attr.aria-pressed]="status() === option ? 'true' : 'false'"
                   (click)="onStatusChange(option)"
                 >
                   {{ statusLabels[option] }}
@@ -101,7 +111,7 @@ const STATUS_LABELS: Record<StatusFilter, string> = {
         </div>
 
         @if (actionError(); as message) {
-          <p class="text-xs text-destructive">{{ message }}</p>
+          <p class="text-xs text-destructive" role="alert">{{ message }}</p>
         }
 
         @if (documentsResource.error(); as error) {
@@ -149,6 +159,9 @@ export class ForgeCollectionWorkspaceComponent {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly refresh = inject(ForgeContentRefresh, { optional: true });
+  private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef, { optional: true });
 
   /** Overrides the `:collection` route param, for standalone embedding outside the route helper. */
   collection = input<string | undefined>(undefined);
@@ -375,6 +388,12 @@ export class ForgeCollectionWorkspaceComponent {
     this.deleting.set(false);
     this.actionError.set(null);
     this.documentsResource.reload();
+    // The row (and the button that opened the dialog) is going away: land on the page heading.
+    afterNextRenderIfAlive(this.injector, this.destroyRef, () => this.focusHeading());
+  }
+
+  private focusHeading(): void {
+    this.host?.nativeElement.querySelector<HTMLElement>('h1')?.focus();
   }
 
   protected async onStatusToggle(request: StatusChangeRequest): Promise<void> {

@@ -1,14 +1,42 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-08 (spec 085 / roadmap 0.11 U01 — reliable content state and failure recovery — COMPLETE on
-> branch `feature/spec-085-admin-reliability`, PR pending; roadmap 0.11 is **not** complete: U02 and U03 pending).
-> Roadmap 0.10 (P01–P03, spec 084, PR #83, main CI `37776352995` ✓) is merged and complete. Published npm `latest` is
-> `0.11.0`; U01 adds `.changeset/reliable-admin-content-state.md` (`@forge-cms/admin` minor → fixed family `0.12.0`).
-> Next bounded responsibility: roadmap 0.11 / U02 — Keyboard, focus and existing field interactions (not started).**
+> **Last updated: 2026-10-09 (spec 086 / roadmap 0.11 U02 — keyboard, focus and existing field interactions — COMPLETE
+> on branch `feature/spec-086-admin-keyboard-focus`, PR pending; roadmap 0.11 is **not** complete: U03 pending).
+> U01 (spec 085, PR #84, main CI `37826074960` ✓) and its release PR #85 (CI `37830311591` ✓) are merged; npm `latest`
+> and GitHub release `v0.12.0` are published for the fixed family. U02 is patch work
+> (`.changeset/admin-keyboard-focus-field-interactions.md` + `date-withtime-field-metadata.md`) → expected next release
+> `0.12.1`.
+> Next bounded responsibility: roadmap 0.11 / U03 — Certify admin reuse and freeze the 1.0 surface (not started).**
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Admin keyboard, focus and field interactions — U02 (spec 086, 2026-10-09, complete; second packet of roadmap 0.11)
+
+Spec: [086-admin-keyboard-focus-field-interactions.md](specs/086-admin-keyboard-focus-field-interactions.md) (audit table,
+design, supported field matrix, Outcome). The existing admin is now operable and certifiable by keyboard; no redesign.
+
+- **Modals:** `ForgeModalFocusDirective` (internal) over `@angular/cdk/a11y`'s focus trap — focus enters (first field /
+  safe choice), Tab and Shift+Tab stay inside, Escape cancels (inert while a U01 write is pending), close restores the
+  opener or, when it is gone, the page `h1`; nested dialogs resolve outermost-first. **`@angular/cdk ^21.2.0` is now a
+  declared peer of `@forge-cms/admin`.**
+- **Unsaved changes:** `canDeactivate()` returns a shared promise behind a Forge confirmation (Stay / Leave without
+  saving); `window.confirm` is gone from the reusable editor.
+- **Errors:** native `<label for>` (Volt's `volt-label` never emitted `for` outside `ngpFormField` — every label was
+  orphaned), `required` on the native control, `aria-invalid` + `aria-describedby` set on the rendered control, composite
+  errors rendered, first-invalid focus (nested paths included), request-level alert inside the dialog.
+- **Fixed on the way:** rows 2+ of arrays/blocks addressed row 0 (nested `@for` `$index`); duplicate ids from static
+  `id` on `volt-input`; relation Enter submitted the whole form; `minRows` ignored; ISO value in a `type="date"` input.
+- **`withTime`:** `FieldDescription.withTime` / `FieldMeta.withTime` (existing core option) → `datetime-local`, local
+  wall-clock in, canonical ISO out. No timezone model.
+- **Pickers/richtext/locales/users/auth:** named controls, status, safe errors, focus management, unknown stored block
+  types kept and flagged, sole-admin reason keyboard-reachable, users real `<form>`, sign-in focus after failure.
+- **Mobile:** editor card capped to `100dvh`; title and Save/Cancel fixed, fields scroll.
+- **Evidence:** rendered `*.accessibility.test.ts` suites (admin 185 tests incl. U01's 103); tiny-project keyboard
+  journey + axe scans, demo-aesthetics styled axe scans + 375px test. `@axe-core/playwright` 4.13.0, WCAG 2.2 AA,
+  one documented exclusion (`target-size` in the unstyled tiny-project fixture only).
+- **Left for U03:** custom-mount/base-path certification and the 1.0 surface freeze.
 
 ## Admin reliability — U01 (spec 085, 2026-10-08, complete; first packet of roadmap 0.11)
 
@@ -34,8 +62,8 @@ now dependable under ordinary failure and concurrency; no redesign.
 - **API/release:** no new exports; optional inputs `submitting`/`submitDisabled` (form), `pending`/`pendingLabel`/`error`
   (confirm dialog), `pendingIds` (list). Changeset minor → `0.12.0`. README corrected (`0.11.0`, `@forge-cms/s3` install).
 - **Gates (final tree):** format, lint, typecheck, test, build, check:api, test:cloudflare/libsql/upgrade/s3, release:verify/compat/ssr, e2e www (41) / www:prod (11) / tiny-project (19) / demo (29) all ✓ — see spec 085 Outcome for cached vs executed.
-- **Left for U02/U03:** keyboard/focus/dialog semantics (the unsaved-changes prompt is still the native `confirm`),
-  relation/upload picker interactions, custom-mount certification and the 1.0 surface freeze.
+- **Left for U02/U03 (U02 done in spec 086):** keyboard/focus/dialog semantics, picker interactions; U03: custom-mount
+  certification and the 1.0 surface freeze.
 
 ## Deployment and recovery profiles — P03 (spec 084, 2026-10-08, complete, PR #83; closes roadmap 0.10)
 

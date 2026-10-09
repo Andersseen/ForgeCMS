@@ -19,7 +19,7 @@
 ---
 
 > [!WARNING]
-> ForgeCMS is pre-1.0 (npm `0.11.0`). The fundamentals — schema DSL, Local API, HTTP handlers, access
+> ForgeCMS is pre-1.0 (npm `0.12.0`). The fundamentals — schema DSL, Local API, HTTP handlers, access
 > control, hooks, drafts, versions, globals, live preview, localization, relations, and a reusable
 > Angular admin — are usable and exercised by real consumer apps in this repo, but API stability is
 > not guaranteed before `1.0`. See [docs/STATE.md](docs/STATE.md) for exactly what is implemented and
@@ -136,9 +136,9 @@ source in [`apps/demo-aesthetics`](apps/demo-aesthetics)) and the docs at
 Two separate numbering schemes:
 
 - **npm versions.** The eleven public packages are one fixed Changesets group; they always share a
-  version. The current release is **`0.11.0`** (adds `@forge-cms/s3`). The numbers are offset from the
+  version. The current release is **`0.12.0`** (admin reliability, roadmap 0.11 U01). The numbers are offset from the
   roadmap: npm `0.8.x` was roadmap 0.7 (upgrade safety), `0.9.0` roadmap 0.8 (Angular DX), `0.10.x` roadmap 0.9
-  (SSR) and `0.11.x` is roadmap 0.10 (portable storage and deployment profiles).
+  (SSR), `0.11.x` roadmap 0.10 (portable storage and deployment profiles) and `0.12.x` is roadmap 0.11 (admin).
 - **Roadmap checkpoints** ([docs/ROADMAP.md](docs/ROADMAP.md)) are product guarantees. Roadmaps 0.6 – 0.10
   are complete; the next bounded responsibility is roadmap 0.11 / U01 (reliable content state and failure
   recovery).

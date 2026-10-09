@@ -59,6 +59,8 @@ export interface FieldMeta {
   blocks?: BlockMeta[];
   minRows?: number;
   maxRows?: number;
+  /** `date` fields only: the value is a date-time (an ISO instant), not a calendar date. */
+  withTime?: boolean;
   /** `true` when the field stores per-locale values (`{ en: "Hello", es: "Hola" }`). */
   localized?: boolean;
 }

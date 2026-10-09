@@ -1,24 +1,45 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
   computed,
   forwardRef,
+  inject,
   input,
   output,
-  signal
+  signal,
+  viewChild,
+  viewChildren
 } from '@angular/core';
-import {
-  VoltButton,
-  VoltError,
-  VoltInput,
-  VoltLabel,
-  VoltSwitch,
-  VoltTextarea
-} from '@voltui/components';
+import { VoltButton, VoltInput, VoltSwitch, VoltTextarea } from '@voltui/components';
 import type { BlockMeta, FieldMeta } from '@forge-cms/angular';
 import { ForgeRelationPickerComponent } from './relation-picker.component.js';
 import { ForgeUploadPickerComponent } from './upload-picker.component.js';
 import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
+import { ForgeControlA11yDirective } from './control-a11y.directive.js';
+import {
+  fromDateInputValue,
+  fromDateTimeLocalValue,
+  toDateInputValue,
+  toDateTimeLocalValue
+} from './date-value.js';
+
+const FOCUSABLE =
+  'input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled]), button:not([disabled])';
+
+/** Kinds whose control is a native `<input>`/`<textarea>`/`<select>` that can carry `required`. */
+const NATIVE_REQUIRED_KINDS = new Set([
+  'text',
+  'slug',
+  'email',
+  'number',
+  'date',
+  'textarea',
+  'json',
+  'select'
+]);
 
 /**
  * Renders a single field, recursing into itself for the composite kinds (`group`, `array`,
@@ -29,6 +50,11 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
  * Values flow up, never sideways: a nested control emits its own new value, and the composite branch
  * that owns it merges that into its object/array and re-emits. Nothing mutates a parent's state
  * directly, so the whole tree stays a plain immutable value the form can submit as-is.
+ *
+ * Accessibility (spec 086): every control is named by a real `<label for>` (or, for the widgets that
+ * have no single native control, a labelled group), a field error is a stable-id element that the
+ * rendered control references through `aria-describedby`, and composites expose their own error and
+ * row identities. Wrapper elements carry `data-forge-invalid` so the form can focus the first one.
  */
 @Component({
   selector: 'forge-field-control',
@@ -37,12 +63,11 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
     VoltInput,
     VoltTextarea,
     VoltSwitch,
-    VoltLabel,
-    VoltError,
     VoltButton,
     ForgeRelationPickerComponent,
     ForgeUploadPickerComponent,
     ForgeRichTextEditorComponent,
+    ForgeControlA11yDirective,
     forwardRef(() => ForgeFieldControlComponent)
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -51,8 +76,20 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
 
     @switch (f.kind) {
       @case ('group') {
-        <fieldset class="space-y-3 rounded-md border border-border p-3">
-          <legend class="px-1 text-sm font-medium">{{ f.label }}</legend>
+        <fieldset
+          class="space-y-3 rounded-md border border-border p-3"
+          [id]="path()"
+          [attr.data-forge-path]="path()"
+          [attr.data-forge-invalid]="error() ? '' : null"
+          [attr.aria-describedby]="error() ? errorId() : null"
+        >
+          <legend class="px-1 text-sm font-medium">
+            {{ f.label }}
+            @if (f.required) {
+              <span class="text-destructive" aria-hidden="true">&nbsp;*</span>
+              <span class="sr-only">(required)</span>
+            }
+          </legend>
           @for (child of f.fields ?? []; track child.name) {
             <forge-field-control
               [field]="child"
@@ -64,19 +101,47 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
               (valueChange)="setInObject(child.name, $event)"
             />
           }
+          @if (error(); as message) {
+            <p [id]="errorId()" class="text-sm font-medium text-error">{{ message }}</p>
+          }
         </fieldset>
       }
 
       @case ('array') {
-        <fieldset class="space-y-3 rounded-md border border-border p-3">
-          <legend class="px-1 text-sm font-medium">{{ f.label }}</legend>
+        <fieldset
+          class="space-y-3 rounded-md border border-border p-3"
+          [id]="path()"
+          [attr.data-forge-path]="path()"
+          [attr.data-forge-invalid]="error() ? '' : null"
+          [attr.aria-describedby]="error() ? errorId() : null"
+        >
+          <legend class="px-1 text-sm font-medium">
+            {{ f.label }}
+            @if (f.required) {
+              <span class="text-destructive" aria-hidden="true">&nbsp;*</span>
+              <span class="sr-only">(required)</span>
+            }
+          </legend>
 
-          @for (row of rowValues(); track $index) {
-            <div class="space-y-3 rounded-md border border-border/60 p-3">
-              <div class="flex items-center justify-between">
-                <span class="text-xs text-muted-foreground">#{{ $index + 1 }}</span>
-                <volt-button type="button" variant="outline" size="sm" (click)="removeRow($index)">
-                  Remove
+          @for (row of rowValues(); track $index; let rowIndex = $index) {
+            <div
+              #rowEl
+              role="group"
+              class="space-y-3 rounded-md border border-border/60 p-3"
+              [attr.aria-label]="rowLabel($index)"
+            >
+              <div class="flex items-center justify-between" data-forge-row-action>
+                <span class="text-xs text-muted-foreground" aria-hidden="true"
+                  >#{{ $index + 1 }}</span
+                >
+                <volt-button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  [disabled]="!canRemoveRow()"
+                  (click)="removeRow($index)"
+                >
+                  Remove<span class="sr-only"> {{ rowLabel($index) }}</span>
                 </volt-button>
               </div>
               @for (child of f.fields ?? []; track child.name) {
@@ -84,10 +149,10 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
                   [field]="child"
                   [value]="row[child.name]"
                   [errors]="errors()"
-                  [path]="rowPath($index, child.name)"
+                  [path]="rowPath(rowIndex, child.name)"
                   [locales]="locales()"
                   [activeLocale]="effectiveLocale()"
-                  (valueChange)="setInRow($index, child.name, $event)"
+                  (valueChange)="setInRow(rowIndex, child.name, $event)"
                 />
               }
             </div>
@@ -95,35 +160,77 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
             <p class="text-sm text-muted-foreground">No rows yet.</p>
           }
 
-          @if (canAddRow()) {
-            <volt-button type="button" variant="outline" size="sm" (click)="addRow()">
-              Add row
-            </volt-button>
+          @if (limitHint(); as hint) {
+            <p class="text-xs text-muted-foreground">{{ hint }}</p>
+          }
+          <volt-button
+            #addButton
+            type="button"
+            variant="outline"
+            size="sm"
+            [disabled]="!canAddRow()"
+            (click)="addRow()"
+          >
+            Add row<span class="sr-only"> to {{ f.label }}</span>
+          </volt-button>
+
+          @if (error(); as message) {
+            <p [id]="errorId()" class="text-sm font-medium text-error">{{ message }}</p>
           }
         </fieldset>
       }
 
       @case ('blocks') {
-        <fieldset class="space-y-3 rounded-md border border-border p-3">
-          <legend class="px-1 text-sm font-medium">{{ f.label }}</legend>
+        <fieldset
+          class="space-y-3 rounded-md border border-border p-3"
+          [id]="path()"
+          [attr.data-forge-path]="path()"
+          [attr.data-forge-invalid]="error() ? '' : null"
+          [attr.aria-describedby]="error() ? errorId() : null"
+        >
+          <legend class="px-1 text-sm font-medium">
+            {{ f.label }}
+            @if (f.required) {
+              <span class="text-destructive" aria-hidden="true">&nbsp;*</span>
+              <span class="sr-only">(required)</span>
+            }
+          </legend>
 
-          @for (row of rowValues(); track $index) {
-            <div class="space-y-3 rounded-md border border-border/60 p-3">
-              <div class="flex items-center justify-between">
+          @for (row of rowValues(); track $index; let rowIndex = $index) {
+            <div
+              #rowEl
+              role="group"
+              class="space-y-3 rounded-md border border-border/60 p-3"
+              [attr.aria-label]="rowLabel($index, row)"
+            >
+              <div class="flex items-center justify-between" data-forge-row-action>
                 <span class="text-xs font-medium">{{ blockLabel(row) }}</span>
-                <volt-button type="button" variant="outline" size="sm" (click)="removeRow($index)">
-                  Remove
+                <volt-button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  [disabled]="!canRemoveRow()"
+                  (click)="removeRow($index)"
+                >
+                  Remove<span class="sr-only"> {{ rowLabel($index, row) }}</span>
                 </volt-button>
               </div>
+              @if (blockFor(row) === undefined) {
+                <p class="text-xs text-destructive">
+                  Unknown block type “{{ row['blockType'] }}”. It is not part of this collection's
+                  schema, so it can't be edited here — its stored content is kept as it is unless
+                  you remove it.
+                </p>
+              }
               @for (child of blockFields(row); track child.name) {
                 <forge-field-control
                   [field]="child"
                   [value]="row[child.name]"
                   [errors]="errors()"
-                  [path]="rowPath($index, child.name)"
+                  [path]="rowPath(rowIndex, child.name)"
                   [locales]="locales()"
                   [activeLocale]="effectiveLocale()"
-                  (valueChange)="setInRow($index, child.name, $event)"
+                  (valueChange)="setInRow(rowIndex, child.name, $event)"
                 />
               }
             </div>
@@ -131,49 +238,78 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
             <p class="text-sm text-muted-foreground">No blocks yet.</p>
           }
 
-          @if (canAddRow()) {
-            <div class="flex items-center gap-2">
-              <select
-                class="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-                #blockPicker
-              >
-                @for (block of f.blocks ?? []; track block.slug) {
-                  <option [value]="block.slug">{{ block.label }}</option>
-                }
-              </select>
-              <volt-button
-                type="button"
-                variant="outline"
-                size="sm"
-                (click)="addBlock(blockPicker.value)"
-              >
-                Add block
-              </volt-button>
-            </div>
+          @if (limitHint(); as hint) {
+            <p class="text-xs text-muted-foreground">{{ hint }}</p>
+          }
+          <div class="flex items-center gap-2">
+            <select
+              #blockPicker
+              class="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              [attr.aria-label]="'Block type to add to ' + f.label"
+              [disabled]="!canAddRow()"
+            >
+              @for (block of f.blocks ?? []; track block.slug) {
+                <option [value]="block.slug">{{ block.label }}</option>
+              }
+            </select>
+            <volt-button
+              #addButton
+              type="button"
+              variant="outline"
+              size="sm"
+              [disabled]="!canAddRow()"
+              (click)="addBlock(blockPicker.value)"
+            >
+              Add block<span class="sr-only"> to {{ f.label }}</span>
+            </volt-button>
+          </div>
+
+          @if (error(); as message) {
+            <p [id]="errorId()" class="text-sm font-medium text-error">{{ message }}</p>
           }
         </fieldset>
       }
 
       @default {
-        <div class="space-y-1.5">
-          <volt-label [htmlFor]="path()" [error]="!!error()">
+        <div
+          class="space-y-1.5"
+          [forgeControlA11y]="path()"
+          [forgeControlInvalid]="!!error()"
+          [forgeControlErrorId]="errorId()"
+          [attr.data-forge-path]="path()"
+          [attr.data-forge-invalid]="error() ? '' : null"
+          [attr.role]="isWidget() ? 'group' : null"
+          [attr.aria-labelledby]="isWidget() ? labelId() : null"
+          [attr.aria-describedby]="groupDescribesError() ? errorId() : null"
+        >
+          <!-- A native <label>: Volt's label only sets \`for\` inside an ngpFormField, which Forge does not use. -->
+          <label
+            class="text-sm font-medium leading-none text-foreground"
+            [class.text-error]="!!error()"
+            [attr.id]="labelId()"
+            [attr.for]="isWidget() && f.kind !== 'relation' && f.kind !== 'upload' ? null : path()"
+          >
             {{ f.label }}
             @if (f.required) {
-              <span class="text-destructive">&nbsp;*</span>
+              <span class="text-destructive" aria-hidden="true">&nbsp;*</span>
+              @if (!hasNativeRequired()) {
+                <span class="sr-only">(required)</span>
+              }
             }
-          </volt-label>
+          </label>
 
           @if (isLocalized()) {
-            <div class="mb-1 flex gap-1">
+            <div role="group" class="mb-1 flex gap-1" [attr.aria-label]="f.label + ' language'">
               @for (loc of locales(); track loc) {
                 <button
                   type="button"
-                  class="rounded border px-2 py-0.5 text-xs transition-colors"
+                  class="rounded border px-2 py-0.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   [class]="
                     loc === effectiveLocale()
                       ? 'border-primary bg-primary text-primary-foreground'
                       : 'border-border bg-transparent text-muted-foreground hover:bg-muted'
                   "
+                  [attr.aria-pressed]="loc === effectiveLocale() ? 'true' : 'false'"
                   (click)="setLocale(loc)"
                 >
                   {{ loc }}
@@ -186,21 +322,25 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
             @case ('textarea') {
               <volt-textarea
                 [id]="path()"
-                [value]="isLocalized() ? localeStringValue() : stringValue()"
-                (valueChange)="isLocalized() ? emitLocaleValue($event) : valueChange.emit($event)"
+                [required]="f.required"
+                [value]="stringValue()"
+                (valueChange)="commit($event)"
               />
             }
             @case ('richtext') {
               <forge-richtext-editor
-                [value]="isLocalized() ? localeValue() : value()"
-                (valueChange)="isLocalized() ? emitLocaleValue($event) : valueChange.emit($event)"
+                [value]="current()"
+                [label]="f.label"
+                [idPrefix]="path()"
+                (valueChange)="commit($event)"
               />
             }
             @case ('json') {
               <volt-textarea
                 [id]="path()"
-                [value]="isLocalized() ? localeJsonValue() : jsonValue()"
-                (valueChange)="isLocalized() ? emitLocaleJson($event) : emitJson($event)"
+                [required]="f.required"
+                [value]="jsonValue()"
+                (valueChange)="emitJson($event)"
               />
             }
             @case ('boolean') {
@@ -208,16 +348,17 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
               <volt-switch
                 [id]="path()"
                 [ariaLabel]="f.label"
-                [checked]="isLocalized() ? localeBooleanValue() : booleanValue()"
-                (checkedChange)="isLocalized() ? emitLocaleValue($event) : valueChange.emit($event)"
+                [checked]="Boolean(current())"
+                (checkedChange)="commit($event)"
               />
             }
             @case ('select') {
               <select
                 [id]="path()"
-                class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                [value]="isLocalized() ? localeStringValue() : stringValue()"
-                (change)="isLocalized() ? onSelectChangeLocalized($event) : onSelectChange($event)"
+                class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                [required]="f.required"
+                [value]="stringValue()"
+                (change)="onSelectChange($event)"
               >
                 <option value="">Select…</option>
                 @for (opt of f.options ?? []; track opt) {
@@ -231,8 +372,9 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
                   [inputId]="path()"
                   [collection]="relation.collection"
                   [many]="relation.many"
-                  [value]="isLocalized() ? localeValue() : value()"
-                  (valueChange)="isLocalized() ? emitLocaleValue($event) : valueChange.emit($event)"
+                  [label]="f.label"
+                  [value]="current()"
+                  (valueChange)="commit($event)"
                 />
               }
             }
@@ -241,8 +383,9 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
                 <forge-upload-picker
                   [inputId]="path()"
                   [collection]="relation.collection"
-                  [value]="isLocalized() ? localeValue() : value()"
-                  (valueChange)="isLocalized() ? emitLocaleValue($event) : valueChange.emit($event)"
+                  [label]="f.label"
+                  [value]="current()"
+                  (valueChange)="commit($event)"
                 />
               }
             }
@@ -250,38 +393,52 @@ import { ForgeRichTextEditorComponent } from './richtext-editor.component.js';
               <volt-input
                 [id]="path()"
                 type="number"
-                [value]="isLocalized() ? localeStringValue() : stringValue()"
-                (valueChange)="isLocalized() ? emitLocaleNumber($event) : emitNumber($event)"
+                [required]="f.required"
+                [value]="stringValue()"
+                (valueChange)="emitNumber($event)"
               />
             }
             @case ('date') {
-              <volt-input
-                [id]="path()"
-                type="date"
-                [value]="isLocalized() ? localeStringValue() : stringValue()"
-                (valueChange)="isLocalized() ? emitLocaleValue($event) : valueChange.emit($event)"
-              />
+              @if (f.withTime) {
+                <volt-input
+                  [id]="path()"
+                  type="datetime-local"
+                  [required]="f.required"
+                  [value]="dateTimeValue()"
+                  (valueChange)="commit(fromDateTimeLocalValue($event))"
+                />
+              } @else {
+                <volt-input
+                  [id]="path()"
+                  type="date"
+                  [required]="f.required"
+                  [value]="dateValue()"
+                  (valueChange)="commit(fromDateInputValue($event))"
+                />
+              }
             }
             @case ('email') {
               <volt-input
                 [id]="path()"
                 type="email"
-                [value]="isLocalized() ? localeStringValue() : stringValue()"
-                (valueChange)="isLocalized() ? emitLocaleValue($event) : valueChange.emit($event)"
+                [required]="f.required"
+                [value]="stringValue()"
+                (valueChange)="commit($event)"
               />
             }
             @default {
               <volt-input
                 [id]="path()"
                 type="text"
-                [value]="isLocalized() ? localeStringValue() : stringValue()"
-                (valueChange)="isLocalized() ? emitLocaleValue($event) : valueChange.emit($event)"
+                [required]="f.required"
+                [value]="stringValue()"
+                (valueChange)="commit($event)"
               />
             }
           }
 
           @if (error(); as message) {
-            <volt-error>{{ message }}</volt-error>
+            <p [id]="errorId()" class="text-sm font-medium text-error">{{ message }}</p>
           }
         </div>
       }
@@ -302,6 +459,16 @@ export class ForgeFieldControlComponent {
 
   valueChange = output<unknown>();
 
+  private readonly injector = inject(Injector);
+  private readonly rowEls = viewChildren<ElementRef<HTMLElement>>('rowEl');
+  private readonly addButton = viewChild<unknown, ElementRef<HTMLElement>>('addButton', {
+    read: ElementRef
+  });
+
+  protected readonly Boolean = Boolean;
+  protected readonly fromDateInputValue = fromDateInputValue;
+  protected readonly fromDateTimeLocalValue = fromDateTimeLocalValue;
+
   /** Locale this control itself picked via its own tabs, overriding `activeLocale`. */
   protected readonly localLocale = signal<string>('');
 
@@ -318,6 +485,27 @@ export class ForgeFieldControlComponent {
     this.localLocale.set(locale);
   }
 
+  protected readonly errorId = computed(() => `${this.path()}-error`);
+  protected readonly labelId = computed(() => `${this.path()}-label`);
+  protected readonly error = computed(() => this.errors()[this.path()]);
+
+  /** The widgets without a single native control are exposed as a group named by the label. */
+  protected readonly isWidget = computed(() =>
+    ['relation', 'upload', 'richtext'].includes(this.field().kind)
+  );
+  /** The group itself carries the error when no native control inside does (richtext; a chosen single relation). */
+  protected readonly groupDescribesError = computed(() => {
+    if (this.error() === undefined) return false;
+    const field = this.field();
+    if (field.kind === 'richtext') return true;
+    if (field.kind !== 'relation' || field.relation?.many === true) return false;
+    const value = this.current();
+    return value !== undefined && value !== null && value !== '';
+  });
+  protected readonly hasNativeRequired = computed(() =>
+    NATIVE_REQUIRED_KINDS.has(this.field().kind)
+  );
+
   /** The stored value for a localized field is `{ en: ..., es: ... }` — this reads the active slice. */
   protected readonly localeValue = computed(() => {
     const value = this.value();
@@ -325,8 +513,17 @@ export class ForgeFieldControlComponent {
     return (value as Record<string, unknown>)[this.effectiveLocale()];
   });
 
-  /** Merges a new value into the active locale, leaving every other locale's value untouched. */
-  protected emitLocaleValue(newValue: unknown): void {
+  /** What the control shows: the active locale's slice for a localized field, else the value. */
+  protected readonly current = computed(() =>
+    this.isLocalized() ? this.localeValue() : this.value()
+  );
+
+  /** Emits a new value, merged into the active locale (others untouched) for a localized field. */
+  protected commit(newValue: unknown): void {
+    if (!this.isLocalized()) {
+      this.valueChange.emit(newValue);
+      return;
+    }
     const current = this.value();
     const perLocale =
       typeof current === 'object' && current !== null && !Array.isArray(current)
@@ -336,54 +533,18 @@ export class ForgeFieldControlComponent {
     this.valueChange.emit(perLocale);
   }
 
-  protected onSelectChangeLocalized(event: Event): void {
-    this.emitLocaleValue((event.target as HTMLSelectElement).value);
-  }
-
-  protected emitLocaleNumber(raw: string): void {
-    this.emitLocaleValue(raw === '' ? undefined : Number(raw));
-  }
-
-  protected emitLocaleJson(raw: string): void {
-    try {
-      this.emitLocaleValue(raw === '' ? undefined : JSON.parse(raw));
-    } catch {
-      this.emitLocaleValue(raw);
-    }
-  }
-
-  protected readonly localeStringValue = computed(() => {
-    const value = this.localeValue();
-    return value === undefined || value === null ? '' : String(value);
-  });
-
-  protected readonly localeBooleanValue = computed(() => Boolean(this.localeValue()));
-
-  protected readonly localeJsonValue = computed(() => {
-    const value = this.localeValue();
-    if (value === undefined || value === null) return '';
-    return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
-  });
-
-  protected readonly error = computed(() => this.errors()[this.path()]);
-
   protected readonly stringValue = computed(() => {
-    const value = this.value();
+    const value = this.current();
     return value === undefined || value === null ? '' : String(value);
   });
 
-  protected readonly booleanValue = computed(() => Boolean(this.value()));
+  protected readonly dateValue = computed(() => toDateInputValue(this.current()));
+  protected readonly dateTimeValue = computed(() => toDateTimeLocalValue(this.current()));
 
   protected readonly jsonValue = computed(() => {
-    const value = this.value();
+    const value = this.current();
     if (value === undefined || value === null) return '';
     return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
-  });
-
-  protected readonly relationValue = computed(() => {
-    const value = this.value();
-    if (Array.isArray(value)) return value.join(', ');
-    return value === undefined || value === null ? '' : String(value);
   });
 
   protected readonly objectValue = computed<Record<string, unknown>>(() => {
@@ -407,6 +568,27 @@ export class ForgeFieldControlComponent {
     return max === undefined || this.rowValues().length < max;
   });
 
+  /** `minRows` is part of the schema: at the minimum another row must not look removable. */
+  protected readonly canRemoveRow = computed(() => {
+    const min = this.field().minRows;
+    return min === undefined || this.rowValues().length > min;
+  });
+
+  /** Says why Add or Remove is unavailable, so a disabled control is never unexplained. */
+  protected readonly limitHint = computed<string | null>(() => {
+    const { minRows, maxRows } = this.field();
+    const count = this.rowValues().length;
+    const noun = this.field().kind === 'blocks' ? 'block' : 'row';
+    const plural = (n: number) => (n === 1 ? noun : `${noun}s`);
+    if (maxRows !== undefined && count >= maxRows) {
+      return `Maximum of ${maxRows} ${plural(maxRows)} reached.`;
+    }
+    if (minRows !== undefined && minRows > 0 && count <= minRows) {
+      return `At least ${minRows} ${plural(minRows)} required.`;
+    }
+    return null;
+  });
+
   protected childPath(name: string): string {
     const prefix = this.path();
     return prefix ? `${prefix}.${name}` : name;
@@ -416,16 +598,23 @@ export class ForgeFieldControlComponent {
     return `${this.childPath(String(index))}.${name}`;
   }
 
+  /** "Steps row 2 of 3" / "Hero block 1 of 2" — the identity of a repeated row or block. */
+  protected rowLabel(index: number, row?: Record<string, unknown>): string {
+    const total = this.rowValues().length;
+    const kind = row === undefined ? `${this.field().label} row` : `${this.blockLabel(row)} block`;
+    return `${kind} ${index + 1} of ${total}`;
+  }
+
   protected blockFields(row: Record<string, unknown>): FieldMeta[] {
     return this.blockFor(row)?.fields ?? [];
   }
 
   protected blockLabel(row: Record<string, unknown>): string {
-    return this.blockFor(row)?.label ?? String(row.blockType ?? 'Unknown block');
+    return this.blockFor(row)?.label ?? String(row['blockType'] ?? 'Unknown block');
   }
 
-  private blockFor(row: Record<string, unknown>): BlockMeta | undefined {
-    return this.field().blocks?.find((block) => block.slug === row.blockType);
+  protected blockFor(row: Record<string, unknown>): BlockMeta | undefined {
+    return this.field().blocks?.find((block) => block.slug === row['blockType']);
   }
 
   protected setInObject(name: string, value: unknown): void {
@@ -438,48 +627,57 @@ export class ForgeFieldControlComponent {
   }
 
   protected addRow(): void {
+    if (!this.canAddRow()) return;
     this.valueChange.emit([...this.rowValues(), {}]);
+    this.focusRow('last');
   }
 
   protected addBlock(blockType: string): void {
-    if (!blockType) return;
+    if (!blockType || !this.canAddRow()) return;
     this.valueChange.emit([...this.rowValues(), { blockType }]);
+    this.focusRow('last');
   }
 
   protected removeRow(index: number): void {
+    if (!this.canRemoveRow()) return;
     this.valueChange.emit(this.rowValues().filter((_, i) => i !== index));
+    this.focusRow(index);
+  }
+
+  /** After a structural change: the added row, the row that took the removed one's place, or "Add". */
+  private focusRow(which: 'last' | number): void {
+    afterNextRender(
+      () => {
+        const rows = this.rowEls();
+        const row = which === 'last' ? rows.at(-1) : rows[Math.min(which, rows.length - 1)];
+        // The row's own fields, not its Remove button (which sits in the header).
+        const target =
+          Array.from(row?.nativeElement.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []).find(
+            (el) => el.closest('[data-forge-row-action]') === null
+          ) ?? this.addButton()?.nativeElement.querySelector<HTMLElement>('button:not([disabled])');
+        target?.focus();
+      },
+      { injector: this.injector }
+    );
   }
 
   protected onSelectChange(event: Event): void {
-    this.valueChange.emit((event.target as HTMLSelectElement).value);
+    this.commit((event.target as HTMLSelectElement).value);
   }
 
   protected emitNumber(raw: string): void {
     // An empty input means "unset", not 0 — coercing it would silently write a value the user
     // never typed.
-    this.valueChange.emit(raw === '' ? undefined : Number(raw));
-  }
-
-  protected emitRelation(raw: string): void {
-    if (this.field().relation?.many !== true) {
-      this.valueChange.emit(raw);
-      return;
-    }
-    this.valueChange.emit(
-      raw
-        .split(',')
-        .map((id) => id.trim())
-        .filter((id) => id.length > 0)
-    );
+    this.commit(raw === '' ? undefined : Number(raw));
   }
 
   protected emitJson(raw: string): void {
     // Keep the raw string when it is not yet valid JSON: the user is mid-edit, and replacing their
     // text with a parse failure would make the field impossible to type into.
     try {
-      this.valueChange.emit(raw === '' ? undefined : JSON.parse(raw));
+      this.commit(raw === '' ? undefined : JSON.parse(raw));
     } catch {
-      this.valueChange.emit(raw);
+      this.commit(raw);
     }
   }
 }

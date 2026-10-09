@@ -53,7 +53,7 @@ test('content: create a draft treatment, publish it from the list, see it on the
   await page.goto('/admin/collections/services');
   await page
     .locator('volt-table-row', { hasText: name })
-    .getByRole('button', { name: 'Publish' })
+    .getByRole('button', { name: /^Publish/ })
     .click();
   await expect(
     page.locator('volt-table-row', { hasText: name }).getByText('Published', { exact: true })

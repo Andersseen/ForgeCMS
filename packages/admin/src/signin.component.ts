@@ -1,7 +1,17 @@
-import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  Injector,
+  DestroyRef,
+  inject,
+  input,
+  signal
+} from '@angular/core';
+import { afterNextRenderIfAlive } from './after-render.js';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ForgeAuthSession } from '@forge-cms/angular';
-import { VoltButton, VoltCard, VoltError, VoltInput, VoltLabel } from '@voltui/components';
+import { VoltButton, VoltCard, VoltInput } from '@voltui/components';
 import { LmnEyeIcon, LmnEyeSlashIcon } from 'lumen-icons';
 import { describeSessionError } from './admin-error.js';
 import { safeAdminRedirect } from './safe-redirect.js';
@@ -14,16 +24,7 @@ import { safeAdminRedirect } from './safe-redirect.js';
 @Component({
   selector: 'forge-sign-in',
   standalone: true,
-  imports: [
-    RouterLink,
-    VoltButton,
-    VoltCard,
-    VoltInput,
-    VoltLabel,
-    VoltError,
-    LmnEyeIcon,
-    LmnEyeSlashIcon
-  ],
+  imports: [RouterLink, VoltButton, VoltCard, VoltInput, LmnEyeIcon, LmnEyeSlashIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex min-h-screen items-center justify-center bg-background p-4">
@@ -41,11 +42,13 @@ import { safeAdminRedirect } from './safe-redirect.js';
           </div>
         }
 
-        <form class="space-y-4" (submit)="onSubmit($event)">
+        <form class="space-y-4" novalidate (submit)="onSubmit($event)">
           <div class="space-y-1.5">
-            <volt-label htmlFor="forge-signin-email">Email</volt-label>
+            <label for="forge-signin-email" class="text-sm font-medium leading-none text-foreground"
+              >Email</label
+            >
             <volt-input
-              id="forge-signin-email"
+              [id]="'forge-signin-email'"
               type="email"
               autocomplete="email"
               [value]="email()"
@@ -53,10 +56,14 @@ import { safeAdminRedirect } from './safe-redirect.js';
             />
           </div>
           <div class="space-y-1.5">
-            <volt-label htmlFor="forge-signin-password">Password</volt-label>
+            <label
+              for="forge-signin-password"
+              class="text-sm font-medium leading-none text-foreground"
+              >Password</label
+            >
             <div class="relative">
               <volt-input
-                id="forge-signin-password"
+                [id]="'forge-signin-password'"
                 [type]="showPassword() ? 'text' : 'password'"
                 autocomplete="current-password"
                 [value]="password()"
@@ -64,7 +71,7 @@ import { safeAdminRedirect } from './safe-redirect.js';
               />
               <button
                 type="button"
-                class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                class="absolute right-2 top-1/2 -translate-y-1/2 rounded text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'"
                 (click)="showPassword.set(!showPassword())"
               >
@@ -78,8 +85,9 @@ import { safeAdminRedirect } from './safe-redirect.js';
           </div>
 
           @if (session.error(); as error) {
-            <volt-error role="alert">{{ describeError(error) }}</volt-error>
+            <p class="text-sm font-medium text-error" role="alert">{{ describeError(error) }}</p>
           }
+          <p class="sr-only" role="status">{{ session.loading() ? 'Please wait…' : '' }}</p>
 
           <volt-button type="submit" class="w-full" [disabled]="session.loading()">
             {{ session.loading() ? 'Signing in…' : 'Sign in' }}
@@ -112,6 +120,9 @@ export class ForgeSignInComponent {
 
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   protected readonly email = signal('');
   protected readonly password = signal('');
@@ -119,7 +130,15 @@ export class ForgeSignInComponent {
 
   async onSubmit(event: Event): Promise<void> {
     event.preventDefault();
+    if (this.session.loading()) return;
     await this.session.login(this.email(), this.password());
+    if (!this.session.authenticated()) {
+      // The submit button was disabled while the request ran, which dropped focus: put it where
+      // the editor retypes the secret.
+      afterNextRenderIfAlive(this.injector, this.destroyRef, () =>
+        this.host.nativeElement.querySelector<HTMLElement>('#forge-signin-password')?.focus()
+      );
+    }
     if (this.session.authenticated()) {
       const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
       const fallback = safeAdminRedirect(this.redirectTo(), '/admin');
