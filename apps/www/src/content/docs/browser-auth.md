@@ -341,7 +341,7 @@ back to its own doc for detail.
 import { provideForgeCms } from '@forge-cms/angular';
 
 export const appConfig: ApplicationConfig = {
-  providers: [provideForgeCms({ baseUrl: '/api/v1' })]
+  providers: [provideForgeCms({ baseUrl: '/api/v1' })] // + authBaseUrl / credentials as needed
 };
 ```
 
@@ -380,7 +380,9 @@ That's the whole surface a consumer needs to write. `forgeAuthGuard()` awaits `F
 one-time `/api/auth/me` bootstrap before deciding (so a page refresh never flashes an anonymous
 sidebar), redirects an anonymous visitor to `signInPath` (default `/admin/login`) with a `returnUrl`,
 and — with `roles` — redirects an authenticated-but-under-privileged visitor to `forbiddenPath`
-(default `/admin`). None of this replaces server enforcement; it only avoids a round trip to discover
+(default `/admin`). Mounted somewhere other than `/admin`? Pass both options (and `basePath` to
+`forgeAdminAuthRoutes()` / `ForgeAdminConfig`) — see [Admin UI](/docs/admin-ui). The sign-in page
+returns only to paths under the mount root, so a crafted `returnUrl` can never leave the admin. None of this replaces server enforcement; it only avoids a round trip to discover
 an action was always going to fail.
 
 **`ForgeAuthSession`** (`providedIn: 'root'`, injectable directly for a custom sign-in form or a

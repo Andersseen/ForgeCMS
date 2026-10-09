@@ -27,6 +27,39 @@ import { angularLinker } from '@forge-cms/admin/vite';
 export default defineConfig({ plugins: [angularLinker(), analog()] });
 ```
 
+## Mounting and configuration (spec 087)
+
+`forgeAdminContentRoutes()` and `forgeAdminAuthRoutes()` return relative route subtrees; nest them under
+any path. `/admin` is only the default assumption. To mount elsewhere (e.g. `/studio`), pass the same
+root to the three places that name a URL — plus the one client provider for the APIs:
+
+```ts
+const MOUNT = '/studio';
+export const ADMIN_ROUTES: Routes = [
+  ...forgeAdminAuthRoutes({ signup: true, basePath: MOUNT }),
+  {
+    path: '',
+    component: ForgeAdminLayoutComponent,
+    data: { config: { title: 'Studio', basePath: MOUNT } satisfies ForgeAdminConfig },
+    canActivate: [forgeAuthGuard({ signInPath: `${MOUNT}/login`, forbiddenPath: MOUNT })],
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'collections' },
+      ...forgeAdminContentRoutes()
+    ]
+  }
+];
+// app.config.ts: provideRouter(routes, withComponentInputBinding()),
+//   provideForgeCms({ baseUrl: '/content-api', authBaseUrl: '/account-api', credentials: 'include' })
+```
+
+`basePath` must be a same-app absolute path (nested segments allowed, trailing slash ignored). A sign-in
+`returnUrl` is honoured only under it. The package has no API URL of its own — `provideForgeCms()` is the
+only place the content and auth bases are set. The default navigation lists only package-mounted
+destinations (Collections, admin-only Users); add your own dashboard/media/settings pages through
+`ForgeAdminConfig.nav`. `logo` and `features` are deprecated no-ops. Forge Analytics is experimental.
+The full reviewed contract, defaults and migration notes are in
+[docs/1.0-PUBLIC-SURFACE.md](../../docs/1.0-PUBLIC-SURFACE.md).
+
 ## Reliability behaviour (spec 085)
 
 What an editor can rely on when something goes wrong — the server stays authoritative throughout:

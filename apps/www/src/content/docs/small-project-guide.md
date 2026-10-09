@@ -182,6 +182,11 @@ document editor, and a users workspace gated to admins. No host-written CRUD pag
 `app.config.ts`, add `provideForgeCms({ baseUrl: '/api/v1' })` — no `authToken`; the browser session
 is the `forge_session` HttpOnly cookie, and `CmsApiService` sends it automatically.
 
+Want it at `/studio` instead of `/admin`, or your APIs somewhere other than `/api/v1` and
+`/api/auth`? That is configuration, not code: `basePath` on `forgeAdminAuthRoutes()` and the layout
+config, `signInPath`/`forbiddenPath` on the guard, `baseUrl`/`authBaseUrl` on `provideForgeCms()` — see
+[Admin UI](/docs/admin-ui#mounting-somewhere-other-than-admin).
+
 **One thing to watch for**: `@forge-cms/angular` and `@forge-cms/admin` ship partial-Ivy code, which
 needs Angular's linker at your app's build time or you'll hit a production-only
 `JIT compiler unavailable` crash. If you're on Vite (Analog.js), add the plugin ForgeCMS ships for

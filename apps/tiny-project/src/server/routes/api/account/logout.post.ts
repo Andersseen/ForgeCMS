@@ -3,7 +3,7 @@ import type { ApiContext } from '@forge-cms/api';
 import { handleLogout } from '@forge-cms/runtime';
 import { getServerRuntime } from '../../../api/runtime';
 
-/** POST /api/auth/logout — thin wrapper over `handleLogout`. Clears the session cookie. */
+/** POST /api/account/logout — thin wrapper over `handleLogout`. Clears the session cookie. */
 export default defineEventHandler(async (event) => {
   const runtime = await getServerRuntime(event.context.cloudflare?.env);
   const context: ApiContext = {

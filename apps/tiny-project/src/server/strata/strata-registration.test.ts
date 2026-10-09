@@ -16,18 +16,18 @@ describe('Strata registration', () => {
     strataPlugin({ router });
 
     expect(registered).toEqual([
-      { path: '/api/v1/:collection', method: 'get' },
-      { path: '/api/v1/:collection/:id', method: 'get' }
+      { path: '/api/content/:collection', method: 'get' },
+      { path: '/api/content/:collection/:id', method: 'get' }
     ]);
   });
 
   it('leaves no file-system GET route competing for the same URLs; mutations stay H3', () => {
-    const fileSystemRoutes = Object.keys(import.meta.glob('../routes/api/v1/**/*.ts')).sort();
+    const fileSystemRoutes = Object.keys(import.meta.glob('../routes/api/content/**/*.ts')).sort();
     expect(fileSystemRoutes).toEqual([
-      '../routes/api/v1/[collection].post.ts',
-      '../routes/api/v1/[collection]/[id].delete.ts',
-      '../routes/api/v1/[collection]/[id].put.ts',
-      '../routes/api/v1/collections.get.ts'
+      '../routes/api/content/[collection].post.ts',
+      '../routes/api/content/[collection]/[id].delete.ts',
+      '../routes/api/content/[collection]/[id].put.ts',
+      '../routes/api/content/collections.get.ts'
     ]);
   });
 });
@@ -52,7 +52,7 @@ function strataRequest(
 describe('createForgeReadContext', () => {
   it('keeps the method, the full query string, every header the read handlers use, and params', () => {
     const context = createForgeReadContext(
-      strataRequest('GET', 'http://localhost/api/v1/posts?status=all&limit=1&title[in]=a,b', {
+      strataRequest('GET', 'http://localhost/api/content/posts?status=all&limit=1&title[in]=a,b', {
         authorization: 'Bearer token',
         cookie: 'forge_session=abc; other=1',
         'accept-language': 'es'
@@ -72,7 +72,7 @@ describe('createForgeReadContext', () => {
   it('refuses anything but a bodyless read, so it cannot back a mutating route by accident', () => {
     for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
       expect(() =>
-        createForgeReadContext(strataRequest(method, 'http://localhost/api/v1/posts'), {})
+        createForgeReadContext(strataRequest(method, 'http://localhost/api/content/posts'), {})
       ).toThrow(/read-only/);
     }
   });

@@ -8,7 +8,14 @@ export const routes: Routes = [
     // `users` record stay hidden from an editor browsing the public pages too). On the server the render
     // forwards no identity anyway (`provideForgeCmsServer` in main.server.ts, no `forwardCookies`).
     path: '',
-    providers: [provideForgeCms({ credentials: 'omit' }), CmsApiService],
+    providers: [
+      provideForgeCms({
+        baseUrl: '/api/content',
+        authBaseUrl: '/api/account',
+        credentials: 'omit'
+      }),
+      CmsApiService
+    ],
     children: [
       {
         path: '',
@@ -26,7 +33,7 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/setup.page').then((m) => m.SetupPage)
   },
   {
-    path: 'admin',
+    path: 'studio',
     loadChildren: () => import('./admin.routes').then((m) => m.ADMIN_ROUTES)
   },
   { path: '**', redirectTo: '', pathMatch: 'full' }

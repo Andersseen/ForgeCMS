@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
 import type { OnInit } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CmsApiService } from '@forge-cms/angular';
 import type { CollectionMeta } from '@forge-cms/angular';
 import { VoltCard } from '@voltui/components';
@@ -65,7 +65,25 @@ interface CollectionCard {
 export class ForgeCollectionsIndexComponent implements OnInit {
   private readonly api = inject(CmsApiService);
 
+  /**
+   * Admin config. When unset, the nearest `data.config` on an ancestor route is used — the same
+   * route data the layout reads — because Angular binds route data only to the route's own
+   * component, so a config set once on the layout route would otherwise never reach this page.
+   */
   config = input<ForgeAdminConfig | null>(null);
+
+  private readonly route = inject(ActivatedRoute);
+
+  private effectiveConfig(): ForgeAdminConfig | null {
+    const own = this.config();
+    if (own) return own;
+    const chain = this.route.snapshot.pathFromRoot;
+    for (let i = chain.length - 1; i >= 0; i--) {
+      const inherited = chain[i]?.data['config'] as ForgeAdminConfig | undefined;
+      if (inherited) return inherited;
+    }
+    return null;
+  }
 
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
@@ -91,7 +109,7 @@ export class ForgeCollectionsIndexComponent implements OnInit {
     try {
       const all = await this.api.getCollections({ signal: abort.signal });
       if (token !== this.loadToken) return;
-      const visible = visibleCollections(all, this.config());
+      const visible = visibleCollections(all, this.effectiveConfig());
 
       const cards = await Promise.all(
         visible.map(async (meta): Promise<CollectionCard> => {

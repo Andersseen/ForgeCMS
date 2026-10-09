@@ -1,5 +1,12 @@
 # ROADMAP — A small, dependable ForgeCMS 1.0
 
+> **2026-10-09 (spec 087):** **Roadmap 0.11 / U03 — Certify admin reuse and freeze the 1.0 surface — is complete, and
+> with it roadmap 0.11 (Admin and consumer reliability).** The reusable admin mounts at a consumer-selected path
+> (`basePath`, default `/admin`) against consumer-selected APIs, proven in a real browser and from packed tarballs; the
+> public admin/client surface is inventoried and frozen in [1.0-PUBLIC-SURFACE.md](1.0-PUBLIC-SURFACE.md). The changeset
+> is a **minor** (default nav shrank); `0.12.1` (U02) is already published, so the next release is `0.13.0`.
+> **Next bounded responsibility: roadmap 0.12 / R01 — Packed production consumers and durable profiles.**
+>
 > **2026-10-09 (spec 086):** **Roadmap 0.11 / U02 — Keyboard, focus and existing field interactions — is complete.** A
 > keyboard-only editor can sign in, create/edit/publish/delete content, correct a real server validation error (focus
 > goes to the first invalid field), pick a relation, guard unsaved edits in an accessible dialog (no more

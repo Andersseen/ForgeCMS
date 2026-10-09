@@ -4,7 +4,7 @@ import { collectionResource } from '@forge-cms/angular';
 
 /**
  * The whole public site: one list of published posts. Read through `@forge-cms/angular`'s
- * `collectionResource` (anonymous `GET /api/v1/posts`, which returns published posts only) so the same
+ * `collectionResource` (anonymous `GET /api/content/posts`, which returns published posts only) so the same
  * code runs in the browser and during SSR (spec 078) — a raw relative `fetch` cannot run on a server.
  * Deliberately no styling framework: this fixture proves integration, not design.
  */
@@ -16,7 +16,7 @@ import { collectionResource } from '@forge-cms/angular';
   template: `
     <nav class="tiny-nav">
       <a routerLink="/">Home</a>
-      <a routerLink="/admin">Admin</a>
+      <a routerLink="/studio">Admin</a>
       <a routerLink="/setup">Setup</a>
     </nav>
     <h1>Tiny project</h1>

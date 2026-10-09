@@ -1,16 +1,34 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-09 (spec 086 / roadmap 0.11 U02 — keyboard, focus and existing field interactions — COMPLETE
+> **Last updated: 2026-10-09 (spec 087 / roadmap 0.11 U03 — admin reuse certified, 1.0 surface frozen — COMPLETE on
+> branch `feature/spec-087-admin-reuse-surface-freeze`, PR pending; roadmap 0.11 is **complete**).** Published release is
+> `0.12.1` (U02); the pending U03 admin changeset is a minor → expected `0.13.0`. Website
+> `CURRENT_FORGE_VERSION` is `0.12.1`. **Next: roadmap 0.12 / R01 (not started).**
+> _Previous header:_ 2026-10-09 (spec 086 / roadmap 0.11 U02 — keyboard, focus and existing field interactions — COMPLETE
 > on branch `feature/spec-086-admin-keyboard-focus`, PR pending; roadmap 0.11 is **not** complete: U03 pending).
 > U01 (spec 085, PR #84, main CI `37826074960` ✓) and its release PR #85 (CI `37830311591` ✓) are merged; npm `latest`
 > and GitHub release `v0.12.0` are published for the fixed family. U02 is patch work
 > (`.changeset/admin-keyboard-focus-field-interactions.md` + `date-withtime-field-metadata.md`) → expected next release
 > `0.12.1`.
-> Next bounded responsibility: roadmap 0.11 / U03 — Certify admin reuse and freeze the 1.0 surface (not started).**
+> Next bounded responsibility: roadmap 0.11 / U03 — Certify admin reuse and freeze the 1.0 surface (not started).\*\*
 > **How to maintain this file:** whenever you complete meaningful work, update the relevant rows,
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Admin reuse and 1.0 surface freeze — U03 (spec 087, 2026-10-09, complete; closes roadmap 0.11)
+
+Spec: [087](specs/087-admin-reuse-and-1.0-surface-freeze.md). Contract: [1.0-PUBLIC-SURFACE.md](1.0-PUBLIC-SURFACE.md).
+
+- **Mount root:** `ForgeAdminConfig.basePath` + `forgeAdminAuthRoutes({ basePath })` (default `/admin`); breadcrumbs, default
+  nav, sign-in path and the sign-in/up `returnUrl` boundary derive from it (`/studio-evil`, `/admin/…`, `//host` refused).
+  Guard uses its existing `signInPath`/`forbiddenPath`. `DEFAULT_ADMIN_NAV` = Collections + admin-only Users.
+- **Fixed:** route `data.config` never reached `ForgeCollectionsIndexComponent`; `collections` is `ReadonlyArray<{ slug }>`;
+  `logo`/`features` deprecated no-ops. No admin code names an API URL (test-pinned).
+- **tiny-project** is now mounted at `/studio` with APIs at `/api/content` + `/api/account` (Analog only routes
+  `/api/**` to Nitro; literal `/content-api`/`/account-api` stay covered by the real-HTTP test). Its e2e (27 tests) adds
+  shell/refresh/returnUrl/journey/role-matrix/invalidated-session certification; the packed production journey checks `/studio`.
+- **Freeze:** see the policy in the surface doc; later public changes need baseline + inventory + migration + semver.
 
 ## Admin keyboard, focus and field interactions — U02 (spec 086, 2026-10-09, complete; second packet of roadmap 0.11)
 

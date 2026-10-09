@@ -114,7 +114,7 @@ describe('portable upload lifecycle — on-disk libSQL + @forge-cms/s3 + Garage 
     for (const [name, value] of Object.entries(fields)) form.set(name, value);
     return handleCreate(
       {
-        request: new Request(`${ORIGIN}/api/v1/media`, {
+        request: new Request(`${ORIGIN}/api/content/media`, {
           method: 'POST',
           body: form,
           headers: bearer(options.token ?? admin.token)
@@ -277,7 +277,7 @@ describe('portable upload lifecycle — on-disk libSQL + @forge-cms/s3 + Garage 
       form.set('file', new File(['x'], 'x.txt', { type: 'text/plain' }));
       const response = await handleCreate(
         {
-          request: new Request(`${ORIGIN}/api/v1/media`, { method: 'POST', body: form }),
+          request: new Request(`${ORIGIN}/api/content/media`, { method: 'POST', body: form }),
           params: { collection: 'media' },
           env: undefined
         },
@@ -312,7 +312,7 @@ describe('portable upload lifecycle — on-disk libSQL + @forge-cms/s3 + Garage 
 
       const noFile = await handleCreate(
         {
-          request: new Request(`${ORIGIN}/api/v1/media`, {
+          request: new Request(`${ORIGIN}/api/content/media`, {
             method: 'POST',
             body: (() => {
               const form = new FormData();
@@ -426,7 +426,7 @@ describe('portable upload lifecycle — on-disk libSQL + @forge-cms/s3 + Garage 
 
       const response = await handleDelete(
         {
-          request: new Request(`${ORIGIN}/api/v1/media/${doc['id']}`, {
+          request: new Request(`${ORIGIN}/api/content/media/${doc['id']}`, {
             method: 'DELETE',
             headers: bearer(admin.token)
           }),

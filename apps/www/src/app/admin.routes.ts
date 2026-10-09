@@ -1,11 +1,40 @@
 import type { Routes } from '@angular/router';
 import {
+  type ForgeAdminConfig,
   ForgeAdminLayoutComponent,
   ForgeUsersWorkspaceComponent,
   forgeAdminAuthRoutes,
   forgeAdminContentRoutes
 } from '@forge-cms/admin';
 import { forgeAuthGuard } from '@forge-cms/angular';
+
+/**
+ * Dashboard, media, API and settings are this app's own pages, so the nav lists them explicitly —
+ * the package's default nav only offers destinations the package itself mounts (spec 087).
+ */
+const ADMIN_CONFIG: ForgeAdminConfig = {
+  nav: [
+    {
+      label: 'Content',
+      items: [
+        { label: 'Dashboard', routerLink: '/admin', icon: 'dashboard', exact: true },
+        { label: 'Collections', routerLink: '/admin/collections', icon: 'collections' },
+        { label: 'Media Library', routerLink: '/admin/media', icon: 'media' }
+      ]
+    },
+    {
+      label: 'Users & Access',
+      items: [
+        { label: 'Users', routerLink: '/admin/users', icon: 'users', adminOnly: true },
+        { label: 'API', routerLink: '/admin/api', icon: 'api' }
+      ]
+    },
+    {
+      label: 'System',
+      items: [{ label: 'Settings', routerLink: '/admin/settings', icon: 'settings' }]
+    }
+  ]
+};
 
 /**
  * `admin/login` (public signup is opt-in server-side only — see `signup.post.ts` — so it isn't
@@ -18,6 +47,7 @@ export const ADMIN_ROUTES: Routes = [
   {
     path: '',
     component: ForgeAdminLayoutComponent,
+    data: { config: ADMIN_CONFIG },
     canActivate: [forgeAuthGuard()],
     children: [
       {

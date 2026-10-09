@@ -20,7 +20,7 @@ interface BodyBlock {
   template: `
     <nav class="tiny-nav">
       <a routerLink="/">Home</a>
-      <a routerLink="/admin">Admin</a>
+      <a routerLink="/studio">Admin</a>
     </nav>
 
     @if (result.error(); as error) {

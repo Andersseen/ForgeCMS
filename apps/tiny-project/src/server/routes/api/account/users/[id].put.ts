@@ -10,7 +10,7 @@ import {
 import { routeParam } from '../../../../api/route-param';
 
 /**
- * PUT /api/auth/users/:id — updates a user. Rejects (409/400) a change that would violate the
+ * PUT /api/account/users/:id — updates a user. Rejects (409/400) a change that would violate the
  * last-admin invariant or the password policy.
  */
 export default defineEventHandler(async (event) => {

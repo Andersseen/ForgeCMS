@@ -175,11 +175,11 @@ bucket_name = "forge-journey-consumer"
 `;
 
 /**
- * Reads. tiny-project serves `GET /api/v1/*` through a Strata plugin (the maintainer's own library, not a Forge
+ * Reads. tiny-project serves `GET /api/content/*` through a Strata plugin (the maintainer's own library, not a Forge
  * package); a consumer of public Forge packages mounts the same `handleList`/`handleRead` as two thin h3 routes.
  */
 const READ_ROUTES = {
-  'src/server/routes/api/v1/[collection].get.ts': `import { defineEventHandler, toWebRequest } from 'h3';
+  'src/server/routes/api/content/[collection].get.ts': `import { defineEventHandler, toWebRequest } from 'h3';
 import type { ApiContext } from '@forge-cms/api';
 import { handleList } from '@forge-cms/runtime';
 import { getServerRuntime } from '../../../api/runtime';
@@ -195,7 +195,7 @@ export default defineEventHandler(async (event) => {
   return handleList(context, { runtime });
 });
 `,
-  'src/server/routes/api/v1/[collection]/[id].get.ts': `import { defineEventHandler, toWebRequest } from 'h3';
+  'src/server/routes/api/content/[collection]/[id].get.ts': `import { defineEventHandler, toWebRequest } from 'h3';
 import type { ApiContext } from '@forge-cms/api';
 import { handleRead } from '@forge-cms/runtime';
 import { getServerRuntime } from '../../../../api/runtime';
@@ -214,7 +214,7 @@ export default defineEventHandler(async (event) => {
 };
 
 /**
- * Consumer-only request observer: records every `GET /api/v1/posts` and whether a browser sent it (browsers send
+ * Consumer-only request observer: records every `GET /api/content/posts` and whether a browser sent it (browsers send
  * `Sec-Fetch-Site`; the server's own fetch does not). It lets the gate count the SSR read and the browser reads
  * from the server side, independently of Playwright.
  */
@@ -229,7 +229,7 @@ export const observedReads: ObservedRead[] = [];
 
 export default defineEventHandler((event) => {
   const url = getRequestURL(event);
-  if (event.method !== 'GET' || !url.pathname.startsWith('/api/v1/posts')) return;
+  if (event.method !== 'GET' || !url.pathname.startsWith('/api/content/posts')) return;
   const source = getRequestHeader(event, 'sec-fetch-site') === undefined ? 'server' : 'browser';
   observedReads.push({ url: url.pathname + url.search, source });
 });
@@ -394,7 +394,7 @@ async function launch(dir, profile, outDir, state, s3) {
   };
   for (let attempt = 0; attempt < 300; attempt++) {
     try {
-      const response = await fetch(`${origin}/api/v1/posts`);
+      const response = await fetch(`${origin}/api/content/posts`);
       if (response.ok) return server;
     } catch {
       // not listening yet
@@ -511,7 +511,7 @@ async function open(context, { strict }) {
   const log = { requests: [], problems: [] };
   page.on('request', (request) => {
     const url = new URL(request.url());
-    if (url.pathname.startsWith('/api/v1/posts')) log.requests.push(url.pathname + url.search);
+    if (url.pathname.startsWith('/api/content/posts')) log.requests.push(url.pathname + url.search);
   });
   page.on('console', (message) => {
     const framework = /NG0\d+|JIT|linker/i.test(message.text());
@@ -539,12 +539,12 @@ const watchDomReuse = (page) =>
   });
 
 async function signIn(page, origin) {
-  await page.goto(`${origin}/admin/login`);
+  await page.goto(`${origin}/studio/login`);
   await hydrated(page);
   await page.locator('input#forge-signin-email').fill(ADMIN.email);
   await page.locator('input#forge-signin-password').fill(ADMIN.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL('**/admin/collections**');
+  await page.waitForURL('**/studio/collections**');
 }
 
 async function expectPublicPage(page, origin, path, expectation, log, label) {
@@ -608,7 +608,7 @@ async function journey({ profile, dir, outDir, s3 }) {
     await adminPage.locator('input[name="email"]').fill(ADMIN.email);
     await adminPage.locator('input[name="password"]').fill(ADMIN.password);
     await adminPage.getByRole('button', { name: 'Create admin' }).click();
-    await adminPage.waitForURL('**/admin/collections**');
+    await adminPage.waitForURL('**/studio/collections**');
     const second = await fetch(`${origin()}/api/bootstrap-admin`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -616,11 +616,11 @@ async function journey({ profile, dir, outDir, s3 }) {
     });
     if (second.status !== 409) fail(`a second bootstrap answered ${second.status}`);
     await adminPage.getByRole('button', { name: /log out/i }).click();
-    await adminPage.waitForURL('**/admin/login**');
+    await adminPage.waitForURL('**/studio/login**');
     await signIn(adminPage, origin());
     // Read through the signed-in page itself (same-origin fetch with its session cookie).
     const usersBody = await adminPage.evaluate(async () => {
-      const response = await fetch('/api/v1/users', { credentials: 'same-origin' });
+      const response = await fetch('/api/content/users', { credentials: 'same-origin' });
       return `${response.status} ${await response.text()}`;
     });
     adminId =
@@ -631,10 +631,48 @@ async function journey({ profile, dir, outDir, s3 }) {
       '  ✓ first admin bootstrapped (second attempt 409); signed in through the admin UI'
     );
 
+    // --- 2b. spec 087: the packed admin is certified at a non-default mount and non-default APIs -------------
+    // tiny-project mounts the reusable admin at /studio with its APIs at /api/content and /api/account.
+    // A packed admin that still assumed /admin, /api/v1 or /api/auth would redirect, 404 or call them here.
+    const literalApis = [];
+    adminPage.on('request', (request) => {
+      const { pathname } = new URL(request.url());
+      if (/^\/(admin|api\/v1|api\/auth)(\/|$)/.test(pathname)) literalApis.push(pathname);
+    });
+    for (const path of ['/studio/collections', '/studio/collections/posts', '/studio/users']) {
+      await adminPage.goto(`${origin()}${path}`);
+      await adminPage.reload();
+      await hydrated(adminPage);
+      if (new URL(adminPage.url()).pathname !== path) {
+        fail(`refresh of ${path} ended at ${adminPage.url()}`);
+      }
+    }
+    const mountHrefs = await adminPage.$$eval('a[href]', (anchors) =>
+      anchors
+        .map((a) => new URL(a.href))
+        .filter((u) => u.origin === location.origin)
+        .map((u) => u.pathname)
+    );
+    for (const expected of ['/studio', '/studio/collections', '/studio/users']) {
+      if (!mountHrefs.includes(expected)) fail(`the mounted admin has no link to ${expected}`);
+    }
+    if (mountHrefs.some((href) => href.startsWith('/admin')))
+      fail('the mounted admin links to /admin');
+    await adminPage.getByRole('button', { name: /log out/i }).click();
+    await adminPage.waitForURL('**/studio/login**');
+    await adminPage.goto(`${origin()}/studio/collections/posts`);
+    await adminPage.waitForURL('**/studio/login?returnUrl=*');
+    if (literalApis.length > 0)
+      fail(`the admin called default API/admin paths: ${literalApis.join(', ')}`);
+    await signIn(adminPage, origin());
+    console.log(
+      '  ✓ spec 087: admin at /studio, APIs at /api/content + /api/account — refresh of nested routes, in-mount links and redirects, no /admin or /api/v1 or /api/auth'
+    );
+
     // --- 3. admin creates a post: draft ---------------------------------------------------------------
-    await adminPage.goto(`${origin()}/admin/collections/posts`);
+    await adminPage.goto(`${origin()}/studio/collections/posts`);
     await adminPage.getByRole('button', { name: 'New' }).click();
-    await adminPage.waitForURL('**/admin/collections/posts/new');
+    await adminPage.waitForURL('**/studio/collections/posts/new');
     await adminPage.locator('input#title').fill(POST.title);
     await adminPage.locator('input#slug').fill(POST.slug);
     await adminPage.locator('input#author').fill(ADMIN.email);
@@ -644,7 +682,7 @@ async function journey({ profile, dir, outDir, s3 }) {
     await adminPage.getByRole('button', { name: 'Add block' }).click();
     await adminPage.locator('volt-textarea textarea').first().fill(POST.body);
     await adminPage.getByRole('button', { name: 'Create' }).click();
-    await adminPage.waitForURL(/\/admin\/collections\/posts$/);
+    await adminPage.waitForURL(/\/studio\/collections\/posts$/);
     const row = () => adminPage.locator('volt-table-row', { hasText: POST.title });
     await row().getByText('Draft', { exact: true }).waitFor();
     console.log('  ✓ the existing admin created the post; it starts as Draft');
@@ -698,7 +736,7 @@ async function journey({ profile, dir, outDir, s3 }) {
 
     // --- 7. an edit elsewhere is not pushed into the loaded page -------------------------------------------
     const stale = await noJs(origin(), `/posts/${POST.slug}`);
-    await adminPage.goto(`${origin()}/admin/collections/posts`);
+    await adminPage.goto(`${origin()}/studio/collections/posts`);
     await adminPage
       .locator('volt-table-row', { hasText: POST.title })
       .getByRole('button', { name: 'Edit' })
@@ -768,7 +806,7 @@ async function journey({ profile, dir, outDir, s3 }) {
     );
 
     // --- 10. back to draft: hidden again everywhere -----------------------------------------------------------
-    await adminPage.goto(`${origin()}/admin/collections/posts`);
+    await adminPage.goto(`${origin()}/studio/collections/posts`);
     const editedRow = adminPage.locator('volt-table-row', { hasText: EDITED.title });
     await editedRow.getByRole('button', { name: 'Unpublish' }).click();
     await editedRow.getByText('Draft', { exact: true }).waitFor();
@@ -794,7 +832,7 @@ async function journey({ profile, dir, outDir, s3 }) {
     );
 
     // --- 11. durable files: multipart upload → handleFile → restart → delete (spec 084) -----------------------
-    await adminPage.goto(`${origin()}/admin/collections/posts`);
+    await adminPage.goto(`${origin()}/studio/collections/posts`);
     await durableFileJourney({
       profile,
       browser,
@@ -891,7 +929,7 @@ async function expectProductionFailsClosed(dir, outDir, s3) {
       let body = '';
       for (let attempt = 0; attempt < 100 && status === 0; attempt++) {
         try {
-          const response = await fetch(`http://127.0.0.1:${port}/api/v1/posts`);
+          const response = await fetch(`http://127.0.0.1:${port}/api/content/posts`);
           status = response.status;
           body = await response.text();
         } catch {
