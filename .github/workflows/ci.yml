@@ -30,9 +30,10 @@ jobs:
   checks:
     name: Lint · Typecheck · Test · Build · Pack · E2E
     runs-on: ubuntu-latest
-    # Measured 2026-10-07: 11–12 min before spec 081, 13.5–14 min with the S03 journey (two production
-    # builds + Chromium on Node/libSQL and workerd/D1). 25 keeps ~45% headroom so a slow runner doesn't
-    # kill the release gate.
+    # Measured 2026-10-07: 13.5–14 min with the S03 journey inside this job. Spec 088 moved every packed
+    # verifier (release:verify/compat/ssr, test:s3, test:upgrade) into the parallel `certify` job; 25 stays as
+    # headroom for the remaining repository gates and app e2e suites (the job name is unchanged on purpose:
+    # renaming a job silently detaches any branch-protection rule that requires it).
     timeout-minutes: 25
 
     steps:
@@ -88,47 +89,12 @@ jobs:
       - name: libSQL portable-profile integration tests
         run: pnpm test:libsql
 
-      # Roadmap 0.7 release gate (spec 073, M03): installations written by historical releases
-      # (committed, hash-checked fixtures — no network) upgrade through planSchema → reviewed
-      # migrations on on-disk libSQL and local D1/R2, then are backed up and restored into isolated,
-      # empty environments with `wrangler d1 export/execute --local`. `release` needs this job.
-      - name: Upgrade and backup/restore rehearsal
-        run: pnpm test:upgrade
-
-      - name: Verify packed package installation
-        run: pnpm release:verify
-
-      # Spec 077: the advertised Angular/admin peer ranges, proven by external Vite apps installed
-      # from the packed tarballs with strict peers (min / current / latest combinations): one copy
-      # of Angular, tsc + ngc strict templates, production build fully linked. `release` needs this job.
-      - name: Angular compatibility matrix (strict packed consumers)
-        run: pnpm release:compat
-
       # One install is enough: www, tiny-project and demo-aesthetics pin the same @playwright/test
       # version, so they share the browser cache. Filtering all three ran three `--with-deps`
       # installs in parallel and they raced for the apt lock (E: Could not get lock
       # /var/lib/apt/lists/lock). If the pins ever diverge, add a second, sequential step.
       - name: Install Playwright (chromium)
         run: pnpm --filter @forge-cms/www exec playwright install --with-deps chromium
-
-      # Spec 078 (roadmap S01): a strict packed Analog SSR consumer, production-built and served by
-      # `node`; concurrent anonymous/A/B renders over real HTTP, linked bundles, no server code in the browser.
-      # Spec 080 (S02): the same consumer then runs the built app in Chromium (hydration, request counts,
-      # transfer-state inspection), so Playwright's browser must be installed first.
-      - name: Packed production SSR consumer
-        run: pnpm release:ssr
-
-      # Every real-service durable-storage gate, against ONE throwaway Garage container (pinned dxflrs/garage
-      # tag + digest, random test-only credentials; the script starts and removes it). It fails — never
-      # skips — without Docker, and `release` needs this job, so a package change cannot publish without it.
-      # Stages: adapter (spec 082, P01) · lifecycle + consumer (spec 083, P02) · recovery (spec 084, P03: historical
-      # fixtures → upgrade → cold libSQL backup → restore into an isolated EMPTY S3 bucket) · profiles (spec 084:
-      # the two COMPLETE durable production profiles, packed and production-built — Node + libSQL + S3, and
-      # Cloudflare Pages under local workerd + local D1 + local R2 — each walking bootstrap → draft → publish →
-      # no-JS SSR → hydration → edit → restart → unpublish, then a multipart upload → handleFile → restart →
-      # delete journey). Needs Chromium (installed above) and the build.
-      - name: Durable profiles — S3 (Garage), recovery and packed production journeys
-        run: pnpm test:s3
 
       - name: E2E tests — apps/www
         run: pnpm e2e:www
@@ -147,6 +113,57 @@ jobs:
 
       - name: E2E tests — apps/demo-aesthetics
         run: pnpm e2e:demo
+
+  # Roadmap 0.12 / R01 (spec 088): the packed-artifact certification of this commit. One `pnpm release:certify` builds,
+  # packs the eleven public packages ONCE (SHA-256 per tarball, `artifacts.json`), hands that exact set to every packed
+  # verifier and seals it: the server-only + entry-point consumers (release:consumers), packed installation and
+  # consumers (release:verify), the strict Angular/admin peer matrix incl. the /studio mount (release:compat), the
+  # technical SSR/hydration consumer (release:ssr), the real-Garage durable evidence (test:s3: adapter · lifecycle ·
+  # packed consumer · S3 recovery · Node+libSQL+S3 and workerd+D1+R2 production journeys) and the historical
+  # upgrade/restore rehearsal (test:upgrade). Docker and Chromium are required — nothing is skipped. It is a separate job
+  # so the slow certification runs in parallel with the fast repository gates; `release` needs BOTH, and there is no
+  # path filter, so a package change can never publish without it.
+  certify:
+    name: Certify packed artifacts · durable profiles
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright (chromium)
+        run: pnpm --filter @forge-cms/www exec playwright install --with-deps chromium
+
+      - name: Certify the packed artifacts of this commit
+        run: pnpm release:certify
+
+      # The hashes, versions and per-stage outcomes are the reusable evidence for R02–R04 and L01. The tarballs stay
+      # out of the artifact: it records WHICH bytes were certified, not a copy to install.
+      - name: Upload the certification result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: certification-result
+          path: |
+            .certification/artifacts.json
+            .certification/certification-result.json
+          if-no-files-found: ignore
 
   changeset-check:
     name: Changeset required for packages/* changes
@@ -192,7 +209,7 @@ jobs:
     name: Release packages to npm
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: checks
+    needs: [checks, certify]
     # Same guard as deploy/deploy-demo: real pushes to main only, never PRs or forks.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:

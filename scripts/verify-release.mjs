@@ -10,6 +10,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { resolveArtifacts } from './certification/artifacts.mjs';
 
 const publicPackages = [
   '@forge-cms/core',
@@ -65,10 +66,6 @@ function writeJson(path, value) {
 
 function fail(message) {
   throw new Error(message);
-}
-
-function sanitizePackageName(name) {
-  return name.replace('@', '').replace('/', '-');
 }
 
 function listFiles(dir) {
@@ -1346,19 +1343,8 @@ export async function rejected(cms: CmsApiService<SiteSchema>): Promise<void> {
 try {
   run('mkdir', ['-p', packDir]);
 
-  const tarballs = [];
-  for (const packageName of publicPackages) {
-    run('pnpm', ['--filter', packageName, 'pack', '--pack-destination', packDir]);
-    const expectedPrefix = `${sanitizePackageName(packageName)}-`;
-    const packed = readdirSync(packDir)
-      .filter((file) => file.startsWith(expectedPrefix) && file.endsWith('.tgz'))
-      .map((file) => join(packDir, file))
-      .sort()
-      .at(-1);
-
-    if (!packed) fail(`Could not find tarball for ${packageName}`);
-    tarballs.push({ name: packageName, path: packed });
-  }
+  // One artifact set: the certified one under `pnpm release:certify`, otherwise packed once here.
+  const tarballs = resolveArtifacts(packDir, publicPackages, { log: (line) => console.log(line) });
 
   // Public packages are versioned together via Changesets' `fixed` group (.changeset/config.json),
   // so every packed tarball must carry the exact same version as every other one — not a specific

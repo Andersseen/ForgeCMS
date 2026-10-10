@@ -67,6 +67,8 @@
     "release:verify": "node scripts/verify-release.mjs",
     "release:compat": "node scripts/verify-angular-compat.mjs",
     "release:ssr": "node scripts/verify-ssr-consumer.mjs",
+    "release:consumers": "node scripts/verify-public-consumers.mjs",
+    "release:certify": "node scripts/release-certify.mjs",
     "check:api": "node scripts/check-public-api.mjs",
     "check:api:update": "node scripts/check-public-api.mjs --update",
     "release:publish-unpublished": "node scripts/publish-unpublished.mjs",
