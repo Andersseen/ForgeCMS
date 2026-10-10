@@ -48,7 +48,7 @@ flakiness, performance, budgets, faults, CI, issues).
   Open for R03: a user-supplied `in` filter with >~95 values still exceeds D1's limit (spec 089 K3).
 - **Flake:** `theme.spec.ts` reproduced at 9/200 under 8 workers, **root cause = test bug** (every page renders its own header;
   a node read after navigation was detached → `getComputedStyle` = `''`); fixed with one atomic in-page snapshot polled via
-  `expect.poll` → **0/200**. CI Playwright retries now **fail the job** (`failOnFlakyTests`).
+  `expect.poll` → **0/200**. A second instance of the same class surfaced on this PR's second CI run (`landing.spec.ts` showcase opacity; 2/160 locally) and was fixed identically → 0/800; a 615-execution hunt of the whole www suite found no more. CI Playwright retries now **fail the job** (`failOnFlakyTests`).
 - **`pnpm test:performance`** (~53 s, local, deterministic): on-disk libSQL, 50 authors · 100 tags · 200 media · 2,000 posts,
   seeded; query / count / population / HTTP list / upload / memory / admin list render + production bundle sizes of the R01 packed
   consumers; 67 metrics, 33 hard-gated (database calls exactly, DOM nodes, bundle bytes, scaling shape, heap) against
