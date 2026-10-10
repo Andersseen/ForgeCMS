@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defineCollection, defineField } from '@forge-cms/core';
 import type { CollectionDefinition } from '@forge-cms/core';
+import { codeOf, requirePair } from './harness.js';
 
 // Relation lifecycle consistency contract (spec 064). Duck-typed on purpose — like every other contract in
 // this package it must not import `@forge-cms/runtime`/`@forge-cms/db`.
@@ -124,14 +125,6 @@ export function createBatchHold(): BatchHold {
 const TEST_TIMEOUT_MS = 30_000;
 let prefixCounter = 0;
 
-function codeOf(outcome: PromiseSettledResult<unknown>): unknown {
-  if (outcome.status === 'fulfilled') return 'ok';
-  const reason: unknown = outcome.reason;
-  return typeof reason === 'object' && reason !== null
-    ? (reason as { code?: unknown }).code
-    : reason;
-}
-
 /** Lets the wall clock move on, so a later write's `updated_at` differs from the one a planner read. */
 const nextMillisecond = () => new Promise((resolve) => setTimeout(resolve, 2));
 
@@ -149,10 +142,7 @@ export function runRelationLifecycleContractTests(setup: RelationLifecycleHarnes
       const prefix = `rl${++prefixCounter}_${Date.now().toString(36)}`;
       const gate = createBatchHold();
       const harness = await setup({ prefix, parties: 2, gate });
-      const [deleter, writer] = harness.contenders;
-      if (!deleter || !writer || harness.contenders.length !== 2) {
-        throw new Error('setup() must return exactly 2 contenders');
-      }
+      const [deleter, writer] = requirePair(harness.contenders);
       const c = {
         authors: `${prefix}_authors`,
         posts: `${prefix}_posts`,

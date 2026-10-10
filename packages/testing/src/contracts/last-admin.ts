@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { requireContenders } from './harness.js';
 
 // Deterministic last-admin concurrency proof (spec 059). Duck-typed on purpose — like every other
 // contract in this package it must not import `@forge-cms/db`/`@forge-cms/auth`.
@@ -185,10 +186,7 @@ export function runLastAdminConcurrencyContractTests(setup: LastAdminHarnessFact
       const collection = `last_admin_${++collectionCounter}`;
       const gate = createWriteGate();
       const harness = await setup({ collection, parties, gate });
-      const [first] = harness.contenders;
-      if (!first || harness.contenders.length !== parties) {
-        throw new Error(`setup() must return exactly ${parties} contenders`);
-      }
+      const [first] = requireContenders(harness.contenders, parties);
 
       async function seed(index: number, role: Role): Promise<string> {
         const result = await first!.users.createUser({

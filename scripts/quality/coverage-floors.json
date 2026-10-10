@@ -1,0 +1,33 @@
+{
+  "$comment": "The 1.0 coverage floors from docs/roadmap/v1/QUALITY.md, enforced per package (spec 089). Never lower these to pass: add tests, or bring structural evidence to the maintainer. TypeScript coverage does not measure Angular templates — those stay certified by the rendered/browser suites.",
+  "classes": {
+    "non-ui": { "statements": 90, "lines": 90, "functions": 90, "branches": 85 },
+    "ui-runtime": { "statements": 85, "lines": 85, "functions": 85, "branches": 80 }
+  },
+  "packages": {
+    "core": "non-ui",
+    "db": "non-ui",
+    "auth": "non-ui",
+    "storage": "non-ui",
+    "s3": "non-ui",
+    "api": "non-ui",
+    "runtime": "non-ui",
+    "cloudflare": "non-ui",
+    "testing": "non-ui",
+    "angular": "ui-runtime",
+    "admin": "ui-runtime"
+  },
+  "environments": {
+    "core": "node (vitest)",
+    "db": "node (vitest) incl. on-disk libSQL + adapter contracts",
+    "auth": "node (vitest) incl. adapter contracts",
+    "storage": "node (vitest) incl. storage contract",
+    "s3": "node (vitest) against a faked S3 client; the real-service suite is certification, not coverage",
+    "api": "node (vitest)",
+    "runtime": "node (vitest) incl. libSQL-backed integration",
+    "cloudflare": "node (vitest) src suites; the workerd D1/R2 suite (test/workers) cannot report v8 coverage and is NOT counted — the number is a lower bound",
+    "testing": "attributed from the contract suites that db/auth/storage/runtime/cloudflare run (source-aliased)",
+    "angular": "node + jsdom (vitest); templates are not measured by TS coverage",
+    "admin": "jsdom + Angular TestBed (vitest, Angular compile transform); templates are not measured by TS coverage"
+  }
+}

@@ -40,6 +40,7 @@ import {
   jsFiles,
   loadChromium,
   ng,
+  recordBundle,
   repoRoot,
   run,
   sleep,
@@ -322,6 +323,10 @@ function build(dir, profile) {
   writeFileSync(join(dir, 'vite.config.ts'), viteConfig(profile.nitro));
   run('pnpm', ['exec', 'vite', 'build', '--logLevel', 'warn'], dir);
   checkBundles(dir, outDir, profile);
+  // The admin's content list ships a label no other chunk has; the chunk holding it is the admin's route chunk.
+  if (profile.id === 'node') {
+    recordBundle('admin', join(dir, outDir, 'client'), { adminList: 'Filter by status' });
+  }
   return outDir;
 }
 
@@ -967,9 +972,8 @@ async function expectProductionFailsClosed(dir, outDir, s3) {
   );
 }
 
-/** Installs the journey consumer once, then builds and walks each profile. */
-export async function verifyJourneyConsumer({ workDir, tarballs, s3 }) {
-  runtimeSecrets = [s3.secretAccessKey, s3.accessKeyId].filter(Boolean);
+/** Assembles, installs and type-checks the journey consumer (the tiny-project app with the reusable admin). */
+function installJourneyConsumer({ workDir, tarballs }) {
   const dir = join(workDir, 'journey-app');
   mkdirSync(dir, { recursive: true });
   assembleApp(dir, tarballs);
@@ -978,6 +982,23 @@ export async function verifyJourneyConsumer({ workDir, tarballs, s3 }) {
   const duplicates = findDuplicateStoreEntries(readdirSync(join(dir, 'node_modules', '.pnpm')));
   if (duplicates.length > 0) fail(`more than one Angular copy: ${JSON.stringify(duplicates)}`);
   run('pnpm', ['exec', 'tsc', '-p', 'tsconfig.json', '--noEmit'], dir);
+  return dir;
+}
+
+/**
+ * Builds the journey consumer's Node production output and runs the bundle checks — no server, browser,
+ * database or S3 service (spec 089: the admin's production bundle size is measured without Docker).
+ */
+export function buildJourneyConsumer({ workDir, tarballs }) {
+  runtimeSecrets = [];
+  const dir = installJourneyConsumer({ workDir, tarballs });
+  return build(dir, PROFILES[0]);
+}
+
+/** Installs the journey consumer once, then builds and walks each profile. */
+export async function verifyJourneyConsumer({ workDir, tarballs, s3 }) {
+  runtimeSecrets = [s3.secretAccessKey, s3.accessKeyId].filter(Boolean);
+  const dir = installJourneyConsumer({ workDir, tarballs });
 
   for (const profile of PROFILES) {
     console.log(`\nJourney — ${profile.label}`);

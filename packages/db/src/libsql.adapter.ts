@@ -312,6 +312,10 @@ export class LibSqlDatabaseAdapter implements DatabaseAdapter {
 
     if (options.limit !== undefined) {
       query = query.limit(options.limit) as typeof query;
+    } else if (options.offset !== undefined) {
+      // SQLite rejects OFFSET without LIMIT, and drizzle drops a negative one; the largest exact
+      // integer is the unbounded LIMIT that makes a bare offset legal.
+      query = query.limit(Number.MAX_SAFE_INTEGER) as typeof query;
     }
 
     if (options.offset !== undefined) {

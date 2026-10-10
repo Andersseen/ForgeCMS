@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createWriteGate, type WriteGate } from './last-admin.js';
+import { requireContenders, winnerIndex } from './harness.js';
 
 // Document / version-history consistency contract (spec 062). Duck-typed on purpose — like every other
 // contract in this package it must not import `@forge-cms/runtime`/`@forge-cms/db`.
@@ -168,10 +169,7 @@ export function runVersionHistoryContractTests(
       const versions = `_versions_${collection}`;
       const gate = createInterceptingGate();
       const harness = await setup({ collection, parties, gate });
-      const [first] = harness.contenders;
-      if (!first || harness.contenders.length !== parties) {
-        throw new Error(`setup() must return exactly ${parties} contenders`);
-      }
+      const [first] = requireContenders(harness.contenders, parties);
 
       const rowOf = async (id: string) => {
         const [row] = await harness.database.findMany({ collection, where: { id } });
@@ -374,7 +372,7 @@ export function runVersionHistoryContractTests(
         expect(rejected).toHaveLength(1);
         expect(codeOf(rejected[0]!.reason)).toBe('CONCURRENT_MODIFICATION');
 
-        const winner = results[0]!.status === 'fulfilled' ? 'A' : 'B';
+        const winner = ['A', 'B'][winnerIndex(results)];
         const row = await rowOf(id);
         expect(row?.title).toBe(winner);
 

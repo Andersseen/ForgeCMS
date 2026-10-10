@@ -230,4 +230,21 @@ describe('R2StorageAdapter', () => {
     const prefixed = await adapter.list('prefix/');
     expect(prefixed).toHaveLength(2);
   });
+  it('head() reads metadata without a body and reports a missing object as null', async () => {
+    await adapter.put({
+      key: 'meta/a.txt',
+      body: new TextEncoder().encode('hello'),
+      contentType: 'text/plain'
+    });
+    expect(await adapter.head('meta/a.txt')).toMatchObject({ key: 'meta/a.txt', size: 5 });
+    expect(await adapter.head('meta/missing.txt')).toBeNull();
+  });
+
+  it('fails closed, naming init(), when used before the bucket is bound', async () => {
+    const unbound = new R2StorageAdapter();
+    await expect(unbound.get('k')).rejects.toThrow(
+      'R2StorageAdapter not initialized. Call init() first.'
+    );
+    await expect(unbound.delete('k')).rejects.toThrow('not initialized');
+  });
 });

@@ -272,6 +272,9 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
     if (options.limit !== undefined) {
       sql += ` LIMIT ?`;
       bindings.push(options.limit);
+    } else if (options.offset !== undefined) {
+      // SQLite rejects OFFSET without LIMIT; a negative limit is its "no limit".
+      sql += ` LIMIT -1`;
     }
 
     if (options.offset !== undefined) {

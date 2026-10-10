@@ -179,6 +179,15 @@ sealed `true`, outcome `certified`, 235 s on the maintainer machine
 > versioned `0.13.0` tree (it is one command) and its hashes recorded for R02–R04/L01. This spec does not merge #89 or
 > edit versions.
 
+> **Resolution (2026-10-10, recorded by [spec 089](089-measurable-reliability-and-performance-baseline.md); the text above is
+> the historical record and is left as written).** PR #89 (Version Packages) was merged (`0d2f317`), then PR #90 — this
+> spec's own PR — landed as `4daec40`, whose main CI run `38069257116` finished ✓ (checks, **certify**, changeset-check,
+> **release**, both Cloudflare Pages deploys). That run's `certify` job sealed the **`0.13.0`** artifacts from the clean
+> commit `4daec40ab3f5145c2dd6a56918717f530457a5f9` (11 tarballs, outcome `certified`, 323 s on `ubuntu-latest`, Node `v22.23.3`),
+> and `release` published the fixed family: npm `latest` and the GitHub releases are `0.13.0` for all eleven packages. The
+> `0.13.0` identity gate is therefore **closed**; its hashes are in spec 089's Outcome. The `0.12.1`-named tarball hashes in
+> the table above remain valid historical evidence of that local run and are **not** the `0.13.0` candidate.
+
 **Stages (one sealed set, local):** `consumers` 7 s · `release` 26 s · `compat` 56 s · `ssr` 16 s · `s3` 82 s · `upgrade` 19 s.
 
 - **Manifests/exports:** all 11 packed manifests aligned at one version, no `workspace:`/`catalog:`/`link:`/`file:` range,

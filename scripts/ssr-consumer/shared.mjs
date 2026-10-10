@@ -3,10 +3,11 @@
 
 import { execFileSync } from 'node:child_process';
 import { resolveTarballs } from '../certification/artifacts.mjs';
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
+import { brotliCompressSync, constants as zlibConstants, gzipSync } from 'node:zlib';
 
 /** The versions the first-party apps use (the C03 `current` combination plus the SSR pieces). */
 export const VERSIONS = {
@@ -156,3 +157,87 @@ export function transferState(html, label) {
 
 export const forgeEntries = (state) =>
   Object.entries(state).filter(([key]) => key.startsWith('forge:public:'));
+
+// ---------------------------------------------------------------------------------------------------------
+// Production browser bundle measurement (spec 089). Opt-in: nothing is written unless FORGE_BUNDLE_REPORT
+// names a file, so the certification runs (which only care that the bundle is clean) are unchanged.
+
+const gzipSize = (buffer) => gzipSync(buffer, { level: 9 }).length;
+const brotliSize = (buffer) =>
+  brotliCompressSync(buffer, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 11 } }).length;
+
+/** Script URLs the entry HTML loads eagerly: module scripts and modulepreload links (the initial JS). */
+function initialScripts(clientDir) {
+  const indexHtml = join(clientDir, 'index.html');
+  if (!existsSync(indexHtml)) return [];
+  const html = readFileSync(indexHtml, 'utf8');
+  const urls = [
+    ...html.matchAll(/<script[^>]+type="module"[^>]+src="([^"]+)"/g),
+    ...html.matchAll(/<link[^>]+rel="modulepreload"[^>]+href="([^"]+)"/g),
+    ...html.matchAll(/<link[^>]+href="([^"]+)"[^>]+rel="modulepreload"/g)
+  ].map((match) => match[1]);
+  return [...new Set(urls)].map((url) => join(clientDir, url.replace(/^\//, '')));
+}
+
+/**
+ * The size of the PRODUCTION browser output in `clientDir`: every JavaScript file, the eagerly loaded
+ * subset, the largest chunk, and — for each `markers` entry — the smallest chunk containing that text
+ * (a string that survives minification, e.g. a template label).
+ */
+export function measureClientBundle(clientDir, markers = {}) {
+  const files = jsFiles(clientDir).map((file) => {
+    const buffer = readFileSync(file);
+    return {
+      file: file.slice(clientDir.length + 1),
+      text: buffer.toString('utf8'),
+      bytes: buffer.length,
+      gzip: gzipSize(buffer),
+      brotli: brotliSize(buffer)
+    };
+  });
+  if (files.length === 0) fail(`no JavaScript in ${clientDir}`);
+  const sum = (list, key) => list.reduce((total, entry) => total + entry[key], 0);
+  const initialSet = new Set(
+    initialScripts(clientDir).map((file) => file.slice(clientDir.length + 1))
+  );
+  const initial = files.filter((entry) => initialSet.has(entry.file));
+  const largest = (list) => list.reduce((a, b) => (b.bytes > a.bytes ? b : a));
+  const strip = ({ file, bytes, gzip, brotli }) => ({ file, bytes, gzip, brotli });
+  const markerChunks = {};
+  for (const [name, text] of Object.entries(markers)) {
+    const hits = files.filter((entry) => entry.text.includes(text));
+    markerChunks[name] =
+      hits.length === 0
+        ? null
+        : {
+            ...strip(hits.reduce((a, b) => (b.bytes < a.bytes ? b : a))),
+            initial: hits.some((hit) => initialSet.has(hit.file))
+          };
+  }
+  return {
+    jsFiles: files.length,
+    totalJs: { bytes: sum(files, 'bytes'), gzip: sum(files, 'gzip'), brotli: sum(files, 'brotli') },
+    initialJs: {
+      files: initial.length,
+      bytes: sum(initial, 'bytes'),
+      gzip: sum(initial, 'gzip'),
+      brotli: sum(initial, 'brotli')
+    },
+    largestChunk: strip(largest(files)),
+    largestInitialChunk: initial.length > 0 ? strip(largest(initial)) : null,
+    markerChunks
+  };
+}
+
+/** Appends `label`'s measurement to the FORGE_BUNDLE_REPORT file, when one is named. */
+export function recordBundle(label, clientDir, markers = {}) {
+  const target = process.env.FORGE_BUNDLE_REPORT;
+  if (!target) return;
+  const report = existsSync(target)
+    ? JSON.parse(readFileSync(target, 'utf8'))
+    : { schema: 1, consumers: {} };
+  report.consumers[label] = measureClientBundle(clientDir, markers);
+  mkdirSync(dirname(target), { recursive: true });
+  writeFileSync(target, `${JSON.stringify(report, null, 2)}\n`);
+  console.log(`  ✓ measured the ${label} production browser bundle → ${target}`);
+}
