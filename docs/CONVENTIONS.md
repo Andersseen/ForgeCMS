@@ -48,6 +48,10 @@
   `'unauthorized' | 'forbidden' | 'expired'`).
 - Adapter methods throw `Error` with descriptive messages (`'D1DatabaseAdapter not initialized. Call init() first.'`);
   handlers translate them into 500 envelopes.
+- **Never log a dependency's error object or message.** A database driver, storage SDK or host error can quote a
+  connection string, key id or token in either. Log the operation and the error's class/code
+  (`describeErrorForLog` in `@forge-cms/runtime`'s internals; the auth handlers do the same). Responses stay generic.
+  `log-redaction.test.ts` injects marker secrets to prove it (spec 089).
 
 ## Testing
 
@@ -62,6 +66,15 @@
   `packages/cloudflare/src/*.test.ts`) — no miniflare in unit tests.
 - E2E (Playwright) only in `apps/www` (`pnpm e2e:www`); keep e2e for user-visible flows, not API logic.
 - New logic ships with tests. Bug fixes ship with a regression test.
+- **Coverage is per package** (`pnpm test:coverage`, spec 089): non-UI packages 90/90/90/85, Angular runtime logic
+  85/85/85/80. Raise it with behavioural tests (denials, faults, boundaries) — never by calling a function to mark a line,
+  excluding a file, or `/* istanbul ignore */`. An unreachable branch needs a written reason in the spec.
+- **Database work is a contract:** relation population is batched (one query per relation field regardless of row count) and
+  invalid queries reach zero database calls. `packages/runtime/src/query-work-bounds.test.ts` and
+  `pnpm test:performance` pin it; a new per-row query is a regression.
+- **A flaky test is a bug with a cause.** Reproduce it in isolation, classify it (product / test / environment), fix the cause.
+  Do not add `waitForTimeout`, retries or a longer timeout. Read the DOM once, atomically, inside `expect.poll` — a locator
+  resolved before a navigation can point at a node that is detached by the time it is read.
 
 ## Angular / Analog (apps and UI packages)
 

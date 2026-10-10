@@ -1,5 +1,5 @@
 {
-  "": "Frozen regression budgets (spec 089). Every number below was MEASURED first (3 runs on the baseline environment), then given headroom \u2014 never the other way round. 'hard' metrics fail 'pnpm test:performance'; 'report' metrics are recorded and printed only. Change a budget only in a PR that explains the evidence, edits docs/specs/089 and \u2014 for bundle/DOM numbers \u2014 names the dependency or template change behind it.",
+  "$comment": "Frozen regression budgets (spec 089). Every number below was MEASURED first (3 runs on the baseline environment), then given headroom \u2014 never the other way round. 'hard' metrics fail 'pnpm test:performance'; 'report' metrics are recorded and printed only. Change a budget only in a PR that explains the evidence, edits docs/specs/089 and \u2014 for bundle/DOM numbers \u2014 names the dependency or template change behind it. 'ciObserved' is the value from the first CI run on a GitHub-hosted runner (provenance only; budgets are not derived from it except the labelled release-blocker ceilings).",
   "fixtureVersion": "r02-1",
   "baselineEnvironment": {
     "node": "v22.23.1",
@@ -7,7 +7,13 @@
     "arch": "arm64",
     "cpu": "Apple M4",
     "database": "libSQL on-disk",
-    "note": "Local-machine regression baselines, not production latency; no remote or cloud measurement exists."
+    "note": "Local-machine regression baselines, not production latency; no remote or cloud measurement exists.",
+    "ciSample": {
+      "runner": "GitHub ubuntu-latest, 4 vCPU (Intel Xeon 6973P-C)",
+      "node": "v22.23.3",
+      "run": "PR #91, CI 38074330019",
+      "note": "one sample; every deterministic metric matched the baseline exactly, wall-clock was ~2-5x slower"
+    }
   },
   "metrics": [
     {
@@ -19,7 +25,8 @@
       "gate": "hard",
       "exact": true,
       "rationale": "first page: page query + total count. Deterministic: counted at the DatabaseAdapter boundary, independent of machine speed. The budget equals the baseline, so ANY extra query (an N+1, a second count, a per-row lookup) fails.",
-      "sensitivity": "none (algorithmic)"
+      "sensitivity": "none (algorithmic)",
+      "ciObserved": 2
     },
     {
       "id": "db-calls.query.later_page",
@@ -30,7 +37,8 @@
       "gate": "hard",
       "exact": true,
       "rationale": "deep page (offset 1500): page query + total count. Deterministic: counted at the DatabaseAdapter boundary, independent of machine speed. The budget equals the baseline, so ANY extra query (an N+1, a second count, a per-row lookup) fails.",
-      "sensitivity": "none (algorithmic)"
+      "sensitivity": "none (algorithmic)",
+      "ciObserved": 2
     },
     {
       "id": "db-calls.query.filtered",
@@ -41,7 +49,8 @@
       "gate": "hard",
       "exact": true,
       "rationale": "filtered page: page query + total count. Deterministic: counted at the DatabaseAdapter boundary, independent of machine speed. The budget equals the baseline, so ANY extra query (an N+1, a second count, a per-row lookup) fails.",
-      "sensitivity": "none (algorithmic)"
+      "sensitivity": "none (algorithmic)",
+      "ciObserved": 2
     },
     {
       "id": "db-calls.query.nested_where",
@@ -52,7 +61,8 @@
       "gate": "hard",
       "exact": true,
       "rationale": "nested and/or page: page query + total count. Deterministic: counted at the DatabaseAdapter boundary, independent of machine speed. The budget equals the baseline, so ANY extra query (an N+1, a second count, a per-row lookup) fails.",
-      "sensitivity": "none (algorithmic)"
+      "sensitivity": "none (algorithmic)",
+      "ciObserved": 2
     },
     {
       "id": "db-calls.query.multi_sort",
@@ -63,7 +73,8 @@
       "gate": "hard",
       "exact": true,
       "rationale": "3-field sort page: page query + total count. Deterministic: counted at the DatabaseAdapter boundary, independent of machine speed. The budget equals the baseline, so ANY extra query (an N+1, a second count, a per-row lookup) fails.",
-      "sensitivity": "none (algorithmic)"
+      "sensitivity": "none (algorithmic)",
+      "ciObserved": 2
     },
     {
       "id": "db-calls.count.filtered",
@@ -74,7 +85,8 @@
       "gate": "hard",
       "exact": true,
       "rationale": "count with the filtered predicate: one count. Deterministic: counted at the DatabaseAdapter boundary, independent of machine speed. The budget equals the baseline, so ANY extra query (an N+1, a second count, a per-row lookup) fails.",
-      "sensitivity": "none (algorithmic)"
+      "sensitivity": "none (algorithmic)",
+      "ciObserved": 1
     },
     {
       "id": "db-calls.count.nested_where",
@@ -85,7 +97,8 @@
       "gate": "hard",
       "exact": true,
       "rationale": "count with the nested predicate: one count. Deterministic: counted at the DatabaseAdapter boundary, independent of machine speed. The budget equals the baseline, so ANY extra query (an N+1, a second count, a per-row lookup) fails.",
-      "sensitivity": "none (algorithmic)"
+      "sensitivity": "none (algorithmic)",
+      "ciObserved": 1
     },
     {
       "id": "db-calls.population.page_50",
@@ -96,7 +109,8 @@
       "gate": "hard",
       "exact": true,
       "rationale": "depth-1 page of 50: page + count + ONE lookup per relation field (author, tags, cover). Deterministic: counted at the DatabaseAdapter boundary, independent of machine speed. The budget equals the baseline, so ANY extra query (an N+1, a second count, a per-row lookup) fails.",
-      "sensitivity": "none (algorithmic)"
+      "sensitivity": "none (algorithmic)",
+      "ciObserved": 5
     },
     {
       "id": "db-calls.population.page_500",
@@ -107,7 +121,8 @@
       "gate": "hard",
       "exact": true,
       "rationale": "depth-1 page of 500: identical to a page of 50 \u2014 population is batched. Deterministic: counted at the DatabaseAdapter boundary, independent of machine speed. The budget equals the baseline, so ANY extra query (an N+1, a second count, a per-row lookup) fails.",
-      "sensitivity": "none (algorithmic)"
+      "sensitivity": "none (algorithmic)",
+      "ciObserved": 5
     },
     {
       "id": "db-calls.population.by_id",
@@ -118,7 +133,8 @@
       "gate": "hard",
       "exact": true,
       "rationale": "depth-1 document: one read + one lookup per relation field. Deterministic: counted at the DatabaseAdapter boundary, independent of machine speed. The budget equals the baseline, so ANY extra query (an N+1, a second count, a per-row lookup) fails.",
-      "sensitivity": "none (algorithmic)"
+      "sensitivity": "none (algorithmic)",
+      "ciObserved": 4
     },
     {
       "id": "db-calls.http.admin_list_page",
@@ -129,7 +145,8 @@
       "gate": "hard",
       "exact": true,
       "rationale": "admin list request: page query + total count. Deterministic: counted at the DatabaseAdapter boundary, independent of machine speed. The budget equals the baseline, so ANY extra query (an N+1, a second count, a per-row lookup) fails.",
-      "sensitivity": "none (algorithmic)"
+      "sensitivity": "none (algorithmic)",
+      "ciObserved": 2
     },
     {
       "id": "db-calls.http.admin_filtered_list",
@@ -140,7 +157,8 @@
       "gate": "hard",
       "exact": true,
       "rationale": "admin filtered list request: page query + total count. Deterministic: counted at the DatabaseAdapter boundary, independent of machine speed. The budget equals the baseline, so ANY extra query (an N+1, a second count, a per-row lookup) fails.",
-      "sensitivity": "none (algorithmic)"
+      "sensitivity": "none (algorithmic)",
+      "ciObserved": 2
     },
     {
       "id": "db-calls.http.max_where",
@@ -151,7 +169,8 @@
       "gate": "hard",
       "exact": true,
       "rationale": "largest accepted where (4 KB): still page query + total count. Deterministic: counted at the DatabaseAdapter boundary, independent of machine speed. The budget equals the baseline, so ANY extra query (an N+1, a second count, a per-row lookup) fails.",
-      "sensitivity": "none (algorithmic)"
+      "sensitivity": "none (algorithmic)",
+      "ciObserved": 2
     },
     {
       "id": "db-calls.http.rejected_deep_where",
@@ -162,7 +181,8 @@
       "gate": "hard",
       "exact": true,
       "rationale": "over-deep where: rejected with ZERO database calls. Deterministic: counted at the DatabaseAdapter boundary, independent of machine speed. The budget equals the baseline, so ANY extra query (an N+1, a second count, a per-row lookup) fails.",
-      "sensitivity": "none (algorithmic)"
+      "sensitivity": "none (algorithmic)",
+      "ciObserved": 0
     },
     {
       "id": "db-calls.upload.multipart_64kib",
@@ -173,7 +193,8 @@
       "gate": "hard",
       "exact": true,
       "rationale": "upload: one storage-intent create + one atomic document batch. Deterministic: counted at the DatabaseAdapter boundary, independent of machine speed. The budget equals the baseline, so ANY extra query (an N+1, a second count, a per-row lookup) fails.",
-      "sensitivity": "none (algorithmic)"
+      "sensitivity": "none (algorithmic)",
+      "ciObserved": 2
     },
     {
       "id": "db-calls.population.spread_500_vs_10",
@@ -184,7 +205,8 @@
       "gate": "hard",
       "exact": true,
       "rationale": "Database calls of a depth-1 page of 500 rows minus a page of 10 rows. 0 = population cost does not grow with the result (no N+1). Also asserted by the measurement itself and by packages/runtime/src/query-work-bounds.test.ts.",
-      "sensitivity": "none (algorithmic)"
+      "sensitivity": "none (algorithmic)",
+      "ciObserved": 0
     },
     {
       "id": "render.rows_50.dom-nodes",
@@ -194,7 +216,8 @@
       "budget": 1600,
       "gate": "hard",
       "rationale": "DOM nodes the admin list creates for 50 rows. Deterministic (identical in every run). ~10% headroom absorbs small template changes; template bloat beyond that is a review decision, not an accident.",
-      "sensitivity": "none (deterministic)"
+      "sensitivity": "none (deterministic)",
+      "ciObserved": 1453
     },
     {
       "id": "render.rows_500.dom-nodes",
@@ -204,7 +227,8 @@
       "budget": 15500,
       "gate": "hard",
       "rationale": "DOM nodes the admin list creates for 500 rows. Deterministic (identical in every run). ~10% headroom absorbs small template changes; template bloat beyond that is a review decision, not an accident.",
-      "sensitivity": "none (deterministic)"
+      "sensitivity": "none (deterministic)",
+      "ciObserved": 14053
     },
     {
       "id": "scaling.population.page_500-over-page_50.p50",
@@ -217,7 +241,8 @@
       "budget": 12,
       "gate": "hard",
       "rationale": "10x the rows should cost ~5.6x (fixed per-request overhead + linear row work). The budget (12) fails only a super-linear population or hydration cost.",
-      "sensitivity": "low (both terms measured on the same machine in the same run)"
+      "sensitivity": "low (both terms measured on the same machine in the same run)",
+      "ciObserved": 5.39
     },
     {
       "id": "scaling.query.later_page-over-first_page.p50",
@@ -230,7 +255,8 @@
       "budget": 5,
       "gate": "hard",
       "rationale": "Paging to offset 1500 costs the same as page 1 (indexed sort). Budget 5x catches a regression to materialising the skipped rows.",
-      "sensitivity": "low (both terms measured on the same machine in the same run)"
+      "sensitivity": "low (both terms measured on the same machine in the same run)",
+      "ciObserved": 1
     },
     {
       "id": "scaling.query.nested_where-over-first_page.p50",
@@ -243,7 +269,8 @@
       "budget": 6,
       "gate": "hard",
       "rationale": "A 3-level nested predicate costs ~1.5x an unfiltered page. Budget 6x catches pathological predicate translation.",
-      "sensitivity": "low (both terms measured on the same machine in the same run)"
+      "sensitivity": "low (both terms measured on the same machine in the same run)",
+      "ciObserved": 1.49
     },
     {
       "id": "scaling.render.rows_500-over-rows_50.p50",
@@ -256,7 +283,8 @@
       "budget": 20,
       "gate": "hard",
       "rationale": "10x the rows renders in ~8.7x the time (linear). Budget 20x fails a quadratic list (e.g. an O(n^2) track/identity or per-row lookup).",
-      "sensitivity": "low (both terms measured on the same machine in the same run)"
+      "sensitivity": "low (both terms measured on the same machine in the same run)",
+      "ciObserved": 8.34
     },
     {
       "id": "memory.heap-growth.workloads-4-to-6",
@@ -266,7 +294,8 @@
       "budget": 5,
       "gate": "hard",
       "rationale": "Growth of the garbage-collected JS heap across the second half of six repetitions of the same operation mix (~480 operations). Steady state is 0; a leak of >=10 KB per operation exceeds 5 MB. Heap readings follow an explicit GC, so they are stable.",
-      "sensitivity": "low"
+      "sensitivity": "low",
+      "ciObserved": 0.1
     },
     {
       "id": "memory.heap-used.after-workload",
@@ -277,7 +306,8 @@
       "review": 45,
       "gate": "hard",
       "rationale": "JS heap after fixture load and six workload rounds (baseline ~25 MB). Release-blocker ceiling 100 MB (4x); above 45 MB (1.8x) is a review signal. A gross-regression guard, not a precision budget.",
-      "sensitivity": "medium (Node version, V8 flags)"
+      "sensitivity": "medium (Node version, V8 flags)",
+      "ciObserved": 25.7
     },
     {
       "id": "memory.rss.after-workload",
@@ -288,7 +318,8 @@
       "review": 700,
       "gate": "hard",
       "rationale": "Process RSS after the workload (baseline ~395 MB, dominated by the native libSQL driver and allocator behaviour: RSS moves up AND down between identical runs and with the raw adapter alone \u2014 spec 089). Only a 1 GB ceiling is gated; 700 MB is a review signal. Never use RSS deltas as a trend.",
-      "sensitivity": "high (allocator, OS, driver)"
+      "sensitivity": "high (allocator, OS, driver)",
+      "ciObserved": 401.6
     },
     {
       "id": "bundle.technical.total-js.bytes",
@@ -298,7 +329,8 @@
       "budget": 253000,
       "gate": "hard",
       "rationale": "All JavaScript of the packed SDK-only Analog consumer's production browser build (@forge-cms/angular + Angular). Budget = baseline +5% rounded up to the next 1,000 B.",
-      "sensitivity": "low (same lockfile and toolchain give the same output; a dependency or toolchain bump legitimately moves it \u2014 update the budget in that PR)"
+      "sensitivity": "low (same lockfile and toolchain give the same output; a dependency or toolchain bump legitimately moves it \u2014 update the budget in that PR)",
+      "ciObserved": 240676
     },
     {
       "id": "bundle.technical.total-js.gzip",
@@ -308,7 +340,8 @@
       "budget": 77000,
       "gate": "hard",
       "rationale": "Same, gzip level 9. Budget = baseline +5% rounded up to the next 1,000 B.",
-      "sensitivity": "low (same lockfile and toolchain give the same output; a dependency or toolchain bump legitimately moves it \u2014 update the budget in that PR)"
+      "sensitivity": "low (same lockfile and toolchain give the same output; a dependency or toolchain bump legitimately moves it \u2014 update the budget in that PR)",
+      "ciObserved": 73036
     },
     {
       "id": "bundle.admin.total-js.bytes",
@@ -318,7 +351,8 @@
       "budget": 841000,
       "gate": "hard",
       "rationale": "All JavaScript of the packed tiny-project consumer (reusable admin) production browser build. Budget = baseline +5% rounded up to the next 1,000 B.",
-      "sensitivity": "low (same lockfile and toolchain give the same output; a dependency or toolchain bump legitimately moves it \u2014 update the budget in that PR)"
+      "sensitivity": "low (same lockfile and toolchain give the same output; a dependency or toolchain bump legitimately moves it \u2014 update the budget in that PR)",
+      "ciObserved": 800106
     },
     {
       "id": "bundle.admin.total-js.gzip",
@@ -328,7 +362,8 @@
       "budget": 232000,
       "gate": "hard",
       "rationale": "Same, gzip level 9. Budget = baseline +5% rounded up to the next 1,000 B.",
-      "sensitivity": "low (same lockfile and toolchain give the same output; a dependency or toolchain bump legitimately moves it \u2014 update the budget in that PR)"
+      "sensitivity": "low (same lockfile and toolchain give the same output; a dependency or toolchain bump legitimately moves it \u2014 update the budget in that PR)",
+      "ciObserved": 220554
     },
     {
       "id": "bundle.admin.initial-js.bytes",
@@ -338,7 +373,8 @@
       "budget": 641000,
       "gate": "hard",
       "rationale": "JavaScript the admin consumer's entry HTML loads eagerly (script + modulepreload). Budget = baseline +5% rounded up to the next 1,000 B.",
-      "sensitivity": "low (same lockfile and toolchain give the same output; a dependency or toolchain bump legitimately moves it \u2014 update the budget in that PR)"
+      "sensitivity": "low (same lockfile and toolchain give the same output; a dependency or toolchain bump legitimately moves it \u2014 update the budget in that PR)",
+      "ciObserved": 610445
     },
     {
       "id": "bundle.admin.largest-initial-chunk.bytes",
@@ -348,7 +384,8 @@
       "budget": 641000,
       "gate": "hard",
       "rationale": "Largest eagerly loaded chunk. Budget = baseline +5% rounded up to the next 1,000 B.",
-      "sensitivity": "low (same lockfile and toolchain give the same output; a dependency or toolchain bump legitimately moves it \u2014 update the budget in that PR)"
+      "sensitivity": "low (same lockfile and toolchain give the same output; a dependency or toolchain bump legitimately moves it \u2014 update the budget in that PR)",
+      "ciObserved": 610445
     },
     {
       "id": "bundle.admin.route-chunk.bytes",
@@ -358,7 +395,8 @@
       "budget": 191000,
       "gate": "hard",
       "rationale": "The lazily loaded chunk holding the admin content list (found by its 'Filter by status' label) \u2014 the admin's own route cost, not in the initial load. Budget = baseline +5% rounded up to the next 1,000 B.",
-      "sensitivity": "low (same lockfile and toolchain give the same output; a dependency or toolchain bump legitimately moves it \u2014 update the budget in that PR)"
+      "sensitivity": "low (same lockfile and toolchain give the same output; a dependency or toolchain bump legitimately moves it \u2014 update the budget in that PR)",
+      "ciObserved": 181154
     },
     {
       "id": "bundle.admin.route-chunk.gzip",
@@ -368,7 +406,8 @@
       "budget": 42000,
       "gate": "hard",
       "rationale": "Same, gzip level 9. Budget = baseline +5% rounded up to the next 1,000 B.",
-      "sensitivity": "low (same lockfile and toolchain give the same output; a dependency or toolchain bump legitimately moves it \u2014 update the budget in that PR)"
+      "sensitivity": "low (same lockfile and toolchain give the same output; a dependency or toolchain bump legitimately moves it \u2014 update the budget in that PR)",
+      "ciObserved": 39431
     },
     {
       "id": "latency.query.first_page.p50",
@@ -378,17 +417,19 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 1.432
     },
     {
       "id": "latency.query.first_page.p95",
       "path": ["runtime", "operations", "query.first_page", "latencyMs", "p95"],
       "unit": "ms",
       "baseline": 0.901,
-      "budget": null,
-      "gate": "report",
-      "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "budget": 50,
+      "gate": "hard",
+      "rationale": "RELEASE-BLOCKER CEILING, not a precision budget: 20x the slowest observed p95 (2.181 ms; macOS arm64 baseline 0.901 ms, first GitHub ubuntu-latest 4-vCPU sample 2.181 ms). Fails only a gross regression (an accidental full scan, a hang). Algorithmic regressions are caught by the exact database-call and scaling-shape gates; finer wall-clock gating waits for repeatability evidence from CI history.",
+      "sensitivity": "medium (20x headroom absorbs runner variance)",
+      "ciObserved": 2.181
     },
     {
       "id": "latency.query.later_page.p50",
@@ -398,7 +439,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 1.435
     },
     {
       "id": "latency.query.later_page.p95",
@@ -408,7 +450,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 2.11
     },
     {
       "id": "latency.query.filtered.p50",
@@ -418,7 +461,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 1.675
     },
     {
       "id": "latency.query.filtered.p95",
@@ -428,7 +472,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 2.332
     },
     {
       "id": "latency.query.nested_where.p50",
@@ -438,17 +483,19 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 2.127
     },
     {
       "id": "latency.query.nested_where.p95",
       "path": ["runtime", "operations", "query.nested_where", "latencyMs", "p95"],
       "unit": "ms",
       "baseline": 1.238,
-      "budget": null,
-      "gate": "report",
-      "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "budget": 60,
+      "gate": "hard",
+      "rationale": "RELEASE-BLOCKER CEILING, not a precision budget: 20x the slowest observed p95 (2.849 ms; macOS arm64 baseline 1.238 ms, first GitHub ubuntu-latest 4-vCPU sample 2.849 ms). Fails only a gross regression (an accidental full scan, a hang). Algorithmic regressions are caught by the exact database-call and scaling-shape gates; finer wall-clock gating waits for repeatability evidence from CI history.",
+      "sensitivity": "medium (20x headroom absorbs runner variance)",
+      "ciObserved": 2.849
     },
     {
       "id": "latency.query.multi_sort.p50",
@@ -458,7 +505,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 1.677
     },
     {
       "id": "latency.query.multi_sort.p95",
@@ -468,7 +516,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 2.19
     },
     {
       "id": "latency.count.filtered.p50",
@@ -478,7 +527,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 0.072
     },
     {
       "id": "latency.count.filtered.p95",
@@ -488,7 +538,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 0.122
     },
     {
       "id": "latency.count.nested_where.p50",
@@ -498,7 +549,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 0.356
     },
     {
       "id": "latency.count.nested_where.p95",
@@ -508,7 +560,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 0.409
     },
     {
       "id": "latency.population.page_50.p50",
@@ -518,17 +571,19 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 2.963
     },
     {
       "id": "latency.population.page_50.p95",
       "path": ["runtime", "operations", "population.page_50", "latencyMs", "p95"],
       "unit": "ms",
       "baseline": 1.716,
-      "budget": null,
-      "gate": "report",
-      "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "budget": 100,
+      "gate": "hard",
+      "rationale": "RELEASE-BLOCKER CEILING, not a precision budget: 20x the slowest observed p95 (4.414 ms; macOS arm64 baseline 1.716 ms, first GitHub ubuntu-latest 4-vCPU sample 4.414 ms). Fails only a gross regression (an accidental full scan, a hang). Algorithmic regressions are caught by the exact database-call and scaling-shape gates; finer wall-clock gating waits for repeatability evidence from CI history.",
+      "sensitivity": "medium (20x headroom absorbs runner variance)",
+      "ciObserved": 4.414
     },
     {
       "id": "latency.population.page_500.p50",
@@ -538,7 +593,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 15.959
     },
     {
       "id": "latency.population.page_500.p95",
@@ -548,7 +604,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 16.836
     },
     {
       "id": "latency.population.by_id.p50",
@@ -558,7 +615,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 0.441
     },
     {
       "id": "latency.population.by_id.p95",
@@ -568,7 +626,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 0.841
     },
     {
       "id": "latency.http.admin_list_page.p50",
@@ -578,17 +637,19 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 1.807
     },
     {
       "id": "latency.http.admin_list_page.p95",
       "path": ["runtime", "operations", "http.admin_list_page", "latencyMs", "p95"],
       "unit": "ms",
       "baseline": 1.023,
-      "budget": null,
-      "gate": "report",
-      "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "budget": 50,
+      "gate": "hard",
+      "rationale": "RELEASE-BLOCKER CEILING, not a precision budget: 20x the slowest observed p95 (2.522 ms; macOS arm64 baseline 1.023 ms, first GitHub ubuntu-latest 4-vCPU sample 2.522 ms). Fails only a gross regression (an accidental full scan, a hang). Algorithmic regressions are caught by the exact database-call and scaling-shape gates; finer wall-clock gating waits for repeatability evidence from CI history.",
+      "sensitivity": "medium (20x headroom absorbs runner variance)",
+      "ciObserved": 2.522
     },
     {
       "id": "latency.http.admin_filtered_list.p50",
@@ -598,7 +659,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 1.336
     },
     {
       "id": "latency.http.admin_filtered_list.p95",
@@ -608,7 +670,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 1.95
     },
     {
       "id": "latency.http.max_where.p50",
@@ -618,17 +681,19 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 6.975
     },
     {
       "id": "latency.http.max_where.p95",
       "path": ["runtime", "operations", "http.max_where", "latencyMs", "p95"],
       "unit": "ms",
       "baseline": 3.875,
-      "budget": null,
-      "gate": "report",
-      "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "budget": 200,
+      "gate": "hard",
+      "rationale": "RELEASE-BLOCKER CEILING, not a precision budget: 20x the slowest observed p95 (8.052 ms; macOS arm64 baseline 3.875 ms, first GitHub ubuntu-latest 4-vCPU sample 8.052 ms). Fails only a gross regression (an accidental full scan, a hang). Algorithmic regressions are caught by the exact database-call and scaling-shape gates; finer wall-clock gating waits for repeatability evidence from CI history.",
+      "sensitivity": "medium (20x headroom absorbs runner variance)",
+      "ciObserved": 8.052
     },
     {
       "id": "latency.http.rejected_deep_where.p50",
@@ -638,7 +703,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 0.077
     },
     {
       "id": "latency.http.rejected_deep_where.p95",
@@ -648,7 +714,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 0.111
     },
     {
       "id": "latency.upload.multipart_64kib.p50",
@@ -658,17 +725,19 @@
       "budget": null,
       "gate": "report",
       "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "sensitivity": "high (CPU, load, Node version)",
+      "ciObserved": 4.497
     },
     {
       "id": "latency.upload.multipart_64kib.p95",
       "path": ["runtime", "operations", "upload.multipart_64kib", "latencyMs", "p95"],
       "unit": "ms",
       "baseline": 1.204,
-      "budget": null,
-      "gate": "report",
-      "rationale": "Wall-clock on a developer machine / CI runner. Recorded as a regression baseline, not a latency promise.",
-      "sensitivity": "high (CPU, load, Node version)"
+      "budget": 120,
+      "gate": "hard",
+      "rationale": "RELEASE-BLOCKER CEILING, not a precision budget: 20x the slowest observed p95 (5.639 ms; macOS arm64 baseline 1.204 ms, first GitHub ubuntu-latest 4-vCPU sample 5.639 ms). Fails only a gross regression (an accidental full scan, a hang). Algorithmic regressions are caught by the exact database-call and scaling-shape gates; finer wall-clock gating waits for repeatability evidence from CI history.",
+      "sensitivity": "medium (20x headroom absorbs runner variance)",
+      "ciObserved": 5.639
     },
     {
       "id": "latency.render.rows_50.p50",
@@ -678,17 +747,19 @@
       "budget": null,
       "gate": "report",
       "rationale": "Angular TestBed + jsdom render time of the admin list (no layout/paint).",
-      "sensitivity": "high (CPU, load, jsdom)"
+      "sensitivity": "high (CPU, load, jsdom)",
+      "ciObserved": 140.235
     },
     {
       "id": "latency.render.rows_50.p95",
       "path": ["render", "renders", "rows_50", "renderMs", "p95"],
       "unit": "ms",
       "baseline": 68.106,
-      "budget": null,
-      "gate": "report",
-      "rationale": "Angular TestBed + jsdom render time of the admin list (no layout/paint).",
-      "sensitivity": "high (CPU, load, jsdom)"
+      "budget": 1800,
+      "gate": "hard",
+      "rationale": "RELEASE-BLOCKER CEILING, not a precision budget: 10x the slowest observed p95 (177.749 ms; macOS arm64 baseline 68.106 ms, first GitHub ubuntu-latest 4-vCPU sample 177.749 ms). Fails only a gross regression (an accidental full scan, a hang). Algorithmic regressions are caught by the exact database-call and scaling-shape gates; finer wall-clock gating waits for repeatability evidence from CI history.",
+      "sensitivity": "medium (10x headroom; jsdom render)",
+      "ciObserved": 177.749
     },
     {
       "id": "latency.render.rows_500.p50",
@@ -698,7 +769,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Angular TestBed + jsdom render time of the admin list (no layout/paint).",
-      "sensitivity": "high (CPU, load, jsdom)"
+      "sensitivity": "high (CPU, load, jsdom)",
+      "ciObserved": 1170.067
     },
     {
       "id": "latency.render.rows_500.p95",
@@ -708,7 +780,8 @@
       "budget": null,
       "gate": "report",
       "rationale": "Angular TestBed + jsdom render time of the admin list (no layout/paint).",
-      "sensitivity": "high (CPU, load, jsdom)"
+      "sensitivity": "high (CPU, load, jsdom)",
+      "ciObserved": 1426.796
     }
   ]
 }
