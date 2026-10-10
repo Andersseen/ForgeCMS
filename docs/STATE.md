@@ -40,9 +40,12 @@ flakiness, performance, budgets, faults, CI, issues).
   runtime HTTP bounds + uploads + versions + globals + "HTTP never trusts a caller override", row-scoped delete race, cascade
   cycles, locale fallback, the concurrency harness itself. **No security or integrity branch was waived.** One justified
   unreachable branch (core `json` `value === undefined`, shadowed by an earlier return).
-- **Product defects found by measuring (patch changeset):** `?offset=N` without `limit` was a **500 on libSQL and D1** (SQLite
-  rejects a bare `OFFSET`; InMemory served it) — fixed in both adapters + shared contract + HTTP regression; unexpected handler
-  errors and storage-cleanup failures **logged the provider error/message** — now class + code only.
+- **Product defects found by measuring (patch changeset):** (1) `?offset=N` without `limit` was a **500 on libSQL and D1** (SQLite
+  rejects a bare `OFFSET`; InMemory served it) — fixed in both adapters + shared contract + HTTP regression; (2) a depth-1 page
+  referencing **>100 distinct targets was a 500 on D1** (100 bound parameters per statement; one `id in (…)` per relation field) —
+  population now chunks at 80 ids (calls = 1 + ⌈distinct/80⌉ per field, still independent of rows), workerd regression; (3)
+  unexpected handler errors and storage-cleanup failures **logged the provider error/message** — now class + code only.
+  Open for R03: a user-supplied `in` filter with >~95 values still exceeds D1's limit (spec 089 K3).
 - **Flake:** `theme.spec.ts` reproduced at 9/200 under 8 workers, **root cause = test bug** (every page renders its own header;
   a node read after navigation was detached → `getComputedStyle` = `''`); fixed with one atomic in-page snapshot polled via
   `expect.poll` → **0/200**. CI Playwright retries now **fail the job** (`failOnFlakyTests`).
@@ -50,7 +53,7 @@ flakiness, performance, budgets, faults, CI, issues).
   seeded; query / count / population / HTTP list / upload / memory / admin list render + production bundle sizes of the R01 packed
   consumers; 67 metrics, 33 hard-gated (database calls exactly, DOM nodes, bundle bytes, scaling shape, heap) against
   `scripts/quality/performance-budgets.json`; wall-clock figures are report-only. **No N+1 exists:** a depth-1 page costs
-  `4 findMany + 1 count` for 10, 50 or 500 rows. Seeded N+1 → gate red (verified).
+  `1 + ⌈distinct targets/80⌉` lookups per relation field plus the count — never per row. Seeded N+1 → gate red (verified).
 - **`pnpm test:stability`** — critical journeys, fresh processes, retries off; full local sample all clean on first attempt
   (spec 089 table). CI runs a smaller profile.
 - **CI:** new required job **`reliability`** (build → coverage → performance → stability), `release` `needs: [checks, certify,
