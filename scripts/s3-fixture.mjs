@@ -73,15 +73,15 @@ admin_token = "${hex(24)}"
 
   try {
     console.log(`$ docker run ${GARAGE_IMAGE} (single node, ephemeral)`);
-    const run = docker([
-      'run',
-      '-d',
+    // `create` + `cp` + `start` instead of a bind mount: a mounted host path must be shared with the Docker VM
+    // (Colima, Rancher Desktop and Docker Desktop each share different directories, and not the OS temp dir by
+    // default), whereas copying the config in works with every daemon.
+    const created = docker([
+      'create',
       '--name',
       container,
       '-p',
       '127.0.0.1::3900',
-      '-v',
-      `${join(workDir, 'garage.toml')}:/etc/garage.toml:ro`,
       '-e',
       `GARAGE_DEFAULT_ACCESS_KEY=${accessKeyId}`,
       '-e',
@@ -94,6 +94,10 @@ admin_token = "${hex(24)}"
       '--single-node',
       '--default-bucket'
     ]);
+    if (created.status !== 0) throw new Error(`could not create Garage:\n${created.stderr}`);
+    const copied = docker(['cp', join(workDir, 'garage.toml'), `${container}:/etc/garage.toml`]);
+    if (copied.status !== 0) throw new Error(`could not copy the Garage config:\n${copied.stderr}`);
+    const run = docker(['start', container]);
     if (run.status !== 0) throw new Error(`could not start Garage:\n${run.stderr}`);
 
     const portLine = docker(['port', container, '3900/tcp']).stdout.trim().split('\n')[0] ?? '';
