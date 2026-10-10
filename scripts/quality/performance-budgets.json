@@ -116,11 +116,11 @@
       "id": "db-calls.population.page_500",
       "path": ["runtime", "operations", "population.page_500", "dbCallsTotal"],
       "unit": "calls",
-      "baseline": 5,
-      "budget": 5,
+      "baseline": 8,
+      "budget": 8,
       "gate": "hard",
       "exact": true,
-      "rationale": "depth-1 page of 500: identical to a page of 50 \u2014 population is batched. Deterministic: counted at the DatabaseAdapter boundary, independent of machine speed. The budget equals the baseline, so ANY extra query (an N+1, a second count, a per-row lookup) fails.",
+      "rationale": "depth-1 page of 500: page query + count + population lookups chunked at 80 distinct ids (D1 allows 100 bound parameters per statement): author 50 distinct -> 1, tags 100 -> 2, cover 200 -> 3 = 8 calls. Grows with DISTINCT targets, never with rows. Deterministic: counted at the DatabaseAdapter boundary, independent of machine speed. The budget equals the baseline, so ANY extra query fails.",
       "sensitivity": "none (algorithmic)",
       "ciObserved": 5
     },
@@ -197,14 +197,14 @@
       "ciObserved": 2
     },
     {
-      "id": "db-calls.population.spread_500_vs_10",
-      "path": ["runtime", "invariants", "populationCallSpread"],
+      "id": "db-calls.population.over-chunk-bound",
+      "path": ["runtime", "invariants", "populationCallsOverBound"],
       "unit": "calls",
       "baseline": 0,
       "budget": 0,
       "gate": "hard",
       "exact": true,
-      "rationale": "Database calls of a depth-1 page of 500 rows minus a page of 10 rows. 0 = population cost does not grow with the result (no N+1). Also asserted by the measurement itself and by packages/runtime/src/query-work-bounds.test.ts.",
+      "rationale": "Largest excess, over pages of 10, 50 and 500 rows, of the page's population database calls above 1 page query + ceil(distinct targets / 80) per relation field. 0 = population is batched and chunked, with no per-row query (no N+1). Also asserted by the measurement itself and by packages/runtime/src/query-work-bounds.test.ts.",
       "sensitivity": "none (algorithmic)",
       "ciObserved": 0
     },

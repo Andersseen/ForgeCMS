@@ -56,6 +56,29 @@ function getRelationFields(collection: CollectionDefinition): RelationFieldEntry
     });
 }
 
+/**
+ * Most distinct ids sent in one `id in (…)` lookup. Cloudflare D1 allows 100 bound parameters per statement
+ * (a larger list fails with "too many SQL variables" — found by spec 089 on a depth-1 page whose rows
+ * referenced >100 distinct targets), and the access/status conditions of an untrusted read add a few more.
+ * Calls therefore grow with the number of DISTINCT targets (one per 80), never with the number of rows.
+ */
+export const POPULATE_ID_CHUNK = 80;
+
+async function findByIds(
+  ctx: OperationContext,
+  collection: string,
+  ids: string[],
+  extra?: DatabaseWhere
+): Promise<DatabaseRecord[]> {
+  const found: DatabaseRecord[] = [];
+  for (let start = 0; start < ids.length; start += POPULATE_ID_CHUNK) {
+    const idFilter: DatabaseWhere = { id: { in: ids.slice(start, start + POPULATE_ID_CHUNK) } };
+    const where = extra === undefined ? idFilter : (mergeWhere(idFilter, extra) ?? idFilter);
+    found.push(...(await ctx.adapters.database.findMany({ collection, where })));
+  }
+  return found;
+}
+
 export async function populateRecords(
   records: DatabaseRecord[],
   collection: CollectionDefinition,
@@ -99,14 +122,11 @@ export async function populateRecords(
           user,
           overrideAccess: false
         });
-        const idFilter: DatabaseWhere = { id: { in: Array.from(ids) } };
-        const where =
-          mergeWhere(
-            mergeWhere(idFilter, decision.where),
-            statusConstraint(targetCollection, undefined, user, false, 'all')
-          ) ?? idFilter;
-
-        related = await ctx.adapters.database.findMany({ collection: targetSlug, where });
+        const extra = mergeWhere(
+          decision.where,
+          statusConstraint(targetCollection, undefined, user, false, 'all')
+        );
+        related = await findByIds(ctx, targetSlug, Array.from(ids), extra);
         related = await Promise.all(
           related.map((doc) => filterReadableFields(doc, targetCollection, user))
         );
@@ -114,10 +134,7 @@ export async function populateRecords(
         if (!(err instanceof AccessDeniedError)) throw err;
       }
     } else {
-      related = await ctx.adapters.database.findMany({
-        collection: targetSlug,
-        where: { id: { in: Array.from(ids) } }
-      });
+      related = await findByIds(ctx, targetSlug, Array.from(ids));
     }
     const byId = new Map(related.map((r) => [r.id as string, r]));
 

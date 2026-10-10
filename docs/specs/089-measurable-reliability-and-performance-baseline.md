@@ -96,6 +96,13 @@ with a focused behavioural test (never a line-marking call):
   the shared query contract now pages with offset alone, offset + limit and past the end for **every** adapter (InMemory, libSQL,
   D1 mock, workerd D1), plus an HTTP regression over real libSQL and a D1 emitted-SQL test. Severity: medium (a valid public
   request returned 500; no data exposure).
+- **Depth-1 population failed on D1 beyond 100 distinct targets.** Population sent every distinct related id of a page in one
+  `id in (…)`; D1 allows 100 bound parameters per statement (documented; reproduced on local workerd: `too many SQL variables`),
+  so listing 50 posts with 3 tags each from 150 tags was a 500 on the D1 profile although it passed on libSQL and InMemory. Found
+  by auditing the population algorithm against platform limits while designing the fixture. Fixed in `populate.ts` (chunks of 80
+  ids; calls now equal 1 + ⌈distinct targets / 80⌉ per relation field, still independent of the row count), with a unit test of the
+  chunking and a workerd regression that fails without the fix. Severity: high for the D1 profile (a normal depth-1 list could
+  500), no data exposure. The fixture's invariant was restated accordingly (Outcome → _N+1_).
 - **Provider errors reached the log.** `handlers.ts` logged the whole error object for any unexpected failure, and storage
   cleanup logged the provider's message. A driver/SDK error can quote a connection string, key id or token in its message or
   properties. Reproduced with deterministic marker secrets (3 of 6 new tests failed), then fixed: unexpected failures log the
@@ -155,7 +162,7 @@ One fixed fixture; local; no network, no cloud, no Docker.
   up and down independent of Forge. `pnpm test:performance` runs the fixture, the bundle build and the judge
   (`judge.mjs`, unit-tested) and exits non-zero on a hard violation.
 - **Algorithmic regressions fail ordinary `pnpm test`** too: `packages/runtime/src/query-work-bounds.test.ts` pins the batching
-  invariant (a depth-1 page costs the same calls for 10, 50 and 100 rows; each lookup is a single de-duplicated `id in (…)`; a
+  invariant (a depth-1 page costs the same calls for 10, 50 and 100 rows while its distinct targets fit one chunk, and ⌈distinct/80⌉ lookups beyond; each lookup is a single de-duplicated `id in (…)`; a
   relation cycle does not recurse; find and count receive the identical predicate), and bounded-work rules (structurally invalid
   queries reach **zero** database calls; the deepest legal nesting, a 2,000-wide `or` and a 200-field sort each cost exactly a page
   query + a count; an over-long `where`, an over-large `limit`, or a bad `offset` never reach the database over HTTP; the largest

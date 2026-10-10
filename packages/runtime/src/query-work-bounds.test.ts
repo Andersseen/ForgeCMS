@@ -193,6 +193,45 @@ describe('relation population is batched (no N+1)', () => {
   });
 });
 
+describe('population never sends an unbounded id list', () => {
+  it('splits >80 distinct targets into chunks: calls grow with distinct targets, not with rows', async () => {
+    const inner = new InMemoryDatabaseAdapter();
+    const db = counting(inner);
+    const runtime = new ForgeCmsRuntime({
+      collections: [tags, posts, authors, media],
+      adapters: {
+        database: db.proxy,
+        auth: new InMemoryAuthAdapter(),
+        storage: new InMemoryStorageAdapter()
+      }
+    });
+    runtime.init();
+    await runtime.syncSchema();
+    const tagIds: string[] = [];
+    for (let i = 0; i < 200; i++) {
+      tagIds.push(
+        (await runtime.create({ collection: 'tags', data: { label: `t${i}` } })).id as string
+      );
+    }
+    // 50 posts x 3 tags = 150 distinct targets on one page.
+    for (let i = 0; i < 50; i++) {
+      await runtime.create({
+        collection: 'posts',
+        data: { title: `p${i}`, tags: [tagIds[i * 3]!, tagIds[i * 3 + 1]!, tagIds[i * 3 + 2]!] }
+      });
+    }
+    db.reset();
+    const page = await runtime.find({ collection: 'posts', depth: 1, limit: 50 });
+    const lookups = (db.args['findMany'] ?? []).slice(1) as Array<
+      [{ collection: string; where: { id: { in: string[] } } }]
+    >;
+    expect(lookups.every(([o]) => o.where.id.in.length <= 80)).toBe(true);
+    expect(lookups.filter(([o]) => o.collection === 'tags')).toHaveLength(2); // ceil(150 / 80)
+    expect(db.calls['findMany']).toBe(1 + 2); // posts page + 2 tag chunks (author/cover are unset)
+    expect(page.docs.every((d) => (d.tags as unknown[]).length === 3)).toBe(true);
+  });
+});
+
 describe('find and count share one predicate', () => {
   it('the filter that selects the page is the filter that counts it', async () => {
     const { runtime, db } = await seed(40);

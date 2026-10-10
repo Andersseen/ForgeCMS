@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { handleCreate, handleList } from '@forge-cms/runtime';
 import type { ApiContext } from '@forge-cms/api';
 import { createRandom, DATASET, FIXTURE_VERSION } from '../src/dataset.js';
+import { POPULATE_ID_CHUNK } from '../src/population.js';
 import { ADMIN_TOKEN, createFixture } from '../src/fixture.js';
 import type { Fixture } from '../src/fixture.js';
 import { measure } from '../src/stats.js';
@@ -57,9 +58,6 @@ interface Entry {
   dbCallsTotal: number;
   latencyMs: Distribution;
 }
-
-const totalCalls = (calls: Record<string, number> | undefined): number =>
-  Object.values(calls ?? {}).reduce((sum, n) => sum + n, 0);
 
 const mb = (bytes: number): number => Math.round((bytes / 1024 / 1024) * 10) / 10;
 
@@ -203,20 +201,37 @@ describe('runtime performance fixture', () => {
         const page = await runtime.find(posts({ limit: 50, where }));
         expect(page.totalDocs).toBe(await runtime.count({ collection: 'posts', where }));
       }
-      // 2. Population is batched: the database-call count is the same for 10, 50 and 500 rows.
+      // 2. Population is batched: one lookup per relation field per 80 DISTINCT targets (D1 allows 100 bound
+      //    parameters per statement), however many rows reference them — never one per row.
+      const RELATION_FIELDS = ['author', 'tags', 'cover'] as const;
+      const expectedLookups = async (limit: number): Promise<number> => {
+        const raw = await runtime.find(posts({ limit, depth: 0 }));
+        let lookups = 0;
+        for (const field of RELATION_FIELDS) {
+          const distinct = new Set<string>();
+          for (const doc of raw.docs) {
+            const value = doc[field];
+            for (const id of Array.isArray(value) ? value : [value])
+              if (typeof id === 'string') distinct.add(id);
+          }
+          lookups += Math.ceil(distinct.size / POPULATE_ID_CHUNK);
+        }
+        return lookups;
+      };
       const callsFor = async (limit: number): Promise<Record<string, number>> => {
         database.reset();
         const page = await runtime.find(posts({ limit, depth: 1 }));
         expect(page.docs).toHaveLength(limit);
         return database.snapshot();
       };
-      const populationByPageSize = {
-        10: await callsFor(10),
-        50: await callsFor(50),
-        500: await callsFor(500)
-      };
-      expect(populationByPageSize[50]).toEqual(populationByPageSize[10]);
-      expect(populationByPageSize[500]).toEqual(populationByPageSize[10]);
+      const populationByPageSize: Record<number, Record<string, number>> = {};
+      let overBound = 0;
+      for (const size of [10, 50, 500]) {
+        populationByPageSize[size] = await callsFor(size);
+        const expected = 1 + (await expectedLookups(size)); // the page query + the chunked lookups
+        overBound = Math.max(overBound, (populationByPageSize[size]!['findMany'] ?? 0) - expected);
+        expect(populationByPageSize[size]!['findMany']).toBe(expected);
+      }
 
       // --- upload: the real multipart handler, a fixed payload, InMemory storage -------------------------
       const payload = new Uint8Array(UPLOAD_BYTES);
@@ -323,9 +338,8 @@ describe('runtime performance fixture', () => {
         operations: entries,
         populationByPageSize,
         invariants: {
-          // 0 means population costs the same number of database calls for 10 rows as for 500 (no N+1).
-          populationCallSpread:
-            totalCalls(populationByPageSize[500]) - totalCalls(populationByPageSize[10])
+          // 0 = every page issued exactly 1 page query + ceil(distinct targets / 80) lookups per relation field.
+          populationCallsOverBound: overBound
         },
         memory: {
           afterFixtureLoad: memorySamples[1],
