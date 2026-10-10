@@ -218,6 +218,20 @@ test('skip link reaches the single main landmark', async ({ page }) => {
   await expect(page.getByRole('main')).toHaveCount(1);
 });
 
+/** Opacity of the showcase and its view, and whether every running animation is effectively instant. */
+const showcaseSnapshot = () => {
+  const showcase = document.querySelector('.forge-showcase');
+  const view = document.querySelector('.forge-showcase-view');
+  if (!showcase || !view) return null;
+  return {
+    showcaseOpacity: getComputedStyle(showcase).opacity,
+    viewOpacity: getComputedStyle(view).opacity,
+    animationsAreInstant: view
+      .getAnimations()
+      .every((animation) => Number(animation.effect?.getTiming().duration ?? 0) <= 1)
+  };
+};
+
 for (const width of [390, 768, 1440, 1920]) {
   test(`all showcase views fit at ${width}px with reduced motion`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1000 });
@@ -231,21 +245,11 @@ for (const width of [390, 768, 1440, 1920]) {
           () => document.documentElement.scrollWidth - document.documentElement.clientWidth
         )
       ).toBeLessThanOrEqual(1);
-      expect(
-        await page.locator('.forge-showcase').evaluate((el) => getComputedStyle(el).opacity)
-      ).toBe('1');
-      expect(
-        await page
-          .locator('.forge-showcase-view')
-          .evaluate((el) =>
-            el
-              .getAnimations()
-              .every((animation) => Number(animation.effect?.getTiming().duration ?? 0) <= 1)
-          )
-      ).toBe(true);
-      expect(
-        await page.locator('.forge-showcase-view').evaluate((el) => getComputedStyle(el).opacity)
-      ).toBe('1');
+      // One atomic read of everything compared: switching a tab replaces the view element, and a node read
+      // through a separate locator after that is detached — `getComputedStyle` of it is `''` (spec 089 F3).
+      await expect
+        .poll(() => page.evaluate(showcaseSnapshot), { message: `${name} showcase at ${width}px` })
+        .toEqual({ showcaseOpacity: '1', viewOpacity: '1', animationsAreInstant: true });
     }
   });
 }
