@@ -27,6 +27,7 @@ import {
   writeFileSync
 } from 'node:fs';
 import { join } from 'node:path';
+import { assertCleanConsumer } from '../certification/artifacts.mjs';
 import { countUnlinkedDeclarations, findDuplicateStoreEntries } from '../angular-compat.mjs';
 import {
   NPMRC,
@@ -80,8 +81,15 @@ const BROWSER_FORBIDDEN = [
   'S3_SECRET_ACCESS_KEY',
   'S3_ACCESS_KEY_ID',
   'AUTH_SECRET',
-  'resolveProfile'
+  'resolveProfile',
+  // Spec 088 (R01): password material and the session-revocation counter never belong in a browser.
+  'passwordHash',
+  '_sessionVersion',
+  'UsersCollectionAuthAdapter'
 ];
+
+/** The actual S3 credentials of the running Garage; set by `verifyJourneyConsumer`, checked in every bundle. */
+let runtimeSecrets = [];
 
 /** The tiny-project sources that make up the consumer app (everything but its tests and Strata plugin). */
 const APP_SOURCES = [
@@ -278,6 +286,12 @@ function checkBundles(dir, outDir, profile) {
   for (const marker of BROWSER_FORBIDDEN) {
     if (browserCode.includes(marker))
       fail(`${profile.id}: the browser bundle contains '${marker}'`);
+  }
+  if (/packages\/[a-z-]+\/src/.test(browserCode)) {
+    fail(`${profile.id}: the browser bundle references a repository packages/*/src path`);
+  }
+  if (runtimeSecrets.some((secret) => browserCode.includes(secret))) {
+    fail(`${profile.id}: the browser bundle contains a live S3 credential`);
   }
   const unlinkedBrowser = countUnlinkedDeclarations(browserCode);
   if (unlinkedBrowser > 0)
@@ -955,9 +969,11 @@ async function expectProductionFailsClosed(dir, outDir, s3) {
 
 /** Installs the journey consumer once, then builds and walks each profile. */
 export async function verifyJourneyConsumer({ workDir, tarballs, s3 }) {
+  runtimeSecrets = [s3.secretAccessKey, s3.accessKeyId].filter(Boolean);
   const dir = join(workDir, 'journey-app');
   mkdirSync(dir, { recursive: true });
   assembleApp(dir, tarballs);
+  assertCleanConsumer(dir, 'journey SSR consumer');
   run('pnpm', ['install', '--prefer-offline'], dir);
   const duplicates = findDuplicateStoreEntries(readdirSync(join(dir, 'node_modules', '.pnpm')));
   if (duplicates.length > 0) fail(`more than one Angular copy: ${JSON.stringify(duplicates)}`);

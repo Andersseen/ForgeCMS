@@ -2,6 +2,7 @@
 // `pnpm release:ssr` (scripts/verify-ssr-consumer.mjs) is the entry point; see there for what is proven.
 
 import { execFileSync } from 'node:child_process';
+import { resolveTarballs } from '../certification/artifacts.mjs';
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { createRequire } from 'node:module';
@@ -64,20 +65,13 @@ export function write(dir, files) {
   }
 }
 
-/** Packs the given Forge packages (default: all) once; the result maps package name → `file:` tarball. */
+/**
+ * The tarballs of the given Forge packages (default: all ten SSR/admin-relevant ones) as a name → `file:` map. Under a
+ * certification run (`FORGE_CERT_ARTIFACTS`) these are the one hash-checked artifact set; standalone they are packed
+ * once into `dir` (scripts/certification/artifacts.mjs — the only place that runs `pnpm pack`).
+ */
 export function pack(dir, names = FORGE_PACKAGES) {
-  mkdirSync(dir, { recursive: true });
-  const tarballs = {};
-  for (const name of names) {
-    run('pnpm', ['--filter', name, 'pack', '--pack-destination', dir], repoRoot);
-    const prefix = `${name.replace('@', '').replace('/', '-')}-`;
-    const file = readdirSync(dir).find(
-      (entry) => entry.startsWith(prefix) && entry.endsWith('.tgz')
-    );
-    if (!file) fail(`could not find the tarball of ${name}`);
-    tarballs[name] = `file:${join(dir, file)}`;
-  }
-  return tarballs;
+  return resolveTarballs(dir, names, { log: (line) => console.log(line) });
 }
 
 export const ng = (name) => [`@angular/${name}`, VERSIONS.angular];

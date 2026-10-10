@@ -22,6 +22,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { assertCleanConsumer, resolveTarballs } from './certification/artifacts.mjs';
 import {
   SINGLETON_PACKAGES,
   countMethodDefinitions,
@@ -146,18 +147,9 @@ function resolveVersion(name, spec) {
 }
 
 function pack(dir) {
-  mkdirSync(dir, { recursive: true });
-  const tarballs = {};
-  for (const name of ['@forge-cms/core', '@forge-cms/angular', '@forge-cms/admin']) {
-    run('pnpm', ['--filter', name, 'pack', '--pack-destination', dir], repoRoot);
-    const prefix = `${name.replace('@', '').replace('/', '-')}-`;
-    const file = readdirSync(dir).find(
-      (entry) => entry.startsWith(prefix) && entry.endsWith('.tgz')
-    );
-    if (!file) fail(`could not find the tarball of ${name}`);
-    tarballs[name] = `file:${join(dir, file)}`;
-  }
-  return tarballs;
+  return resolveTarballs(dir, ['@forge-cms/core', '@forge-cms/angular', '@forge-cms/admin'], {
+    log: (line) => console.log(line)
+  });
 }
 
 function isPublished(name, version) {
@@ -517,6 +509,7 @@ function verify(combination, tarballs, workDir) {
     writeFileSync(join(dir, file), content);
   }
 
+  assertCleanConsumer(dir, combination.id);
   run('pnpm', ['install', '--prefer-offline'], dir);
   checkSingleCopies(dir, combination);
   run('pnpm', ['exec', 'tsc', '-p', 'tsconfig.json', '--noEmit'], dir);

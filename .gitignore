@@ -46,3 +46,6 @@ pnpm-debug.log*
 
 # Upgrade rehearsal scratch (timings, temporary environments)
 .rehearsal/
+
+# Packed-artifact certification run (spec 088): tarballs, hashes, results — ephemeral evidence
+.certification/

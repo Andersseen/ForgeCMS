@@ -14,6 +14,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { assertCleanConsumer } from '../certification/artifacts.mjs';
 import { countUnlinkedDeclarations, findDuplicateStoreEntries } from '../angular-compat.mjs';
 import {
   NPMRC,
@@ -732,6 +733,7 @@ export async function verifyTechnicalConsumer({ workDir, tarballs }) {
   writeFileSync(join(dir, 'package.json'), `${JSON.stringify(manifest(tarballs), null, 2)}\n`);
   write(dir, APP);
 
+  assertCleanConsumer(dir, 'technical SSR consumer');
   run('pnpm', ['install', '--prefer-offline'], dir);
   const duplicates = findDuplicateStoreEntries(readdirSync(join(dir, 'node_modules', '.pnpm')));
   if (duplicates.length > 0) fail(`more than one Angular copy: ${JSON.stringify(duplicates)}`);
