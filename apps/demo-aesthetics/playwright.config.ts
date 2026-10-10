@@ -5,6 +5,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
+  // A retry exists to capture a trace, never to turn red into green: a test that needed one fails the job
+  // (spec 089). First-attempt failures stay visible in the report.
+  failOnFlakyTests: !!process.env.CI,
   workers: process.env.CI ? 1 : '50%',
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   use: {

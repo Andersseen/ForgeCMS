@@ -3,6 +3,7 @@ import { defineCollection, defineField, defineGlobal } from '@forge-cms/core';
 import type { CollectionDefinition, GlobalDefinition } from '@forge-cms/core';
 import type { BatchHold } from './relation-lifecycle.js';
 import { createBatchHold } from './relation-lifecycle.js';
+import { requirePair } from './harness.js';
 
 // Auth-managed delete relation integrity contract (spec 065). Duck-typed on purpose — like every other
 // contract in this package it must not import `@forge-cms/runtime`/`@forge-cms/auth`/`@forge-cms/db`.
@@ -125,10 +126,7 @@ export function runAuthManagedDeleteContractTests(setup: AuthManagedDeleteHarnes
       const prefix = `amd${++prefixCounter}_${Date.now().toString(36)}`;
       const gate = createBatchHold();
       const harness = await setup({ prefix, parties: 2, gate });
-      const [deleter, writer] = harness.contenders;
-      if (!deleter || !writer || harness.contenders.length !== 2) {
-        throw new Error('setup() must return exactly 2 contenders');
-      }
+      const [deleter, writer] = requirePair(harness.contenders);
       const schema = authManagedDeleteSchema(prefix);
       let emails = 0;
       const user = async (role: 'admin' | 'editor' | 'viewer') => {

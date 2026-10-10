@@ -514,6 +514,20 @@ export function runDatabaseAdapterQueryContractTests(
       });
     });
 
+    it('pages with an offset alone (no limit), with an offset and a limit, and past the end', async () => {
+      // `GET /api/v1/<collection>?offset=N` reaches the adapter as an offset with no limit; SQL needs an
+      // explicit unbounded LIMIT for that, which an adapter can easily forget (spec 089).
+      const titles = async (options: { limit?: number; offset?: number }) =>
+        (await adapter.findMany({ collection: 'articles', sort: 'views', ...options })).map(
+          (r) => r.id
+        );
+      expect(await titles({})).toEqual(['q4', 'q2', 'q1', 'q3']);
+      expect(await titles({ offset: 1 })).toEqual(['q2', 'q1', 'q3']);
+      expect(await titles({ offset: 1, limit: 2 })).toEqual(['q2', 'q1']);
+      expect(await titles({ offset: 0, limit: 1 })).toEqual(['q4']);
+      expect(await titles({ offset: 99 })).toEqual([]);
+    });
+
     it('still supports flat implicit-AND across fields (backward compatibility)', async () => {
       const results = await adapter.findMany({
         collection: 'articles',

@@ -1,11 +1,14 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-10 (spec 088 / roadmap 0.12 R01 — packed production consumers and durable profiles —
-> COMPLETE on branch `feature/spec-088-packed-candidate-certification`, PR pending).** Roadmap 0.12: **R01 complete;
-> R02–R04 not started.** Published release is still `0.12.1`; the pending U03 admin changeset (Version Packages PR #89,
-> **open, unmerged**) is a minor → expected `0.13.0`. Website `CURRENT_FORGE_VERSION` stays `0.12.1`. The `0.13.0`
-> artifact-identity gate is **pending** (re-run `pnpm release:certify` on the versioned tree). **Next: roadmap 0.12 / R02.**
-> _Previous header:_ 2026-10-09 (spec 087 / roadmap 0.11 U03 — admin reuse certified, 1.0 surface frozen — merged as PR #88,
+> **Last updated: 2026-10-10 (spec 089 / roadmap 0.12 R02 — measurable reliability and a performance baseline —
+> COMPLETE on branch `feature/spec-089-measurable-reliability`, PR #91 pending review).** Roadmap 0.12: **R01 ✓ and R02 ✓;
+> R03–R04 pending.** The `0.13.0` fixed family (U03) is **published** (npm `latest` and GitHub releases, CI run `38069257116`
+> of `4daec40`), website `CURRENT_FORGE_VERSION` = `0.13.0`; this PR carries one **patch** changeset (offset-without-limit and
+> log-redaction fixes) → expected `0.13.1`. **Next bounded responsibility: roadmap 0.12 / R03 — Rehearse deployment and
+> recovery (not started).**
+> _Previous header:_ 2026-10-10 (spec 088 / R01 — packed production consumers and durable profiles — merged as PR #90 `4daec40`,
+> main CI `38069257116` ✓ incl. `certify` and `release`; its Version Packages PR #89 had merged first).
+> _Earlier header:_ 2026-10-09 (spec 087 / roadmap 0.11 U03 — admin reuse certified, 1.0 surface frozen — merged as PR #88,
 > main CI `37940209740` ✓; roadmap 0.11 is **complete**).
 > _Earlier header:_ 2026-10-09 (spec 086 / roadmap 0.11 U02 — keyboard, focus and existing field interactions — COMPLETE
 > on branch `feature/spec-086-admin-keyboard-focus`, PR pending; roadmap 0.11 is **not** complete: U03 pending).
@@ -18,6 +21,45 @@
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Measurable reliability — R02 (spec 089, 2026-10-10, complete; second packet of roadmap 0.12)
+
+Spec: [089](specs/089-measurable-reliability-and-performance-baseline.md) (Outcome holds every table: coverage, matrix,
+flakiness, performance, budgets, faults, CI, issues).
+
+- **Release truth first.** PR #89 (Version Packages) merged, then #90 as `4daec40`; main CI `38069257116` ✓ — `certify` sealed
+  `0.13.0` (11 tarballs, 323 s) and `release` published all eleven packages (npm `latest` = `0.13.0`; GitHub releases exist).
+  Website `CURRENT_FORGE_VERSION` = `0.13.0`. Registry tarballs equal the CI-certified ones byte-for-byte for 9 of 11; `runtime`
+  and `cloudflare` differ only in the _order_ of keys in the packed `package.json` dependency maps (identical content).
+- **`pnpm test:coverage`** — per-package, source-attributed V8 coverage, gated by class (non-UI **90/90/90/85**, Angular runtime
+  **85/85/85/80**), ~18 s. All eleven pass (table in spec 089). `@forge-cms/testing` was reported ~0% because the contract suites
+  reach it through `dist`; now attributed. The root B04 ratchet is gone (root `vitest.config.ts` keeps only its `include`, which
+  packages without a config inherit). Cloudflare **workerd** suites cannot report V8 coverage and are not counted (lower bound).
+  Templates stay certified by the rendered/browser suites, not by these numbers.
+- **Closed critical gaps** with behavioural tests: core validation boundaries, auth managed-delete / last-admin / fail-closed,
+  runtime HTTP bounds + uploads + versions + globals + "HTTP never trusts a caller override", row-scoped delete race, cascade
+  cycles, locale fallback, the concurrency harness itself. **No security or integrity branch was waived.** One justified
+  unreachable branch (core `json` `value === undefined`, shadowed by an earlier return).
+- **Product defects found by measuring (patch changeset):** (1) `?offset=N` without `limit` was a **500 on libSQL and D1** (SQLite
+  rejects a bare `OFFSET`; InMemory served it) — fixed in both adapters + shared contract + HTTP regression; (2) a depth-1 page
+  referencing **>100 distinct targets was a 500 on D1** (100 bound parameters per statement; one `id in (…)` per relation field) —
+  population now chunks at 80 ids (calls = 1 + ⌈distinct/80⌉ per field, still independent of rows), workerd regression; (3)
+  unexpected handler errors and storage-cleanup failures **logged the provider error/message** — now class + code only.
+  Open for R03: a user-supplied `in` filter with >~95 values still exceeds D1's limit (spec 089 K3).
+- **Flake:** `theme.spec.ts` reproduced at 9/200 under 8 workers, **root cause = test bug** (every page renders its own header;
+  a node read after navigation was detached → `getComputedStyle` = `''`); fixed with one atomic in-page snapshot polled via
+  `expect.poll` → **0/200**. A second instance of the same class surfaced on this PR's second CI run (`landing.spec.ts` showcase opacity; 2/160 locally) and was fixed identically → 0/800; a 615-execution hunt of the whole www suite found no more. CI Playwright retries now **fail the job** (`failOnFlakyTests`).
+- **`pnpm test:performance`** (~53 s, local, deterministic): on-disk libSQL, 50 authors · 100 tags · 200 media · 2,000 posts,
+  seeded; query / count / population / HTTP list / upload / memory / admin list render + production bundle sizes of the R01 packed
+  consumers; 67 metrics, 33 hard-gated (database calls exactly, DOM nodes, bundle bytes, scaling shape, heap) against
+  `scripts/quality/performance-budgets.json`; wall-clock figures are report-only. **No N+1 exists:** a depth-1 page costs
+  `1 + ⌈distinct targets/80⌉` lookups per relation field plus the count — never per row. Seeded N+1 → gate red (verified).
+- **`pnpm test:stability`** — critical journeys, fresh processes, retries off; full local sample all clean on first attempt
+  (spec 089 table). CI runs a smaller profile.
+- **CI:** new required job **`reliability`** (build → coverage → performance → stability), `release` `needs: [checks, certify,
+reliability]`. R01 `release:certify` is unchanged and independent; for an RC both must pass on the same commit.
+- Identity: the branch tree (`0.13.0` manifests) re-certified clean (`release:certify` ✓ 241 s); contents of every unchanged
+  package equal the published `0.13.0`.
 
 ## Packed production consumers and durable profiles — R01 (spec 088, 2026-10-10, complete)
 
@@ -37,8 +79,9 @@ Spec: [088](specs/088-packed-production-consumers-and-durable-profiles.md) (Outc
   green, 235 s. Cloudflare = **local** workerd/D1/R2, not remote staging.
 - CI: new required `certify` job, `release` `needs: [checks, certify]`; the verifiers moved out of `checks`.
 - Fixed: Garage fixture no longer bind-mounts from the OS temp dir (broke on Colima).
-- No `packages/*` change, no changeset, no API change. **Pending:** `0.13.0` identity re-certification after #89 merges; R02
-  (coverage/perf), R03 (remote staging), R04 (docs/dossier), L01.
+- No `packages/*` change, no changeset, no API change. **Resolved by spec 089:** #89 merged, #90 landed as `4daec40`, main CI
+  `38069257116` ✓ sealed the `0.13.0` artifacts and `release` published them (npm + GitHub); R02 ✓. Pending: R03 (remote
+  staging), R04 (docs/dossier), L01.
 
 ## Admin reuse and 1.0 surface freeze — U03 (spec 087, 2026-10-09, complete; closes roadmap 0.11)
 

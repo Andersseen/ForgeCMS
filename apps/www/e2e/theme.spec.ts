@@ -1,5 +1,22 @@
 import { expect, test } from '@playwright/test';
 
+/**
+ * One atomic read of everything the theme assertion compares. Every page component (landing, demo, docs)
+ * renders its own `forge-cms-header`, so a route change replaces the header element. Reading the page
+ * background and the header background through two separate locators let the second read land on the
+ * previous page's header just after it was detached — `getComputedStyle` of a detached node is `''`
+ * (spec 089 flake inventory F1). A single in-page evaluation queries both elements at the same instant,
+ * so either both are attached or the snapshot is `null` and the poll simply tries again.
+ */
+const themeSnapshot = () =>
+  document.querySelector('.forge-header') && document.querySelector('.forge-public')
+    ? {
+        path: location.pathname,
+        header: getComputedStyle(document.querySelector('.forge-header')!).backgroundColor,
+        page: getComputedStyle(document.querySelector('.forge-public')!).backgroundColor
+      }
+    : null;
+
 for (const mode of ['light', 'dark'] as const) {
   test(`${mode} theme is consistent across Home, Demo and Docs and survives reload`, async ({
     page
@@ -9,28 +26,32 @@ for (const mode of ['light', 'dark'] as const) {
     const label = mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
     const background = mode === 'dark' ? 'rgb(10, 15, 26)' : 'rgb(247, 249, 252)';
     await page.getByRole('tab', { name: 'Content', exact: true }).click();
-    expect(
-      await page
-        .locator('.forge-content-view')
-        .evaluate((el) => getComputedStyle(el).backgroundColor)
-    ).toBe(mode === 'dark' ? 'rgb(17, 26, 43)' : 'rgb(255, 255, 255)');
-    for (const destination of ['Product', 'Demo', 'Docs']) {
+    await expect
+      .poll(() =>
+        page.locator('.forge-content-view').evaluate((el) => getComputedStyle(el).backgroundColor)
+      )
+      .toBe(mode === 'dark' ? 'rgb(17, 26, 43)' : 'rgb(255, 255, 255)');
+    for (const [destination, path] of [
+      ['Product', '/'],
+      ['Demo', '/demo'],
+      ['Docs', '/docs/introduction']
+    ] as const) {
       await page
         .locator('.forge-header')
         .getByRole('link', { name: destination, exact: true })
         .click();
       await expect(page.getByRole('button', { name: label })).toBeVisible();
       await expect(page.locator('html')).toHaveClass(mode === 'dark' ? /dark/ : /^(?!.*dark).*$/);
+      // Arrived at the destination AND header and page share the theme, in one consistent snapshot.
       await expect
-        .poll(() =>
-          page.locator('.forge-public').evaluate((el) => getComputedStyle(el).backgroundColor)
-        )
-        .toBe(background);
-      expect(
-        await page.locator('.forge-header').evaluate((el) => getComputedStyle(el).backgroundColor)
-      ).toBe(background);
+        .poll(() => page.evaluate(themeSnapshot), { message: `${destination} theme snapshot` })
+        .toEqual({ path, header: background, page: background });
       await page.reload();
       await expect(page.getByRole('button', { name: label })).toBeVisible();
+      // The preference survives the reload: same destination, same theme, header and page alike.
+      await expect
+        .poll(() => page.evaluate(themeSnapshot), { message: `${destination} after reload` })
+        .toEqual({ path, header: background, page: background });
     }
   });
 }

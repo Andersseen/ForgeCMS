@@ -672,6 +672,14 @@ describe('D1DatabaseAdapter', () => {
     );
   });
 
+  it('fails closed, naming init(), when used before the database is bound', async () => {
+    const unbound = new D1DatabaseAdapter();
+    await expect(unbound.findMany({ collection: 'posts' })).rejects.toThrow(
+      'D1DatabaseAdapter not initialized. Call init() first.'
+    );
+    await expect(unbound.create('posts', { title: 'x' })).rejects.toThrow('not initialized');
+  });
+
   it('syncs schema without errors', async () => {
     await expect(adapter.syncSchema([posts])).resolves.toBeUndefined();
   });
@@ -758,6 +766,25 @@ describe('D1DatabaseAdapter', () => {
 
     const results = await adapter.findMany({ collection: 'posts', limit: 2 });
     expect(results).toHaveLength(2);
+  });
+
+  it('emits an unbounded LIMIT before OFFSET when only an offset is given (SQLite rejects a bare OFFSET)', async () => {
+    const seen: string[] = [];
+    const prepare = mockDb.prepare.bind(mockDb);
+    mockDb.prepare = (sql: string) => {
+      seen.push(sql);
+      return prepare(sql);
+    };
+    await adapter.syncSchema([posts]);
+    await adapter.findMany({ collection: 'posts', offset: 2 });
+    await adapter.findMany({ collection: 'posts', offset: 2, limit: 5 });
+    await adapter.findMany({ collection: 'posts', limit: 5 });
+    const selects = seen.filter((sql) => sql.startsWith('SELECT * FROM "posts"'));
+    expect(selects).toEqual([
+      'SELECT * FROM "posts" LIMIT -1 OFFSET ?',
+      'SELECT * FROM "posts" LIMIT ? OFFSET ?',
+      'SELECT * FROM "posts" LIMIT ?'
+    ]);
   });
 
   it('filters by boolean fields by coercing true/false to 1/0 bindings', async () => {

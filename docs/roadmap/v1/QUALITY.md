@@ -69,6 +69,11 @@ erase first-attempt failure metrics. Shared server state must be reset or isolat
 These floors are proposed policy, not a measured baseline. B04 can propose better evidence-backed
 thresholds for maintainer approval; it cannot silently weaken them during implementation.
 
+**Status (spec 089, R02):** enforced per package by `pnpm test:coverage` from
+`scripts/quality/coverage-floors.json` (numbers unchanged from the list above), in a required CI job. The measured table,
+the critical-behaviour audit and the performance budgets (`pnpm test:performance`) are in
+[spec 089](../../specs/089-measurable-reliability-and-performance-baseline.md).
+
 ## Required behavior matrix
 
 | Capability          | Unit/contract cases                                                                                | HTTP / browser / consumer evidence                                                                      |

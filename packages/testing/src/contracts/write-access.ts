@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defineCollection, defineField, defineGlobal } from '@forge-cms/core';
 import type { CollectionDefinition, GlobalDefinition } from '@forge-cms/core';
+import { codeOf, requirePair } from './harness.js';
 
 // Write-time access contract (spec 068). Duck-typed on purpose — like every other contract in this package
 // it must not import `@forge-cms/runtime`/`@forge-cms/db`.
@@ -144,14 +145,6 @@ const TEST_TIMEOUT_MS = 30_000;
 let prefixCounter = 0;
 const bob: User = { id: 'bob', role: 'editor' };
 
-function codeOf(outcome: PromiseSettledResult<unknown>): unknown {
-  if (outcome.status === 'fulfilled') return 'ok';
-  const reason: unknown = outcome.reason;
-  return typeof reason === 'object' && reason !== null
-    ? (reason as { code?: unknown }).code
-    : reason;
-}
-
 /**
  * Proves, on one backend, that a query-returning update/delete rule is enforced **at the write**
  * (spec 068): the caller's write is held after its access check passed; an independent trusted writer
@@ -163,8 +156,7 @@ export function runWriteAccessContractTests(setup: WriteAccessHarnessFactory) {
       const prefix = `wa${++prefixCounter}_${Date.now().toString(36)}`;
       const hold = createWriteHold();
       const harness = await setup({ prefix, hold });
-      const [caller, mover] = harness.contenders;
-      if (!caller || !mover) throw new Error('setup() must return exactly 2 contenders');
+      const [caller, mover] = requirePair(harness.contenders);
       return { hold, caller, mover, prefix, database: harness.database };
     }
 

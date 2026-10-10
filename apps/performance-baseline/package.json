@@ -1,0 +1,43 @@
+{
+  "name": "@forge-cms/performance-baseline",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Roadmap 0.12 R02 (spec 089): the one fixed, deterministic performance fixture — an on-disk libSQL database with a documented dataset — that records database calls, latency distributions, memory and admin list-render cost, and gates the regression budgets in budgets.json. Local measurement only; not deployed.",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "measure": "vitest run -c vitest.performance.config.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf .quality"
+  },
+  "dependencies": {
+    "@forge-cms/admin": "workspace:*",
+    "@forge-cms/angular": "workspace:*",
+    "@forge-cms/auth": "workspace:*",
+    "@forge-cms/core": "workspace:*",
+    "@forge-cms/db": "workspace:*",
+    "@forge-cms/runtime": "workspace:*",
+    "@forge-cms/storage": "workspace:*"
+  },
+  "devDependencies": {
+    "@analogjs/vite-plugin-angular": "2.4.8",
+    "@angular/cdk": "21.2.11",
+    "@angular/common": "21.2.10",
+    "@angular/compiler": "21.2.10",
+    "@angular/compiler-cli": "21.2.10",
+    "@angular/core": "21.2.10",
+    "@angular/forms": "21.2.10",
+    "@angular/platform-browser": "21.2.10",
+    "@angular/router": "21.2.10",
+    "@babel/core": "7.29.0",
+    "@types/node": "22.15.3",
+    "@voltui/components": "1.0.1",
+    "jsdom": "27.4.0",
+    "lumen-icons": "0.2.0",
+    "rxjs": "7.8.2",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

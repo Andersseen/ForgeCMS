@@ -165,6 +165,92 @@ jobs:
             .certification/certification-result.json
           if-no-files-found: ignore
 
+  # Roadmap 0.12 / R02 (spec 089): MEASURED reliability of this commit. Separate from `checks` (fast gates) and from
+  # `certify` (which artifacts were built and certified): this job answers "how well tested, how stable, how
+  # expensive". It runs per-package coverage against the 1.0 floors (pnpm test:coverage), the fixed performance
+  # fixture with its frozen budgets and the production bundle sizes (pnpm test:performance), and repeated
+  # first-attempt-only runs of the critical journeys (pnpm test:stability --profile ci). `release` needs it, and there
+  # is no path filter: a package change can never publish without it. Retries are never used to hide a failure.
+  reliability:
+    name: Reliability · Coverage · Performance
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages and apps
+        run: pnpm build
+
+      # One source-attributed V8 run per package (its own Vitest environment), merged per package, enforced per package
+      # class (90/90/90/85 non-UI, 85/85/85/80 Angular runtime). Templates are certified by the rendered/browser suites,
+      # not by this number.
+      - name: Package-level coverage against the 1.0 floors
+        run: pnpm test:coverage
+
+      - name: Upload coverage evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-evidence
+          path: |
+            coverage/packages.json
+            coverage/summary.md
+            coverage/files.json
+            coverage/uncovered.md
+          if-no-files-found: ignore
+
+      # Fixed on-disk libSQL fixture: database calls, latency distributions, memory, admin list rendering and the
+      # production browser bundles of the packed consumers, judged against scripts/quality/performance-budgets.json.
+      - name: Performance fixture and frozen budgets
+        run: pnpm test:performance
+
+      - name: Upload performance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-evidence
+          path: |
+            .quality/performance/summary.json
+            .quality/performance/results.json
+            .quality/performance/runtime.json
+            .quality/performance/render.json
+            .quality/performance/bundle.json
+          if-no-files-found: ignore
+
+      - name: Install Playwright (chromium)
+        run: pnpm --filter @forge-cms/www exec playwright install --with-deps chromium
+
+      # Critical journeys, repeated in fresh processes with retries OFF; every run's first-attempt result is recorded.
+      - name: Stability of the critical journeys
+        run: pnpm test:stability --profile ci
+
+      - name: Upload stability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stability-evidence
+          path: |
+            .quality/stability/results.json
+            apps/*/test-results/**
+          if-no-files-found: ignore
+
   changeset-check:
     name: Changeset required for packages/* changes
     runs-on: ubuntu-latest
@@ -209,7 +295,7 @@ jobs:
     name: Release packages to npm
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [checks, certify]
+    needs: [checks, certify, reliability]
     # Same guard as deploy/deploy-demo: real pushes to main only, never PRs or forks.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:

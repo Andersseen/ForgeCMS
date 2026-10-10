@@ -3,6 +3,7 @@ import { defineCollection, defineField } from '@forge-cms/core';
 import type { CollectionDefinition } from '@forge-cms/core';
 import type { WriteGate } from './last-admin.js';
 import { createWriteGate } from './last-admin.js';
+import { codeOf, requirePair, winnerIndex } from './harness.js';
 
 // Collection locale-merge contract (spec 067). Duck-typed on purpose — like every other contract in this
 // package it must not import `@forge-cms/runtime`/`@forge-cms/db`.
@@ -46,14 +47,6 @@ export function localeMergeCollections(prefix: string): CollectionDefinition[] {
 const TEST_TIMEOUT_MS = 30_000;
 let prefixCounter = 0;
 
-function codeOf(outcome: PromiseSettledResult<unknown>): unknown {
-  if (outcome.status === 'fulfilled') return 'ok';
-  const reason: unknown = outcome.reason;
-  return typeof reason === 'object' && reason !== null
-    ? (reason as { code?: unknown }).code
-    : reason;
-}
-
 /**
  * Proves, on one backend, that two **independent** writers editing different locales of one collection
  * document at the same moment can never both report success while one locale is lost (spec 067). Both
@@ -70,8 +63,7 @@ export function runLocaleMergeContractTests(setup: LocaleMergeHarnessFactory) {
           const prefix = `lm${++prefixCounter}_${Date.now().toString(36)}`;
           const gate = createWriteGate({ timeoutMs: 10_000 });
           const harness = await setup({ prefix, parties: 2, gate });
-          const [a, b] = harness.contenders;
-          if (!a || !b) throw new Error('setup() must return exactly 2 contenders');
+          const [a, b] = requirePair(harness.contenders);
           const collection = `${prefix}_${kind}`;
 
           const page = await a.create({ collection, locale: 'en', data: { title: 'hello' } });
@@ -86,14 +78,18 @@ export function runLocaleMergeContractTests(setup: LocaleMergeHarnessFactory) {
           gate.disarm();
 
           expect(outcomes.map(codeOf).sort()).toEqual(['CONCURRENT_MODIFICATION', 'ok']);
-          const enWon = outcomes[0]?.status === 'fulfilled';
+          const won = winnerIndex(outcomes); // 0: the `en` writer, 1: the `es` writer
           expect((await harness.database.findById(collection, id))?.title).toEqual(
-            enWon ? { en: 'hi', es: 'hola' } : { en: 'hello', es: 'buenas' }
+            [
+              { en: 'hi', es: 'hola' },
+              { en: 'hello', es: 'buenas' }
+            ][won]
           );
 
-          await (enWon
-            ? b.update({ collection, id, locale: 'es', data: { title: 'buenas' } })
-            : a.update({ collection, id, locale: 'en', data: { title: 'hi' } }));
+          await [
+            () => b.update({ collection, id, locale: 'es', data: { title: 'buenas' } }),
+            () => a.update({ collection, id, locale: 'en', data: { title: 'hi' } })
+          ][won]!();
           expect((await harness.database.findById(collection, id))?.title).toEqual({
             en: 'hi',
             es: 'buenas'

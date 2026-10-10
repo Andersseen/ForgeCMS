@@ -2,6 +2,7 @@ import type { CollectionDefinition } from '@forge-cms/core';
 import { defineField, getLogger } from '@forge-cms/core';
 import type { AtomicWriteOperation, DatabaseAdapter, DatabaseRecord } from '@forge-cms/db';
 import type { OperationContext } from './context.js';
+import { describeErrorForLog } from './safe-error.js';
 
 /**
  * Durable storage-cleanup intents (spec 067). A database transaction cannot include object storage, so
@@ -261,7 +262,7 @@ async function restoreIntent(
   } catch (restoreErr) {
     logCleanupFailure(key, when, err, 'lost');
     getLogger().error(
-      `Could not restore the storage intent for '${key}': ${messageOf(restoreErr)}`
+      `Could not restore the storage intent for '${key}': ${describeErrorForLog(restoreErr)}`
     );
   }
 }
@@ -270,10 +271,10 @@ function keyCollection(key: string): string {
   return key.split('/')[0] ?? '';
 }
 
-/** The key and the error's message only — never the error object, which can carry request/credential details. */
+/** The key and the error's class/code only — a provider's message or object can quote credentials (spec 089). */
 function logCleanupFailure(key: string, when: string, err: unknown, intent: 'kept' | 'lost'): void {
   getLogger().error(
-    `Failed to delete storage object '${key}' ${when}: ${messageOf(err)}. ` +
+    `Failed to delete storage object '${key}' ${when}: ${describeErrorForLog(err)}. ` +
       (intent === 'kept'
         ? `Its storage intent remains; run reconcileStorage() to retry (spec 067).`
         : `Its storage intent could not be kept, so the object is now orphaned and must be removed by ` +

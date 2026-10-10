@@ -27,6 +27,7 @@ import {
   jsFiles,
   loadChromium,
   ng,
+  recordBundle,
   run,
   transferState,
   write
@@ -727,7 +728,12 @@ async function hydration(origin) {
 }
 
 /** Installs, builds and exercises the technical consumer. `tarballs` maps package name → `file:` tarball. */
-export async function verifyTechnicalConsumer({ workDir, tarballs }) {
+/**
+ * Installs the technical consumer from the tarballs, type-checks it, builds it for production and runs the
+ * bundle checks. Split from {@link verifyTechnicalConsumer} so the bundle-size measurement (spec 089,
+ * `pnpm test:performance`) can build the same production output without starting a server or a browser.
+ */
+export function buildTechnicalConsumer({ workDir, tarballs }) {
   const dir = join(workDir, 'technical-app');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'package.json'), `${JSON.stringify(manifest(tarballs), null, 2)}\n`);
@@ -740,6 +746,12 @@ export async function verifyTechnicalConsumer({ workDir, tarballs }) {
   run('pnpm', ['exec', 'tsc', '-p', 'tsconfig.json', '--noEmit'], dir);
   run('pnpm', ['exec', 'vite', 'build', '--logLevel', 'warn'], dir);
   checkBundles(dir);
+  recordBundle('technical', join(dir, 'dist', 'client'));
+  return dir;
+}
+
+export async function verifyTechnicalConsumer({ workDir, tarballs }) {
+  const dir = buildTechnicalConsumer({ workDir, tarballs });
 
   const server = await startServer(dir);
   try {

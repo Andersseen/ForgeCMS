@@ -3,6 +3,7 @@ import { defineField, defineGlobal } from '@forge-cms/core';
 import type { GlobalDefinition } from '@forge-cms/core';
 import type { WriteGate } from './last-admin.js';
 import { createWriteGate } from './last-admin.js';
+import { codeOf, requirePair, winnerIndex } from './harness.js';
 
 // Global document lifecycle contract (spec 066). Duck-typed on purpose — like every other contract in
 // this package it must not import `@forge-cms/runtime`/`@forge-cms/db`.
@@ -60,14 +61,6 @@ export function globalLifecycleGlobals(prefix: string): GlobalDefinition[] {
 const TEST_TIMEOUT_MS = 30_000;
 let prefixCounter = 0;
 
-function codeOf(outcome: PromiseSettledResult<unknown>): unknown {
-  if (outcome.status === 'fulfilled') return 'ok';
-  const reason: unknown = outcome.reason;
-  return typeof reason === 'object' && reason !== null
-    ? (reason as { code?: unknown }).code
-    : reason;
-}
-
 /**
  * Proves, on one backend, that a global's document survives **independent** writers (spec 066): two
  * simultaneous first writes, two simultaneous edits of different locales, and two simultaneous partial
@@ -81,10 +74,7 @@ export function runGlobalLifecycleContractTests(setup: GlobalLifecycleHarnessFac
       const prefix = `gl${++prefixCounter}_${Date.now().toString(36)}`;
       const gate = createWriteGate({ timeoutMs: 10_000 });
       const harness = await setup({ prefix, parties: 2, gate });
-      const [a, b] = harness.contenders;
-      if (!a || !b || harness.contenders.length !== 2) {
-        throw new Error('setup() must return exactly 2 contenders');
-      }
+      const [a, b] = requirePair(harness.contenders);
       const global = `${prefix}_site`;
       const row = () => harness.database.findById(`_global_${global}`, 'global');
       return { gate, a, b, global, row };
@@ -104,11 +94,12 @@ export function runGlobalLifecycleContractTests(setup: GlobalLifecycleHarnessFac
 
         const codes = outcomes.map(codeOf).sort();
         expect(codes).toEqual(['CONCURRENT_MODIFICATION', 'ok']);
-        const winner = outcomes[0]?.status === 'fulfilled' ? 'A' : 'B';
+        const won = winnerIndex(outcomes);
+        const winner = ['A', 'B'][won];
         expect(await row()).toMatchObject({ title: winner, theme: 'light', _status: 'draft' });
 
         // The loser's retry is an ordinary partial update of the row the winner created.
-        await (winner === 'A' ? b : a).updateGlobalDocument({ global, data: { footer: 'f' } });
+        await [b, a][won]!.updateGlobalDocument({ global, data: { footer: 'f' } });
         expect(await row()).toMatchObject({ title: winner, footer: 'f' });
       },
       TEST_TIMEOUT_MS
@@ -132,15 +123,19 @@ export function runGlobalLifecycleContractTests(setup: GlobalLifecycleHarnessFac
         gate.disarm();
 
         expect(outcomes.map(codeOf).sort()).toEqual(['CONCURRENT_MODIFICATION', 'ok']);
-        const enWon = outcomes[0]?.status === 'fulfilled';
+        const won = winnerIndex(outcomes); // 0: the `en` writer, 1: the `es` writer
         expect((await row())?.tagline).toEqual(
-          enWon ? { en: 'hi', es: 'hola' } : { en: 'hello', es: 'buenas' }
+          [
+            { en: 'hi', es: 'hola' },
+            { en: 'hello', es: 'buenas' }
+          ][won]
         );
 
         // Retried against the fresh row, the loser's locale lands and the winner's stays.
-        await (enWon
-          ? b.updateGlobalDocument({ global, locale: 'es', data: { tagline: 'buenas' } })
-          : a.updateGlobalDocument({ global, locale: 'en', data: { tagline: 'hi' } }));
+        await [
+          () => b.updateGlobalDocument({ global, locale: 'es', data: { tagline: 'buenas' } }),
+          () => a.updateGlobalDocument({ global, locale: 'en', data: { tagline: 'hi' } })
+        ][won]!();
         expect((await row())?.tagline).toEqual({ en: 'hi', es: 'buenas' });
         expect(await a.getGlobalDocument({ global, locale: 'es' })).toMatchObject({
           tagline: 'buenas'

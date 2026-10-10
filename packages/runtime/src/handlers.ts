@@ -16,6 +16,7 @@ import {
 } from './errors.js';
 import { assertCsrfSafe } from './csrf.js';
 import { assertNotAuthManaged } from './auth-managed.js';
+import { describeErrorForLog } from './safe-error.js';
 
 const WHERE_OPERATORS = new Set([
   'eq',
@@ -83,7 +84,8 @@ function toErrorResponse(err: unknown, user: AuthUser | null): Response {
     const body = toApiErrorBody(err);
     return jsonResponse(body, err.status);
   }
-  getLogger().error('Unexpected error in request handler', err);
+  // Metadata only: a driver/SDK error can quote credentials in its message or properties (spec 089).
+  getLogger().error('Unexpected error in request handler', { error: describeErrorForLog(err) });
   return errorResponse('INTERNAL_ERROR', 'An unexpected error occurred', 500);
 }
 

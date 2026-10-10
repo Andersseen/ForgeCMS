@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createWriteGate, type WriteGate } from './last-admin.js';
+import { requireContenders } from './harness.js';
 
 // First-admin provisioning proof (spec 060). Duck-typed on purpose — like every other contract in this
 // package it must not import `@forge-cms/db`/`@forge-cms/auth`.
@@ -52,7 +53,7 @@ type FaultKind = 'duplicate-email' | 'missing-row';
  *   and the user were written: `'duplicate-email'` a second user with the same email (unique violation),
  *   `'missing-row'` an `update` of a row that does not exist (a non-unique failure).
  */
-function createFaultInjector() {
+export function createFaultInjector() {
   let armed: FaultKind | undefined;
   return {
     arm(kind: FaultKind) {
@@ -125,9 +126,7 @@ export function runFirstAdminBootstrapContractTests(setup: FirstAdminHarnessFact
         parties,
         wrap: (database) => gate.wrap(fault.wrap(database, collection))
       });
-      if (contenders.length !== parties) {
-        throw new Error(`setup() must return exactly ${parties} contenders`);
-      }
+      requireContenders(contenders, parties);
       await Promise.all(contenders.map((c) => c.users.syncSchema()));
 
       const inspector = contenders[0]!.database;

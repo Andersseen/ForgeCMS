@@ -1,12 +1,22 @@
 # ROADMAP — A small, dependable ForgeCMS 1.0
 
+> **2026-10-10 (spec 089):** **Roadmap 0.12 / R02 — Close measurable reliability gaps — is complete.** Coverage is now
+> per package and source-attributed (`pnpm test:coverage`, the QUALITY floors 90/90/90/85 and 85/85/85/80, all eleven packages
+> pass); every critical behaviour has explicit positive/negative evidence; a fixed on-disk libSQL fixture records database calls,
+> latency, memory, upload, admin list rendering and production bundle sizes against frozen budgets (`pnpm test:performance`);
+> the known theme e2e flake was reproduced, root-caused (a test reading a detached node) and fixed; critical journeys are run
+> repeatedly with retries off (`pnpm test:stability`). Measuring also found and fixed two real defects (`?offset=N` without
+> `limit` was a 500 on libSQL/D1; provider errors reached logs). New required CI job `reliability`; `release` needs it.
+> `0.13.0` (U03) is published. **0.12: R01 ✓, R02 ✓; R03–R04 pending. Next bounded responsibility: roadmap 0.12 / R03 —
+> Rehearse deployment and recovery.**
+>
 > **2026-10-10 (spec 088):** **Roadmap 0.12 / R01 — Packed production consumers and durable profiles — is complete.**
 > One exact set of the 11 packed public packages (recorded commit, SHA-256 per tarball) passed a server-only consumer, all
 > 15 package/subpath entry points, the strict Angular/admin peer matrix with the `/studio` mount, technical SSR, the
 > Node + libSQL + Garage S3 and the local workerd + D1 + R2 production journeys (restart + upload/read/delete), the
-> historical upgrade and the S3 recovery rehearsal — via `pnpm release:certify`, now a required CI job. Published is still
-> `0.12.1`; Version Packages #89 (`0.13.0`) is unmerged, so the `0.13.0` artifact re-certification is pending.
-> **0.12: R01 ✓; R02–R04 pending. Next bounded responsibility: roadmap 0.12 / R02 — Close measurable reliability gaps.**
+> historical upgrade and the S3 recovery rehearsal — via `pnpm release:certify`, now a required CI job. (When written, `0.12.1`
+> was published and Version Packages #89 unmerged; #89 and this PR have since merged, `0.13.0` is published and its artifacts
+> were sealed by main CI `38069257116` — see spec 089.)
 >
 > **2026-10-09 (spec 087):** **Roadmap 0.11 / U03 — Certify admin reuse and freeze the 1.0 surface — is complete, and
 > with it roadmap 0.11 (Admin and consumer reliability).** The reusable admin mounts at a consumer-selected path
