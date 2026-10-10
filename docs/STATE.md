@@ -1,10 +1,13 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-09 (spec 087 / roadmap 0.11 U03 — admin reuse certified, 1.0 surface frozen — COMPLETE on
-> branch `feature/spec-087-admin-reuse-surface-freeze`, PR pending; roadmap 0.11 is **complete**).** Published release is
-> `0.12.1` (U02); the pending U03 admin changeset is a minor → expected `0.13.0`. Website
-> `CURRENT_FORGE_VERSION` is `0.12.1`. **Next: roadmap 0.12 / R01 (not started).**
-> _Previous header:_ 2026-10-09 (spec 086 / roadmap 0.11 U02 — keyboard, focus and existing field interactions — COMPLETE
+> **Last updated: 2026-10-10 (spec 088 / roadmap 0.12 R01 — packed production consumers and durable profiles —
+> COMPLETE on branch `feature/spec-088-packed-candidate-certification`, PR pending).** Roadmap 0.12: **R01 complete;
+> R02–R04 not started.** Published release is still `0.12.1`; the pending U03 admin changeset (Version Packages PR #89,
+> **open, unmerged**) is a minor → expected `0.13.0`. Website `CURRENT_FORGE_VERSION` stays `0.12.1`. The `0.13.0`
+> artifact-identity gate is **pending** (re-run `pnpm release:certify` on the versioned tree). **Next: roadmap 0.12 / R02.**
+> _Previous header:_ 2026-10-09 (spec 087 / roadmap 0.11 U03 — admin reuse certified, 1.0 surface frozen — merged as PR #88,
+> main CI `37940209740` ✓; roadmap 0.11 is **complete**).
+> _Earlier header:_ 2026-10-09 (spec 086 / roadmap 0.11 U02 — keyboard, focus and existing field interactions — COMPLETE
 > on branch `feature/spec-086-admin-keyboard-focus`, PR pending; roadmap 0.11 is **not** complete: U03 pending).
 > U01 (spec 085, PR #84, main CI `37826074960` ✓) and its release PR #85 (CI `37830311591` ✓) are merged; npm `latest`
 > and GitHub release `v0.12.0` are published for the fixed family. U02 is patch work
@@ -15,6 +18,27 @@
 > the "Known issues" and "Suggested next steps" lists, and the date above. Keep it a _snapshot of
 > reality_, not a wishlist — if code and this file disagree, fix this file. This is the primary
 > "where were we?" document for every new session.
+
+## Packed production consumers and durable profiles — R01 (spec 088, 2026-10-10, complete)
+
+Spec: [088](specs/088-packed-production-consumers-and-durable-profiles.md) (Outcome holds the tarball hashes and versions).
+
+- **`pnpm release:certify`** = forced build → pack the 11 public packages **once** (`scripts/certification/artifacts.mjs`;
+  SHA-256 + inspected manifests → `.certification/artifacts.json`, gitignored) → every packed verifier consumes that set via
+  `FORGE_CERT_ARTIFACTS` (hash re-checked on each load; standalone verifiers still self-pack through the same code) →
+  seal. Refuses a dirty tree (`--allow-dirty` = not certifying); requires Docker; `--stages` = incomplete (exit 2).
+- **New gate `pnpm release:consumers`:** server-only consumer (no Angular/admin in the store; first admin, CRUD,
+  `overrideAccess:false`, relation, denials) + all 15 entry points (11 roots, 4 retained subpaths) resolved, every
+  `api-baseline` symbol type-checked from the tarballs; browser/server import boundary of the packed JS.
+- `assertCleanConsumer` guards every generated consumer; journey bundle markers extended (`passwordHash`, `_sessionVersion`,
+  live S3 credentials, `packages/*/src`).
+- **Evidence (local, commit `cd0dcd7`, version `0.12.1` manifests containing U03 code):** consumers · release · compat · ssr ·
+  s3 (Garage `v2.4.1`: Node+libSQL+S3 and workerd+D1+R2 journeys, restart, upload/read/delete, S3 recovery) · upgrade — all
+  green, 235 s. Cloudflare = **local** workerd/D1/R2, not remote staging.
+- CI: new required `certify` job, `release` `needs: [checks, certify]`; the verifiers moved out of `checks`.
+- Fixed: Garage fixture no longer bind-mounts from the OS temp dir (broke on Colima).
+- No `packages/*` change, no changeset, no API change. **Pending:** `0.13.0` identity re-certification after #89 merges; R02
+  (coverage/perf), R03 (remote staging), R04 (docs/dossier), L01.
 
 ## Admin reuse and 1.0 surface freeze — U03 (spec 087, 2026-10-09, complete; closes roadmap 0.11)
 
