@@ -1,5 +1,15 @@
 # @forge-cms/playground
 
+## 0.0.28
+
+### Patch Changes
+
+- @forge-cms/auth@0.13.2
+- @forge-cms/db@0.13.2
+- @forge-cms/runtime@0.13.2
+- @forge-cms/storage@0.13.2
+- @forge-cms/core@0.13.2
+
 ## 0.0.27
 
 ### Patch Changes
