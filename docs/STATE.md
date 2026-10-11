@@ -1,6 +1,16 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-10 (spec 089 / roadmap 0.12 R02 — measurable reliability and a performance baseline —
+> **Last updated: 2026-10-11 (spec 090 / roadmap 0.12 R03 — staging deployment and recovery rehearsal — PREPARED on branch
+> `feature/spec-090-staging-recovery-rehearsal`; REMOTE STAGING GATE PENDING EXPLICIT AUTHORIZATION).** R03 is **not complete**.
+> Done locally: guarded staging tooling (`pnpm staging …`, `scripts/staging/`, refuses production names), the operator runbook
+> [STAGING-REHEARSAL.md](STAGING-REHEARSAL.md), and the fix of R02's finding **K3** — reproduced on workerd D1 (`title[in]=` with ≥100
+> values → 500), fixed in `@forge-cms/cloudflare` (long `in` lists travel as one JSON parameter; patch changeset, no API change).
+> Roadmap 0.12: **R01 ✓ R02 ✓, R03 prepared (remote gate pending), R04 pending.** Published: `0.13.0`; PR #92 (`0.13.1`) still open.
+> Not run (no Docker / no Cloudflare login): `pnpm test:s3`, `pnpm release:certify`, remote staging.
+> _Previous header:_ 2026-10-10 (spec 089 / R02 — merged as PR #91 `64322dd`, main CI `38080646922` ✓).
+
+> _Older header (R02):_
+> **2026-10-10 (spec 089 / roadmap 0.12 R02 — measurable reliability and a performance baseline —
 > COMPLETE on branch `feature/spec-089-measurable-reliability`, PR #91 pending review).** Roadmap 0.12: **R01 ✓ and R02 ✓;
 > R03–R04 pending.** The `0.13.0` fixed family (U03) is **published** (npm `latest` and GitHub releases, CI run `38069257116`
 > of `4daec40`), website `CURRENT_FORGE_VERSION` = `0.13.0`; this PR carries one **patch** changeset (offset-without-limit and
