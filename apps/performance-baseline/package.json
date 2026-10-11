@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/performance-baseline",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "Roadmap 0.12 R02 (spec 089): the one fixed, deterministic performance fixture — an on-disk libSQL database with a documented dataset — that records database calls, latency distributions, memory and admin list-render cost, and gates the regression budgets in budgets.json. Local measurement only; not deployed.",
   "type": "module",

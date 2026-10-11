@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/testing",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "description": "Shared testing helpers for ForgeCMS packages.",
   "author": "ForgeCMS contributors",
   "license": "MIT",

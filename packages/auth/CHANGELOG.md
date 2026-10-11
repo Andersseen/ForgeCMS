@@ -1,5 +1,13 @@
 # @forge-cms/auth
 
+## 0.13.1
+
+### Patch Changes
+
+- Updated dependencies [430bf68]
+  - @forge-cms/db@0.13.1
+  - @forge-cms/core@0.13.1
+
 ## 0.13.0
 
 ### Patch Changes
