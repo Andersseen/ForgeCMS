@@ -57,6 +57,9 @@ function assertValidColumn(key: string, collectionDef: CollectionDefinition | un
   throw new Error(`Unknown column '${key}'`);
 }
 
+/** Longest `in` list bound value by value; longer lists travel as one JSON parameter (D1: 100 parameters per statement). */
+const IN_LIST_PARAMETER_MAX = 50;
+
 export class D1DatabaseAdapter implements DatabaseAdapter {
   readonly name = 'd1';
   private db?: D1Database;
@@ -223,6 +226,12 @@ export class D1DatabaseAdapter implements DatabaseAdapter {
             return `"${key}" <= ?`;
           case 'in': {
             const values = (opValue as unknown[]).map(coerce);
+            if (values.length > IN_LIST_PARAMETER_MAX) {
+              // One bound parameter however long the list: D1 allows 100 per statement, so a long `in` bound
+              // value by value would be a provider-level 500 (spec 090, K3). Same set semantics as IN (?, ?, …).
+              bindings.push(JSON.stringify(values));
+              return `"${key}" IN (SELECT value FROM json_each(?))`;
+            }
             bindings.push(...values);
             return `"${key}" IN (${values.map(() => '?').join(', ')})`;
           }

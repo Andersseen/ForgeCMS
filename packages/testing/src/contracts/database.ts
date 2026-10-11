@@ -514,6 +514,24 @@ export function runDatabaseAdapterQueryContractTests(
       });
     });
 
+    it('filters with a very long in list (beyond a provider bound-parameter ceiling)', async () => {
+      // D1 allows 100 bound parameters per statement; the list is ordinary public input (`?title[in]=…`).
+      const filler = Array.from({ length: 300 }, (_, i) => `no-such-id-${i}`);
+      const long = await adapter.findMany({
+        collection: 'articles',
+        where: { id: { in: [...filler, 'q1', 'q3'] } }
+      });
+      expect(long.map((r) => r.id).sort()).toEqual(['q1', 'q3']);
+      expect(
+        await adapter.findMany({ collection: 'articles', where: { id: { in: filler } } })
+      ).toEqual([]);
+      const combined = await adapter.findMany({
+        collection: 'articles',
+        where: { id: { in: [...filler, 'q1', 'q3'] }, status: 'published' }
+      });
+      expect(combined.map((r) => r.id)).toEqual(['q1']);
+    });
+
     it('pages with an offset alone (no limit), with an offset and a limit, and past the end', async () => {
       // `GET /api/v1/<collection>?offset=N` reaches the adapter as an offset with no limit; SQL needs an
       // explicit unbounded LIMIT for that, which an adapter can easily forget (spec 089).

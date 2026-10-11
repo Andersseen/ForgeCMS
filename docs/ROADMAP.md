@@ -1,5 +1,9 @@
 # ROADMAP — A small, dependable ForgeCMS 1.0
 
+> **2026-10-11 (spec 090):** Roadmap 0.12 / R03 — Rehearse deployment and recovery — is **prepared, not complete**: guarded staging tooling and the
+> [runbook](STAGING-REHEARSAL.md) exist and R02's finding K3 (long `in` lists on D1) is fixed, but the authorized remote Cloudflare staging +
+> isolated restore rehearsal is pending explicit authorization. R04 is not started.
+>
 > **2026-10-10 (spec 089):** **Roadmap 0.12 / R02 — Close measurable reliability gaps — is complete.** Coverage is now
 > per package and source-attributed (`pnpm test:coverage`, the QUALITY floors 90/90/90/85 and 85/85/85/80, all eleven packages
 > pass); every critical behaviour has explicit positive/negative evidence; a fixed on-disk libSQL fixture records database calls,
