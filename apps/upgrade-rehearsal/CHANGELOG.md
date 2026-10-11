@@ -1,5 +1,18 @@
 # @forge-cms/upgrade-rehearsal
 
+## 0.0.14
+
+### Patch Changes
+
+- Updated dependencies [bbb7c18]
+  - @forge-cms/cloudflare@0.13.2
+  - @forge-cms/auth@0.13.2
+  - @forge-cms/db@0.13.2
+  - @forge-cms/runtime@0.13.2
+  - @forge-cms/s3@0.13.2
+  - @forge-cms/storage@0.13.2
+  - @forge-cms/core@0.13.2
+
 ## 0.0.13
 
 ### Patch Changes
