@@ -47,6 +47,7 @@
     "e2e:tiny-project": "pnpm --filter @forge-cms/tiny-project e2e",
     "test": "turbo run test && pnpm test:scripts",
     "test:scripts": "node --test scripts/*.test.mjs",
+    "staging": "node scripts/staging/staging.mjs",
     "test:coverage": "node scripts/quality/coverage-release.mjs",
     "test:performance": "node scripts/quality/performance.mjs",
     "test:stability": "node scripts/quality/stability.mjs",
