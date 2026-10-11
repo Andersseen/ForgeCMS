@@ -165,6 +165,12 @@ class WhereClauseParser {
       return { type: 'jsonEachContains', key: existsMatch[1]!, value: this.nextValue() };
     }
 
+    // A long list: one JSON-array parameter that json_each expands (spec 090, K3).
+    const jsonInMatch = text.match(/^"([^"]+)"\s+IN\s*\(SELECT value FROM json_each\(\?\)\)$/i);
+    if (jsonInMatch) {
+      return { type: 'in', key: jsonInMatch[1]!, values: JSON.parse(this.nextValue() as string) };
+    }
+
     const inMatch = text.match(/^"([^"]+)"\s+IN\s*\(([^)]*)\)$/i);
     if (inMatch) {
       const placeholderCount = (inMatch[2]!.match(/\?/g) ?? []).length;
