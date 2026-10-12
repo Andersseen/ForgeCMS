@@ -1,9 +1,9 @@
 # 090 — Staging deployment and recovery rehearsal (roadmap 0.12 / R03)
 
-- **Status:** in-progress — repository preparation complete; **remote staging gate pending explicit authorization** (2026-10-11)
+- **Status:** complete — remote staging + isolated restore executed and passed on 2026-10-12 (with the caveats recorded in the Outcome); preparation 2026-10-11
 - **Author:** agent draft (implementation requested by the maintainer, 2026-10-11 — "spec 090 — roadmap 0.12 / R03")
 - **Date:** 2026-10-11
-- **Branch:** feature/spec-090-staging-recovery-rehearsal
+- **Branch:** feature/spec-090-staging-recovery-rehearsal (preparation, PR #93); feature/spec-090-remote-staging-closeout (remote closeout)
 - **Affected packages/apps:** `scripts/staging/` (new, private tooling), `docs/STAGING-REHEARSAL.md`, `.gitignore`, docs; and — because
   R02's open finding K3 reproduced — `@forge-cms/cloudflare` and `@forge-cms/testing` (**patch**, one changeset, no public API change).
 
@@ -59,12 +59,12 @@ local profile fail-closed tests (`apps/tiny-project/src/tests/storage-selection.
 ## Acceptance criteria
 
 1. Staging tooling refuses every production identifier and any source == target. ✔ (unit tests)
-2. K3 is reproduced, fixed without a public limit and covered by a failing-before/passing-after regression. ✔ locally; remote confirmation pending
+2. K3 is reproduced, fixed without a public limit and covered by a failing-before/passing-after regression. ✔ locally and remotely (80/99/100/120/400 → 200 on the real staging D1)
 3. Local candidate gates green. ✔ (see Outcome)
-4. Authorized remote staging passes health, first-admin, login/cookie/CSRF, content, R2, redeploy persistence, remote K3, logs. ⏳ pending
-5. Quiesced remote backup restores into separate empty D1/R2 and verifies auth/content/files/ledger/reconciliation/write. ⏳ pending
-6. Portable libSQL/S3 evidence stays green. ✔/⏳ see Outcome
-7. R03 is marked complete only after 4–5. ⏳
+4. Authorized remote staging passes health, first-admin, login/cookie/CSRF, content, R2, redeploy persistence, remote K3, logs. ✔ (browser form sign-in not driven; see caveats)
+5. Quiesced remote backup restores into separate empty D1/R2 and verifies auth/content/files/ledger/reconciliation/write. ✔
+6. Portable libSQL/S3 evidence stays green. ✔ libSQL/upgrade local; S3/certify inherited from main CI (no Docker here) — the closeout PR's CI re-establishes it
+7. R03 is marked complete only after 4–5. ✔
 
 ## Outcome
 
@@ -87,8 +87,10 @@ Wrangler is not logged in on this machine.
 
 ### Authorization
 
-No remote staging authorization has been given in this session and Wrangler is not logged in (`wrangler whoami` fails to fetch a token). No remote
-resource was created, read or modified.
+The preparation PR (#93) ran without remote access. On 2026-10-12 the maintainer logged Wrangler in locally (OAuth) and instructed the agent to run the
+whole rehearsal end to end against the isolated `forge-cms-r03-*` manifest, never touching production. Pre-checks (read-only): the account held **no**
+`forge-cms-r03-*` D1/R2/Pages resource beforehand. Authorization scope and the cleanup rule used (manifest lifetimes: staging persistent, restore + copy
+Worker disposable) are in the Remote rehearsal section.
 
 ### K3 (R02 finding) — reproduced, fixed
 
@@ -128,10 +130,88 @@ server was under load. **Not reproduced:** 25/25 isolated repeats and 4/4 furthe
 occurrence, suspected dev-server load; no change made** (no retry, no longer timeout). It is a dev-server test of the www admin guard, not a package
 behaviour; it must be watched in CI and, if it recurs, root-caused before R03 is accepted.
 
-### Remaining (blocked on authorization)
+### Remote rehearsal (2026-10-12) — newly executed, remote
 
-Everything under acceptance criteria 4–5: Pages project, D1, R2, secret, deploy, real-origin journey, redeploy persistence, remote K3 sizes, remote logs,
-quiesced export, metadata-preserving R2 copy, isolated restore and verification, cleanup decision.
+**Candidate:** code commit `c2a124f1af908369a42f4a0f7c77d2e974b8af72` (branch `feature/spec-090-remote-staging-closeout`; `main` `3eb46aa` + the R03 finding
+fix below). Published release at the time: `0.13.2` (K3 fix included). **Wrangler 4.91.0**, account in the staging region WEUR.
+
+**Resources (all `forge-cms-r03-*`; nothing else touched):**
+
+| Resource        | Name                                                                | Identity                                                      | End state                         |
+| --------------- | ------------------------------------------------------------------- | ------------------------------------------------------------- | --------------------------------- |
+| Pages (source)  | `forge-cms-r03-staging` → `https://forge-cms-r03-staging.pages.dev` | bindings `DB`, `BUCKET`, var `FORGE_SSR_ORIGIN` = that origin | **retained**                      |
+| D1 (source)     | `forge-cms-r03-staging-db`                                          | `408c4c0d-9f4f-44fa-8505-c9504fe1a81e`                        | **retained**                      |
+| R2 (source)     | `forge-cms-r03-staging-media`                                       | —                                                             | **retained**                      |
+| Pages (restore) | `forge-cms-r03-restore` → `…restore.pages.dev`                      | bound only to the restore D1/R2                               | deleted                           |
+| D1 (restore)    | `forge-cms-r03-restore-db`                                          | `514960e4-310f-4356-af3c-c0e618f425a2`                        | deleted                           |
+| R2 (restore)    | `forge-cms-r03-restore-media`                                       | —                                                             | deleted (2 objects removed first) |
+| Worker (copy)   | `forge-cms-r03-r2-copy`                                             | bindings `SOURCE`, `TARGET`, secret `COPY_TOKEN`              | deleted after the copy            |
+
+Pages bindings came from a generated, untracked config (`.staging/…/wrangler.toml`, never the repository's `apps/tiny-project/wrangler.toml`); each app had
+its own freshly generated `AUTH_SECRET`, installed from stdin and never printed. Deployments: `352f248a` (pre-fix), `8ad45d3a` (candidate), `09abd85b`
+(same-candidate redeploy).
+
+**Health (`pnpm staging verify`, source and restore origin):** collections `200`, public posts `200`, anonymous `/api/account/me` `401`,
+`/api/content/does-not-exist` `404`, `/studio/login` `200`, `/` `200` — no `D1_ERROR`, `SQLITE_`, `too many SQL variables`, `passwordHash` or
+`_sessionVersion` in any body. Runtime selected D1 + R2 (the build refuses to start without both bindings; there is no in-memory fallback).
+
+**Journey (`scripts/staging/journey.mjs`, over the real HTTPS origin, 37/37 checks on the second full pass; the first pass proved the bootstrap):**
+genuinely empty D1 → `POST /api/bootstrap-admin` `400` without credentials (zero users), then `201` + Secure/HttpOnly cookie, a second bootstrap `409`;
+login `200`; `/api/account/me` as the admin; cross-origin cookie mutation `403 FORBIDDEN` and cookie mutation with no Origin `403`, same-origin mutation `201`
+(protection never disabled); relation target, draft create, anonymous list hides the draft, publish, edit, public read sees the edit, SSR deep link
+renders the published title; multipart upload → `media` document with `_storageKey`, `/api/media/…` returns the exact bytes and content type, a public
+file is readable anonymously, a private file is hidden from anonymous and readable by staff, delete → `204`, the file then `404` and the document gone;
+logout `204`, then anonymous. Redeploying the **same commit** (`09abd85b`) kept D1 and R2: admin id, login, post, relation, published SSR and the object
+bytes all verified again (14/14).
+
+**Remote K3** (`GET /api/site/posts?title[in]=…`, anonymous): **80, 99, 100, 120, 400 values → `200` at every size**, no provider text in the body.
+
+**Logs** (`wrangler pages deployment tail`, 12 requests: ok, 404, invalid JSON `400`, wrong credentials `401`, cross-origin `403`, bad query): 0 exceptions,
+0 application log lines, and no `AUTH_SECRET`, password, email, `passwordHash`, `_sessionVersion`, SQL, D1 error or token text. Cloudflare's tail event
+echoes request headers, so a live session cookie would appear there (only a fake cookie did in this run) — a platform property to keep in mind.
+
+**Quiesce + backup:** all writers stopped at `2026-10-12T12:18:04Z` (no atomic D1+R2 snapshot exists; none is claimed). `wrangler d1 export … --remote` of the
+staging D1 only → `.staging/database.sql`, 5.8 KB, **SHA-256 `925bb2456aa7172809c1836a9091129fd9051d522227bb59b168af44d6657169`** (gitignored). Required
+object keys were derived from that snapshot with `pnpm staging keys` (**2** `media/…-r03-fixture.bin` keys), never from a bucket listing.
+
+**Metadata-preserving copy:** the disposable Worker copied exactly those keys source → restore bucket; `pnpm staging compare` → **2/2 objects match**
+(size 963, SHA-256, content type `application/octet-stream`). The fixture's `customMetadata` is empty, so metadata fidelity is exercised by the unit
+tests, not by this data. The Worker answered `403` without the token and does not exist any more (`10007` from the API).
+
+**Isolated restore:** the restore D1 had 0 tables and the restore bucket was new before the import; `wrangler d1 execute … --file` loaded the snapshot (6
+tables). The restore Pages app was bound only to the restore D1/R2 with its own secret and real origin, and passed: health; login with the same
+credentials; same admin id; same post id, relation, draft/published state; same `_storageKey`; `/api/media` exact bytes and type; a new write and delete
+(`201`/`204`). SQL-level comparison source vs restore: same 6 tables, identical schema hash (`48ac459a47e392ff`) and **identical rows in every table**
+(including the `_forge_schema` ledger). An ephemeral `wrangler dev --remote` Worker running the tiny-project runtime against the restore resources reported
+`planSchema()` → **0 changes**, `reconcileStorage()` → empty report **twice** (second run a no-op), migration history `[]`.
+
+**Finding fixed — R03-F1 (`@forge-cms/runtime`, patch `hide-internal-fields-from-metadata`):** `GET /api/content/collections` (anonymous) listed the users
+collection's internal `passwordHash` and `_sessionVersion` fields (`access: { read: [], write: [] }`). Names only, never values — but the verifier flagged
+it and an anonymous schema endpoint should not advertise credentials storage. `describeFields` now omits fields no role can read or write. Test added;
+admin forms are unaffected (nobody could edit those fields).
+
+**Tooling findings fixed in the repository:** (a) the copy Worker accepted `Bearer undefined` in the window between `wrangler deploy` and
+`wrangler secret put` — now refuses unless `COPY_TOKEN` is set (≥16 chars), with tests; (b) `scripts/staging/journey.mjs` added (the journey above, also run
+against the restore); (c) the runbook now records the real procedure and the pitfalls below.
+
+**Incident (disclosed):** my first `wrangler pages deploy` was run through `pnpm --dir ../..`, which switched the working directory to the repository root,
+so Wrangler used the **root `wrangler.toml`** (the production website's config) and uploaded `apps/www/dist/analog/public` to
+`forge-cms-r03-staging` (deployment `780ee840`). Only the staging Pages project was a deploy target — the production project `forge-cms` was not deployed
+to — but that config also declares the production D1 `forge-cms` as `DB`, so that one deployment may have been bound to it. The only requests it received
+were my health probes (`/api/content/…`, `/api/account/…`, `/api/bootstrap-admin` (empty body), none of which the website implements — it answered with its
+static page), so no D1 access is expected, but it is not proven. It was superseded minutes later by the correct deployment (Pages replaces the bindings on
+each deploy). Lesson recorded in the runbook: run Wrangler for Pages from the generated directory with the absolute binary, never through `pnpm --dir`.
+
+**Caveats (not hidden):** (1) the `/studio/login` **form** was not driven in a browser — signing in with a typed password on a remote origin is outside
+what the agent may do; sign-in, the Secure/HttpOnly cookie, session use and logout were proven through the same HTTP API the form calls, and `/studio/login`
+renders. (2) `apps/tiny-project` defines no migrations, so "rerun known migrations → already-applied" is not applicable remotely (covered locally by
+`test:upgrade`); the ledger compared is `_forge_schema`. (3) `test:s3` / `release:certify` cannot run here (no Docker): the final candidate's portable
+evidence is the CI of the closeout PR; main CI `38143496339` is the inherited evidence for `3eb46aa`. (4) F5 did not recur (all five CI runs after spec 090
+and the stability runs of this session were clean).
+
+**Cleanup:** deleted exactly the restore Pages/D1/R2 and the copy Worker (the user gave no instruction beyond "complete it"; manifest lifetimes were
+followed). **Retained for RC/R04:** the staging Pages project, D1 and R2 bucket (one admin, one published post, two public media rows). Nothing outside
+`forge-cms-r03-*` was created, changed or deleted.
 
 ### Limits
 

@@ -13,7 +13,7 @@ import {
   keysFromSnapshotSql,
   verifyOrigin
 } from './staging/staging-lib.mjs';
-import { copyObjects, inspectObjects } from './staging/r2-copy-worker.mjs';
+import worker, { copyObjects, inspectObjects } from './staging/r2-copy-worker.mjs';
 
 // Spec 090 — the staging tooling must be unable to name a production resource.
 
@@ -180,4 +180,26 @@ test('origin verification fails on a startup 500 and on leaked internals or secr
     'passwordHash',
     'MARK_X'
   ]);
+});
+
+const callWorker = (env, auth) =>
+  worker.fetch(
+    new Request('https://w.test/copy', {
+      method: 'POST',
+      headers: auth ? { authorization: auth } : {},
+      body: '{"keys":[]}'
+    }),
+    env
+  );
+
+test('r2 copy worker refuses every request while COPY_TOKEN is unset or short, including "Bearer undefined"', async () => {
+  assert.equal((await callWorker({}, 'Bearer undefined')).status, 403);
+  assert.equal((await callWorker({ COPY_TOKEN: 'short' }, 'Bearer short')).status, 403);
+});
+
+test('r2 copy worker accepts only the exact bearer token', async () => {
+  const env = { COPY_TOKEN: 'a-sufficiently-long-token', SOURCE: {}, TARGET: {} };
+  assert.equal((await callWorker(env, 'Bearer wrong-token-value-here')).status, 403);
+  assert.equal((await callWorker(env)).status, 403);
+  assert.equal((await callWorker(env, 'Bearer a-sufficiently-long-token')).status, 200);
 });

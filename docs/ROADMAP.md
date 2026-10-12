@@ -1,8 +1,13 @@
 # ROADMAP — A small, dependable ForgeCMS 1.0
 
-> **2026-10-11 (spec 090):** Roadmap 0.12 / R03 — Rehearse deployment and recovery — is **prepared, not complete**: guarded staging tooling and the
-> [runbook](STAGING-REHEARSAL.md) exist and R02's finding K3 (long `in` lists on D1) is fixed, but the authorized remote Cloudflare staging +
-> isolated restore rehearsal is pending explicit authorization. R04 is not started.
+> **2026-10-12 (spec 090):** **Roadmap 0.12 / R03 — Rehearse deployment and recovery — is complete.** An authorized, isolated Cloudflare staging
+> (`forge-cms-r03-*`: Pages + D1 + R2) served the real HTTPS origin: health, first admin from an empty D1, login/cookie/CSRF, draft → publish → edit,
+> an R2 upload with exact bytes and private/public semantics, same-commit redeploy persistence, the remote K3 sizes 80/99/100/120/400 (all `200`) and a
+> clean log review all passed; a quiesced D1 export (SHA-256 recorded) plus a snapshot-derived, metadata-preserving R2 copy restored into a separate
+> empty D1/R2/Pages with identical rows, a clean schema plan, idempotent `reconcileStorage()` and a working new write. It found and fixed one patch
+> defect (the anonymous collections metadata advertised the internal `passwordHash`/`_sessionVersion` field names) and hardened the copy Worker; one
+> operator slip (a first deploy made with the repository-root Wrangler config) is disclosed in the spec. Caveats are recorded in the spec's Outcome.
+> **0.12: R01 ✓, R02 ✓, R03 ✓; R04 pending. Next bounded responsibility: roadmap 0.12 / R04 — Consumer documentation and release dossier.**
 >
 > **2026-10-10 (spec 089):** **Roadmap 0.12 / R02 — Close measurable reliability gaps — is complete.** Coverage is now
 > per package and source-attributed (`pnpm test:coverage`, the QUALITY floors 90/90/90/85 and 85/85/85/80, all eleven packages

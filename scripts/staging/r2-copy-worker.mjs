@@ -54,7 +54,11 @@ export async function inspectObjects(bucket, keys) {
 
 export default {
   async fetch(request, env) {
+    // A missing/short secret must never match `Bearer undefined` (found by the R03 remote rehearsal: a Worker is
+    // reachable between `wrangler deploy` and `wrangler secret put`).
     if (
+      typeof env.COPY_TOKEN !== 'string' ||
+      env.COPY_TOKEN.length < 16 ||
       request.method !== 'POST' ||
       request.headers.get('authorization') !== `Bearer ${env.COPY_TOKEN}`
     ) {
