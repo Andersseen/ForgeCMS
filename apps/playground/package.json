@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/playground",
-  "version": "0.0.28",
+  "version": "0.0.29",
   "private": true,
   "description": "Personal sandbox for trying ForgeCMS APIs locally.",
   "type": "module",

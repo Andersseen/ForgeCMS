@@ -1,5 +1,20 @@
 # @forge-cms/demo-aesthetics
 
+## 0.0.28
+
+### Patch Changes
+
+- Updated dependencies [c2a124f]
+  - @forge-cms/runtime@0.13.3
+  - @forge-cms/cloudflare@0.13.3
+  - @forge-cms/core@0.13.3
+  - @forge-cms/db@0.13.3
+  - @forge-cms/auth@0.13.3
+  - @forge-cms/storage@0.13.3
+  - @forge-cms/api@0.13.3
+  - @forge-cms/angular@0.13.3
+  - @forge-cms/admin@0.13.3
+
 ## 0.0.27
 
 ### Patch Changes

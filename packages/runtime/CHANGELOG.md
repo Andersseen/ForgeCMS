@@ -1,5 +1,16 @@
 # @forge-cms/runtime
 
+## 0.13.3
+
+### Patch Changes
+
+- c2a124f: Collection and global metadata (`GET /api/content/collections`, `describeCollections`) no longer lists fields that no role can read or write (`access: { read: [], write: [] }`), such as the users collection's `passwordHash` and `_sessionVersion`. Found by the R03 staging rehearsal; no data was ever exposed, only the field names.
+  - @forge-cms/core@0.13.3
+  - @forge-cms/db@0.13.3
+  - @forge-cms/auth@0.13.3
+  - @forge-cms/storage@0.13.3
+  - @forge-cms/api@0.13.3
+
 ## 0.13.2
 
 ### Patch Changes
