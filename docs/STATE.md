@@ -1,12 +1,17 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-11 (spec 090 / roadmap 0.12 R03 — staging deployment and recovery rehearsal — PREPARED on branch
-> `feature/spec-090-staging-recovery-rehearsal`; REMOTE STAGING GATE PENDING EXPLICIT AUTHORIZATION).** R03 is **not complete**.
-> Done locally: guarded staging tooling (`pnpm staging …`, `scripts/staging/`, refuses production names), the operator runbook
-> [STAGING-REHEARSAL.md](STAGING-REHEARSAL.md), and the fix of R02's finding **K3** — reproduced on workerd D1 (`title[in]=` with ≥100
-> values → 500), fixed in `@forge-cms/cloudflare` (long `in` lists travel as one JSON parameter; patch changeset, no API change).
-> Roadmap 0.12: **R01 ✓ R02 ✓, R03 prepared (remote gate pending), R04 pending.** Published: `0.13.0`; PR #92 (`0.13.1`) still open.
-> Not run (no Docker / no Cloudflare login): `pnpm test:s3`, `pnpm release:certify`, remote staging.
+> **Last updated: 2026-10-12 (spec 090 / roadmap 0.12 R03 — staging deployment and recovery rehearsal — COMPLETE on
+> `feature/spec-090-remote-staging-closeout`).** Roadmap 0.12: **R01 ✓ R02 ✓ R03 ✓, R04 pending.** The authorized remote rehearsal ran on isolated
+> `forge-cms-r03-*` Cloudflare resources: real-origin health/auth/CSRF/content/R2 journey, same-commit redeploy persistence, remote K3 (80/99/100/120/400
+> → `200`), clean logs, quiesced D1 export + snapshot-derived R2 copy, and an isolated restore (identical rows, clean schema plan, idempotent
+> `reconcileStorage()`, new write). One patch fix (`@forge-cms/runtime`: anonymous collection metadata no longer lists `access: { read: [], write: [] }`
+> fields) → pending release as the next patch; website `CURRENT_FORGE_VERSION` stays `0.13.2` until it publishes. Published now: `0.13.2` (npm `latest`,
+> GitHub `v0.13.2`, main CI `38143496339` ✓). Caveats (spec 090 Outcome): `/studio/login` form not driven in a browser, no migrations in the fixture,
+> S3/certify for this candidate come from the closeout PR's CI (no Docker here). Staging retained; restore and the copy Worker deleted.
+> **Next bounded responsibility: roadmap 0.12 / R04 — Consumer documentation and release dossier (not started).**
+> _Previous header (same day, before the remote run):_ R03 prepared, remote gate pending; release truth reconciled to `0.13.2`.
+> _Historical (pre-#94) header, kept for evidence:_ R03 prepared on `feature/spec-090-staging-recovery-rehearsal`; published `0.13.0`;
+> PR #92 (`0.13.1`) then open; not run there: `pnpm test:s3`, `pnpm release:certify`, remote staging.
 > _Previous header:_ 2026-10-10 (spec 089 / R02 — merged as PR #91 `64322dd`, main CI `38080646922` ✓).
 
 > _Older header (R02):_

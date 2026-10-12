@@ -138,8 +138,22 @@ function describeField(name: string, field: AnyField): FieldDescription {
   }
 }
 
+/** `access: { read: [], write: [] }` — a system field (e.g. `passwordHash`) no role may read or write. */
+function isInternalField(field: AnyField): boolean {
+  const access = field.options.access;
+  return (
+    Array.isArray(access?.read) &&
+    access.read.length === 0 &&
+    Array.isArray(access.write) &&
+    access.write.length === 0
+  );
+}
+
+/** Internal fields are not part of the client-facing description: no form can edit them, no read can show them. */
 export function describeFields(fields: FieldMap): FieldDescription[] {
-  return Object.entries(fields).map(([name, field]) => describeField(name, field));
+  return Object.entries(fields)
+    .filter(([, field]) => !isInternalField(field))
+    .map(([name, field]) => describeField(name, field));
 }
 
 export function describeCollection(collection: CollectionDefinition): CollectionDescription {

@@ -61,6 +61,21 @@ All mutating steps are dry runs unless `--apply` is given. Generated evidence li
 11. **Cleanup** — staging is retained only if the maintainer says so; otherwise delete the Pages projects, D1 databases and R2 buckets named
     in the manifest (and nothing else).
 
+## Practical notes (from the 2026-10-12 run)
+
+- **Never run Wrangler for Pages through `pnpm --dir …` or from the repository root.** The root `wrangler.toml` is the production website's
+  config; Pages reads the config of the current directory. Generate a directory with a `wrangler.toml` (`pages_build_output_dir = "public"`, `DB`,
+  `BUCKET`, `FORGE_SSR_ORIGIN`) plus a copy of `apps/tiny-project/dist/analog/public`, `cd` into it and call the absolute `node_modules/.bin/wrangler`.
+  Pages has no `--config` flag. `pnpm staging run deploy` plans the generic command only; it does not do this.
+- The Worker for the R2 copy and `wrangler delete` need the same care (run from the Worker's own directory with `--name`).
+- Install `COPY_TOKEN` immediately after `wrangler deploy`; the Worker refuses every request until it exists.
+- `d1 export` prints a one-hour pre-signed download URL; treat the terminal output as sensitive.
+- Empty a restore R2 bucket (delete the known keys) before `r2 bucket delete`.
+- `wrangler pages deployment tail <deployment-id> --format json` needs the full deployment id; it echoes request headers (cookies included).
+- Journey and restore checks: `node scripts/staging/journey.mjs write|read|post-write --origin https://…` (state in the gitignored `.staging/`).
+- The schema plan, migration history and `reconcileStorage()` of a restored database have no HTTP route; run the runtime against the restore bindings with
+  `wrangler dev --remote` from an ephemeral directory.
+
 ## Portable profile
 
 Node/Nitro with a durable on-disk libSQL file **on a persistent volume** (a container's ephemeral filesystem is not durable) and
