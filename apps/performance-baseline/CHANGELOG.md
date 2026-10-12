@@ -1,5 +1,18 @@
 # @forge-cms/performance-baseline
 
+## 0.0.4
+
+### Patch Changes
+
+- Updated dependencies [c2a124f]
+  - @forge-cms/runtime@0.13.3
+  - @forge-cms/core@0.13.3
+  - @forge-cms/db@0.13.3
+  - @forge-cms/auth@0.13.3
+  - @forge-cms/storage@0.13.3
+  - @forge-cms/angular@0.13.3
+  - @forge-cms/admin@0.13.3
+
 ## 0.0.3
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # @forge-cms/cloudflare
 
+## 0.13.3
+
+### Patch Changes
+
+- @forge-cms/core@0.13.3
+- @forge-cms/db@0.13.3
+- @forge-cms/storage@0.13.3
+
 ## 0.13.2
 
 ### Patch Changes
