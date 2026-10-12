@@ -3,6 +3,24 @@ import { defineCollection, defineField } from '@forge-cms/core';
 import { describeCollection } from './describe.js';
 
 describe('describeCollection', () => {
+  it('omits fields that no role can read or write (spec 090 R03 finding)', () => {
+    const users = defineCollection({
+      slug: 'users',
+      fields: {
+        email: defineField.email({ required: true }),
+        passwordHash: defineField.text({ access: { read: [], write: [] } }),
+        readOnlyForAdmin: defineField.text({ access: { read: ['admin'], write: [] } }),
+        writeOnly: defineField.text({ access: { read: [], write: ['admin'] } })
+      }
+    });
+
+    expect(describeCollection(users).fieldDefinitions.map((f) => f.name)).toEqual([
+      'email',
+      'readOnlyForAdmin',
+      'writeOnly'
+    ]);
+  });
+
   it('humanises the slug and derives a default description when admin metadata is absent', () => {
     const posts = defineCollection({
       slug: 'service_categories',
