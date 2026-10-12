@@ -1,12 +1,15 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-11 (spec 090 / roadmap 0.12 R03 — staging deployment and recovery rehearsal — PREPARED on branch
-> `feature/spec-090-staging-recovery-rehearsal`; REMOTE STAGING GATE PENDING EXPLICIT AUTHORIZATION).** R03 is **not complete**.
-> Done locally: guarded staging tooling (`pnpm staging …`, `scripts/staging/`, refuses production names), the operator runbook
-> [STAGING-REHEARSAL.md](STAGING-REHEARSAL.md), and the fix of R02's finding **K3** — reproduced on workerd D1 (`title[in]=` with ≥100
-> values → 500), fixed in `@forge-cms/cloudflare` (long `in` lists travel as one JSON parameter; patch changeset, no API change).
-> Roadmap 0.12: **R01 ✓ R02 ✓, R03 prepared (remote gate pending), R04 pending.** Published: `0.13.0`; PR #92 (`0.13.1`) still open.
-> Not run (no Docker / no Cloudflare login): `pnpm test:s3`, `pnpm release:certify`, remote staging.
+> **Last updated: 2026-10-12 (spec 090 / roadmap 0.12 R03 — staging deployment and recovery rehearsal — PREPARED; REMOTE STAGING GATE
+> STILL PENDING EXPLICIT AUTHORIZATION; release truth reconciled on `feature/spec-090-remote-staging-closeout`).** R03 is **not complete**.
+> Current release truth (verified 2026-10-12 against npm, GitHub and CI): PR #92 merged and published `0.13.1`; PR #93 (R03 tooling +
+> K3 fix) merged as `f5295a0`; PR #94 (Version Packages) merged as `3eb46aa` and published **`0.13.2`** (all eleven packages `latest`,
+> GitHub release `v0.13.2`, main CI `38143496339` ✓ incl. certify, deploys and release). Website `CURRENT_FORGE_VERSION` = `0.13.2`.
+> K3 (D1 100-bound-parameter limit on long `in` lists) is fixed in the published `@forge-cms/cloudflare@0.13.2`; **remote D1 proof is
+> still outstanding**. Roadmap 0.12: **R01 ✓ R02 ✓, R03 prepared (remote gate pending), R04 pending.**
+> Remote blocker at last check: `wrangler whoami` → not logged in; no Docker locally (`test:s3`/`release:certify` rely on CI evidence).
+> _Historical (pre-#94) header, kept for evidence:_ R03 prepared on `feature/spec-090-staging-recovery-rehearsal`; published `0.13.0`;
+> PR #92 (`0.13.1`) then open; not run there: `pnpm test:s3`, `pnpm release:certify`, remote staging.
 > _Previous header:_ 2026-10-10 (spec 089 / R02 — merged as PR #91 `64322dd`, main CI `38080646922` ✓).
 
 > _Older header (R02):_

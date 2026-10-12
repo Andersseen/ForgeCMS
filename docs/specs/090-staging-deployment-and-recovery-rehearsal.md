@@ -70,7 +70,14 @@ local profile fail-closed tests (`apps/tiny-project/src/tests/storage-selection.
 
 **R03 is PREPARED — remote staging gate pending explicit authorization. It is not complete.** Nothing below claims remote success.
 
-### Candidate
+### Current-truth note (2026-10-12) — the Candidate section below is historical
+
+Since that Outcome was written: PR #92 merged and published `0.13.1`; PR #93 merged as `f5295a0`; PR #94 (Version Packages) merged as `3eb46aa` and published **`0.13.2`**
+(all eleven packages on npm `latest`, GitHub release `v0.13.2`, main CI `38143496339` ✓). The K3 fix is therefore in the published
+`@forge-cms/cloudflare@0.13.2`; website `CURRENT_FORGE_VERSION = '0.13.2'`. R03 is **still not complete**: the remote gate has not been authorized or run, and
+Wrangler is not logged in on this machine.
+
+### Candidate (historical, as of PR #93)
 
 - Starting main `64322dd` (PR #91, spec 089 merge); main CI `38080646922` ✓ (all required jobs incl. Reliability · Coverage · Performance).
 - Published: all eleven packages `0.13.0` on npm and GitHub; website `CURRENT_FORGE_VERSION = '0.13.0'`. PR #92 "Version Packages" (`0.13.1`, the R02
