@@ -12,7 +12,10 @@ pnpm add @forge-cms/auth
 import { UsersCollectionAuthAdapter, defineUsersCollection } from '@forge-cms/auth';
 
 export const users = defineUsersCollection(); // email, name, role (admin | editor | viewer), password hash
-const auth = new UsersCollectionAuthAdapter().init({ AUTH_SECRET: env.AUTH_SECRET, userDatabase: database });
+const auth = new UsersCollectionAuthAdapter().init({
+  AUTH_SECRET: env.AUTH_SECRET,
+  userDatabase: database
+});
 ```
 
 ## What it provides

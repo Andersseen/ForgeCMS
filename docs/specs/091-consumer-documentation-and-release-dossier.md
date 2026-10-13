@@ -134,4 +134,68 @@ None.
 
 ## Outcome
 
-_Filled at completion (see below)._
+**Shipped (2026-10-13):** consumer documentation, two executable quickstarts, a documentation gate and the 1.0 release dossier. Documentation, repository tooling and CI only — **no `packages/*` code, export, option or
+default changed** (`pnpm check:api`: baseline unchanged). One **patch** changeset covers the eleven package READMEs (published content). No release candidate, prerelease mode, tag or dist-tag was created; L01 was not started;
+nothing was published.
+
+### REPOSITORY
+
+- Starting `main` `7aa8fa3105fa2aa8692328870916be06b956c652`; no open PRs; `.changeset/` empty before this branch.
+- PR #95 (R03 closeout): merged; post-merge CI `38257961133` ✓. PR #96 (Version Packages): merged; CI `38262008765` ✓ (checks, certify, reliability, changeset gate, website + demo deployment, npm release).
+- Branch `feature/spec-091-consumer-docs-release-dossier`; the final commit is the PR head.
+
+### RELEASE
+
+- Published at start and end: **`0.13.3`**, all eleven packages (`npm view`), GitHub release published by run `38262008765`. Website `CURRENT_FORGE_VERSION` corrected `0.13.2` → `0.13.3`.
+- Changeset state: none on `main`; this branch adds `.changeset/package-readmes-and-docs.md` (patch, all eleven). It becomes a release (expected `0.13.4`) only through a normal Version Packages PR; it is not claimed published.
+
+### AUDIT
+
+- ~60 current-facing documents classified (table in Design). Stale current-facing statements fixed: package READMEs (`api`, `runtime`, `auth`, `storage`, `core`, `testing`), root README (`0.12.0`/`0.11.0`, "not guaranteed", mixed versions), `CONTEXT.md` (nothing published, `0.0.0`, no compatibility, drafts/i18n as non-goals, KV planned),
+  `docs/README.md`, `QUICKSTART.md` (`0.0.1`), `CONTRIBUTING.md` (Node 20, placeholder admin, manual release), deployment/small-project/SSR/BACKUP-RESTORE/SCHEMA-UPGRADES/ARCHITECTURE remote-evidence claims, website introduction (`0.8.2`), quickstart, collections ("typed client still on the roadmap"),
+  browser-auth logout wording, landing roadmap/packages/footer copy ("S3 remains on the road", "experimental pre-1.0"), STATE header and obsolete "Known issues (2026-07-22)" list (marked historical).
+- Historical material left unchanged: all specs 001–090 (spec 090 gained one dated current-truth note; no evidence edited), `ROADMAP-LEGACY.md`, `DEMO-FINDINGS.md` (two links to deleted demo files became plain text).
+
+### ROOT / DOCS
+
+README (product entry point), CONTEXT (current intent; ForgeCMS 2.0 only as non-promise), docs index (versions vs checkpoints), CONTRIBUTING (Node 22, pnpm 10.11, gates, fixed group, CI-driven Version Packages), `SECURITY.md`, `docs/SUPPORT.md` (semver, deprecation, ranges vs tested versions).
+**Security reporting:** GitHub private vulnerability reporting is _disabled_ (checked via the API), so `SECURITY.md` documents only the content-free-issue mechanism that exists, invents no address and promises no SLA; enabling PVR is dossier blocker **J1** for L01 (owner action).
+
+### QUICKSTARTS
+
+- Server-only (`docs/examples/server-quickstart` → website `/docs/server-quickstart`): installed from packed tarballs into an empty project with six packages — the store contains no Angular, VoltUI, lumen, RxJS, zone, admin; strict `tsc` (`exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`); the built output creates the first admin, enforces access, serves the HTTP handler.
+- Angular/Analog (`docs/examples/analog-quickstart` → `/docs/angular-quickstart`): eight Forge packages + only the documented peers, official `angularLinker`, strict TS + `ngc` strict templates, Analog production build (`node-server`), fully linked browser bundle with no server code or secret; the built server: first admin, `forge_session` cookie, cross-origin write `403`, draft → publish, multipart upload served from `/api/media`, oversized login `413`, logout;
+  Chromium: public page, guard → `/admin/login` → sign in → `/admin/collections`, no console errors.
+- Toolchain: Angular 21.2.10, Analog 2.5.2, Vite 7.1.4, TypeScript 5.9.2, Node 22. Imports are public entry points only. Snippets in the pages equal the example files (`pnpm docs:verify` fails on drift).
+- Findings while writing them (no package change): Analog still requires a `main.server.ts` even with `ssr: false` (DEMO-FINDINGS 2; shown in the quickstart); a Local API `where` with an unknown operator reaches the driver as a raw error (dossier J9, post-1.0); `@types/node` is a documented dev dependency.
+
+### PACKAGES
+
+README of all eleven packages current (what/who/install/entry points/boundary/compat/links); `api`, `runtime`, `auth`, `storage`, `core`, `testing` rewritten from the real exports. Changeset: patch for all eleven (the CI gate requires one for any `packages/*` change, READMEs included).
+
+### REFERENCE
+
+`docs/REFERENCE.md` (all 15 entry points; options, defaults, environment, errors, stability — checked against `api-baseline` by `docs:verify`), `docs/MATRICES.md` (15-kind field matrix incl. `withTime`, array/block bounds, simple-block rich text + JSON fallback, depth-1 and exact localization shapes; feature matrix with Analytics experimental and Strata not a Forge feature; deployment profiles with five evidence layers; Garage the only certified S3, AWS/B2/Wasabi configurable only),
+`docs/SUPPORT.md` (support matrix: ranges vs tested versions, Angular 22 client-only, admin Angular 21 only), `docs/LIMITATIONS.md`.
+
+### OPERATIONS
+
+Auth/security (sessions, CSRF, password-change invalidation, roles, API keys, Local API trust vs HTTP, metadata privacy since `0.13.3` — field _names_ only were ever exposed), uploads/storage (ownership, intents, `reconcileStorage`, limits), schema upgrades and backup/restore (no atomic cross-store snapshot, no PITR, no down migrations), remote staging (certified on isolated Cloudflare staging; not a universal production guarantee) reconciled across the guides.
+
+### MIGRATION / TROUBLESHOOTING
+
+`docs/MIGRATING-TO-1.0.md` (19-row checklist: drift, migrations, ISO dates, Angular transport/errors/typing/resources, SSR, hydration, S3, upload ownership, admin U01–U03, CDK peer, `basePath`, default nav, deprecations, API defaults, `0.13.1`–`0.13.3` fixes). Website `/docs/troubleshooting` covers `SERVER_ORIGIN_REQUIRED`, `JIT compiler unavailable`, `SchemaDriftError`, all `MigrationError` codes, incomplete profiles, ephemeral libSQL, S3/R2 failures, missing objects, `401` vs `403`, expired sessions, CSRF, `ForgeApiError` kinds, validation details, `413`, upload size/MIME (`400 INVALID_INPUT`, no default cap), peers and custom-mount mistakes — all names taken from source.
+
+### DOSSIER
+
+`docs/1.0-RELEASE-DOSSIER.md`: surface, release identity, R01 evidence (the sealed `0.13.3` certification of `7aa8fa3` with all eleven SHA-256s, toolchain and stage timings), R02 (per-package coverage, fixture/N+1 bounds, stability, fault/log safety), R03 (remote staging, K3, D1 export, snapshot-derived R2, isolated restore, retention), upgrade/recovery, security, support matrix, limitations, 16 classified issues (J1 BLOCKER FOR L01; J2 BLOCKER FOR 1.0 = the RC matrix itself; the rest non-blocking/post-1.0 with justification — none concerns an unresolved critical/high auth, access, data-integrity, migration, storage-ownership or secret-leakage defect), release owner (the repository maintainer), and section L: RC version, commit, tarball hashes, dist-tag, notes and RC matrix as **TO BE SEALED BY L01**.
+
+**R03 caveats disposed:** (1) remote login _form_ not driven — the guarantee (cookie/CSRF/session on a real origin) was proven over HTTP, the form has U02/U03 + R04 browser evidence; manual smoke on retained staging recommended (J4). (2) no migration in the fixture — covered by local D1 `test:upgrade`/contract; one reviewed migration on retained staging recommended for L01 (J3). (3) no local Docker — CI supplied the evidence (J5). (4) first deploy used the root Wrangler config — only static-page probes reached it; optional production-D1 check (J6).
+
+### VALIDATION
+
+**VALIDATION**
+
+### Fresh-reviewer walkthrough (the 23 questions)
+
+1 what is it → README · 2 which packages → README / quickstarts · 3 versions → SUPPORT · 4 collection → quickstarts, collections · 5 runtime → server quickstart §3 · 6 schema init → `syncSchema()` + schema-upgrades · 7 Local API → server quickstart §5, local-api · 8 REST → server quickstart §4, rest-api · 9 auth → browser-auth, Angular quickstart §4 · 10 access → access-control · 11 Angular client → angular-client · 12 admin → Angular quickstart §5, admin-ui · 13 Cloudflare → deployment · 14 Node/libSQL/S3 → deployment · 15 uploads → uploads · 16 upgrades → schema-upgrades / SCHEMA-UPGRADES · 17 backup/restore → BACKUP-RESTORE · 18 certified → MATRICES, dossier · 19 experimental → MATRICES, SUPPORT · 20 unsupported → LIMITATIONS · 21 troubleshoot → troubleshooting · 22 report → SECURITY, SUPPORT · 23 0.x → 1.0 → MIGRATING-TO-1.0. None is answered only by a spec.
