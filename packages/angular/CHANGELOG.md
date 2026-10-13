@@ -1,5 +1,14 @@
 # @forge-cms/angular
 
+## 0.13.4
+
+### Patch Changes
+
+- 47b0f72: Documentation only (roadmap 0.12 / R04, spec 091): the README shipped in every package now describes what the package is, who needs it, its stable entry points, its server/browser boundary and its support status.
+  `@forge-cms/api`, `runtime`, `auth`, `storage`, `core` and `testing` no longer say the implemented CRUD runtime, request handling, authentication and storage are future work. No code, export, option or default changed.
+- Updated dependencies [47b0f72]
+  - @forge-cms/core@0.13.4
+
 ## 0.13.3
 
 ### Patch Changes
