@@ -1,6 +1,6 @@
 # 091 — Consumer documentation and release dossier
 
-- **Status:** in-progress
+- **Status:** done
 - **Author:** agent draft (maintainer-directed, roadmap 0.12 / R04)
 - **Date:** 2026-10-13
 - **Branch:** `feature/spec-091-consumer-docs-release-dossier`
@@ -110,12 +110,12 @@ consumer dogfood, not Forge API; the previously-reported metadata exposure (R03-
 - [x] Spec 091 with the documentation audit
 - [x] Executable quickstart sources + `docs:verify:consumers` (server + Angular/Analog, packed tarballs, strict TS/templates, built server, Chromium)
 - [x] `docs:verify` (links with anchors, snippets, reference↔baseline, stale denylist) + unit tests
-- [ ] Package READMEs, root README, CONTEXT, docs index, CONTRIBUTING, SECURITY, QUICKSTART
-- [ ] Reference, matrices, support, limitations, migration guide, troubleshooting, quickstart pages
-- [ ] Stale-claim fixes: deployment, backup/restore, architecture, schema upgrades, website pages, forge-release
-- [ ] Release dossier; R03 caveat disposition; issue classification
-- [ ] Changeset (patch), CI wiring, STATE/ROADMAP/0.12 closeout, Outcome
-- [ ] Full local gate run; PR
+- [x] Package READMEs, root README, CONTEXT, docs index, CONTRIBUTING, SECURITY, QUICKSTART
+- [x] Reference, matrices, support, limitations, migration guide, troubleshooting, quickstart pages
+- [x] Stale-claim fixes: deployment, backup/restore, architecture, schema upgrades, website pages, forge-release
+- [x] Release dossier; R03 caveat disposition; issue classification
+- [x] Changeset (patch), CI wiring, STATE/ROADMAP/0.12 closeout, Outcome
+- [x] Full local gate run; PR
 
 ## Test plan
 
