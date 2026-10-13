@@ -61,7 +61,7 @@ import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
             >npm</a
           >
         </nav>
-        <p class="text-xs text-muted-foreground">MIT · experimental pre-1.0</p>
+        <p class="text-xs text-muted-foreground">MIT · 1.0 candidate</p>
       </div>
     </footer>
   `

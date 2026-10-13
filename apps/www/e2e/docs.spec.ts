@@ -14,7 +14,7 @@ test('/docs redirects to the introduction and renders the sidebar', async ({ pag
   await expect(page.getByRole('heading', { name: 'Introduction', level: 1 })).toBeVisible();
 
   const sidebar = page.locator('aside');
-  await expect(sidebar.getByRole('link', { name: 'Quickstart' })).toBeVisible();
+  await expect(sidebar.getByRole('link', { name: 'Quickstart', exact: true })).toBeVisible();
   await expect(sidebar.getByRole('link', { name: 'Small project guide' })).toBeVisible();
   await expect(sidebar.getByRole('link', { name: 'Local API' })).toBeVisible();
 });

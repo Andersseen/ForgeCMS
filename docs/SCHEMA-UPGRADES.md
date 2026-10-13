@@ -14,8 +14,9 @@ exists: on a local libSQL file, a Turso database or Cloudflare D1. It covers two
 
 Both are rehearsed on every CI run against databases written by older releases (`0.4.0`, `0.6.0`,
 `0.8.0`), on libSQL and local D1/R2, followed by a backup and a restore into an empty environment
-(roadmap 0.7 M03, [spec 073](specs/073-historical-upgrade-and-backup-restore-rehearsal.md)). Backups
-and recovery: [BACKUP-RESTORE.md](BACKUP-RESTORE.md).
+(roadmap 0.7 M03, [spec 073](specs/073-historical-upgrade-and-backup-restore-rehearsal.md)); the restore half was
+also rehearsed on isolated remote Cloudflare staging in R03 ([spec 090](specs/090-staging-deployment-and-recovery-rehearsal.md)).
+Backups and recovery: [BACKUP-RESTORE.md](BACKUP-RESTORE.md).
 
 ## The short version
 
@@ -384,8 +385,9 @@ may not reference it or `_forge_schema`.
 - libSQL and D1 only. `InMemoryDatabaseAdapter` and custom adapters without `runMigrations()` report
   `MIGRATION_UNSUPPORTED`.
 - Evidence is on-disk libSQL and local D1 (workerd), including upgrades of databases written by
-  `0.4.0`, `0.6.0` and `0.8.0` (`pnpm test:upgrade`). Remote D1 and Turso behave per their documented
-  batch semantics but are not exercised by the test suite.
+  `0.4.0`, `0.6.0` and `0.8.0` (`pnpm test:upgrade`). Remote D1 was exercised only by the R03 staging rehearsal
+  (schema plan and ledger after a restore; that fixture defines no migrations, so remote migration execution is covered by the local D1
+  suite). Turso behaves per its documented batch semantics but is not exercised by the test suite.
 - At most 40 statements per migration, 100 args per statement. The runner adds up to 7 statements
   of its own to each batch.
 - On D1, `runMigrations()` runs inside one Worker invocation. It plans the schema before and after

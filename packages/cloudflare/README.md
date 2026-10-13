@@ -1,5 +1,10 @@
 # @forge-cms/cloudflare
 
+**Who needs it:** the Cloudflare deployment profile (Pages/Workers + D1 + R2). **Boundary:** server only. **Certified:** adapter contracts, local
+workerd/D1/R2, a packed production consumer, and an isolated real Cloudflare staging rehearsal with backup and restore (spec 090) — not a
+guarantee for every production deployment. Reference: [docs/REFERENCE.md](../../docs/REFERENCE.md#forge-cmscloudflare) ·
+deployment: <https://forge-cms.pages.dev/docs/deployment>.
+
 Cloudflare-native adapters and types for ForgeCMS.
 
 ## Target services

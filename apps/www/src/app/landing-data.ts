@@ -112,7 +112,8 @@ export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
   { version: '0.9', title: 'SSR for Analog', status: 'complete' },
   { version: '0.10', title: 'Portable storage and deployment profiles', status: 'complete' },
   { version: '0.11', title: 'Admin certification', status: 'complete' },
-  { version: '0.12', title: 'Release-candidate preparation', status: 'next' }
+  { version: '0.12', title: 'Certification and documentation', status: 'complete' },
+  { version: '1.0', title: 'Release candidate', status: 'next' }
 ];
 
 /** Static, illustrative content shared by the three product showcase views. */

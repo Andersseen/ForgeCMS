@@ -14,23 +14,25 @@ ForgeCMS is an experimental, TypeScript-native, Payload-like headless CMS for **
 
 Node >= 22 (`.nvmrc`), pnpm `10.11.0` (via `packageManager` field). Never use npm or yarn.
 
-| Command                                | Purpose                                                                                      |
-| -------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `pnpm install`                         | Install deps (frozen lockfile in CI)                                                         |
-| `pnpm build`                           | Build all packages/apps (topological, cached by Turbo)                                       |
-| `pnpm dev:www` / `pnpm dev:playground` | Run the landing/admin app or the playground                                                  |
-| `pnpm dev:demo`                        | Run the real-world demo app (`apps/demo-aesthetics`)                                         |
-| `pnpm deploy:www` / `pnpm deploy:demo` | Manual Cloudflare Pages deploy (CI does both on `main`)                                      |
-| `pnpm test`                            | Unit tests (Vitest) across the repo                                                          |
-| `pnpm lint` / `pnpm typecheck`         | ESLint / `tsc --noEmit` across the repo                                                      |
-| `pnpm format` / `pnpm format:check`    | Prettier write / check                                                                       |
-| `pnpm e2e:www`                         | Playwright e2e for `apps/www`                                                                |
-| `pnpm test:s3`                         | Real S3 service (Garage in Docker) integration for `@forge-cms/s3`; needs Docker             |
-| `pnpm test:upgrade`                    | Historical upgrades + backup/restore rehearsal (0.7 gate)                                    |
-| `pnpm test:coverage`                   | Per-package source-attributed coverage vs the 1.0 floors (spec 089); fails under a floor     |
-| `pnpm test:performance`                | Fixed libSQL fixture: DB calls, latency, memory, list render, bundle sizes vs frozen budgets |
-| `pnpm test:stability`                  | Critical journeys run repeatedly with retries OFF; records every first-attempt result        |
-| `pnpm changeset`                       | Add a changeset (required when changing any `packages/*`)                                    |
+| Command                                | Purpose                                                                                             |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `pnpm install`                         | Install deps (frozen lockfile in CI)                                                                |
+| `pnpm build`                           | Build all packages/apps (topological, cached by Turbo)                                              |
+| `pnpm dev:www` / `pnpm dev:playground` | Run the landing/admin app or the playground                                                         |
+| `pnpm dev:demo`                        | Run the real-world demo app (`apps/demo-aesthetics`)                                                |
+| `pnpm deploy:www` / `pnpm deploy:demo` | Manual Cloudflare Pages deploy (CI does both on `main`)                                             |
+| `pnpm test`                            | Unit tests (Vitest) across the repo                                                                 |
+| `pnpm lint` / `pnpm typecheck`         | ESLint / `tsc --noEmit` across the repo                                                             |
+| `pnpm format` / `pnpm format:check`    | Prettier write / check                                                                              |
+| `pnpm e2e:www`                         | Playwright e2e for `apps/www`                                                                       |
+| `pnpm test:s3`                         | Real S3 service (Garage in Docker) integration for `@forge-cms/s3`; needs Docker                    |
+| `pnpm test:upgrade`                    | Historical upgrades + backup/restore rehearsal (0.7 gate)                                           |
+| `pnpm test:coverage`                   | Per-package source-attributed coverage vs the 1.0 floors (spec 089); fails under a floor            |
+| `pnpm test:performance`                | Fixed libSQL fixture: DB calls, latency, memory, list render, bundle sizes vs frozen budgets        |
+| `pnpm test:stability`                  | Critical journeys run repeatedly with retries OFF; records every first-attempt result               |
+| `pnpm docs:verify`                     | Docs links/anchors, embedded snippets, reference vs `api-baseline`, stale-claim denylist (spec 091) |
+| `pnpm docs:verify:consumers`           | The two canonical quickstarts built from packed tarballs in clean projects (spec 091)               |
+| `pnpm changeset`                       | Add a changeset (required when changing any `packages/*`, including package READMEs)                |
 
 **Quality gates — run before declaring any task done:**
 `pnpm lint && pnpm typecheck && pnpm test && pnpm build`

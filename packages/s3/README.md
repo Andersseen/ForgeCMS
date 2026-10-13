@@ -1,5 +1,9 @@
 # @forge-cms/s3
 
+**Who needs it:** the portable deployment profile (on-disk libSQL + S3-compatible storage). **Boundary:** server only — it holds credentials.
+**Certified:** Garage `v2.4.1` only (CI, real service). AWS S3, Backblaze B2 and Wasabi are configurable but **not certified**.
+Reference: [docs/REFERENCE.md](../../docs/REFERENCE.md#forge-cmss3) · deployment: <https://forge-cms.pages.dev/docs/deployment>.
+
 A server-side `StorageAdapter` for ForgeCMS backed by the **S3 API** (AWS SDK for JavaScript v3). One
 adapter, configured per service — not a family of provider integrations.
 

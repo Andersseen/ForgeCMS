@@ -303,7 +303,7 @@ from `@forge-cms/angular/vite`. [SSR guide](/docs/ssr) has every snippet and the
 handlers → admin → first admin → SSR → public client → hydration → upload → build → serve → restart → recover — is
 exercised end to end, from packed public packages only, by `pnpm test:s3 profiles` (production-built Node +
 on-disk libSQL + Garage S3, and the Cloudflare Pages output under local workerd + local D1 + local R2 — local
-evidence, not a remote deployment) and `pnpm release:ssr` (the technical SSR consumer).
+workerd evidence; the isolated remote Cloudflare rehearsal is described in [Deployment](/docs/deployment)) and `pnpm release:ssr` (the technical SSR consumer).
 
 ## Next
 

@@ -1,5 +1,9 @@
 # @forge-cms/db
 
+**Who needs it:** every project (the database contract + in-memory and libSQL adapters). **Boundary:** server only. **Status:** stable
+1.0 candidate. Install: `pnpm add @forge-cms/db`. The Cloudflare D1 adapter is in [`@forge-cms/cloudflare`](../cloudflare). Reference:
+[docs/REFERENCE.md](../../docs/REFERENCE.md#forge-cmsdb).
+
 Database adapter contract for ForgeCMS, plus `InMemoryDatabaseAdapter` and `LibSqlDatabaseAdapter`
 (libSQL / Turso / a local SQLite file).
 

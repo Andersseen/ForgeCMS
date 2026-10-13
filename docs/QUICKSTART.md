@@ -1,191 +1,22 @@
 # QUICKSTART — build your first ForgeCMS
 
-ForgeCMS `0.0.1` is the first public experimental release. This guide is for using ForgeCMS from a
-separate application repository, not for contributing to this monorepo.
+There are two canonical starting paths. Both are written for a project **outside this monorepo**, install only published `@forge-cms/*` packages, and are
+verified: `pnpm docs:verify:consumers` installs each one into a clean temporary project from the packed tarballs (strict peers, no workspace shortcuts), builds it and
+runs it.
 
-## Prerequisites
+| You are…                                        | Follow                                                                          | Packages                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| A server/TypeScript developer (no Angular)      | [Server quickstart](../apps/www/src/content/docs/server-quickstart.md)          | `core` · `db` · `auth` · `storage` · `api` · `runtime`         |
+| An Angular/Analog developer who wants the admin | [Angular/Analog quickstart](../apps/www/src/content/docs/angular-quickstart.md) | the above + `angular` · `admin` + the documented Angular peers |
 
-- Node >= 22
-- pnpm 10
-- TypeScript with ESM output
+Prerequisites for both: **Node >= 22**, **pnpm 10**, TypeScript 5.9 with strict ESM output. The same pages are published at
+<https://forge-cms.pages.dev/docs/server-quickstart> and <https://forge-cms.pages.dev/docs/angular-quickstart>.
 
-## 1. Install the runtime packages
+After a quickstart:
 
-```sh
-pnpm add @forge-cms/core @forge-cms/runtime @forge-cms/db @forge-cms/auth @forge-cms/storage
-```
+- the long form with users, drafts, uploads and both durable profiles: [small project guide](../apps/www/src/content/docs/small-project-guide.md);
+- going to production: [deployment](../apps/www/src/content/docs/deployment.md), then [BACKUP-RESTORE.md](BACKUP-RESTORE.md) and [SCHEMA-UPGRADES.md](SCHEMA-UPGRADES.md);
+- something broke: [troubleshooting](../apps/www/src/content/docs/troubleshooting.md);
+- every export and option: [REFERENCE.md](REFERENCE.md).
 
-Add Cloudflare adapters only when deploying to Workers/Pages with D1 or R2:
-
-```sh
-pnpm add @forge-cms/cloudflare
-```
-
-## 2. Define one collection
-
-Create `src/cms.ts`:
-
-```ts
-import { defineCollection, defineField } from '@forge-cms/core';
-
-export const notes = defineCollection({
-  slug: 'notes',
-  fields: {
-    title: defineField.text({ required: true }),
-    data: defineField.json()
-  }
-});
-```
-
-## 3. Create and initialize a runtime
-
-```ts
-import { InMemoryAuthAdapter } from '@forge-cms/auth';
-import { InMemoryDatabaseAdapter } from '@forge-cms/db';
-import { ForgeCmsRuntime } from '@forge-cms/runtime';
-import { InMemoryStorageAdapter } from '@forge-cms/storage';
-import { notes } from './cms.js';
-
-export const runtime = new ForgeCmsRuntime({
-  collections: [notes],
-  adapters: {
-    database: new InMemoryDatabaseAdapter(),
-    auth: new InMemoryAuthAdapter(),
-    storage: new InMemoryStorageAdapter()
-  }
-});
-
-runtime.init();
-await runtime.syncSchema();
-```
-
-That is the supported bootstrap pattern for `0.0.1`: choose adapters, create `ForgeCmsRuntime`, call
-`init()`, then call `syncSchema()`.
-
-## 4. Use the Local API
-
-```ts
-const created = await runtime.create({
-  collection: 'notes',
-  data: {
-    title: 'Hello ForgeCMS',
-    data: { mood: 'curious' }
-  }
-});
-
-const page = await runtime.find({
-  collection: 'notes',
-  limit: 10
-});
-
-await runtime.update({
-  collection: 'notes',
-  id: String(created.id),
-  data: { title: 'Updated title' }
-});
-
-await runtime.delete({
-  collection: 'notes',
-  id: String(created.id)
-});
-```
-
-Direct Local API calls are trusted server-side calls. They skip access checks by default. Pass
-`overrideAccess: false` and a `user` when you want to run an operation under normal CMS access rules,
-which is what the HTTP handlers do for network requests.
-
-## 5. Expose HTTP handlers
-
-ForgeCMS runtime handlers are framework-agnostic: they take an `ApiContext` and return a standard
-`Response`.
-
-```ts
-import type { ApiContext } from '@forge-cms/api';
-import { handleCreate, handleList } from '@forge-cms/runtime';
-import { runtime } from './runtime.js';
-
-export function listNotes(context: ApiContext) {
-  return handleList(
-    {
-      ...context,
-      params: { collection: 'notes' }
-    },
-    { runtime }
-  );
-}
-
-export function createNote(context: ApiContext) {
-  return handleCreate(
-    {
-      ...context,
-      params: { collection: 'notes' }
-    },
-    { runtime }
-  );
-}
-```
-
-Your framework adapter only needs to build `{ request, params, env }`. Analog/Nitro, Hono, Express
-via Web `Request`, and Cloudflare Workers can all call the same handlers.
-
-## Schema synchronization
-
-`runtime.syncSchema()` asks the configured database adapter to create or update the storage shape for
-registered collections and globals.
-
-For the built-in SQLite-style adapters (libSQL, D1), it **plans before it changes anything**
-(spec 070, since npm `0.8.0`; `0.7.0` and older only create tables and add columns):
-
-- A fresh database: every table and index is created.
-- New optional fields, new collections and new indexes: applied automatically, in one transaction.
-- Anything that would drop, rename, retype, reinterpret or backfill data: nothing is executed, and
-  `syncSchema()` throws a `SchemaDriftError` whose `plan` lists every change and what to do about it.
-  Examples: a removed field, `text` → `number`, `localized` switched on, a relation made `many`, a
-  new required field on a table with rows, `unique` added over duplicate rows.
-- Renames are never guessed.
-
-`runtime.planSchema()` returns the same plan read-only. It is useful in a deploy check. The refused
-changes are applied with reviewed migrations: `runtime.runMigrations(migrations)` from a deploy
-script, never at startup (spec 072, on `main`, next patch release). See
-[SCHEMA-UPGRADES.md](SCHEMA-UPGRADES.md) for the full classification, the migration format and the
-operator guide.
-
-## Angular and admin packages
-
-For Angular apps:
-
-```sh
-pnpm add @forge-cms/angular
-```
-
-```ts
-import { provideForgeCms } from '@forge-cms/angular';
-
-export const appConfig = {
-  providers: [provideForgeCms({ baseUrl: '/api' })]
-};
-```
-
-For the admin components:
-
-```sh
-pnpm add @forge-cms/admin @forge-cms/angular @angular/common @angular/core @angular/forms @angular/router rxjs @voltui/components lumen-icons
-```
-
-`@forge-cms/admin` is a component library, not a full hosted admin application. Bring its exported
-standalone components into your Angular routes and provide your own routing shell around them.
-
-## Developing ForgeCMS itself
-
-To work on this repository:
-
-```sh
-git clone https://github.com/Andersseen/ForgeCMS.git
-cd ForgeCMS
-pnpm install
-pnpm build
-pnpm dev:www
-```
-
-Contributor workflow and quality gates live in [../CLAUDE.md](../CLAUDE.md) and
-[CONTRIBUTING.md](../CONTRIBUTING.md).
+To work on ForgeCMS itself rather than use it, see [CONTRIBUTING.md](../CONTRIBUTING.md) and [../CLAUDE.md](../CLAUDE.md).

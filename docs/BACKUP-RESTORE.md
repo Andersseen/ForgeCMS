@@ -234,7 +234,7 @@ new data. There are no down migrations.
 
 ## Limits
 
-- No remote D1/R2 rehearsal: local evidence does not prove a remote Cloudflare configuration.
+- Remote evidence is one isolated Cloudflare staging rehearsal ([STAGING-REHEARSAL.md](STAGING-REHEARSAL.md), spec 090): D1 export, R2 copy of the snapshot-derived keys, and a restore into empty D1/R2 with identical rows and a clean `planSchema()`. It proves the procedure and the profile on that account, not your production project; rehearse a restore into isolated resources there too. Forge cannot verify that a backup you supply is complete.
 - No online, atomic database + object-storage snapshot; writes must be quiesced.
 - No point-in-time recovery beyond the snapshot (Time Travel is a separate provider feature).
 - Only Garage `v2.4.1` is a CI-certified S3 service; AWS S3, Backblaze B2 and Wasabi are not CI-tested.

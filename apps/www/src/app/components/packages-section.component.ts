@@ -61,8 +61,10 @@ import { packages } from '../landing-data';
       </div>
 
       <p class="mt-6 max-w-3xl text-sm leading-6 text-muted-foreground">
-        Available today: InMemory, libSQL/Turso and Cloudflare D1 databases, with InMemory and
-        Cloudflare R2 storage. The portable S3 profile remains on the road to 1.0.
+        Databases: InMemory, libSQL and Cloudflare D1. Storage: InMemory, Cloudflare R2 and an
+        S3-compatible service (Garage is the one certified in CI; AWS S3, Backblaze B2 and Wasabi
+        are configurable, not certified). Two durable profiles are certified: Cloudflare (D1 + R2)
+        and portable (libSQL + S3).
       </p>
     </section>
   `

@@ -321,8 +321,10 @@ return handleLogout(context, { runtime, cookie: { secure: true } });
 
 Clears the cookie and returns `204` — idempotent, and CSRF-checked like any other mutation. Tokens are
 stateless (signed, not stored), so this is client-state-only: it cannot revoke a Bearer token a
-programmatic client still holds. A future spec may add real session revocation; this one doesn't
-pretend to.
+programmatic client still holds. What does end earlier sessions is a **password change** (every session issued
+before it fails validation), a **deleted** user, and a **role change** (the current user row is re-read on every
+request, so a demotion applies immediately); otherwise a token lives for its 24 hours. Per-session revocation is not
+part of 1.0.
 
 ## Angular / admin auth experience
 
