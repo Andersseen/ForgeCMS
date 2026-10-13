@@ -1,5 +1,9 @@
 # @forge-cms/admin
 
+**Who needs it:** an Angular 21 app that wants the reusable ForgeCMS admin. **Boundary:** browser; contains no API URL and no server code.
+**Status:** stable 1.0 candidate; Forge Analytics (`forgeAdminAnalyticsRoutes`) is experimental. Angular 22 is **not** supported by the admin yet.
+Reference: [docs/REFERENCE.md](../../docs/REFERENCE.md#forge-cmsadmin) · start here: <https://forge-cms.pages.dev/docs/angular-quickstart>.
+
 Embeddable Angular admin for ForgeCMS: layout, collections index, collection workspace, document
 editor, sign-in/sign-up and users workspace, plus the route helpers `forgeAdminContentRoutes()` and
 `forgeAdminAuthRoutes()`. Built on `@forge-cms/angular`.

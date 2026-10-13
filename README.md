@@ -4,186 +4,164 @@
 
 <br />
 
-**Code-first, TypeScript-native CMS foundation with first-class Angular, Analog, and Cloudflare support.**
+**A code-first, TypeScript-native headless CMS for Angular and Analog.js — runs on Cloudflare (D1 + R2) or on plain Node (libSQL + S3).**
 
 <br />
 
 [![CI](https://img.shields.io/github/actions/workflow/status/Andersseen/ForgeCMS/ci.yml?branch=main&label=CI&style=flat-square&logo=githubactions&logoColor=white)](https://github.com/Andersseen/ForgeCMS/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-8B5CF6.svg?style=flat-square)](./LICENSE)
-[![Status](https://img.shields.io/badge/status-experimental-22D3EE.svg?style=flat-square)](docs/STATE.md)
+[![npm](https://img.shields.io/npm/v/@forge-cms/runtime?style=flat-square&label=npm)](https://www.npmjs.com/package/@forge-cms/runtime)
+[![Status](https://img.shields.io/badge/status-1.0%20candidate-22D3EE.svg?style=flat-square)](docs/1.0-RELEASE-DOSSIER.md)
 
-**[Quick start](docs/QUICKSTART.md)** · **[Architecture](docs/ARCHITECTURE.md)** · **[Roadmap](docs/ROADMAP.md)** · **[Status](docs/STATE.md)**
+**[Documentation](https://forge-cms.pages.dev/docs)** · **[Server quickstart](apps/www/src/content/docs/server-quickstart.md)** · **[Angular quickstart](apps/www/src/content/docs/angular-quickstart.md)** · **[Reference](docs/REFERENCE.md)** · **[Support](docs/SUPPORT.md)** · **[Security](SECURITY.md)**
 
 </div>
 
 ---
 
-> [!WARNING]
-> ForgeCMS is pre-1.0 (npm `0.12.0`). The fundamentals — schema DSL, Local API, HTTP handlers, access
-> control, hooks, drafts, versions, globals, live preview, localization, relations, and a reusable
-> Angular admin — are usable and exercised by real consumer apps in this repo, but API stability is
-> not guaranteed before `1.0`. See [docs/STATE.md](docs/STATE.md) for exactly what is implemented and
-> [docs/ROADMAP.md](docs/ROADMAP.md) for what remains before `1.0`.
+> [!NOTE]
+> **Status.** The eleven `@forge-cms/*` packages are published as one fixed family; the current release is **`0.13.3`**. The 1.0 public
+> surface is frozen ([docs/1.0-PUBLIC-SURFACE.md](docs/1.0-PUBLIC-SURFACE.md)) and the 1.0 release candidate is the next step — ForgeCMS is
+> **not released as 1.0 yet**. Until then a minor release may still change the frozen surface only to fix a release blocker. What is proven, by
+> which gate, and what is deliberately out of scope: [docs/1.0-RELEASE-DOSSIER.md](docs/1.0-RELEASE-DOSSIER.md) and
+> [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
 
-## What Is ForgeCMS?
+## What is ForgeCMS?
 
-ForgeCMS is a generic CMS foundation for TypeScript applications. You define collections in code,
-create a runtime, choose adapters for database/auth/storage, and expose either the Local API or the
-framework-agnostic HTTP handlers from your own server.
+ForgeCMS is a **code-first headless CMS for Angular and Analog.js developers**. You describe your content in TypeScript; that one
+definition drives the database schema, validation, a REST API, the types your Angular app receives and the forms of a reusable admin.
+There is no GUI schema builder, no code generation step and no second language.
 
-It is not tied to Analog. The current repository includes Analog apps and Angular packages because
-Angular/Analog and Cloudflare are first-class targets, but the core/runtime packages stay framework
-agnostic.
+- **Audience:** TypeScript/Node developers who want a CMS they own (server-only use is fully supported), and Angular/Analog developers who want a
+  CMS that is Angular-native instead of a React admin next to their app.
+- **Product inspiration:** [Payload](https://payloadcms.com) — config-as-code collections, a Local API, access functions. ForgeCMS is **not** a Payload clone and
+  does not claim feature parity; it has no GraphQL, plugin system, page builder or CLI (see [limitations](docs/LIMITATIONS.md)).
+- **Where it runs:** Cloudflare Pages/Workers with D1 + R2, or Node with on-disk libSQL + an S3-compatible bucket. Both profiles are built from the packed
+  public packages and exercised in CI; the Cloudflare profile was also rehearsed on isolated real Cloudflare staging with a backup and an isolated restore.
+  See the [deployment matrix](docs/MATRICES.md#deployment-profiles).
+- **Supported baseline:** Node >= 22, pnpm 10, TypeScript 5.9 strict, Angular 21 (client also on Angular 22), Analog.js 2 — exact ranges and the versions
+  actually tested are in [docs/SUPPORT.md](docs/SUPPORT.md).
 
 ## Install
 
-```sh
-pnpm add @forge-cms/core @forge-cms/runtime @forge-cms/db @forge-cms/auth @forge-cms/storage
-```
-
-Optional integrations:
+Server only (no Angular, no admin):
 
 ```sh
-pnpm add @forge-cms/cloudflare   # D1 and R2 adapters
-pnpm add @forge-cms/s3           # S3-compatible storage adapter (portable Node profile)
-pnpm add @forge-cms/angular      # Angular client SDK
-pnpm add @forge-cms/admin        # Angular admin components
+pnpm add @forge-cms/core @forge-cms/runtime @forge-cms/db @forge-cms/auth @forge-cms/storage @forge-cms/api
 ```
 
-## Minimal Runtime
+Add what your profile needs:
+
+```sh
+pnpm add @forge-cms/cloudflare   # D1 + R2 (Cloudflare profile)
+pnpm add @forge-cms/s3           # S3-compatible storage (portable profile)
+pnpm add @forge-cms/angular      # typed Angular client, session, guard, signal resources
+pnpm add @forge-cms/admin        # reusable Angular admin (Angular 21)
+pnpm add -D @forge-cms/testing   # adapter contract suites, if you write an adapter
+```
+
+## A schema, a runtime, the Local API
 
 ```ts
 import { defineCollection, defineField } from '@forge-cms/core';
-import { InMemoryAuthAdapter } from '@forge-cms/auth';
-import { InMemoryDatabaseAdapter } from '@forge-cms/db';
+import { UsersCollectionAuthAdapter, defineUsersCollection } from '@forge-cms/auth';
+import { LibSqlDatabaseAdapter } from '@forge-cms/db';
 import { ForgeCmsRuntime } from '@forge-cms/runtime';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 
+const users = defineUsersCollection();
 const notes = defineCollection({
   slug: 'notes',
   fields: {
     title: defineField.text({ required: true }),
-    data: defineField.json()
-  }
+    author: defineField.relation({ collection: 'users', required: true })
+  },
+  access: { read: () => true, create: ({ user }) => user?.role === 'admin' }
 });
 
+const database = new LibSqlDatabaseAdapter('file:./forge.db');
+const auth = new UsersCollectionAuthAdapter().init({
+  AUTH_SECRET: process.env.AUTH_SECRET,
+  userDatabase: database
+});
 const runtime = new ForgeCmsRuntime({
-  collections: [notes],
-  adapters: {
-    database: new InMemoryDatabaseAdapter(),
-    auth: new InMemoryAuthAdapter(),
-    storage: new InMemoryStorageAdapter()
-  }
+  collections: [users, notes],
+  adapters: { database, auth, storage: new InMemoryStorageAdapter() }
 });
 
 runtime.init();
 await runtime.syncSchema();
-
-const created = await runtime.create({
-  collection: 'notes',
-  data: { title: 'Hello ForgeCMS', data: { source: 'readme' } }
-});
-
 const { docs } = await runtime.find({ collection: 'notes' });
 ```
 
-See [docs/QUICKSTART.md](docs/QUICKSTART.md) for HTTP handler setup, Cloudflare notes, and Angular
-usage.
+This is a sketch; the complete, verified version (first admin, access enforced, HTTP handlers) is the
+[server quickstart](apps/www/src/content/docs/server-quickstart.md). Business logic lives in the Local API; the HTTP handlers are a thin transport.
 
-## What ForgeCMS Delivers Today
+## Two ways to start
 
-Verified from packed npm artifacts (`pnpm release:verify`) and real consumer apps in this repo
-(`apps/tiny-project`, `apps/demo-aesthetics`, `apps/www`):
+| You are…                      | Start with                                                                   | Installs                                                       |
+| ----------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| A server/TypeScript developer | [Server quickstart](apps/www/src/content/docs/server-quickstart.md)          | core · db · auth · storage · api · runtime — no Angular at all |
+| An Angular/Analog developer   | [Angular/Analog quickstart](apps/www/src/content/docs/angular-quickstart.md) | the above + `@forge-cms/angular` + `@forge-cms/admin` + peers  |
 
-- schema definitions with `defineCollection`/`defineField`, including composite fields (group,
-  array, blocks) and relations (with `depth: 1` population)
-- collection CRUD, `findOne`, nested `and`/`or` queries, and multi-field sort through a Local API
-  that infers typed documents from your collection definitions
-- framework-agnostic HTTP handlers with a stable response envelope
-- runtime validation, the full hook pipeline, and function-based row/field-level access control
-- drafts, document versions with restore, live preview, globals, and localization — all enforcing
-  the same access/draft/field policy as ordinary reads and writes
-- relation integrity (`restrict`/`cascade`/`set-null` on delete), including self-relations
-- browser auth (signup/signin/logout/session cookies, CSRF) and machine auth (scoped API keys)
-- in-memory, LibSQL, and Cloudflare D1 database adapters (shared contract test suite); R2 storage
-- a reusable Angular admin (`@forge-cms/admin`) covering content, users, and auth, embeddable under a
-  host app's own routes — not a skeleton, and not a redesign target
-- adapter contract tests through `@forge-cms/testing/contracts`
+Both quickstarts are executable: `pnpm docs:verify:consumers` installs each one from the packed tarballs into a clean project and builds and runs it.
 
-Upgrade safety (roadmap 0.7): schema drift detection (`runtime.planSchema()`, and a `syncSchema()`
-that refuses unsafe drift instead of half-applying it, since `0.8.0`), reviewed migrations
-(`runtime.runMigrations()`, since `0.8.1`) that apply that drift exactly once, atomically, with a
-durable history, and a release-gating rehearsal (`pnpm test:upgrade`): databases written by `0.4.0`,
-`0.6.0` and `0.8.0` upgrade on libSQL and local D1/R2, and an upgraded installation is backed up and
-restored into an empty environment. See [docs/SCHEMA-UPGRADES.md](docs/SCHEMA-UPGRADES.md) and
-[docs/BACKUP-RESTORE.md](docs/BACKUP-RESTORE.md).
+## What you get
 
-Portable storage and deployment profiles (roadmap 0.10, complete): `@forge-cms/s3` (an S3-API `StorageAdapter`,
-published in `0.11.0`) completes **two durable production profiles** — **Cloudflare** (D1 + R2) and **portable
-Node** (on-disk libSQL + S3-compatible storage). Each is built from packed public packages, production-built, and
-walked through auth, admin, SSR, a multipart upload, access-checked file serving, a restart and an isolated
-backup/restore. CI certifies Cloudflare against local workerd + local D1 + local R2 (not a remote deployment) and
-S3 against Garage `v2.4.1`; AWS S3, Backblaze B2 and Wasabi are configurable but not CI-certified. A production
-build never silently falls back to in-memory adapters. See
-[Deployment](apps/www/src/content/docs/deployment.md) and [docs/BACKUP-RESTORE.md](docs/BACKUP-RESTORE.md).
+Schema DSL with 15 field kinds (including `group`, `array`, `blocks`) · Local API and REST · function-based row and field access · the full hook
+pipeline · drafts, versions with restore, globals, live preview and localization · relations with `restrict`/`cascade`/`set-null` integrity ·
+browser sessions with CSRF, scoped API keys, roles · uploads through R2 or S3 · schema drift detection and reviewed migrations · backup/restore
+procedures · a typed Angular client with signal resources and SSR support · a reusable Angular admin. The honest per-capability status (stable,
+experimental, intentionally limited) is the [feature matrix](docs/MATRICES.md#feature-matrix).
 
-Try it: the [Lumea clinic demo](https://forge-cms-demo.pages.dev) (a real site built on the CMS,
-source in [`apps/demo-aesthetics`](apps/demo-aesthetics)) and the docs at
-[forge-cms.pages.dev](https://forge-cms.pages.dev/docs).
+## Packages
+
+All eleven are versioned together (one Changesets fixed group), ESM-only, and imported only through their entry points.
+
+| Package                                        | Purpose                                                                             |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [`@forge-cms/core`](packages/core)             | Schema DSL, collection/global definitions, validation, base types                   |
+| [`@forge-cms/db`](packages/db)                 | Database contract, InMemory and libSQL adapters, schema planning, migrations        |
+| [`@forge-cms/auth`](packages/auth)             | Auth contract; users-collection sessions, API keys, composite/external adapters     |
+| [`@forge-cms/storage`](packages/storage)       | Storage contract and InMemory adapter                                               |
+| [`@forge-cms/s3`](packages/s3)                 | S3-API storage adapter (portable profile; Garage certified)                         |
+| [`@forge-cms/api`](packages/api)               | `ApiContext` and handler contracts                                                  |
+| [`@forge-cms/runtime`](packages/runtime)       | `ForgeCmsRuntime` (Local API) and framework-agnostic HTTP handlers                  |
+| [`@forge-cms/cloudflare`](packages/cloudflare) | D1 + R2 adapters (and experimental Analytics Engine)                                |
+| [`@forge-cms/angular`](packages/angular)       | Angular client SDK: `provideForgeCms`, typed client, session, guard, resources, SSR |
+| [`@forge-cms/admin`](packages/admin)           | Reusable Angular admin: layout, content, auth pages, users workspace                |
+| [`@forge-cms/testing`](packages/testing)       | Adapter contract suites                                                             |
+
+Every export, option and default: [docs/REFERENCE.md](docs/REFERENCE.md).
+
+## Deployment profiles
+
+| Profile    | Database       | Files                                       | Evidence                                                                                                                                                            |
+| ---------- | -------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cloudflare | D1             | R2                                          | Adapter contracts · local workerd/D1/R2 · packed production consumer · **isolated real Cloudflare staging** with redeploy persistence and backup → isolated restore |
+| Portable   | on-disk libSQL | `@forge-cms/s3` — Garage `v2.4.1` certified | Packed Node production server · restart persistence · upload/read/delete · backup/restore                                                                           |
+
+AWS S3, Backblaze B2 and Wasabi are configurable but **not certified**. Staging evidence supports the framework/profile; it is not a guarantee for any
+particular production deployment. A production build never silently falls back to in-memory adapters. Details: [deployment](https://forge-cms.pages.dev/docs/deployment),
+[docs/STAGING-REHEARSAL.md](docs/STAGING-REHEARSAL.md), [docs/BACKUP-RESTORE.md](docs/BACKUP-RESTORE.md).
 
 ## Versions and roadmap checkpoints
 
 Two separate numbering schemes:
 
-- **npm versions.** The eleven public packages are one fixed Changesets group; they always share a
-  version. The current release is **`0.12.0`** (admin reliability, roadmap 0.11 U01). The numbers are offset from the
-  roadmap: npm `0.8.x` was roadmap 0.7 (upgrade safety), `0.9.0` roadmap 0.8 (Angular DX), `0.10.x` roadmap 0.9
-  (SSR), `0.11.x` roadmap 0.10 (portable storage and deployment profiles) and `0.12.x` is roadmap 0.11 (admin).
-- **Roadmap checkpoints** ([docs/ROADMAP.md](docs/ROADMAP.md)) are product guarantees. Roadmaps 0.6 – 0.10
-  are complete; the next bounded responsibility is roadmap 0.11 / U01 (reliable content state and failure
-  recovery).
+- **npm versions.** The eleven packages always share one version; the latest is **`0.13.3`**. They are not the roadmap numbers.
+- **Roadmap checkpoints** ([docs/ROADMAP.md](docs/ROADMAP.md)) are product guarantees (0.5 → 0.12, then the 1.0 release). Roadmaps 0.5–0.12 are
+  complete; the next bounded responsibility is the 1.0 release candidate (L01 in [docs/roadmap/v1/1.0-release.md](docs/roadmap/v1/1.0-release.md)).
 
-A package version does not certify a roadmap checkpoint; the offset above is deliberate and documented.
+What is implemented right now is [docs/STATE.md](docs/STATE.md); what the 1.0 release will stand on is [docs/1.0-RELEASE-DOSSIER.md](docs/1.0-RELEASE-DOSSIER.md).
 
-## Packages
+## Help, support and security
 
-All public packages are versioned together.
+- Documentation: <https://forge-cms.pages.dev/docs> · troubleshooting: [/docs/troubleshooting](apps/www/src/content/docs/troubleshooting.md)
+- Bugs and questions: [GitHub issues](https://github.com/Andersseen/ForgeCMS/issues) — see [docs/SUPPORT.md](docs/SUPPORT.md) for what is supported and the semver/deprecation policy.
+- **Security problems:** do not open a public issue with exploit details — read [SECURITY.md](SECURITY.md).
 
-| Package                                        | Purpose                                                             |
-| ---------------------------------------------- | ------------------------------------------------------------------- |
-| [`@forge-cms/core`](packages/core)             | Schema DSL, collection/global definitions, validation, base types   |
-| [`@forge-cms/db`](packages/db)                 | Database contract, InMemory and LibSQL adapters, SQL schema helpers |
-| [`@forge-cms/auth`](packages/auth)             | Auth contract and built-in auth adapters                            |
-| [`@forge-cms/storage`](packages/storage)       | Storage contract and InMemory adapter                               |
-| [`@forge-cms/api`](packages/api)               | `ApiContext` and HTTP handler contracts                             |
-| [`@forge-cms/runtime`](packages/runtime)       | Runtime orchestrator, Local API, HTTP handlers                      |
-| [`@forge-cms/s3`](packages/s3)                 | S3-compatible storage adapter (since `0.11.0`)                      |
-| [`@forge-cms/cloudflare`](packages/cloudflare) | Cloudflare D1 and R2 adapters                                       |
-| [`@forge-cms/angular`](packages/angular)       | Angular client SDK                                                  |
-| [`@forge-cms/admin`](packages/admin)           | Reusable Angular admin components (content, users, auth)            |
-| [`@forge-cms/testing`](packages/testing)       | Adapter contract test suites                                        |
-
-They share one version (currently `0.11.0` on npm); see each package's `CHANGELOG.md` for what
-changed.
-
-## Schema Synchronization
-
-`runtime.syncSchema()` creates missing tables and adds missing columns; it never drops, renames,
-retypes or backfills data. Since `0.8.0` it first **plans**: safe additive changes run in one
-transaction, and anything that needs a data migration throws `SchemaDriftError` with nothing
-executed. `runtime.planSchema()` shows the plan without changing anything. The refused changes are
-applied by reviewed migrations, `runtime.runMigrations(migrations)`, run from a deploy script and
-never at startup (on `main`, next patch release). See [docs/SCHEMA-UPGRADES.md](docs/SCHEMA-UPGRADES.md).
-
-## Strata
-
-ForgeCMS does not depend on [Strata](https://github.com/Andersseen/Strata). `apps/tiny-project`
-installs the published `@strata-sc/core`/`@strata-sc/analog` packages as an external consumer and
-serves its two read routes (`GET /api/v1/:collection[/:id]`) through Strata controllers that delegate
-to Forge's handlers. Strata owns the transport; Forge owns CMS behaviour. Mutations stay on H3 until
-Strata exposes the Web `Request`. Strata Server Components are not used anywhere in this repository.
-
-## Developing This Repository
+## Developing this repository
 
 ```sh
 git clone https://github.com/Andersseen/ForgeCMS.git
@@ -193,29 +171,13 @@ pnpm build
 pnpm dev:www
 ```
 
-Common commands:
+Quality gates, the spec-driven workflow, Changesets and the CI-driven release are in [CONTRIBUTING.md](CONTRIBUTING.md), [CLAUDE.md](CLAUDE.md) and
+[docs/SDD.md](docs/SDD.md). Try the [Lumea clinic demo](https://forge-cms-demo.pages.dev) (source in [`apps/demo-aesthetics`](apps/demo-aesthetics)).
 
-```sh
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
-pnpm test:cloudflare   # real local D1/R2 via Miniflare — no account or credentials needed
-pnpm test:libsql       # real libSQL database, no Cloudflare binding at all
-pnpm release:verify
-pnpm e2e:www
-pnpm e2e:tiny-project
-pnpm e2e:demo
-```
+## Strata
 
-Before release, `pnpm release:verify` packs every public package and installs those tarballs into
-isolated external consumer projects. This is the publish gate that catches workspace-only mistakes.
-
-## Contributing
-
-Non-trivial changes start with a spec in [docs/specs](docs/specs). See [CLAUDE.md](CLAUDE.md),
-[docs/SDD.md](docs/SDD.md), and [CONTRIBUTING.md](CONTRIBUTING.md). Changes under `packages/*`
-require a changeset after the first public baseline.
+ForgeCMS does not depend on [Strata](https://github.com/Andersseen/Strata) and Strata is **not part of the ForgeCMS 1.0 API**. `apps/tiny-project` installs the
+published Strata packages as an external consumer to dogfood them; Forge owns CMS behaviour. Strata Server Components are not used and are not a 1.0 feature.
 
 ## License
 

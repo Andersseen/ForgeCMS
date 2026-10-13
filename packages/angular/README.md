@@ -1,5 +1,9 @@
 # @forge-cms/angular
 
+**Who needs it:** an Angular/Analog app that talks to a ForgeCMS server. **Boundary:** browser + SSR (`/server` is server-rendering only; `/vite` is
+build-time only). **Status:** stable 1.0 candidate; the Analytics exports are experimental. Reference:
+[docs/REFERENCE.md](../../docs/REFERENCE.md#forge-cmsangular) · start here: <https://forge-cms.pages.dev/docs/angular-quickstart>.
+
 Angular client SDK for ForgeCMS.
 
 ```sh

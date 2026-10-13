@@ -74,7 +74,7 @@ also no signal/`resource()` surface, so every page hand-rolls loading/error stat
 
 - **Cost:** the entire public site talks to purpose-built endpoints via raw `fetch`
   ([`site-api.service.ts`](../apps/demo-aesthetics/src/app/services/site-api.service.ts)), and the
-  admin needed a second service ([`admin-api.service.ts`](../apps/demo-aesthetics/src/app/services/admin-api.service.ts))
+  admin needed a second service (`apps/demo-aesthetics/src/app/services/admin-api.service.ts` (since removed))
   just to build query strings. Loading state is a home-grown helper
   ([`async-state.ts`](../apps/demo-aesthetics/src/app/pages/site/async-state.ts)) repeated in seven pages.
 - **Why it matters more than it looks:** this is the package that is supposed to be the reason to
@@ -111,7 +111,7 @@ already live.
 "structurally identical to a single relation", but population does not treat it as one — so every
 image came back as a bare UUID.
 
-- **Workaround:** [`uploads.ts`](../apps/demo-aesthetics/src/server/api/uploads.ts) — a 30-line
+- **Workaround:** `apps/demo-aesthetics/src/server/api/uploads.ts` (since removed) — a 30-line
   re-implementation of the batching `populate.ts` already does.
 - **Fixed (spec 040).** `populate.ts` resolves `upload` as the single relation it is. The demo's
   `uploads.ts` is gone, and the site's endpoints just pass `depth: 1`.
