@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm exec wrangler pages deploy *forge-cms-r03-*)",
+      "Bash(pnpm exec wrangler pages * forge-cms-r03-*)",
+      "Bash(pnpm exec wrangler d1 * forge-cms-r03-*)",
+      "Bash(pnpm exec wrangler r2 * forge-cms-r03-*)",
+      "Bash(pnpm exec wrangler deploy *forge-cms-r03-*)",
+      "Bash(pnpm exec wrangler delete *forge-cms-r03-*)",
+      "Bash(pnpm staging *)"
+    ]
+  }
+}
