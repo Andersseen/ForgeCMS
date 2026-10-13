@@ -30,8 +30,9 @@ const STATUS_LABELS: Record<MilestoneStatus, string> = {
               Built in the open. Getting stronger.
             </h2>
             <p class="mt-5 max-w-[48ch] leading-7 text-white/65">
-              The foundations below are complete. Safe SSR and hydration, portable S3 storage and
-              admin certification are the next steps toward 1.0. ForgeCMS remains experimental.
+              Every checkpoint below is complete: upgrade safety, the Angular client, SSR, portable
+              S3 storage, the admin and packed-artifact certification. A 1.0 release candidate is
+              next; until it ships, ForgeCMS is a 1.0 candidate, not a released 1.0.
             </p>
             <a
               voltButton

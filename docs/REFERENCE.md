@@ -115,13 +115,13 @@ password change invalidates every earlier session (`_sessionVersion`). The users
 
 **Important options.**
 
-| Option           | Default              | Meaning                                                                                |
-| ---------------- | -------------------- | -------------------------------------------------------------------------------------- |
-| `bucket`         | required             | Existing bucket; Forge never creates buckets or policies                               |
-| `region`         | required, no default | Signing region (Garage publishes its own value)                                        |
-| `endpoint`       | AWS S3               | Absolute `http(s)` URL of an S3-compatible service; `http:` for local/test only        |
-| `credentials`    | SDK provider chain   | `{ accessKeyId, secretAccessKey, sessionToken? }`                                      |
-| `forcePathStyle` | `false`              | Many self-hosted services need `true`                                                  |
+| Option           | Default              | Meaning                                                                                              |
+| ---------------- | -------------------- | ---------------------------------------------------------------------------------------------------- |
+| `bucket`         | required             | Existing bucket; Forge never creates buckets or policies                                             |
+| `region`         | required, no default | Signing region (Garage publishes its own value)                                                      |
+| `endpoint`       | AWS S3               | Absolute `http(s)` URL of an S3-compatible service; `http:` for local/test only                      |
+| `credentials`    | SDK provider chain   | `{ accessKeyId, secretAccessKey, sessionToken? }`                                                    |
+| `forcePathStyle` | `false`              | Many self-hosted services need `true`                                                                |
 | `publicUrlBase`  | `/api/media`         | Base of `getPublicUrl()`; a direct bucket/CDN base bypasses the runtime file handler's access checks |
 
 **Errors.** A missing object reads as `null` (HTTP 404 from the runtime file handler); an unreachable bucket or rejected credentials surface as a generic `500` that names no bucket, endpoint or key.

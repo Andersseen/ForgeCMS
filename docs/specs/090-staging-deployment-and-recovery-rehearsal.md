@@ -68,6 +68,9 @@ local profile fail-closed tests (`apps/tiny-project/src/tests/storage-selection.
 
 ## Outcome
 
+> **Current-truth note (2026-10-13, added by spec 091; the record below is otherwise unedited).** R03 is **complete**: the remote rehearsal ran on 2026-10-12 (section _Remote rehearsal_ below), PR #95 and PR #96 are merged, and
+> the R03 runtime fix is published in `0.13.3`. The sentence that follows was true when the preparation PR was written and is kept as history.
+
 **R03 is PREPARED — remote staging gate pending explicit authorization. It is not complete.** Nothing below claims remote success.
 
 ### Current-truth note (2026-10-12) — the Candidate section below is historical

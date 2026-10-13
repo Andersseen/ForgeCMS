@@ -224,3 +224,8 @@ operation. Keep the routes thin — logic belongs in the Local API.
 Composite fields carry their nested structure (`fields`, `blocks`, `minRows`, `maxRows`), which is
 why the admin can render arbitrarily nested groups, arrays and blocks without knowing your schema at
 build time.
+
+**What the metadata endpoint does not list.** Metadata describes shape, never values, and it does not advertise internal storage: a field that no role can read or write
+(`access: { read: [], write: [] }` — for example the users collection's `passwordHash` and `_sessionVersion`) is omitted for every caller, anonymous included (since `0.13.3`; before it the
+two _names_ appeared in anonymous metadata, never their values). Admin forms are unaffected because nobody could edit those fields. Field-level `access` rules that depend on the caller
+still apply to values on every read.

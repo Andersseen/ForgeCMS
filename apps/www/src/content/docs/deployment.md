@@ -9,10 +9,10 @@ ForgeCMS has **two official durable production profiles**. Each is complete — 
 admin, server-rendered public pages, uploads — and each is exercised in CI from packed public packages
 through a production build, a browser journey, a restart and a backup/restore.
 
-| Profile        | Database                | Files                           | Runtime                           | CI evidence                                                   |
-| -------------- | ----------------------- | ------------------------------- | --------------------------------- | ------------------------------------------------------------- |
-| **Cloudflare** | D1 (`DB` binding)       | R2 (`BUCKET` binding)           | Cloudflare Pages / Workers        | **Local** workerd + local D1 + local R2 (not a remote deploy) |
-| **Portable**   | libSQL (`DATABASE_URL`) | S3-compatible (`@forge-cms/s3`) | Node (`node-server` Nitro preset) | On-disk libSQL + real Garage `v2.4.1` S3 service              |
+| Profile        | Database                | Files                           | Runtime                           | CI evidence                                                                          |
+| -------------- | ----------------------- | ------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------ |
+| **Cloudflare** | D1 (`DB` binding)       | R2 (`BUCKET` binding)           | Cloudflare Pages / Workers        | Local workerd + D1 + R2 in CI, **and** an isolated real Cloudflare staging rehearsal |
+| **Portable**   | libSQL (`DATABASE_URL`) | S3-compatible (`@forge-cms/s3`) | Node (`node-server` Nitro preset) | On-disk libSQL + real Garage `v2.4.1` S3 service                                     |
 
 > **Production never silently falls back to memory.** `InMemoryDatabaseAdapter` and `InMemoryStorageAdapter` are
 > development and test adapters: they prove nothing about durability. A deployment must be built from exactly
@@ -22,8 +22,21 @@ through a production build, a browser journey, a restart and a backup/restore.
 > [`profile.ts`](https://github.com/Andersseen/ForgeCMS/blob/main/apps/tiny-project/src/server/api/profile.ts) is the tested reference).
 
 **Certified S3-compatible service:** Garage `v2.4.1` (pinned image digest) in CI. AWS S3, Backblaze B2 and
-Wasabi are _configurable_ through the same options but **not** CI-certified. Remote Cloudflare deployments are
-not certified by the CI gate either — only local workerd, D1 and R2 are.
+Wasabi are _configurable_ through the same options but **not** CI-certified.
+
+### What "certified" means here — five evidence layers
+
+Keep these separate; each proves something different, and none replaces the next:
+
+1. **Mock/unit adapter tests** — the D1/R2 adapters against hand-written fakes.
+2. **Local real bindings** — the same adapters against real local workerd + D1 + R2 (`pnpm test:cloudflare`), and libSQL + Garage for the portable profile.
+3. **Packed production consumer** — the production build of an external app installed from the packed public packages, walked through login, content, upload, restart and backup/restore.
+4. **Isolated remote staging** — the Cloudflare profile was rehearsed on real, isolated Cloudflare resources (Pages + D1 + R2): real origin, auth/CSRF, content and files, persistence across a
+   same-commit redeploy, remote D1 query-boundary checks, a D1 export with a snapshot-derived R2 copy, and a restore into empty resources, with clean logs. This is **certified on isolated Cloudflare staging**
+   ([spec 090](https://github.com/Andersseen/ForgeCMS/blob/main/docs/specs/090-staging-deployment-and-recovery-rehearsal.md), runbook: [STAGING-REHEARSAL.md](https://github.com/Andersseen/ForgeCMS/blob/main/docs/STAGING-REHEARSAL.md)).
+5. **Your own production deployment** — yours to verify with the [health checks](https://github.com/Andersseen/ForgeCMS/blob/main/docs/DEPLOYMENT-HEALTH.md) and a restore rehearsal.
+
+Layer 4 is evidence for the framework and the profile. It is not a guarantee for every production deployment and not an SLA.
 
 ## Profile A — Cloudflare (D1 + R2)
 
@@ -299,8 +312,10 @@ machine auth, one full HTTP request/response path, and R2 — against a **real l
 binding** (Miniflare/workerd), with no Cloudflare account, credentials, or remote resources
 required. That's what "locally verified against real Workers bindings" means throughout this repo's
 docs: proven against the real engine running on your machine or in CI, not a simulation of it. It is
-**not** the same claim as a verified remote production deployment — that's still only checked by the
-`curl`-and-inspect step above, run by a maintainer after a real deploy.
+**not** the same claim as a verified remote deployment. That claim is the isolated Cloudflare staging
+rehearsal (layer 4 above, spec 090), run once against the release candidate source and repeatable with the
+[staging runbook](https://github.com/Andersseen/ForgeCMS/blob/main/docs/STAGING-REHEARSAL.md); your own production
+deployment is verified by the `curl`-and-inspect step above.
 
 ## Server-rendered production (SSR)
 

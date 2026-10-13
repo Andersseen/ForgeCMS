@@ -5,8 +5,9 @@ group: Getting started
 order: 2
 ---
 
-ForgeCMS is an experimental, TypeScript-native CMS foundation — API stability is not guaranteed
-before `1.0`. Start from your own repository:
+This is the smallest possible ForgeCMS: the Local API with in-memory adapters, nothing durable. For a real project
+follow the verified [Server quickstart](/docs/server-quickstart) (libSQL, first admin, access control) or the
+[Angular/Analog quickstart](/docs/angular-quickstart) (admin included). Start from your own repository:
 
 ```sh
 pnpm add @forge-cms/core @forge-cms/runtime @forge-cms/db @forge-cms/auth @forge-cms/storage

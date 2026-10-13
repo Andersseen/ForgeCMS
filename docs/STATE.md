@@ -1,15 +1,17 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-12 (spec 090 / roadmap 0.12 R03 — staging deployment and recovery rehearsal — COMPLETE on
-> `feature/spec-090-remote-staging-closeout`).** Roadmap 0.12: **R01 ✓ R02 ✓ R03 ✓, R04 pending.** The authorized remote rehearsal ran on isolated
-> `forge-cms-r03-*` Cloudflare resources: real-origin health/auth/CSRF/content/R2 journey, same-commit redeploy persistence, remote K3 (80/99/100/120/400
-> → `200`), clean logs, quiesced D1 export + snapshot-derived R2 copy, and an isolated restore (identical rows, clean schema plan, idempotent
-> `reconcileStorage()`, new write). One patch fix (`@forge-cms/runtime`: anonymous collection metadata no longer lists `access: { read: [], write: [] }`
-> fields) → pending release as the next patch; website `CURRENT_FORGE_VERSION` stays `0.13.2` until it publishes. Published now: `0.13.2` (npm `latest`,
-> GitHub `v0.13.2`, main CI `38143496339` ✓). Caveats (spec 090 Outcome): `/studio/login` form not driven in a browser, no migrations in the fixture,
-> S3/certify for this candidate come from the closeout PR's CI (no Docker here). Staging retained; restore and the copy Worker deleted.
-> **Next bounded responsibility: roadmap 0.12 / R04 — Consumer documentation and release dossier (not started).**
-> _Previous header (same day, before the remote run):_ R03 prepared, remote gate pending; release truth reconciled to `0.13.2`.
+> **Last updated: 2026-10-13 (spec 091 / roadmap 0.12 R04 — consumer documentation and release dossier — COMPLETE on
+> `feature/spec-091-consumer-docs-release-dossier`).** Roadmap 0.12 is **complete: R01 ✓ R02 ✓ R03 ✓ R04 ✓.** ForgeCMS is **not released as 1.0**; no release
+> candidate exists. Release truth: PR #95 (R03 closeout) and PR #96 (Version Packages) are merged; main `7aa8fa3` CI `38262008765` ✓ (checks, certify, reliability,
+> Pages deployments, npm release); all eleven packages are published as **`0.13.3`** (npm `latest`, GitHub release), which **includes** the R03 runtime metadata fix
+> (anonymous collection/global metadata no longer lists fields nobody can read or write — names only, never values). Website `CURRENT_FORGE_VERSION = '0.13.3'`.
+> R04 delivered: two executable quickstarts (`docs/examples/*`, `pnpm docs:verify:consumers`), the docs gate (`pnpm docs:verify`), `docs/REFERENCE.md`, `docs/MATRICES.md`,
+> `docs/SUPPORT.md`, `docs/LIMITATIONS.md`, `docs/MIGRATING-TO-1.0.md`, `SECURITY.md`, the website pages `server-quickstart`/`angular-quickstart`/`troubleshooting`, rewritten
+> README/CONTEXT/CONTRIBUTING/package READMEs, and `docs/1.0-RELEASE-DOSSIER.md`. A patch changeset covers the package READMEs (expected `0.13.4` only through a normal Version Packages PR;
+> nothing is published by this branch). **Next bounded responsibility: L01 — Produce and validate a ForgeCMS 1.0 release candidate**
+> ([roadmap/v1/1.0-release.md](roadmap/v1/1.0-release.md)), starting from the dossier's section L and its blocker J1 (no private vulnerability-reporting channel is enabled yet).
+> _Previous header (2026-10-12, R03):_ R03 complete on `feature/spec-090-remote-staging-closeout` with the runtime patch pending and `0.13.2` current — superseded by the above; its evidence
+> is in spec 090's Outcome.
 > _Historical (pre-#94) header, kept for evidence:_ R03 prepared on `feature/spec-090-staging-recovery-rehearsal`; published `0.13.0`;
 > PR #92 (`0.13.1`) then open; not run there: `pnpm test:s3`, `pnpm release:certify`, remote staging.
 > _Previous header:_ 2026-10-10 (spec 089 / R02 — merged as PR #91 `64322dd`, main CI `38080646922` ✓).
@@ -2354,7 +2356,10 @@ ARCHITECTURE.md: `{ error: string, details?: ValidationError[] }`.
 - `wrangler.toml`: Pages config, output `apps/www/dist/analog/public` (Nitro `cloudflare-pages`
   preset — includes `_worker.js`, the compiled API server), `nodejs_compat`.
 
-## Known issues / debt (verified 2026-07-22)
+## Known issues / debt (verified 2026-07-22) — HISTORICAL
+
+> **Superseded 2026-10-13.** This list predates most of the product (several items below — relation picker, globals, localization, referential integrity — shipped long ago). The current,
+> classified issue list is [1.0-RELEASE-DOSSIER.md §J](1.0-RELEASE-DOSSIER.md#j-open-issues--classification). Kept as written for the record.
 
 1. ~~`handleUpdate` partial-validation bug~~ — **fixed 2026-07-19.** Required fields already present on
    the stored record are no longer required in a partial PUT body.

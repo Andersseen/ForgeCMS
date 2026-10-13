@@ -1,5 +1,11 @@
 # ROADMAP — A small, dependable ForgeCMS 1.0
 
+> **2026-10-13 (spec 091):** **Roadmap 0.12 / R04 — Consumer documentation and release dossier — is complete, and with it roadmap 0.12 (R01–R04).** A developer outside the monorepo
+> can follow two verified quickstarts (server-only; Angular/Analog + admin — each built from the packed tarballs in a clean project, `pnpm docs:verify:consumers`); the reference, field/feature/deployment
+> matrices, support/semver/deprecation policy, limitations, troubleshooting, the 0.x → 1.0 migration guide and `SECURITY.md` exist and are checked (`pnpm docs:verify`); stale pre-release claims are gone;
+> and `docs/1.0-RELEASE-DOSSIER.md` maps every 1.0 commitment to evidence and lists what L01 must seal. The published family is `0.13.3` (it includes the R03 metadata fix). **ForgeCMS is not released as 1.0
+> and no release candidate exists.** **Next bounded responsibility: L01 — Produce and validate a ForgeCMS 1.0 release candidate** ([roadmap/v1/1.0-release.md](roadmap/v1/1.0-release.md)).
+>
 > **2026-10-12 (spec 090):** **Roadmap 0.12 / R03 — Rehearse deployment and recovery — is complete.** An authorized, isolated Cloudflare staging
 > (`forge-cms-r03-*`: Pages + D1 + R2) served the real HTTPS origin: health, first admin from an empty D1, login/cookie/CSRF, draft → publish → edit,
 > an R2 upload with exact bytes and private/public semantics, same-commit redeploy persistence, the remote K3 sizes 80/99/100/120/400 (all `200`) and a
@@ -7,7 +13,7 @@
 > empty D1/R2/Pages with identical rows, a clean schema plan, idempotent `reconcileStorage()` and a working new write. It found and fixed one patch
 > defect (the anonymous collections metadata advertised the internal `passwordHash`/`_sessionVersion` field names) and hardened the copy Worker; one
 > operator slip (a first deploy made with the repository-root Wrangler config) is disclosed in the spec. Caveats are recorded in the spec's Outcome.
-> **0.12: R01 ✓, R02 ✓, R03 ✓; R04 pending. Next bounded responsibility: roadmap 0.12 / R04 — Consumer documentation and release dossier.**
+> **0.12: R01 ✓, R02 ✓, R03 ✓ (R04 followed on 2026-10-13, above).**
 >
 > **2026-10-10 (spec 089):** **Roadmap 0.12 / R02 — Close measurable reliability gaps — is complete.** Coverage is now
 > per package and source-attributed (`pnpm test:coverage`, the QUALITY floors 90/90/90/85 and 85/85/85/80, all eleven packages

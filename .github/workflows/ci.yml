@@ -76,6 +76,12 @@ jobs:
       - name: Check public API surface
         run: pnpm check:api
 
+      # Roadmap 0.12 / R04 (spec 091): the documentation can be trusted — every link and anchor resolves, the embedded
+      # quickstart snippets equal the example sources, the reference covers all 15 public entry points, and no stale claim
+      # is back. Offline and fast; the executable half (the quickstarts built from packed tarballs) runs in `certify`.
+      - name: Verify documentation
+        run: pnpm docs:verify
+
       # Real local Cloudflare Workers runtime (D1 + R2 via Miniflare/workerd) — no account, no
       # credentials, no remote resources. Kept as its own step (not folded into "Unit tests" above)
       # since it's slower and exercises a different pool; needs the build above for workspace
@@ -152,6 +158,12 @@ jobs:
 
       - name: Certify the packed artifacts of this commit
         run: pnpm release:certify
+
+      # Spec 091: the two canonical quickstarts (server-only; Angular/Analog + admin) installed from packed tarballs into clean
+      # projects with strict peers, built, started and exercised (HTTP + Chromium). Not part of `release:certify`'s sealed set:
+      # it proves the documentation, not the artifacts, and `release` still needs this job.
+      - name: Verify the documented quickstarts
+        run: pnpm docs:verify:consumers
 
       # The hashes, versions and per-stage outcomes are the reusable evidence for R02–R04 and L01. The tarballs stay
       # out of the artifact: it records WHICH bytes were certified, not a copy to install.

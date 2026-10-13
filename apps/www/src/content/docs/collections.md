@@ -62,8 +62,8 @@ type Post = CollectionData<typeof posts>;
 Note that this is the **schema** shape, not the API response shape: documents read back from the
 database also carry `id`, `created_at`, `updated_at`, and `_status` on a `drafts` collection. The
 first three (and an upload's `_storageKey`) are Forge-owned and not writable through the CMS API — see
-[Local API → System metadata](/docs/local-api#system-metadata). Typed
-documents flowing all the way to the client without codegen is still on the roadmap.
+[Local API → System metadata](/docs/local-api#system-metadata). The same
+definition types the Angular client without code generation: see [Angular client → Typed client](/docs/angular-client#typed-client-schema-aware).
 
 ## From definition to database
 

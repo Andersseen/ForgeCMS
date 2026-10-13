@@ -124,7 +124,8 @@ console.log(report.results, formatSchemaPlan(report.after)); // after never bloc
 - **Done (roadmap 0.7):** detect drift and refuse it safely (M01), reviewed, ordered migrations with
   a durable history (M02), and a release-gating rehearsal (M03): databases written by `0.4.0`, `0.6.0`
   and `0.8.0` upgrade through this path on libSQL and local D1/R2, and an upgraded installation is
-  backed up and restored into an empty environment with working logins, content, history and files.
+  backed up and restored into an empty environment with working logins, content, history and files. The restore
+  procedure was also rehearsed once on isolated remote Cloudflare staging (spec 090); there are no down migrations.
 
 ## Backups
 

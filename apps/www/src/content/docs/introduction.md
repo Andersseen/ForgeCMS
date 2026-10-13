@@ -66,12 +66,14 @@ hop between your Analog route and your content.
 
 Be honest with yourself about this list before adopting it for something that matters:
 
-- **Pre-1.0 release line.** The packages (currently `0.8.2` on npm) are installable and exercised by
-  real consumer apps, but API stability is not guaranteed before `1.0`.
+- **Approaching 1.0.** The packages (currently `0.13.3` on npm) are installable, the 1.0 public surface is frozen
+  and certified from packed artifacts, and a release candidate is next. Until 1.0 is released, treat the version as
+  pre-1.0; what the compatibility promise will cover is in [Support and compatibility](https://github.com/Andersseen/ForgeCMS/blob/main/docs/SUPPORT.md).
 - **Schema upgrades are explicit.** Schema sync applies safe additive changes and refuses drift that
   needs a data migration. Reviewed migrations apply those changes from your deploy script, exactly
   once. There are no down migrations. Upgrades from older releases and backup/restore are rehearsed
-  in CI on libSQL and local D1/R2, not on a live Cloudflare account. See
+  in CI on libSQL and local D1/R2, and the Cloudflare profile's backup and isolated restore were rehearsed on
+  real isolated Cloudflare staging. See
   [Schema upgrades](/docs/schema-upgrades).
 - **Relation population is one level deep** (`depth: 1`), and composite JSON values cannot be queried
   inside.
@@ -94,8 +96,10 @@ packages talk to the outside world. Read [Core concepts](/docs/concepts) for the
 
 ## Where to go next
 
+- [Server quickstart](/docs/server-quickstart) and [Angular/Analog quickstart](/docs/angular-quickstart) — the two verified starting paths.
 - [Small project guide](/docs/small-project-guide) — users, cookie auth, posts, and a working admin.
-- [Quickstart](/docs/quickstart) — the bare Local API path in about ten minutes.
+- [Quickstart](/docs/quickstart) — the bare Local API path with in-memory adapters.
+- [Troubleshooting](/docs/troubleshooting) and the [intentional limitations](https://github.com/Andersseen/ForgeCMS/blob/main/docs/LIMITATIONS.md).
 - [Core concepts](/docs/concepts) — the mental model, in one page.
 - [Collections](/docs/collections) and [Fields](/docs/fields) — the modelling reference.
 - [Local API](/docs/local-api) — the way to use ForgeCMS from server code.
