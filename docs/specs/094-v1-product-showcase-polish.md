@@ -83,3 +83,8 @@ None.
 Shipped as designed. Website: twelve-package inventory, `FORGE_CHANNELS`-driven availability, capability groups, localization/client-flow/Agent Kit/Analytics sections, `/demo` explore grid. Lumea: additive localized `notices`
 (+ idempotent `ensureNotices`), EN/ES switcher via `?lang=`, dashboard polish, stale comments and DEMO-FINDINGS reconciled, Agent Kit dogfood script. Divergences: the Agent Kit doctor flagged the demo's undeclared
 `@angular/cdk` admin peer, so it is now declared (3-line lockfile change; version already in the lockfile). No `packages/*` change, no changeset; RC publication not triggered.
+
+**Artifact impact.** `git diff 02ba1e6 HEAD -- packages api-baseline .changeset` is empty, and `release:certify` on this commit is CERTIFIED (all seven stages). Nine of twelve tarball SHA-256s equal the dossier's,
+including `@forge-cms/agent` (so the bundled docs are unchanged). `auth`, `runtime` and `cloudflare` differ only in the _key order_ of `dependencies` inside the packed `package.json` (`pnpm pack`'s workspace-protocol
+rewrite); the same different hash is produced with the unmodified lockfile, so it is pack-time ordering variance and not a change from this packet. Source, `dist` and docs are byte-identical. Classified: public
+RC package contents unaffected; the manifest key-order variance is flagged for the RC publication step, which should compare registry vs sealed hashes as the dossier already requires.
