@@ -52,7 +52,9 @@ export const BROWSER_FORBIDDEN = [
   'ForgeCmsRuntime', // @forge-cms/runtime
   'defineEventHandler', // h3 / Nitro routes
   'invalid server origin', // @forge-cms/angular/server
-  'forwardCookies'
+  'forwardCookies',
+  '@modelcontextprotocol', // @forge-cms/agent is dev-only tooling (spec 093)
+  'forge-cms-mcp'
 ];
 
 const TECHNICAL_PACKAGES = [

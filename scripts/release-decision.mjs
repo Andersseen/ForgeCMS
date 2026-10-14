@@ -73,7 +73,7 @@ export function isAlreadyPublishedError(output) {
 // protect that for us, so every publication path states its mode and tag explicitly.
 // ---------------------------------------------------------------------------------------------------
 
-/** The one fixed public package family (`.changeset/config.json` → `fixed`). */
+/** The one fixed public package family (`.changeset/config.json` → `fixed`). `@forge-cms/agent` is experimental (spec 093) but versioned with the family. */
 export const PUBLIC_FAMILY = [
   '@forge-cms/core',
   '@forge-cms/db',
@@ -85,7 +85,8 @@ export const PUBLIC_FAMILY = [
   '@forge-cms/cloudflare',
   '@forge-cms/angular',
   '@forge-cms/admin',
-  '@forge-cms/testing'
+  '@forge-cms/testing',
+  '@forge-cms/agent'
 ];
 
 /** The single npm dist-tag a ForgeCMS release candidate publishes under. */
@@ -207,4 +208,31 @@ export function assertLatestSafe(before, after) {
   if (after !== undefined && after !== before) {
     throw new Error(`npm "latest" moved from ${before} to ${after}`);
   }
+}
+
+/**
+ * `changeset status` ignores changesets that a prerelease version commit already consumed (they are listed in
+ * `.changeset/pre.json`). A pull request that both changes packages and contains the Changesets prerelease
+ * version commit would then look "changeset-less". It is covered when the PR adds at least one changeset file
+ * and every added changeset file is recorded in `pre.json` (spec 092/093).
+ *
+ * @param {{ added: string[], preChangesets: string[] | null }} input
+ *   `added`: `.changeset/*.md` paths added since the base branch. `preChangesets`: `pre.json` `changesets`, or `null` outside pre mode.
+ * @returns {{ ok: boolean, reason: string }}
+ */
+export function changesetsCoveredByPrerelease({ added, preChangesets }) {
+  if (preChangesets === null)
+    return { ok: false, reason: 'Changesets prerelease mode is not active' };
+  const files = added.filter((path) => /(^|\/)[^/]+\.md$/.test(path) && !/README\.md$/.test(path));
+  if (files.length === 0) return { ok: false, reason: 'the pull request adds no changeset file' };
+  const recorded = new Set(preChangesets);
+  const unrecorded = files.filter(
+    (path) => !recorded.has(path.replace(/^.*\//, '').replace(/\.md$/, ''))
+  );
+  return unrecorded.length === 0
+    ? {
+        ok: true,
+        reason: `${files.length} changeset file(s) added, all consumed by the prerelease version commit`
+      }
+    : { ok: false, reason: `changeset(s) not recorded in pre.json: ${unrecorded.join(', ')}` };
 }

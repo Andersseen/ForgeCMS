@@ -29,9 +29,9 @@ const good = () => ({
   files: ['README.md', 'package.json', 'dist/index.js', 'dist/index.d.ts']
 });
 
-test('the public package list is the eleven-package fixed family', () => {
-  assert.equal(PUBLIC_PACKAGES.length, 11);
-  assert.equal(new Set(PUBLIC_PACKAGES).size, 11);
+test('the public package list is the twelve-package fixed family', () => {
+  assert.equal(PUBLIC_PACKAGES.length, 12);
+  assert.equal(new Set(PUBLIC_PACKAGES).size, 12);
 });
 
 test('exportTargets collects every string leaf of an exports map', () => {

@@ -116,7 +116,7 @@ experimental, intentionally limited) is the [feature matrix](docs/MATRICES.md#fe
 
 ## Packages
 
-All eleven are versioned together (one Changesets fixed group), ESM-only, and imported only through their entry points.
+All twelve are versioned together (one Changesets fixed group), ESM-only, and imported only through their entry points. `@forge-cms/agent` is **experimental development tooling** (a read-only local MCP server and an official skill pack for AI coding agents); it first appears in the 1.0 release line, is never a runtime dependency, and is outside the stable 1.x guarantee - see the [Agent Kit guide](apps/www/src/content/docs/agent-kit.md).
 
 | Package                                        | Purpose                                                                             |
 | ---------------------------------------------- | ----------------------------------------------------------------------------------- |
@@ -131,6 +131,7 @@ All eleven are versioned together (one Changesets fixed group), ESM-only, and im
 | [`@forge-cms/angular`](packages/angular)       | Angular client SDK: `provideForgeCms`, typed client, session, guard, resources, SSR |
 | [`@forge-cms/admin`](packages/admin)           | Reusable Angular admin: layout, content, auth pages, users workspace                |
 | [`@forge-cms/testing`](packages/testing)       | Adapter contract suites                                                             |
+| [`@forge-cms/agent`](packages/agent)           | **Experimental** dev tooling: read-only local MCP server + official skill pack      |
 
 Every export, option and default: [docs/REFERENCE.md](docs/REFERENCE.md).
 

@@ -5,10 +5,11 @@
 //   preflight  Node/pnpm, git commit, clean tree (a dirty tree is refused unless --allow-dirty, which marks the
 //              result NOT certifying), Docker daemon (required: the real-Garage evidence cannot be skipped).
 //   build      a forced (uncached) `pnpm build`, so the artifacts come from this tree.
-//   pack       all eleven public packages exactly ONCE into an isolated directory; SHA-256 per tarball, the
+//   pack       all twelve public packages exactly ONCE into an isolated directory; SHA-256 per tarball, the
 //              packed manifests inspected, `artifacts.json` written (scripts/certification/artifacts.mjs).
 //   stages     every packed verifier, each handed that set through FORGE_CERT_ARTIFACTS so none can repack:
-//                consumers  server-only + the 11 roots / 4 retained subpaths (verify-public-consumers.mjs)
+//                consumers  server-only + the 12 roots / 4 retained subpaths (verify-public-consumers.mjs)
+//                agent      packed @forge-cms/agent: stdio MCP handshake, tools, docs, skills, no secret (verify-agent-kit.mjs)
 //                release    packed manifests + runtime/S3/Cloudflare/upgrade/Angular consumers (verify-release.mjs)
 //                compat     strict Angular/admin peer matrix incl. the /studio mount (verify-angular-compat.mjs)
 //                ssr        technical SSR/hydration consumer (verify-ssr-consumer.mjs technical)
@@ -44,6 +45,7 @@ const option = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : u
 
 const STAGES = [
   { name: 'consumers', command: ['node', 'scripts/verify-public-consumers.mjs'] },
+  { name: 'agent', command: ['node', 'scripts/verify-agent-kit.mjs'] },
   { name: 'release', command: ['node', 'scripts/verify-release.mjs'] },
   { name: 'compat', command: ['node', 'scripts/verify-angular-compat.mjs'] },
   { name: 'ssr', command: ['node', 'scripts/verify-ssr-consumer.mjs', 'technical'] },

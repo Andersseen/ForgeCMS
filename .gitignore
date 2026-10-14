@@ -55,3 +55,6 @@ pnpm-debug.log*
 
 # R03 staging rehearsal evidence (spec 090): D1 exports, cookies, object bytes — never committed
 .staging/
+
+# Generated agent-kit docs corpus (scripts/build-agent-docs.mjs)
+packages/agent/docs/

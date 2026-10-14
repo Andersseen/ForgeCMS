@@ -3,9 +3,9 @@
 How ForgeCMS versions, what is supported, and what a "supported" claim is backed by. Security reporting is in [../SECURITY.md](../SECURITY.md); deliberate scope boundaries are in
 [LIMITATIONS.md](LIMITATIONS.md); the status of each capability is in [MATRICES.md](MATRICES.md).
 
-## One version for eleven packages
+## One version for twelve packages
 
-`@forge-cms/core`, `db`, `auth`, `storage`, `s3`, `api`, `runtime`, `cloudflare`, `angular`, `admin` and `testing` form one Changesets **fixed** group: they are always released
+`@forge-cms/core`, `db`, `auth`, `storage`, `s3`, `api`, `runtime`, `cloudflare`, `angular`, `admin`, `testing` and the experimental `agent` form one Changesets **fixed** group: they are always released
 together at the same version, and you should install matching versions. The current release is **`0.13.4`**. Roadmap checkpoints (0.5–0.12) are planning labels, not versions.
 
 ## Semantic versioning from 1.0
@@ -19,10 +19,10 @@ exported names (`api-baseline/*.json`, checked in CI), documented options and de
 | MINOR   | Backward-compatible additions (new exports, options with unchanged defaults, new supported ranges)    |
 | MAJOR   | Any breaking change to the stable surface, or dropping a supported range                              |
 
-Because the family is fixed, a patch to one package is a patch of all eleven. Changing a documented default is a breaking change. Before 1.0 (the current `0.x` line) the frozen
+Because the family is fixed, a patch to one package is a patch of all twelve. Changing a documented default is a breaking change. Before 1.0 (the current `0.x` line) the frozen
 surface changes only to fix a release blocker.
 
-**Not covered by the promise:** experimental APIs (Cloudflare Analytics: the Analytics Engine writer/query client, `provideForgeAnalytics` and its tracker/service, the admin analytics route and dashboard),
+**Not covered by the promise:** the whole `@forge-cms/agent` package (the experimental Agent Kit: its MCP tools, resources and skills), experimental APIs (Cloudflare Analytics: the Analytics Engine writer/query client, `provideForgeAnalytics` and its tracker/service, the admin analytics route and dashboard),
 anything not exported from an entry point, deep imports into `src/` or `dist/`, internal collections and fields (`_forge_*`, `_storageKey`, `_sessionVersion`), the exact text of error messages (use
 `code`/`kind`), and the repository's apps (`apps/*`).
 

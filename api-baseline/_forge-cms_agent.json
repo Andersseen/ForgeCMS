@@ -1,0 +1,18 @@
+[
+  "CheckStatus",
+  "DocEntry",
+  "DocHit",
+  "DoctorCheck",
+  "DoctorReport",
+  "ForgeMcpOptions",
+  "ProjectDetection",
+  "RuntimeMetadataResult",
+  "SupportFacts",
+  "createForgeMcpServer",
+  "detectProject",
+  "doctorProject",
+  "fetchRuntimeMetadata",
+  "listDocs",
+  "searchDocs",
+  "supportFacts"
+]

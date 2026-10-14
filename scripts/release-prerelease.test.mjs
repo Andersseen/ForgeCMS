@@ -15,6 +15,7 @@ import {
   PUBLIC_FAMILY,
   assertFixedFamily,
   assertLatestSafe,
+  changesetsCoveredByPrerelease,
   classifyVersion,
   detectReleaseMode,
   githubReleasePlan,
@@ -75,7 +76,7 @@ describe('resolvePublishTag: `latest` cannot be reached by a prerelease', () => 
 });
 
 describe('assertFixedFamily / assertLatestSafe / githubReleasePlan', () => {
-  it('accepts exactly the eleven at one version', () => {
+  it('accepts exactly the twelve at one version', () => {
     assert.equal(assertFixedFamily(family('1.0.0-rc.0')), '1.0.0-rc.0');
   });
   it('rejects a missing, extra or split package', () => {
@@ -128,7 +129,7 @@ describe('publish-unpublished.mjs (spawned with fake npm/pnpm)', () => {
     const { result, calls } = runPublish('0.13.4', []);
     assert.equal(result.status, 0, result.stderr);
     const publishes = calls.split('\n').filter((line) => line.startsWith('pnpm'));
-    assert.equal(publishes.length, 11);
+    assert.equal(publishes.length, 12);
     assert.ok(publishes.every((line) => !line.includes('--tag') && line.includes('--provenance')));
   });
 
@@ -160,7 +161,7 @@ describe('publish-unpublished.mjs (spawned with fake npm/pnpm)', () => {
     const { result, calls } = runPublish('1.0.0-rc.0', ['--tag', 'rc']);
     assert.equal(result.status, 0, result.stderr);
     const publishes = calls.split('\n').filter((line) => line.startsWith('pnpm'));
-    assert.equal(publishes.length, 11);
+    assert.equal(publishes.length, 12);
     assert.ok(
       publishes.every((line) => line.includes('--tag rc') && line.includes('--provenance'))
     );
@@ -171,5 +172,33 @@ describe('publish-unpublished.mjs (spawned with fake npm/pnpm)', () => {
     assert.equal(result.status, 0, result.stderr);
     assert.equal(calls.split('\n').filter((line) => line.startsWith('pnpm')).length, 0);
     assert.match(result.stdout, /already published/);
+  });
+});
+
+describe('changesetsCoveredByPrerelease (CI changeset check in pre mode)', () => {
+  it('accepts added changesets that the prerelease version commit consumed', () => {
+    const verdict = changesetsCoveredByPrerelease({
+      added: ['.changeset/a.md', '.changeset/b.md'],
+      preChangesets: ['a', 'b', 'older']
+    });
+    assert.equal(verdict.ok, true);
+  });
+  it('rejects outside pre mode, with no added changeset, or with an unrecorded one', () => {
+    assert.equal(
+      changesetsCoveredByPrerelease({ added: ['.changeset/a.md'], preChangesets: null }).ok,
+      false
+    );
+    assert.equal(changesetsCoveredByPrerelease({ added: [], preChangesets: ['a'] }).ok, false);
+    assert.equal(
+      changesetsCoveredByPrerelease({ added: ['.changeset/README.md'], preChangesets: ['a'] }).ok,
+      false
+    );
+    assert.equal(
+      changesetsCoveredByPrerelease({
+        added: ['.changeset/a.md', '.changeset/new.md'],
+        preChangesets: ['a']
+      }).ok,
+      false
+    );
   });
 });

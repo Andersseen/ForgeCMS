@@ -6,6 +6,9 @@ import { join } from 'node:path';
 import test from 'node:test';
 import {
   anchorsOf,
+  checkAgentKitDocs,
+  mentionsWithoutLabel,
+  registeredTools,
   checkLinks,
   checkReference,
   checkSnippets,
@@ -91,4 +94,36 @@ test('the reference must cover every entry point and not misattribute an export'
 test('stale claims are caught', () => {
   const root = tree({ 'a.md': 'Early design phase\nfine line\nNothing published yet.' });
   assert.equal(checkStalePhrases({ root, files: [join(root, 'a.md')] }).failures.length, 2);
+});
+
+test('mentionsWithoutLabel flags an unlabelled mention of the agent kit', () => {
+  const doc = '@forge-cms/agent is great.\n\nThe @forge-cms/agent package is experimental.';
+  assert.equal(mentionsWithoutLabel(doc, '@forge-cms/agent').length, 1);
+});
+
+test('registeredTools reads the tool names from the server source', () => {
+  assert.deepEqual(
+    registeredTools("server.registerTool(\n    'forge_a',\n {});\nx.registerTool('forge_b', {})"),
+    ['forge_a', 'forge_b']
+  );
+});
+
+test('checkAgentKitDocs fails when a documented tool does not exist and when a skill is unlisted', () => {
+  const root = tree({
+    'packages/agent/src/server.ts': "server.registerTool('forge_real', {});",
+    'packages/agent/skills/forgecms-x/SKILL.md':
+      '---\nname: forgecms-x\ndescription: x\n---\nUse forge_fake and @forge-cms/core/src/x.',
+    'packages/agent/package.json': '{"name":"@forge-cms/agent"}',
+    'apps/www/src/content/docs/agent-kit.md': 'forge_real forge_ghost',
+    'docs/REFERENCE.md': 'forge_real',
+    'packages/agent/README.md': 'forge_real',
+    'apps/www/src/content/docs/analytics.md': 'no banner'
+  });
+  const { failures } = checkAgentKitDocs({ root });
+  const text = failures.join('\n');
+  assert.match(text, /forge_ghost/);
+  assert.match(text, /forge_fake/);
+  assert.match(text, /does not list the skill|agent-kit\.md does not list/);
+  assert.match(text, /src\/ or dist\/|not a public specifier/);
+  assert.match(text, /Experimental banner/);
 });

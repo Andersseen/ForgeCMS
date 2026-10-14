@@ -1,0 +1,66 @@
+{
+  "name": "@forge-cms/agent",
+  "version": "0.13.4",
+  "description": "EXPERIMENTAL development-time tooling for ForgeCMS: a read-only local MCP server and an official skill pack for AI coding agents.",
+  "author": "ForgeCMS contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Andersseen/ForgeCMS.git",
+    "directory": "packages/agent"
+  },
+  "bugs": {
+    "url": "https://github.com/Andersseen/ForgeCMS/issues"
+  },
+  "homepage": "https://github.com/Andersseen/ForgeCMS/tree/main/packages/agent#readme",
+  "keywords": [
+    "cms",
+    "mcp",
+    "agent",
+    "skills",
+    "experimental",
+    "typescript"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "bin": {
+    "forge-cms-mcp": "./dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "docs",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/build-agent-docs.mjs",
+    "build": "tsc -p tsconfig.build.json",
+    "pretest": "node ../../scripts/build-agent-docs.mjs",
+    "test": "vitest run --dir .",
+    "test:watch": "vitest --dir .",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist coverage docs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.3",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

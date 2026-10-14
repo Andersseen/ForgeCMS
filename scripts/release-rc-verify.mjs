@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Release-candidate publication guards (spec 092). Used by .github/workflows/release-rc.yml.
-//   --phase pre   <expected-version>   family is exactly the fixed eleven at one `1.0.0-rc.N` equal to
+//   --phase pre   <expected-version>   family is exactly the fixed twelve at one `1.0.0-rc.N` equal to
 //                                      the expected version; npm `latest` is stable; prints `latest`.
 //   --phase post  <expected-version> <latest-before>
 //                                      every package has the version, `rc` → version, `latest` unchanged.

@@ -23,7 +23,8 @@ const publicPackages = [
   '@forge-cms/cloudflare',
   '@forge-cms/angular',
   '@forge-cms/admin',
-  '@forge-cms/testing'
+  '@forge-cms/testing',
+  '@forge-cms/agent'
 ];
 
 const workspaceOnlyProtocols = ['workspace:', 'catalog:', 'link:', 'file:'];
