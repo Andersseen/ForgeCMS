@@ -16,6 +16,23 @@ async function signIn(page: Page): Promise<void> {
 }
 
 test.describe('demo admin dashboard', () => {
+  test('the overview is client-ready and its traffic card is honest, never fabricated', async ({
+    page
+  }) => {
+    await signIn(page);
+
+    await expect(page.getByRole('heading', { name: 'Clinic overview' })).toBeVisible();
+    await expect(page.getByText('Pending bookings')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Quick links' })).toBeVisible();
+
+    const traffic = page.locator('[data-analytics-state]');
+    await expect(traffic).toBeVisible();
+    const state = await traffic.getAttribute('data-analytics-state');
+    // No Analytics Engine locally: the honest states are "unconfigured" or "empty", never a made-up count.
+    expect(['unconfigured', 'empty', 'traffic']).toContain(state);
+    if (state !== 'traffic') await expect(traffic).not.toContainText(/\d{2,}/);
+  });
+
   test('clinic settings is an admin route, not a blocking document modal', async ({ page }) => {
     await signIn(page);
 

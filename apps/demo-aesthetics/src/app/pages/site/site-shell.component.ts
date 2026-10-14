@@ -1,8 +1,11 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { applyVoltTheme } from '@voltui/components';
 import { SiteApiService } from '../../services/site-api.service';
+import { isSiteLocale, SITE_LOCALES, type SiteLocale } from '../../../shared/site-content';
 import { asyncState } from './async-state';
+import { NoticeBanner } from './notice-banner.component';
 
 /**
  * Chrome for the public site. The clinic name, contact details and opening hours in the header and
@@ -11,7 +14,7 @@ import { asyncState } from './async-state';
 @Component({
   selector: 'lumea-site-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, NoticeBanner],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex min-h-screen flex-col">
@@ -30,6 +33,7 @@ import { asyncState } from './async-state';
             @for (item of navigation; track item.path) {
               <a
                 [routerLink]="item.path"
+                queryParamsHandling="preserve"
                 routerLinkActive="text-foreground"
                 [routerLinkActiveOptions]="{ exact: item.path === '/' }"
                 class="text-muted-foreground transition-colors hover:text-foreground"
@@ -61,6 +65,7 @@ import { asyncState } from './async-state';
                 @for (item of navigation; track item.path) {
                   <a
                     [routerLink]="item.path"
+                    queryParamsHandling="preserve"
                     routerLinkActive="bg-muted text-foreground"
                     [routerLinkActiveOptions]="{ exact: item.path === '/' }"
                     class="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -70,8 +75,33 @@ import { asyncState } from './async-state';
                 }
               </nav>
             </details>
+            <nav
+              class="flex items-center rounded-full border border-border p-0.5 text-xs font-medium"
+              aria-label="Content language"
+            >
+              @for (code of languages; track code) {
+                <a
+                  [routerLink]="[]"
+                  [queryParams]="{ lang: code }"
+                  queryParamsHandling="merge"
+                  [attr.aria-current]="locale() === code ? 'true' : null"
+                  [attr.hreflang]="code"
+                  [attr.lang]="code"
+                  [attr.aria-label]="code === 'en' ? 'Read in English' : 'Leer en español'"
+                  class="rounded-full px-2.5 py-1 uppercase transition-colors hover:text-foreground"
+                  [class]="
+                    locale() === code
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground'
+                  "
+                >
+                  {{ code }}
+                </a>
+              }
+            </nav>
             <a
               routerLink="/booking"
+              queryParamsHandling="preserve"
               class="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
             >
               Book
@@ -79,6 +109,8 @@ import { asyncState } from './async-state';
           </div>
         </div>
       </header>
+
+      <lumea-notice-banner [locale]="locale()" />
 
       <main class="flex-1">
         <router-outlet />
@@ -144,6 +176,19 @@ import { asyncState } from './async-state';
 })
 export class SiteShell {
   private readonly api = inject(SiteApiService);
+  private readonly route = inject(ActivatedRoute);
+
+  /**
+   * The content language lives in the URL (`?lang=es`) and nowhere else, so it survives navigation
+   * and reload, is shareable, and cannot leak between server requests. It selects which language of
+   * the CMS content is read — not a UI-translation system (spec 094).
+   */
+  private readonly query = toSignal(this.route.queryParamMap);
+  protected readonly languages = SITE_LOCALES;
+  protected readonly locale = computed<SiteLocale>(() => {
+    const requested = this.query()?.get('lang');
+    return isSiteLocale(requested) ? requested : 'en';
+  });
 
   constructor() {
     if (typeof window !== 'undefined') {

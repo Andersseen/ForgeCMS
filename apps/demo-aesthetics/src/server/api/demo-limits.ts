@@ -34,6 +34,7 @@ export const MAX_DOCUMENTS: Record<string, number> = {
   service_categories: 20,
   staff: 20,
   promotions: 20,
+  notices: 20,
   pages: 10
 };
 
@@ -46,6 +47,7 @@ export const MIN_DOCUMENTS: Record<string, number> = {
   service_categories: 4,
   staff: 3,
   pages: 1,
+  notices: 1,
   site_settings: 1
 };
 

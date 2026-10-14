@@ -16,15 +16,27 @@ import type { DemoDocument, DemoSchema } from '../../forge-schema';
     <div class="space-y-6">
       <forge-page-header
         title="Clinic overview"
-        subtitle="Bookings waiting on a reply, and what is live on the site right now."
+        subtitle="Bookings waiting on a reply, what is live on the site, and who is visiting."
       />
 
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         @for (stat of stats(); track stat.label) {
-          <div class="rounded-xl border border-border bg-card p-5">
+          <a
+            [routerLink]="stat.link"
+            class="group rounded-xl border border-border bg-card p-5 outline-none transition-colors hover:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring"
+          >
             <p class="text-sm text-muted-foreground">{{ stat.label }}</p>
-            <p class="mt-2 text-2xl font-semibold">{{ stat.value }}</p>
-          </div>
+            <p class="mt-2 text-2xl font-semibold">
+              @if (loading()) {
+                <span class="text-muted-foreground" aria-label="Loading">–</span>
+              } @else {
+                {{ stat.value }}
+              }
+            </p>
+            <p class="mt-1 text-xs text-muted-foreground group-hover:underline">
+              {{ stat.hint }}
+            </p>
+          </a>
         }
       </div>
 
@@ -43,7 +55,10 @@ import type { DemoDocument, DemoSchema } from '../../forge-schema';
           @if (loading()) {
             <p class="px-5 py-6 text-sm text-muted-foreground">Loading…</p>
           } @else if (error(); as message) {
-            <p class="px-5 py-6 text-sm text-destructive">{{ message }}</p>
+            <div class="px-5 py-6 text-sm" role="alert">
+              <p class="text-destructive">{{ message }}</p>
+              <button type="button" class="mt-2 underline" (click)="retry()">Try again</button>
+            </div>
           } @else {
             <ul class="divide-y divide-border">
               @for (booking of bookings(); track booking.id) {
@@ -69,34 +84,52 @@ import type { DemoDocument, DemoSchema } from '../../forge-schema';
                   </div>
                 </li>
               } @empty {
-                <li class="px-5 py-6 text-sm text-muted-foreground">No bookings yet.</li>
+                <li class="px-5 py-6 text-sm text-muted-foreground">
+                  No bookings yet. New requests from the booking form appear here as pending.
+                </li>
               }
             </ul>
           }
         </div>
 
         <div class="rounded-xl border border-border bg-card">
-          <div class="flex items-center justify-between border-b border-border px-5 py-4">
-            <h2 class="text-sm font-medium">Site traffic</h2>
+          <div class="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+            <h2 class="text-sm font-medium">
+              Site traffic
+              <span class="ml-1 rounded-full border border-border px-2 py-0.5 text-[0.65rem]"
+                >Experimental</span
+              >
+            </h2>
             <a routerLink="/admin/analytics" class="text-sm text-muted-foreground hover:underline">
               View analytics →
             </a>
           </div>
 
-          <div class="px-5 py-4">
+          <div class="px-5 py-4" aria-live="polite">
             @if (analyticsLoading()) {
               <p class="text-sm text-muted-foreground">Loading…</p>
             } @else if (analyticsError(); as message) {
-              <p class="text-sm text-destructive">{{ message }}</p>
+              <div role="alert" class="text-sm">
+                <p class="text-destructive">{{ message }}</p>
+                <button type="button" class="mt-2 underline" (click)="retryAnalytics()">
+                  Try again
+                </button>
+              </div>
             } @else if (analytics(); as summary) {
               @if (!summary.configured) {
-                <p class="text-sm text-muted-foreground">
-                  Not set up yet — configure a Cloudflare Analytics Engine binding to see traffic
-                  here.
+                <p class="text-sm text-muted-foreground" data-analytics-state="unconfigured">
+                  Traffic reporting is not switched on for this site yet. Once the Cloudflare
+                  Analytics Engine binding and read token are set, visits appear here.
+                </p>
+              } @else if ((summary.totals?.pageviews ?? 0) === 0) {
+                <p class="text-sm text-muted-foreground" data-analytics-state="empty">
+                  No visits recorded in the last 7 days.
                 </p>
               } @else {
                 <p class="text-xs text-muted-foreground">Pageviews, last 7 days</p>
-                <p class="mt-2 text-2xl font-semibold">{{ summary.totals?.pageviews ?? 0 }}</p>
+                <p class="mt-2 text-2xl font-semibold" data-analytics-state="traffic">
+                  {{ summary.totals?.pageviews ?? 0 }}
+                </p>
                 @if (analyticsChangeLabel(); as change) {
                   <p class="mt-1 text-xs text-muted-foreground">{{ change }}</p>
                 }
@@ -105,6 +138,25 @@ import type { DemoDocument, DemoSchema } from '../../forge-schema';
           </div>
         </div>
       </div>
+
+      <section aria-labelledby="quick-links-title" class="rounded-xl border border-border bg-card">
+        <h2 id="quick-links-title" class="border-b border-border px-5 py-4 text-sm font-medium">
+          Quick links
+        </h2>
+        <ul class="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
+          @for (link of quickLinks; track link.path) {
+            <li class="bg-card">
+              <a
+                [routerLink]="link.path"
+                class="block px-5 py-4 text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              >
+                <span class="font-medium">{{ link.label }}</span>
+                <span class="mt-0.5 block text-xs text-muted-foreground">{{ link.hint }}</span>
+              </a>
+            </li>
+          }
+        </ul>
+      </section>
     </div>
   `
 })
@@ -121,8 +173,9 @@ export class AdminDashboardPage implements OnInit {
   protected readonly error = signal<string | null>(null);
 
   // Forge Analytics (spec 057, experimental) — a compact peer of the booking inbox rather than a
-  // stat tile: `configured: false` (no CLOUDFLARE_ANALYTICS_TOKEN/CLOUDFLARE_ACCOUNT_ID secret set
-  // on this deployment yet) and "no traffic yet" are both real, expected states, not errors.
+  // stat tile. Four real states, none of them fabricated: loading, `configured: false` (no
+  // CLOUDFLARE_ANALYTICS_TOKEN/CLOUDFLARE_ACCOUNT_ID on this deployment), configured with no
+  // traffic yet, and traffic. A failed request offers a retry; it never shows a number.
   protected readonly analytics = signal<AnalyticsSummaryResponse | null>(null);
   protected readonly analyticsLoading = signal(true);
   protected readonly analyticsError = signal<string | null>(null);
@@ -130,12 +183,40 @@ export class AdminDashboardPage implements OnInit {
   protected readonly stats = computed(() => [
     {
       label: 'Pending bookings',
-      value: this.bookings().filter((booking) => booking.status === 'pending').length
+      value: this.bookings().filter((booking) => booking.status === 'pending').length,
+      hint: 'Waiting on a reply',
+      link: '/admin/collections/bookings'
     },
-    { label: 'Treatments live', value: this.serviceCount() },
-    { label: 'Drafts waiting', value: this.draftCount() },
-    { label: 'Journal entries', value: this.postCount() }
+    {
+      label: 'Treatments live',
+      value: this.serviceCount(),
+      hint: 'On the public menu',
+      link: '/admin/collections/services'
+    },
+    {
+      label: 'Drafts waiting',
+      value: this.draftCount(),
+      hint: 'Treatments and journal posts',
+      link: '/admin/collections/services'
+    },
+    {
+      label: 'Journal posts',
+      value: this.postCount(),
+      hint: 'Published and drafts',
+      link: '/admin/collections/posts'
+    }
   ]);
+
+  protected readonly quickLinks = [
+    {
+      label: 'Treatments',
+      hint: 'Prices, benefits and publishing',
+      path: '/admin/collections/services'
+    },
+    { label: 'Content', hint: 'Home page, team, journal, notices', path: '/admin/collections' },
+    { label: 'Media', hint: 'Photos used across the site', path: '/admin/media' },
+    { label: 'Clinic settings', hint: 'Phone, address, opening hours', path: '/admin/settings' }
+  ] as const;
 
   protected readonly analyticsChangeLabel = computed(() => {
     const pct = this.analytics()?.totals?.changePct;
@@ -146,6 +227,18 @@ export class AdminDashboardPage implements OnInit {
 
   ngOnInit(): void {
     void this.load();
+    void this.loadAnalytics();
+  }
+
+  protected retry(): void {
+    this.error.set(null);
+    this.loading.set(true);
+    void this.load();
+  }
+
+  protected retryAnalytics(): void {
+    this.analyticsError.set(null);
+    this.analyticsLoading.set(true);
     void this.loadAnalytics();
   }
 

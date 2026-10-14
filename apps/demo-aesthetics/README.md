@@ -12,7 +12,10 @@ this app is marked `FINDING n` in a comment pointing back to it. Spec:
 > most findings. [Spec 071](../../docs/specs/071-0.7-consolidation-and-dogfood-refresh.md)
 > (2026-09-28) re-dogfooded the app against ForgeCMS 0.7 and deleted every workaround current Forge
 > replaces. What is left in here still marked `FINDING n` is either something the CMS still does
-> not do, or a deliberate retention explained where it is marked (finding 4).
+> not do, or a deliberate retention explained where it is marked (finding 4). The current status of
+> every finding (closed / demo-only / intentional 1.0 limit / post-1.0) is the table at the top of
+> DEMO-FINDINGS. Spec [094](../../docs/specs/094-v1-product-showcase-polish.md) (2026-10-14) polished
+> the demo for the 1.0 candidate without touching any package.
 
 ## Run it
 
@@ -35,19 +38,35 @@ Data lives in the in-memory adapters locally, so **it resets on every reload** �
 
 ## What to look at
 
-| Path                          | Why it is interesting                                                                                      |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `/`                           | Rendered from a `blocks` field, not a fixed template. Reorder the blocks in `/admin` and the page changes. |
-| `/services/:slug`             | Composite fields (`array` benefits/FAQs, `group` aftercare) plus relations and uploads.                    |
-| `/booking`                    | The only public **write**. Allowed by the collection's own `access.create`, not by the route.              |
-| `/journal`                    | `drafts: true` in action — the unpublished post is invisible here and 404s by slug.                        |
-| `/admin`                      | `@forge-cms/admin`'s layout, cookie session and guard; content and staff pages are package routes.         |
-| `/admin/collections/bookings` | The booking inbox, including the request you just sent from `/booking`.                                    |
+| Path                          | Why it is interesting                                                                                                 |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `/`                           | Rendered from a `blocks` field, not a fixed template. Reorder the blocks in `/admin` and the page changes.            |
+| `/?lang=es`                   | The **EN / ES switch**. The "From the clinic" notice is a localized collection read per locale (see below).           |
+| `/services/:slug`             | Composite fields (`array` benefits/FAQs, `group` aftercare) plus relations and uploads.                               |
+| `/booking`                    | The only public **write**. Allowed by the collection's own `access.create`, not by the route.                         |
+| `/journal`                    | `drafts: true` in action — the unpublished post is invisible here and 404s by slug.                                   |
+| `/admin`                      | `@forge-cms/admin`'s layout, cookie session and guard; custom navigation; content and staff pages are package routes. |
+| `/admin/collections/bookings` | The booking inbox, including the request you just sent from `/booking`.                                               |
+| `/admin/collections/notices`  | Edit one notice in English, switch the locale control, edit it in Spanish: the values stay separate.                  |
+| `/admin/media`                | Uploads through the typed client (`uploadFile`) to R2.                                                                |
+| `/admin/analytics`            | **Experimental** Forge Analytics. Real traffic, or an honest "not configured" / "no visits" state — never fake data.  |
+
+## Localization (EN / ES)
+
+`notices` is the demo's one localized collection (`locales: ['en', 'es']`, spec 094). Only top-level
+`text` / `textarea` fields are localized (`title`, `message`, `linkLabel`); the slug, link target and draft
+status are shared. It is a **new table**, so no deployed row is reinterpreted: an existing scalar value is
+never read as a locale map. `GET /api/site/notices/:locale` (only `en` / `es`; anything else is 404) reads
+through the Local API as an anonymous visitor, so a draft notice never appears in either language. The
+language lives in the URL (`?lang=es`) and nowhere else, so it survives navigation and cannot leak between
+requests. The rest of the site is deliberately English: this shows Forge localization, it is not an i18n
+framework. Existing deployments get the two seed notices once, additively, by `ensureNotices` (it writes
+only while the table is empty).
 
 ## How it is wired
 
 ```
-src/server/api/collections.ts   11 collections: hooks, function-based access, drafts, blocks, uploads
+src/server/api/collections.ts   12 collections: hooks, function-based access, drafts, blocks, uploads
 src/server/api/runtime.ts       ForgeCmsRuntime<ServerEnv, DemoCollections>: the typed Local API
 src/server/api/mappers.ts       typed CMS documents → the public view models in src/shared
 src/server/api/seed.ts          realistic content, written through the Local API
@@ -79,7 +98,9 @@ the server). That is the architecture this demo recommends, not a workaround.
 - **Tests live in `src/tests/`, not next to the code.** Nitro bundles everything under `src/server/**`
   into the worker, so a `*.test.ts` there drags `vitest` into the server bundle and the API crashes
   on the first request.
-- SSR is off (`ssr: false`), as in `apps/www` — see finding 2.
+- Lumea stays an SPA (`ssr: false`) by choice. ForgeCMS itself supports and certifies Angular/Analog
+  SSR; moving a deployed site to SSR changes runtime behaviour, so it is a consumer-observation
+  decision, not part of a presentation change (finding 2).
 - Seeded images are static SVGs in `public/images`; uploads go through the storage adapter and are
   served back by `routes/api/media/[...key].get.ts`, a thin wrapper over the runtime's `handleFile`.
 - `e2e/` gives each spec file its own write-throttle bucket (`e2e/visitor.ts`); otherwise a full
@@ -171,6 +192,10 @@ true })`; a first-party tracker beacons `POST /api/analytics/collect` on load an
 - `pnpm test:demo` — the content model through the typed Local API: access, drafts, hooks, the
   service-detail queries (`findOne`/`containsValue`), typed-registry compile checks and the demo
   limits.
+- `node --test scripts/agent-dogfood.test.mjs` — the experimental **Agent Kit as development tooling**:
+  the local read-only MCP server is pointed at this project and must detect Forge, Angular, Analog,
+  Vite, the Cloudflare D1/R2 profile, the admin, localization and the Analytics wiring with no doctor
+  error. No LLM, no network. `@forge-cms/agent` is never a dependency of this app.
 - `pnpm e2e:demo` (Playwright, dev server) covers:
   - the public journeys: home, treatment detail, journal and a post, a booking that lands in the
     staff inbox, and a not-found treatment;
@@ -178,6 +203,7 @@ true })`; a first-party tracker beacons `POST /api/analytics/collect` on load an
   - content: create a draft treatment in the package editor, publish it from the list, see it on the
     site;
   - media: upload and serve a file;
+  - localization: the EN / ES switch reads real per-locale content and never shows the draft notice;
   - the admin at phone width;
   - signup.
 
@@ -186,7 +212,7 @@ true })`; a first-party tracker beacons `POST /api/analytics/collect` on load an
 These are real gaps, each marked `FINDING n` in the code (details in
 [DEMO-FINDINGS](../../docs/DEMO-FINDINGS.md)):
 
-- `site_settings` as a collection (4 — retained until M02);
+- `site_settings` as a collection (4 — retained on purpose; moving the deployed row is a backed-up production operation);
 - no email on booking (6);
 - richtext flattened to paragraphs, no renderer (7);
 - `blocks` rows cast at the render site (16);
@@ -194,7 +220,7 @@ These are real gaps, each marked `FINDING n` in the code (details in
 - `date` typed as `Date` but written and read as strings (24);
 - money as `number`, zone-less appointment times (3);
 - copied auth route files (11);
-- no SSR (2).
+- Lumea itself is an SPA by choice (2); ForgeCMS supports SSR.
 
 ## Not included
 

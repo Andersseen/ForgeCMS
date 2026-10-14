@@ -3,6 +3,8 @@ import { ForgeApiError } from '@forge-cms/angular';
 import type {
   BookingRequest,
   HomePayload,
+  Notice,
+  SiteLocale,
   PostDetail,
   PostSummary,
   ServiceDetailPayload,
@@ -66,6 +68,10 @@ export class SiteApiService {
       });
     }
     return body.data as T;
+  }
+
+  notices(locale: SiteLocale): Promise<Notice[]> {
+    return this.get<Notice[]>(`notices/${locale}`);
   }
 
   home(): Promise<HomePayload> {

@@ -16,7 +16,8 @@ import { VoltButton } from '@voltui/components';
  * FINDING 4, retained on purpose: settings are a one-row `site_settings` collection, so this page
  * finds the row, remembers its id and decides between create and update itself. ForgeCMS has globals
  * (`PUT /api/v1/globals/:slug`, no id, no ambiguity), but the deployed demo's D1 keeps the edited
- * settings in this collection, and moving them is a data migration — roadmap 0.7 M02. See
+ * settings in this collection, and moving them is a production data migration that needs a
+ * reviewed migration and a backup first (docs/BACKUP-RESTORE.md). See
  * `server/routes/api/site/settings.get.ts`.
  */
 @Component({

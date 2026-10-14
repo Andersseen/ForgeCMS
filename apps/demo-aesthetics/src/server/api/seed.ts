@@ -71,6 +71,7 @@ export async function seedContent(
   await seedBookings(runtime, ids);
   await seedPages(runtime);
   await seedSettings(runtime);
+  await seedNotices(runtime);
 }
 
 async function seedMedia(runtime: SeedRuntime, ids: SeedIds): Promise<void> {
@@ -713,4 +714,70 @@ async function seedSettings(runtime: SeedRuntime): Promise<void> {
       }
     }
   });
+}
+
+/**
+ * The two seeded notices (spec 094). Created in Spanish, then completed in English through a second
+ * locale write — the same two-step an editor performs in the admin. The second notice is a draft, so
+ * the public site (in either language) must not show it.
+ *
+ * Idempotent and additive: `ensureNotices` is also called for deployments seeded before the
+ * `notices` collection existed, and writes only when the collection is empty.
+ */
+export async function ensureNotices(
+  typedRuntime: ForgeCmsRuntime<unknown, DemoCollections>
+): Promise<void> {
+  const runtime = typedRuntime as unknown as SeedRuntime;
+  if ((await runtime.count({ collection: 'notices' })) > 0) return;
+  await seedNotices(runtime);
+}
+
+async function seedNotices(runtime: SeedRuntime): Promise<void> {
+  const write = async (
+    es: { title: string; message: string; linkLabel: string },
+    en: { title: string; message: string; linkLabel: string },
+    status: 'published' | 'draft'
+  ): Promise<void> => {
+    const created = await runtime.create({
+      collection: 'notices',
+      locale: 'es',
+      data: { ...es, linkPath: '/booking', _status: status }
+    });
+    await runtime.update({
+      collection: 'notices',
+      id: String(created.id),
+      locale: 'en',
+      data: en
+    });
+  };
+
+  await write(
+    {
+      title: 'Consulta de piel gratuita este mes',
+      message:
+        'Reserva una primera valoración de 20 minutos con nuestra dermatóloga y recibe un plan de cuidado personalizado.',
+      linkLabel: 'Reservar valoración'
+    },
+    {
+      title: 'Free skin consultation this month',
+      message:
+        'Book a first 20-minute assessment with our dermatologist and leave with a personalised care plan.',
+      linkLabel: 'Book an assessment'
+    },
+    'published'
+  );
+
+  await write(
+    {
+      title: 'Horario de verano (borrador)',
+      message: 'Aviso interno en preparación: horario reducido durante agosto.',
+      linkLabel: 'Ver horario'
+    },
+    {
+      title: 'Summer hours (draft)',
+      message: 'Internal notice in preparation: reduced opening hours during August.',
+      linkLabel: 'See hours'
+    },
+    'draft'
+  );
 }

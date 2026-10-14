@@ -21,10 +21,10 @@ import { packages } from '../landing-data';
         </div>
         <div class="max-w-xl">
           <p class="leading-7 text-muted-foreground">
-            Ten focused packages move together at
+            Twelve focused packages. The eleven stable ones move together at
             <strong class="font-semibold text-foreground">v{{ version }}</strong
-            >. Start with the model and runtime, then add only the platform and Angular surfaces
-            your application uses.
+            >; the experimental Agent Kit joins with the 1.0 release candidate. Start with the model
+            and runtime, then add only the platform and Angular surfaces your application uses.
           </p>
           <a voltButton variant="ghost" class="mt-3 px-0" routerLink="/docs/quickstart">
             Open the quickstart
@@ -41,15 +41,18 @@ import { packages } from '../landing-data';
                 <h3 class="font-semibold">{{ group.label }}</h3>
                 <p class="mt-1 text-sm text-muted-foreground">{{ group.description }}</p>
               </div>
-              <span class="text-xs text-muted-foreground">{{ group.items.length }}</span>
+              <span class="text-xs text-muted-foreground">{{ group.items.length }} packages</span>
             </header>
             <div class="divide-y divide-border">
               @for (pkg of group.items; track pkg.name) {
-                <div class="grid gap-2 py-4 sm:grid-cols-[0.8fr_1.2fr] sm:gap-4">
-                  <div class="flex items-center gap-2">
-                    <code class="break-all text-sm font-semibold"
+                <div class="grid gap-2 py-4 sm:grid-cols-[1fr_1fr] sm:gap-4">
+                  <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                    <code class="whitespace-nowrap text-sm font-semibold"
                       >&#64;forge-cms/{{ pkg.name }}</code
                     >
+                    @if (pkg.availability === 'experimental') {
+                      <span class="forge-experimental-badge">Experimental</span>
+                    }
                     <volt-badge variant="secondary">{{ pkg.version }}</volt-badge>
                   </div>
                   <p class="text-sm leading-6 text-muted-foreground">{{ pkg.purpose }}</p>
@@ -78,9 +81,9 @@ export class PackagesSectionComponent {
       items: packages.filter((pkg) => ['core', 'db', 'auth', 'storage'].includes(pkg.name))
     },
     {
-      label: 'Execution',
-      description: 'Operations, transport and edge adapters',
-      items: packages.filter((pkg) => ['api', 'runtime', 'cloudflare'].includes(pkg.name))
+      label: 'Runtime and platform',
+      description: 'Operations, transport and deployment adapters',
+      items: packages.filter((pkg) => ['api', 'runtime', 'cloudflare', 's3'].includes(pkg.name))
     },
     {
       label: 'Angular experience',
@@ -88,9 +91,9 @@ export class PackagesSectionComponent {
       items: packages.filter((pkg) => ['angular', 'admin'].includes(pkg.name))
     },
     {
-      label: 'Confidence',
-      description: 'Contracts for adapters and consumers',
-      items: packages.filter((pkg) => pkg.name === 'testing')
+      label: 'Quality and tooling',
+      description: 'Adapter contracts and coding-agent support',
+      items: packages.filter((pkg) => ['testing', 'agent'].includes(pkg.name))
     }
   ] as const;
 }

@@ -28,7 +28,7 @@ test('content: create a draft treatment, publish it from the list, see it on the
   await signIn(page);
 
   // The sidebar links into the package's content routes.
-  await page.getByRole('link', { name: 'Treatments' }).click();
+  await page.getByRole('link', { name: 'Treatments', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/collections\/services$/);
 
   await page.getByRole('button', { name: 'New' }).click();

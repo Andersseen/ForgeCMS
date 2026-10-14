@@ -20,6 +20,43 @@
 > three admin package defects, fixed in the same spec. See [0.7 status](#status-07) for the current
 > table; the per-finding text below stays as originally written, with dated status lines added.
 
+## Current status (ForgeCMS 1.0 candidate, spec 094)
+
+> Read this table first. The sections below are the **historical record** of what building Lumea cost
+> in July–September 2026 and are deliberately left as written, with dated status lines. Where they
+> say "no SSR story", "no globals" or "fix: 036/037", the status here supersedes them.
+
+| #   | Finding                               | Status now                                                                                                                                                                    |
+| --- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Declared-but-inert field options      | **Closed** (040).                                                                                                                                                             |
+| 2   | No SSR story                          | **Closed in Forge.** ForgeCMS supports and certifies Angular/Analog SSR (specs 036–037, 080–081, roadmap 0.9). **Lumea itself stays an SPA by choice** (demo-only retention). |
+| 3   | Money and timezone-aware dates        | **Intentional 1.0 limit** (post-1.0); the demo keeps `number` prices and zone-less appointment times.                                                                         |
+| 4   | No globals                            | **Closed in Forge** (023/066, reviewed migrations 072). **Demo-only retention**: the deployed D1 keeps the edited `site_settings` row; moving it needs a backed-up run.       |
+| 5   | `allowedRoles` precedes access rule   | **Documented behaviour**, not changed.                                                                                                                                        |
+| 6   | No email adapter                      | **Intentional 1.0 limit** (post-1.0); listed in [LIMITATIONS](LIMITATIONS.md).                                                                                                |
+| 7   | `richtext` editor / renderer          | Editor **closed** (042). Renderer is an **intentional 1.0 limit**; the demo flattens to paragraphs.                                                                           |
+| 8   | Local API untyped                     | **Closed** (047); demo migrated (071).                                                                                                                                        |
+| 9   | `depth: 1` and `upload`               | **Closed** (040).                                                                                                                                                             |
+| 10  | Slug lookup / relation contains       | **Closed** (050): `findOne`, `containsValue`; demo migrated (071).                                                                                                            |
+| 11  | Copied auth route files               | **Demo-only historical workaround.** Still copy-paste per app; framework route helpers are post-1.0.                                                                          |
+| 12  | Auth-token storage                    | **Closed** (054): cookie session and guard; demo migrated (071).                                                                                                              |
+| 13  | Linker plugin copied per app          | **Closed** (055): `@forge-cms/admin/vite`.                                                                                                                                    |
+| 14  | Fixed R2 binding name                 | **Closed** (040); the demo keeps `DB` / `BUCKET` because its deployed bindings use them.                                                                                      |
+| 15  | SDK cannot query                      | **Closed** (041). The public site still composes on the server by design (see README).                                                                                        |
+| 16  | Untyped `blocks` rows at render site  | **Open, post-1.0.** The demo casts each block by hand.                                                                                                                        |
+| 17  | Admin cannot see drafts               | **Closed** (041 + 042).                                                                                                                                                       |
+| 18  | SDK cannot upload                     | **Closed** (041): `uploadFile`.                                                                                                                                               |
+| 19  | Hooks cannot tell trusted calls apart | **Closed** (040): `overrideAccess`.                                                                                                                                           |
+| 20  | Hardcoded admin nav                   | **Closed** (042); admin mount and navigation are public API (087).                                                                                                            |
+| 21  | Uploads not served                    | **Closed** (040).                                                                                                                                                             |
+| 22  | Adapters disagree on timestamps       | **Closed** (040).                                                                                                                                                             |
+| 23  | Hook cannot query the CMS             | **Open, post-1.0.** Demo workaround: `runtime-ref.ts`.                                                                                                                        |
+| 24  | `date` typed `Date`, sent as string   | **Closed** (076).                                                                                                                                                             |
+
+Dogfood added since: Forge Analytics (057, experimental) with the tested collector/summary recipe,
+the localized `notices` collection (top-level `text` / `textarea` only, 067/094), and the Agent Kit
+detecting this project as development tooling (093/094). None of them changed a package.
+
 ## Summary
 
 The core held up. Eleven collections, drafts, function-based access, the full hook pipeline,
