@@ -71,6 +71,8 @@ const BROWSER_FORBIDDEN = [
   'defineEventHandler',
   'invalid server origin',
   'forwardCookies',
+  '@modelcontextprotocol', // @forge-cms/agent is dev-only tooling (spec 093)
+  'forge-cms-mcp',
   'LibSqlDatabaseAdapter',
   'D1DatabaseAdapter',
   '@libsql',

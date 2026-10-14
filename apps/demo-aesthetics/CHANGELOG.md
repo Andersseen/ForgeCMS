@@ -1,5 +1,34 @@
 # @forge-cms/demo-aesthetics
 
+## 0.0.30-rc.1
+
+### Patch Changes
+
+- @forge-cms/core@1.0.0-rc.1
+- @forge-cms/db@1.0.0-rc.1
+- @forge-cms/auth@1.0.0-rc.1
+- @forge-cms/storage@1.0.0-rc.1
+- @forge-cms/api@1.0.0-rc.1
+- @forge-cms/runtime@1.0.0-rc.1
+- @forge-cms/cloudflare@1.0.0-rc.1
+- @forge-cms/angular@1.0.0-rc.1
+- @forge-cms/admin@1.0.0-rc.1
+
+## 0.0.30-rc.0
+
+### Patch Changes
+
+- Updated dependencies
+  - @forge-cms/core@1.0.0-rc.0
+  - @forge-cms/db@1.0.0-rc.0
+  - @forge-cms/auth@1.0.0-rc.0
+  - @forge-cms/storage@1.0.0-rc.0
+  - @forge-cms/api@1.0.0-rc.0
+  - @forge-cms/runtime@1.0.0-rc.0
+  - @forge-cms/cloudflare@1.0.0-rc.0
+  - @forge-cms/angular@1.0.0-rc.0
+  - @forge-cms/admin@1.0.0-rc.0
+
 ## 0.0.29
 
 ### Patch Changes

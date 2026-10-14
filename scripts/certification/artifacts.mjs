@@ -20,7 +20,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { arch, platform } from 'node:os';
 import { join } from 'node:path';
 
-/** The eleven public packages (the Changesets `fixed` family). */
+/** The twelve public packages (the Changesets `fixed` family; `@forge-cms/agent` is experimental, spec 093). */
 export const PUBLIC_PACKAGES = [
   '@forge-cms/core',
   '@forge-cms/db',
@@ -32,7 +32,8 @@ export const PUBLIC_PACKAGES = [
   '@forge-cms/cloudflare',
   '@forge-cms/angular',
   '@forge-cms/admin',
-  '@forge-cms/testing'
+  '@forge-cms/testing',
+  '@forge-cms/agent'
 ];
 
 /** Directory holding `artifacts.json` + the tarballs of the run being certified. */
@@ -173,7 +174,7 @@ function readPacked(tarball) {
 }
 
 /**
- * Packs `names` (default: all eleven) once into `dir`, hashes and inspects every tarball and writes the manifest.
+ * Packs `names` (default: all twelve) once into `dir`, hashes and inspects every tarball and writes the manifest.
  * `log` receives the pnpm command lines (kept quiet by default).
  */
 export function packArtifacts(dir, { names = PUBLIC_PACKAGES, log = () => {} } = {}) {

@@ -44,7 +44,7 @@ population depth 1; no atomic database+object-store snapshot, no point-in-time r
 
 ## Ecosystem context
 
-- **Monorepo** (`Andersseen/ForgeCMS`): eleven public packages and the apps listed in [CLAUDE.md](../CLAUDE.md). `apps/www` is the official site, docs and the live `/admin`
+- **Monorepo** (`Andersseen/ForgeCMS`): twelve public packages and the apps listed in [CLAUDE.md](../CLAUDE.md). `apps/www` is the official site, docs and the live `/admin`
   demo on the real runtime; `apps/tiny-project` is the external-style consumer used for certification; `apps/demo-aesthetics` is the real-world demo whose purpose is
   [DEMO-FINDINGS.md](DEMO-FINDINGS.md).
 - **`@voltui/components`** (Volt UI) is the author's Angular UI library and a peer of `@forge-cms/admin`.

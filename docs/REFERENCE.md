@@ -7,7 +7,7 @@ The human-readable companion to the machine-checked export inventory in [`api-ba
 Stability vocabulary (see [SUPPORT.md](SUPPORT.md)): **stable** = covered by the 1.0 compatibility promise · **experimental** = public but outside it ·
 **deprecated** = still works, removed after 1.0. Defaults in the frozen client/admin contract are in [1.0-PUBLIC-SURFACE.md](1.0-PUBLIC-SURFACE.md).
 
-All eleven packages are ESM-only, share one version, and are imported only through the entry points below.
+All twelve packages are ESM-only, share one version, and are imported only through the entry points below. `@forge-cms/agent` is experimental development tooling.
 
 | Entry point                    | Boundary              | Stability                               |
 | ------------------------------ | --------------------- | --------------------------------------- |
@@ -26,6 +26,7 @@ All eleven packages are ESM-only, share one version, and are imported only throu
 | `@forge-cms/admin/vite`        | build time            | stable                                  |
 | `@forge-cms/testing`           | dev/test only         | stable                                  |
 | `@forge-cms/testing/contracts` | dev/test only         | stable                                  |
+| `@forge-cms/agent`             | dev time only         | **experimental**                        |
 
 ## `@forge-cms/core`
 
@@ -255,3 +256,14 @@ The adapter contract suites an adapter must pass: `runDatabaseAdapterContractTes
 `runStorageAdapterContractTests`, `runAnalyticsWriterContractTests`, and the behavioural suites `runSchemaDriftContractTests`, `runMigrationContractTests`, `runVersionHistoryContractTests`,
 `runRelationLifecycleContractTests`, `runLocaleMergeContractTests`, `runWriteAccessContractTests`, `runGlobalLifecycleContractTests`, `runFirstAdminBootstrapContractTests`,
 `runLastAdminConcurrencyContractTests`, `runAuthManagedDeleteContractTests`. The suites use Vitest globals. Stable.
+
+## `@forge-cms/agent`
+
+**Experimental development tooling** - outside the stable 1.x compatibility promise (tool names, resource ids and skill names may change in a compatible minor). Dev dependency only: no Forge package, no application and no browser bundle may depend on it.
+Node >= 22, ESM. Binary: `forge-cms-mcp` (`pnpm exec forge-cms-mcp [--root <dir>]`), a **read-only, local, stdio** MCP server with no telemetry. Guide: [Agent Kit](../apps/www/src/content/docs/agent-kit.md).
+
+**Programmatic surface.** `createForgeMcpServer({ projectRoot })` returns the server; `detectProject(root)`, `doctorProject(root)`, `searchDocs(query, limit?)`, `listDocs()`, `supportFacts(version)` and `fetchRuntimeMetadata(origin)` are the functions behind the tools.
+
+**MCP tools** (all read-only, none takes a path): `forge_project_detect`, `forge_project_doctor`, `forge_docs_search`, `forge_support`, `forge_runtime_metadata`.
+**MCP resources:** `forge://docs/<guide>`, `forge://skills/<skill>`, `forge://support`, `forge://project`.
+**Skills** (shipped as `skills/<name>/SKILL.md`): `forgecms-setup`, `forgecms-content-modeling`, `forgecms-admin`, `forgecms-localization`, `forgecms-auth-access`, `forgecms-cloudflare`, `forgecms-analytics`, `forgecms-migrations-recovery`.

@@ -2,9 +2,27 @@
 import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { decideAggregateRelease, releaseCommit } from './release-decision.mjs';
+import {
+  decideAggregateRelease,
+  assertFixedFamily,
+  detectReleaseMode,
+  githubReleasePlan,
+  isRcVersion,
+  releaseCommit
+} from './release-decision.mjs';
 
 const dryRun = process.argv.includes('--dry-run');
+/** `--mode stable|prerelease` (default stable): the release kind this invocation is allowed to create. */
+function readModeArgument(argv) {
+  const index = argv.indexOf('--mode');
+  const value = index === -1 ? 'stable' : argv[index + 1];
+  if (value !== 'stable' && value !== 'prerelease') {
+    throw new Error(`--mode must be "stable" or "prerelease" (got ${JSON.stringify(value)})`);
+  }
+  return value;
+}
+
+const expectedMode = readModeArgument(process.argv.slice(2));
 const packageNamePattern = /^@forge-cms\/[a-z0-9-]+$/;
 
 function readPublicPackages() {
@@ -98,19 +116,34 @@ for (const pkg of packages) {
   }
 }
 
-// Only the commit that introduced this version may carry `vX.Y.Z` (spec 072 §9).
-const decision = decideAggregateRelease({
-  head: packages,
-  base: readFirstParentPackages(releaseCommit(process.env))
-});
-console.log(`Aggregate release decision: ${decision.reason}`);
-if (!decision.create) {
-  process.exit(0);
+// The stable path must never create a prerelease's release (or the reverse): the mode is explicit.
+const actualMode = detectReleaseMode(packages);
+if (actualMode !== expectedMode) {
+  throw new Error(
+    `Refusing to create a ${expectedMode} GitHub release: public packages are in ${actualMode} mode.`
+  );
 }
 
-const version = decision.version;
+// Stable: only the commit that introduced this version may carry `vX.Y.Z` (spec 072 §9).
+// Prerelease: the manual RC workflow *is* the explicit act, run on the candidate SHA it was given, so the
+// first-parent test does not apply; the existing-release check below keeps it idempotent.
+let version;
+if (expectedMode === 'prerelease') {
+  version = assertFixedFamily(packages);
+  if (!isRcVersion(version)) throw new Error(`${version} is not a 1.0.0-rc.N release candidate`);
+} else {
+  const decision = decideAggregateRelease({
+    head: packages,
+    base: readFirstParentPackages(releaseCommit(process.env))
+  });
+  console.log(`Aggregate release decision: ${decision.reason}`);
+  if (!decision.create) {
+    process.exit(0);
+  }
+  version = decision.version;
+}
 
-const tagName = `v${version}`;
+const { tagName, prerelease } = githubReleasePlan(version);
 const targetCommitish = process.env.GITHUB_SHA;
 
 if (!targetCommitish) {
@@ -118,7 +151,9 @@ if (!targetCommitish) {
 }
 
 const packageList = packages.map((pkg) => `- ${pkg.name}@${pkg.version}`).join('\n');
-const body = `Published ForgeCMS packages to npm as ${version}.\n\n${packageList}`;
+const body = prerelease
+  ? `ForgeCMS release candidate ${version}, published to npm under the \`rc\` dist-tag (npm \`latest\` is unchanged).\n\n${packageList}\n\nSee docs/1.0-RC-NOTES.md.`
+  : `Published ForgeCMS packages to npm as ${version}.\n\n${packageList}`;
 
 if (dryRun) {
   console.log(`Would ensure GitHub release ${tagName} at ${targetCommitish}`);
@@ -153,7 +188,7 @@ const release = await githubFetch('/releases', {
     name: `ForgeCMS ${tagName}`,
     body,
     draft: false,
-    prerelease: false
+    prerelease
   })
 });
 

@@ -121,7 +121,7 @@ jobs:
         run: pnpm e2e:demo
 
   # Roadmap 0.12 / R01 (spec 088): the packed-artifact certification of this commit. One `pnpm release:certify` builds,
-  # packs the eleven public packages ONCE (SHA-256 per tarball, `artifacts.json`), hands that exact set to every packed
+  # packs the twelve public packages ONCE (SHA-256 per tarball, `artifacts.json`), hands that exact set to every packed
   # verifier and seals it: the server-only + entry-point consumers (release:consumers), packed installation and
   # consumers (release:verify), the strict Angular/admin peer matrix incl. the /studio mount (release:compat), the
   # technical SSR/hydration consumer (release:ssr), the real-Garage durable evidence (test:s3: adapter · lifecycle ·
@@ -301,7 +301,8 @@ jobs:
       # .changeset/*.md file. Apps are `private: true`, so changes under apps/* never trigger this.
       - name: Verify a changeset exists
         if: github.event_name == 'pull_request'
-        run: pnpm changeset status --since=origin/main
+        # Pre mode aware (spec 092/093): a PR that also contains the prerelease version commit consumed its own changesets.
+        run: node scripts/check-changesets.mjs origin/main
 
   release:
     name: Release packages to npm
@@ -339,18 +340,28 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Spec 092: this job publishes STABLE versions only. A prerelease version (1.0.0-rc.N) that lands on main
+      # is published solely by the manual release-rc workflow, under an explicit `rc` dist-tag. Every step below
+      # is gated on the detected mode, so nothing here can publish a prerelease to `latest`.
+      - name: Detect release mode
+        id: mode
+        run: node scripts/release-mode.mjs
+
       # publishConfig.access is already "public" per package, but dist/ is gitignored — it must be
       # rebuilt here, or `changeset publish` would ship packages with no `dist/` at all.
       - name: Build all packages
+        if: steps.mode.outputs.mode == 'stable'
         run: pnpm build
 
       - name: Verify packed package installation
+        if: steps.mode.outputs.mode == 'stable'
         run: pnpm release:verify
 
       # No pending changesets and no version bump → this step is a no-op (nothing to publish).
       # Pending changesets → opens/updates a "Version Packages" PR instead of publishing.
       # That PR merged (versions bumped, changesets consumed) → publishes the bumped packages.
       - name: Create Release PR or publish to npm
+        if: steps.mode.outputs.mode == 'stable'
         uses: changesets/action@v1
         with:
           publish: pnpm changeset publish
@@ -366,7 +377,7 @@ jobs:
       # itself is untouched. The two steps below must only ever publish/tag what is actually
       # committed to `main`, or they publish/tag a version whose bump never landed in git history.
       - name: Restore working tree to the triggering commit
-        if: always()
+        if: always() && steps.mode.outputs.mode == 'stable'
         run: git checkout "${{ github.sha }}" -- .
 
       # The first public release started from an empty baseline changeset, so Changesets has no
@@ -374,13 +385,15 @@ jobs:
       # normal Changesets releases will publish first, and this step will skip already-published
       # versions.
       - name: Publish package versions missing from npm
+        if: steps.mode.outputs.mode == 'stable'
         run: pnpm release:publish-unpublished
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
 
       - name: Create GitHub release
-        run: pnpm release:github
+        if: steps.mode.outputs.mode == 'stable'
+        run: pnpm release:github --mode stable
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

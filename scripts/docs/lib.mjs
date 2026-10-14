@@ -252,3 +252,171 @@ export function markdownFiles(dir, skip = ['node_modules', 'dist', '.git', '.tur
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------------------------------------
+// Agent Kit and Analytics documentation (spec 093)
+
+const NUMBER_WORDS = { 11: 'eleven', 12: 'twelve', 13: 'thirteen', 14: 'fourteen' };
+const PUBLIC_SPECIFIERS = new Set([
+  '@forge-cms/core',
+  '@forge-cms/db',
+  '@forge-cms/auth',
+  '@forge-cms/storage',
+  '@forge-cms/s3',
+  '@forge-cms/api',
+  '@forge-cms/runtime',
+  '@forge-cms/cloudflare',
+  '@forge-cms/angular',
+  '@forge-cms/admin',
+  '@forge-cms/testing',
+  '@forge-cms/agent',
+  '@forge-cms/angular/server',
+  '@forge-cms/angular/vite',
+  '@forge-cms/admin/vite',
+  '@forge-cms/testing/contracts'
+]);
+
+/** Paragraphs (blank-line separated) of `markdown` that mention `needle` but not `/experimental/i`. */
+export function mentionsWithoutLabel(markdown, needle, label = /experimental/i) {
+  return markdown
+    .split(/\n\s*\n/)
+    .filter((paragraph) => paragraph.includes(needle) && !label.test(paragraph));
+}
+
+/** The MCP tool names registered in the agent kit's server source. */
+export function registeredTools(serverSource) {
+  return [...serverSource.matchAll(/registerTool\(\s*'([a-z_]+)'/g)].map((match) => match[1]);
+}
+
+export function checkAgentKitDocs({ root }) {
+  const failures = [];
+  const read = (path) =>
+    existsSync(join(root, path)) ? readFileSync(join(root, path), 'utf8') : null;
+  const need = (path) => {
+    const text = read(path);
+    if (text === null) failures.push(`${path} does not exist`);
+    return text ?? '';
+  };
+
+  const serverSource = need('packages/agent/src/server.ts');
+  const tools = registeredTools(serverSource);
+  if (tools.length === 0) failures.push('packages/agent/src/server.ts registers no MCP tool');
+
+  // MCP docs list the real tools, and only the real tools.
+  const toolDocs = [
+    'apps/www/src/content/docs/agent-kit.md',
+    'docs/REFERENCE.md',
+    'packages/agent/README.md'
+  ];
+  for (const path of toolDocs) {
+    const text = need(path);
+    for (const tool of tools) {
+      if (!text.includes(tool)) failures.push(`${path}: does not document the MCP tool ${tool}`);
+    }
+    for (const mentioned of new Set(text.match(/\bforge_[a-z_]+\b/g) ?? [])) {
+      if (!tools.includes(mentioned))
+        failures.push(`${path}: documents a tool that does not exist: ${mentioned}`);
+    }
+  }
+  for (const resource of ['forge://support', 'forge://project']) {
+    if (!serverSource.includes(`'${resource}'`))
+      failures.push(`server.ts does not register ${resource}`);
+    if (!need('apps/www/src/content/docs/agent-kit.md').includes(resource)) {
+      failures.push(`agent-kit.md does not document ${resource}`);
+    }
+  }
+
+  // Skills: frontmatter, links, public imports, real tool names, and listed in the guide.
+  const skillsDir = join(root, 'packages/agent/skills');
+  const skills = existsSync(skillsDir) ? readdirSync(skillsDir).sort() : [];
+  if (skills.length === 0) failures.push('packages/agent/skills has no skills');
+  const guide = need('apps/www/src/content/docs/agent-kit.md');
+  for (const skill of skills) {
+    const path = `packages/agent/skills/${skill}/SKILL.md`;
+    const text = read(path);
+    if (text === null) {
+      failures.push(`${path} does not exist`);
+      continue;
+    }
+    const front = /^---\nname: (.+)\ndescription: (.+)\n---\n/.exec(text);
+    if (!front || front[1] !== skill) failures.push(`${path}: frontmatter name must be "${skill}"`);
+    if (!guide.includes(`\`${skill}\``))
+      failures.push(`agent-kit.md does not list the skill ${skill}`);
+    for (const specifier of text.match(/@forge-cms\/[a-z0-9-]+(?:\/[a-z0-9/-]+)?/g) ?? []) {
+      if (!PUBLIC_SPECIFIERS.has(specifier))
+        failures.push(`${path}: not a public specifier: ${specifier}`);
+    }
+    if (/@forge-cms\/[a-z-]+\/(?:src|dist)\b/.test(text))
+      failures.push(`${path}: references src/ or dist/`);
+    for (const tool of new Set(text.match(/\bforge_[a-z_]+\b/g) ?? [])) {
+      if (!tools.includes(tool))
+        failures.push(`${path}: names a tool that does not exist: ${tool}`);
+    }
+    for (const link of text.matchAll(/\]\((?!https?:|#|mailto:)([^)\s]+)\)/g)) {
+      if (!existsSync(resolve(dirname(join(root, path)), link[1].split('#')[0]))) {
+        failures.push(`${path}: broken link ${link[1]}`);
+      }
+    }
+  }
+
+  // The package count the docs state is the real one.
+  const packages = readdirSync(join(root, 'packages')).filter((name) => {
+    const manifest = read(`packages/${name}/package.json`);
+    return manifest !== null && JSON.parse(manifest).private !== true;
+  });
+  const word = NUMBER_WORDS[packages.length];
+  if (word && !need('docs/REFERENCE.md').includes(`All ${word} packages`)) {
+    failures.push(
+      `docs/REFERENCE.md must state "All ${word} packages" (${packages.length} public packages)`
+    );
+  }
+
+  // Experimental labelling: dedicated pages carry a banner at the top, shared pages label every mention.
+  for (const path of ['packages/agent/README.md', 'apps/www/src/content/docs/agent-kit.md']) {
+    const text = read(path);
+    if (text !== null && !/experimental/i.test(text.slice(0, 900))) {
+      failures.push(`${path}: must open with an EXPERIMENTAL banner`);
+    }
+  }
+  const reference = need('docs/REFERENCE.md');
+  const referenceSection = reference.slice(reference.indexOf('## `@forge-cms/agent`'));
+  if (!/experimental/i.test(referenceSection.slice(0, 400))) {
+    failures.push('docs/REFERENCE.md: the @forge-cms/agent section must say it is experimental');
+  }
+  for (const path of [
+    'README.md',
+    'docs/MATRICES.md',
+    'docs/SUPPORT.md',
+    'docs/LIMITATIONS.md',
+    'docs/1.0-PUBLIC-SURFACE.md'
+  ]) {
+    const text = read(path);
+    if (text === null) continue;
+    for (const paragraph of mentionsWithoutLabel(text, '@forge-cms/agent')) {
+      failures.push(
+        `${path}: mentions @forge-cms/agent without labelling it experimental: "${paragraph.slice(0, 60).replace(/\s+/g, ' ')}…"`
+      );
+    }
+  }
+  const analyticsGuide = need('apps/www/src/content/docs/analytics.md');
+  if (!/\*\*Experimental\.\*\*/.test(analyticsGuide))
+    failures.push('analytics.md must open with the Experimental banner');
+  const surface = need('docs/1.0-PUBLIC-SURFACE.md');
+  const experimental = surface.slice(
+    surface.indexOf('### Experimental'),
+    surface.indexOf('### Deprecated')
+  );
+  if (!/Forge Analytics/.test(experimental))
+    failures.push('1.0-PUBLIC-SURFACE.md: Analytics must stay under "Experimental"');
+  for (const path of ['docs/MATRICES.md', 'docs/SUPPORT.md', 'docs/LIMITATIONS.md']) {
+    const text = need(path);
+    if (
+      !/Analytics[^\n]*(?:experimental|Experimental)|(?:experimental|Experimental)[^\n]*Analytics/.test(
+        text
+      )
+    ) {
+      failures.push(`${path}: Analytics must be labelled experimental`);
+    }
+  }
+  return { failures, tools, skills };
+}

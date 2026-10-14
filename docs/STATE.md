@@ -1,5 +1,12 @@
 # STATE — Current implementation status
 
+> **Last updated: 2026-10-14 (spec 092 L01 + spec 093 pre-L02 scope amendment - candidate `1.0.0-rc.1` PREPARED AND CERTIFIED, NOT PUBLISHED, on `release/spec-092-forgecms-1.0-rc`, PR #99).** ForgeCMS is **not released as 1.0**;
+> npm `latest` is `0.13.4` and nothing from this branch is published. J1 is closed (private vulnerability reporting enabled). Prerelease publication is fail-closed (`--tag rc`, GitHub prerelease mode, stable-only `release` job, manual
+> `release-rc.yml`). Spec 093 added the experimental `@forge-cms/agent` (read-only MCP server + skill pack; the fixed family is now **twelve** packages) and a verified Analytics onboarding recipe. The earlier `1.0.0-rc.0` was never
+> published and is superseded. Candidate `1.0.0-rc.1` = `02ba1e6`; `release:certify` CERTIFIED and the matrix is in the [dossier](1.0-RELEASE-DOSSIER.md#l-l01--the-release-candidate). **Pending:** the maintainer's authorization to
+> dispatch the manual RC publication, then registry verification (J11). L02 (observe `1.0.0-rc.1`, fix only defects) has not started; L03 not started.
+> _Previous header (2026-10-13, R04):_ roadmap 0.12 complete (R01–R04); `0.13.3` current; no release candidate.
+>
 > **Last updated: 2026-10-13 (spec 091 / roadmap 0.12 R04 — consumer documentation and release dossier — COMPLETE on
 > `feature/spec-091-consumer-docs-release-dossier`).** Roadmap 0.12 is **complete: R01 ✓ R02 ✓ R03 ✓ R04 ✓.** ForgeCMS is **not released as 1.0**; no release
 > candidate exists. Release truth: PR #95 (R03 closeout) and PR #96 (Version Packages) are merged; main `7aa8fa3` CI `38262008765` ✓ (checks, certify, reliability,

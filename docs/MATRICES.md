@@ -44,34 +44,35 @@ localized field is not supported. There is no arbitrary nested or per-field-kind
 
 ## Feature matrix
 
-| Capability                        | Status                | Notes / where it is proven                                                                         |
-| --------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------- |
-| Schema DSL (15 kinds)             | stable 1.0 candidate  | `packages/core` tests; coverage floor enforced                                                     |
-| Local API                         | stable 1.0 candidate  | Trusted by default (`overrideAccess: true`); the whole pipeline                                    |
-| REST API                          | stable 1.0 candidate  | Stable envelope; no GraphQL                                                                        |
-| Validation, defaults              | stable 1.0 candidate  | Every write; `defaultValue` on create only                                                         |
-| Hooks                             | stable 1.0 candidate  | Nine collection stages plus field hooks                                                            |
-| Row access, field access          | stable 1.0 candidate  | Functions returning a boolean or a query; HTTP never trusts a caller override                      |
-| Drafts, versions, restore         | stable 1.0 candidate  | Draft visibility enforced on reads, files and relations                                            |
-| Globals                           | stable 1.0 candidate  | Singleton; `read`/`update` access only                                                             |
-| Localization                      | intentionally limited | Top-level `text`/`textarea` only (see above)                                                       |
-| Relations, `depth: 1`             | intentionally limited | One population level                                                                               |
-| Relation integrity                | stable 1.0 candidate  | `restrict`/`cascade`/`set-null`, atomic; users are restrict-only                                   |
-| Uploads (multipart, `handleFile`) | stable 1.0 candidate  | Ownership via `_storageKey`; no presigned uploads, no image processing, no Local API upload helper |
-| Browser sessions, CSRF            | stable 1.0 candidate  | `HttpOnly` cookie, 24-hour signed token, CSRF for cookie mutations; logout is client-state only    |
-| API keys                          | stable 1.0 candidate  | Scoped, hashed, shown once                                                                         |
-| Typed Angular client              | stable 1.0 candidate  | `ForgeSchema` / `injectForgeClient`; no code generation                                            |
-| Signal resources                  | stable 1.0 candidate  | Abort superseded requests, no stale overwrite, reset on identity change                            |
-| SSR, request isolation            | stable 1.0 candidate  | `provideForgeCmsServer`; explicit origin; per-render state                                         |
-| Public hydration transfer         | stable 1.0 candidate  | Opt-in per resource (`transfer: 'public'`), anonymous data only                                    |
-| Angular admin                     | stable 1.0 candidate  | Angular 21 only; no admin on Angular 22 yet                                                        |
-| Schema drift detection            | stable 1.0 candidate  | `planSchema()` / `SchemaDriftError`                                                                |
-| Reviewed migrations               | stable 1.0 candidate  | Append-only ledger, checksums, destructive opt-in; no down migrations                              |
-| Backup / restore procedure        | stable 1.0 candidate  | Procedures rehearsed on both profiles; no atomic cross-store snapshot, no PITR                     |
-| Cloudflare D1 + R2                | stable 1.0 candidate  | See the deployment table                                                                           |
-| libSQL + S3                       | stable 1.0 candidate  | Garage `v2.4.1` certified                                                                          |
-| Cloudflare Analytics Engine       | **experimental**      | Opt-in; may change in any release                                                                  |
-| Strata integration                | not a Forge feature   | Consumer dogfood in `apps/tiny-project` only; not part of the 1.0 API                              |
+| Capability                        | Status                | Notes / where it is proven                                                                                                       |
+| --------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Schema DSL (15 kinds)             | stable 1.0 candidate  | `packages/core` tests; coverage floor enforced                                                                                   |
+| Local API                         | stable 1.0 candidate  | Trusted by default (`overrideAccess: true`); the whole pipeline                                                                  |
+| REST API                          | stable 1.0 candidate  | Stable envelope; no GraphQL                                                                                                      |
+| Validation, defaults              | stable 1.0 candidate  | Every write; `defaultValue` on create only                                                                                       |
+| Hooks                             | stable 1.0 candidate  | Nine collection stages plus field hooks                                                                                          |
+| Row access, field access          | stable 1.0 candidate  | Functions returning a boolean or a query; HTTP never trusts a caller override                                                    |
+| Drafts, versions, restore         | stable 1.0 candidate  | Draft visibility enforced on reads, files and relations                                                                          |
+| Globals                           | stable 1.0 candidate  | Singleton; `read`/`update` access only                                                                                           |
+| Localization                      | intentionally limited | Top-level `text`/`textarea` only (see above)                                                                                     |
+| Relations, `depth: 1`             | intentionally limited | One population level                                                                                                             |
+| Relation integrity                | stable 1.0 candidate  | `restrict`/`cascade`/`set-null`, atomic; users are restrict-only                                                                 |
+| Uploads (multipart, `handleFile`) | stable 1.0 candidate  | Ownership via `_storageKey`; no presigned uploads, no image processing, no Local API upload helper                               |
+| Browser sessions, CSRF            | stable 1.0 candidate  | `HttpOnly` cookie, 24-hour signed token, CSRF for cookie mutations; logout is client-state only                                  |
+| API keys                          | stable 1.0 candidate  | Scoped, hashed, shown once                                                                                                       |
+| Typed Angular client              | stable 1.0 candidate  | `ForgeSchema` / `injectForgeClient`; no code generation                                                                          |
+| Signal resources                  | stable 1.0 candidate  | Abort superseded requests, no stale overwrite, reset on identity change                                                          |
+| SSR, request isolation            | stable 1.0 candidate  | `provideForgeCmsServer`; explicit origin; per-render state                                                                       |
+| Public hydration transfer         | stable 1.0 candidate  | Opt-in per resource (`transfer: 'public'`), anonymous data only                                                                  |
+| Angular admin                     | stable 1.0 candidate  | Angular 21 only; no admin on Angular 22 yet                                                                                      |
+| Schema drift detection            | stable 1.0 candidate  | `planSchema()` / `SchemaDriftError`                                                                                              |
+| Reviewed migrations               | stable 1.0 candidate  | Append-only ledger, checksums, destructive opt-in; no down migrations                                                            |
+| Backup / restore procedure        | stable 1.0 candidate  | Procedures rehearsed on both profiles; no atomic cross-store snapshot, no PITR                                                   |
+| Cloudflare D1 + R2                | stable 1.0 candidate  | See the deployment table                                                                                                         |
+| libSQL + S3                       | stable 1.0 candidate  | Garage `v2.4.1` certified                                                                                                        |
+| Cloudflare Analytics Engine       | **experimental**      | Opt-in; verified onboarding recipe ([guide](../apps/www/src/content/docs/analytics.md)); may change in any release               |
+| Agent Kit (`@forge-cms/agent`)    | **experimental**      | Dev-time, read-only local MCP server + skill pack ([guide](../apps/www/src/content/docs/agent-kit.md)); not a runtime dependency |
+| Strata integration                | not a Forge feature   | Consumer dogfood in `apps/tiny-project` only; not part of the 1.0 API                                                            |
 
 ## Deployment profiles
 

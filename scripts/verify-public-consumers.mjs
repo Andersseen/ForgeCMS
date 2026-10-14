@@ -6,7 +6,7 @@
 //   server-only  core · db · auth · storage · api · runtime and nothing else. Proves the backend does not drag
 //                Angular, the admin, VoltUI, CDK or lumen into a server project, then compiles under strict
 //                TypeScript and RUNS a first-admin + CRUD + access (`overrideAccess: false`) + relation journey.
-//   entrypoints  all eleven packages together with their real peers. Resolves every package root and the four
+//   entrypoints  all twelve packages together with their real peers. Resolves every package root and the four
 //                retained subpaths through the exports maps, type-checks every symbol of the committed
 //                api-baseline against the packed declarations, imports the server-safe entries in Node, and
 //                scans the packed JavaScript of the browser-facing packages for server/Node leakage.
@@ -286,6 +286,7 @@ const NODE_IMPORTABLE = [
   '@forge-cms/runtime',
   '@forge-cms/cloudflare',
   '@forge-cms/testing',
+  '@forge-cms/agent',
   '@forge-cms/testing/contracts',
   '@forge-cms/angular/vite',
   '@forge-cms/admin/vite'
@@ -317,7 +318,7 @@ console.log('entry points ok');
 
 /** Node/server-only things the packed JavaScript of a browser-facing package must never import. */
 const SERVER_ONLY_IMPORT =
-  /(?:from\s+|import\s*\()\s*['"](node:[^'"]+|@forge-cms\/(?:db|auth|runtime|s3|cloudflare|storage|api|testing)(?:\/[^'"]*)?|@libsql\/[^'"]+|@aws-sdk\/[^'"]+|h3|nitropack)['"]/;
+  /(?:from\s+|import\s*\()\s*['"](node:[^'"]+|@forge-cms\/(?:db|auth|runtime|s3|cloudflare|storage|api|testing|agent)(?:\/[^'"]*)?|@modelcontextprotocol\/[^'"]+|@libsql\/[^'"]+|@aws-sdk\/[^'"]+|h3|nitropack)['"]/;
 
 function jsFilesUnder(dir) {
   return readdirSync(dir, { recursive: true })
@@ -389,7 +390,7 @@ function verifyEntryPoints(workDir, tarballs) {
   process.stdout.write(run('node', ['resolve.mjs'], dir));
   verifyBrowserBoundary(dir);
   console.log(
-    `  ✓ entry points: ${specifiers.length} specifiers (11 roots + ${RETAINED_SUBPATHS.length} subpaths) resolve, type-check every baseline symbol, and the Node-safe ones import`
+    `  ✓ entry points: ${specifiers.length} specifiers (${PUBLIC_PACKAGES.length} roots + ${RETAINED_SUBPATHS.length} subpaths) resolve, type-check every baseline symbol, and the Node-safe ones import`
   );
 }
 

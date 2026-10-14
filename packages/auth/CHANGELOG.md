@@ -1,5 +1,26 @@
 # @forge-cms/auth
 
+## 1.0.0-rc.1
+
+### Patch Changes
+
+- @forge-cms/core@1.0.0-rc.1
+- @forge-cms/db@1.0.0-rc.1
+
+## 1.0.0-rc.0
+
+### Major Changes
+
+- ForgeCMS 1.0 compatibility commitment. This is a version milestone, not a behavioural change: it introduces no new feature relative to the final `0.13.x`
+  line. The stable public surface was frozen in `0.13.0` (U03) and the 0.12 certification work (R01–R04) supplies the evidence. From `1.0.0` the semver and
+  deprecation rules in `docs/SUPPORT.md` apply.
+
+### Patch Changes
+
+- Updated dependencies
+  - @forge-cms/core@1.0.0-rc.0
+  - @forge-cms/db@1.0.0-rc.0
+
 ## 0.13.4
 
 ### Patch Changes

@@ -22,7 +22,7 @@ pnpm build        # required once: @forge-cms/* resolve through packages/*/dist 
 A **pnpm workspace** driven by **Turborepo**, ESM-only, TypeScript strict.
 
 ```
-packages/   core · db · auth · storage · s3 · api · runtime · cloudflare · angular · admin · testing     (the eleven published packages)
+packages/   core · db · auth · storage · s3 · api · runtime · cloudflare · angular · admin · testing · agent     (the twelve published packages)
 apps/       www (site, docs, /admin demo) · playground (maintainer sandbox) · tiny-project (certification consumer)
             demo-aesthetics (real-world demo) · upgrade-rehearsal · performance-baseline
 docs/       state, architecture, conventions, specs, roadmap, reference, support, dossier
@@ -61,7 +61,7 @@ pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build
 | `pnpm test:coverage`                                              | Per-package source-attributed coverage against the 1.0 floors                                                                                                           |
 | `pnpm test:performance`                                           | Fixed libSQL fixture and bundle sizes against frozen budgets                                                                                                            |
 | `pnpm test:stability`                                             | Critical journeys repeated with retries off                                                                                                                             |
-| `pnpm release:certify`                                            | Packs the eleven packages **once** and certifies exactly those tarballs (consumers, compat, SSR, S3, upgrade)                                                           |
+| `pnpm release:certify`                                            | Packs the twelve packages **once** and certifies exactly those tarballs (consumers, compat, SSR, S3, upgrade)                                                           |
 | `pnpm e2e:www` · `e2e:www:prod` · `e2e:tiny-project` · `e2e:demo` | Playwright journeys                                                                                                                                                     |
 
 CI (`.github/workflows/ci.yml`) is the authority: `Lint · Typecheck · Test · Build · Pack · E2E`, `Certify packed artifacts · durable profiles`,
@@ -75,7 +75,7 @@ for Node builtins; relative imports inside `packages/*` use the `.js` extension;
 
 ## Changesets and releases
 
-The eleven public packages are one **fixed** Changesets group: they always release together at one version, whichever of them changed. Apps are private and never need a changeset.
+The twelve public packages are one **fixed** Changesets group: they always release together at one version, whichever of them changed. Apps are private and never need a changeset.
 
 ```sh
 pnpm changeset      # pick the packages, the bump (patch | minor | major) and write the summary

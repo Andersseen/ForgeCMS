@@ -7,6 +7,7 @@
 //               `#anchor`s into Markdown. External URLs are listed, never fatal (no network in the gate).
 //   snippets    every `<!-- snippet: path -->` block equals the example file the verifiers actually build.
 //   reference   docs/REFERENCE.md covers all 15 public entry points and attributes no export to the wrong package.
+//   agent kit   MCP tools/resources and skills are documented and real; package count; experimental labels (spec 093).
 //   stale       phrases that were true once ("nothing published yet", "Early design phase", …) stay out.
 //
 // The executable half — the two quickstarts installed from packed tarballs — is `pnpm docs:verify:consumers`.
@@ -14,6 +15,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  checkAgentKitDocs,
   checkLinks,
   checkReference,
   checkSnippets,
@@ -85,6 +87,12 @@ if (existsSync(referencePath)) {
 } else {
   report('reference', ['docs/REFERENCE.md does not exist']);
 }
+
+const agentKit = checkAgentKitDocs({ root });
+report(
+  `agent kit: ${agentKit.tools.length} MCP tools, ${agentKit.skills.length} skills, experimental labels, package count`,
+  agentKit.failures
+);
 
 report('stale claims', checkStalePhrases({ root, files: currentFacing }).failures);
 

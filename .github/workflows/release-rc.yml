@@ -1,0 +1,98 @@
+# Manual release-candidate publication (spec 092). workflow_dispatch ONLY: never push/PR/merge triggered.
+# Publishes an already-prepared `1.0.0-rc.N` commit under the fixed `rc` dist-tag and verifies npm `latest`
+# did not move. It does not deploy any website. Re-running after a partial publish only publishes the
+# packages still missing from npm (scripts/publish-unpublished.mjs skips existing versions, never overwrites).
+name: Release candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Exact commit SHA of the certified candidate (full 40 chars)'
+        required: true
+        type: string
+      version:
+        description: 'Expected candidate version, e.g. 1.0.0-rc.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+  actions: read
+
+concurrency:
+  group: release-rc
+  cancel-in-progress: false
+
+jobs:
+  publish-rc:
+    name: Publish release candidate to npm (tag rc)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout the exact candidate commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+          fetch-depth: 1
+
+      - name: Verify the checkout is the requested SHA and is clean
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.sha }}"
+          test -z "$(git status --porcelain)"
+
+      - name: Require green CI on this exact commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          conclusion=$(gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?head_sha=${{ inputs.sha }}&status=completed" \
+            --jq '[.workflow_runs[] | select(.conclusion=="success")] | length')
+          if [ "$conclusion" -lt 1 ]; then
+            echo "No successful CI run for ${{ inputs.sha }}; refusing to publish." >&2
+            exit 1
+          fi
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify candidate identity and npm latest (pre)
+        id: pre
+        run: |
+          latest=$(node scripts/release-rc-verify.mjs --phase pre "${{ inputs.version }}")
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          echo "npm latest before: $latest"
+
+      - name: Build all packages
+        run: pnpm build
+
+      - name: Verify packed package installation
+        run: pnpm release:verify
+
+      - name: Publish missing packages under tag rc
+        run: pnpm release:publish-unpublished --tag rc
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+
+      - name: Verify rc tags and that npm latest did not move (post)
+        run: node scripts/release-rc-verify.mjs --phase post "${{ inputs.version }}" "${{ steps.pre.outputs.latest }}"
+
+      - name: Create GitHub prerelease
+        run: pnpm release:github --mode prerelease
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_SHA: ${{ inputs.sha }}

@@ -20,7 +20,7 @@
 ---
 
 > [!NOTE]
-> **Status.** The eleven `@forge-cms/*` packages are published as one fixed family; the current release is **`0.13.3`**. The 1.0 public
+> **Status.** The eleven `@forge-cms/*` packages are published as one fixed family; the current release is **`0.13.4`**. The 1.0 public
 > surface is frozen ([docs/1.0-PUBLIC-SURFACE.md](docs/1.0-PUBLIC-SURFACE.md)) and the 1.0 release candidate is the next step — ForgeCMS is
 > **not released as 1.0 yet**. Until then a minor release may still change the frozen surface only to fix a release blocker. What is proven, by
 > which gate, and what is deliberately out of scope: [docs/1.0-RELEASE-DOSSIER.md](docs/1.0-RELEASE-DOSSIER.md) and
@@ -116,7 +116,7 @@ experimental, intentionally limited) is the [feature matrix](docs/MATRICES.md#fe
 
 ## Packages
 
-All eleven are versioned together (one Changesets fixed group), ESM-only, and imported only through their entry points.
+All twelve are versioned together (one Changesets fixed group), ESM-only, and imported only through their entry points. `@forge-cms/agent` is **experimental development tooling** (a read-only local MCP server and an official skill pack for AI coding agents); it first appears in the 1.0 release line, is never a runtime dependency, and is outside the stable 1.x guarantee - see the [Agent Kit guide](apps/www/src/content/docs/agent-kit.md).
 
 | Package                                        | Purpose                                                                             |
 | ---------------------------------------------- | ----------------------------------------------------------------------------------- |
@@ -131,6 +131,7 @@ All eleven are versioned together (one Changesets fixed group), ESM-only, and im
 | [`@forge-cms/angular`](packages/angular)       | Angular client SDK: `provideForgeCms`, typed client, session, guard, resources, SSR |
 | [`@forge-cms/admin`](packages/admin)           | Reusable Angular admin: layout, content, auth pages, users workspace                |
 | [`@forge-cms/testing`](packages/testing)       | Adapter contract suites                                                             |
+| [`@forge-cms/agent`](packages/agent)           | **Experimental** dev tooling: read-only local MCP server + official skill pack      |
 
 Every export, option and default: [docs/REFERENCE.md](docs/REFERENCE.md).
 
@@ -149,7 +150,7 @@ particular production deployment. A production build never silently falls back t
 
 Two separate numbering schemes:
 
-- **npm versions.** The eleven packages always share one version; the latest is **`0.13.3`**. They are not the roadmap numbers.
+- **npm versions.** The eleven packages always share one version; the latest is **`0.13.4`**. They are not the roadmap numbers.
 - **Roadmap checkpoints** ([docs/ROADMAP.md](docs/ROADMAP.md)) are product guarantees (0.5 → 0.12, then the 1.0 release). Roadmaps 0.5–0.12 are
   complete; the next bounded responsibility is the 1.0 release candidate (L01 in [docs/roadmap/v1/1.0-release.md](docs/roadmap/v1/1.0-release.md)).
 
