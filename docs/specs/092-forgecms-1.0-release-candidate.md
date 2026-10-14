@@ -1,6 +1,6 @@
 # 092 — Produce and validate a ForgeCMS 1.0 release candidate
 
-- **Status:** in-progress
+- **Status:** done (candidate prepared and certified; publication pending authorization)
 - **Author:** agent draft (maintainer-directed, roadmap L01)
 - **Date:** 2026-10-14
 - **Branch:** `release/spec-092-forgecms-1.0-rc`
@@ -101,4 +101,11 @@ None.
 
 ## Outcome
 
-_Filled in as evidence is produced._
+**Baseline.** Started from `main` `afcc0ee`; PR #98 was merged by the maintainer on 2026-10-14 and published `0.13.4` (npm `latest`, GitHub `v0.13.4`); no pending changeset, no `pre.json`.
+**Security.** Private vulnerability reporting was disabled; enabled with the maintainer's authorization and verified (`{"enabled":true}`); `SECURITY.md` updated; J1 closed.
+**Release tooling.** `release-decision.mjs` (version/mode classification, fail-closed `resolvePublishTag`, fixed-family and `latest` assertions, GitHub release plan, pre-mode changeset coverage); `publish-unpublished --tag` (prerelease without tag or with `latest`
+fails before any registry call; resumable; provenance kept); `create-github-release --mode` (RC -> `prerelease: true`); `ci.yml` `release` job publishes only in `stable` mode; manual `release-rc.yml`; `check-changesets.mjs` for the CI check. 89 script tests.
+**Versioning.** `pnpm changeset pre enter rc` + a major changeset -> `1.0.0-rc.0` (never published, superseded by spec 093); the next `pnpm changeset:version` produced `1.0.0-rc.1` for all twelve packages. No version was edited by hand.
+**Candidate.** `02ba1e68deabfd80e7eac55ad5cbeb2e8862dee7`, `1.0.0-rc.1`, clean tree; hashes and the matrix are in the [dossier](../1.0-RELEASE-DOSSIER.md#l-l01--the-release-candidate). `rc.0` evidence (`f25ae13`) is historical only.
+**Publication.** Not authorized yet. npm `latest` stays `0.13.4`; nothing was published to npm or GitHub; no registry comparison exists (J11 open).
+**Optional follow-ups.** J3 (remote D1 migration) and J4 (remote admin login) not run - no authorization.

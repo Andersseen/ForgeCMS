@@ -1,6 +1,6 @@
 # 093 — Experimental Forge Agent Kit and client-ready Analytics onboarding
 
-- **Status:** in-progress
+- **Status:** done (candidate prepared and certified; publication pending authorization)
 - **Author:** agent draft (maintainer-approved pre-L02 scope amendment)
 - **Date:** 2026-10-14
 - **Branch:** `release/spec-092-forgecms-1.0-rc` (inserted into the open L01 candidate PR before any RC was published)
@@ -90,8 +90,8 @@ tools/resources, calls detect/doctor/support/docs search, checks the bin and the
 - [x] Client-site scenario + Agent Kit guide + package README
 - [x] Twelve-package release tooling + `agent` certify stage + browser-bundle regression
 - [x] `docs:verify` agent-kit checks; docs inventory updated
-- [ ] Changeset, next RC through Changesets pre mode, CI changeset-check for pre mode
-- [ ] Full matrix on the exact new candidate; dossier/STATE/roadmap
+- [x] Changeset, next RC through Changesets pre mode, CI changeset-check for pre mode
+- [x] Full matrix on the exact new candidate; dossier/STATE/roadmap
 
 ## Test plan
 
@@ -108,4 +108,11 @@ None.
 
 ## Outcome
 
-_Filled in as evidence is produced._
+- **Package.** `@forge-cms/agent` (experimental, dev-time, ESM, Node >= 22), MCP SDK `@modelcontextprotocol/sdk` 1.32.1. Tools: `forge_project_detect`, `forge_project_doctor`, `forge_docs_search`, `forge_support`, `forge_runtime_metadata` (included: the anonymous
+  `/api/v1/collections` endpoint already exists). Resources: docs, skills, `forge://support`, `forge://project`. All read-only, none takes a path, no telemetry. 57 package tests (reader traversal/symlink/size, detect, doctor, docs, protocol,
+  secret and path-traversal adversarial tests, skill golden tasks A-H).
+- **Skills.** Eight, tool-neutral. Agentyx 0.11.0 has no supported third-party-pack mechanism, so no manifest was invented; the guide documents copying the skills. The repository itself was not wired to the kit (it is not a Forge consumer project; its internal skills stay separate).
+- **Analytics.** Still experimental. Collector/summary extracted to tested modules, embedded verbatim in the guide; privacy and state tests; 10 new dashboard tests; no export added, no visitor identifier, no coverage floor changed.
+- **Client-site scenario.** ES/EN model run against the real runtime. Finding recorded in the skills: global slugs are identifiers (`siteSettings`), and drafts are hidden from anonymous reads until `_status: 'published'`.
+- **Release family.** Twelve packages everywhere (`PUBLIC_FAMILY`, `PUBLIC_PACKAGES`, verifiers, `.changeset/config.json`, docs); new `agent` certify stage (packed tarball, stdio handshake, 35 resources, no secret leaked); browser scans also forbid `@modelcontextprotocol`/`forge-cms-mcp`.
+- **Candidate.** `1.0.0-rc.1`, `02ba1e68deabfd80e7eac55ad5cbeb2e8862dee7`, certified (248 s) and the full matrix recorded in the dossier. Stable API baselines unchanged. `rc.0` superseded. 1.0 not published; L02 not started.
