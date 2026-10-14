@@ -1,5 +1,13 @@
 # STATE — Current implementation status
 
+> **Last updated: 2026-10-14 (spec 092 / L01 — ForgeCMS 1.0 release candidate — IN PROGRESS on `release/spec-092-forgecms-1.0-rc`).** L01 is **not complete**.
+> Baseline: PR #98 merged; all eleven packages are **`0.13.4`** on npm `latest` (website `CURRENT_FORGE_VERSION = '0.13.4'`). J1 is closed: GitHub private vulnerability
+> reporting is enabled (verified through the API) and `SECURITY.md` documents it. Prerelease publication is now fail-closed (`publish-unpublished --tag`, GitHub
+> prerelease mode, stable-only `release` job, manual `release-rc.yml`, npm tag `rc`). Candidate (pre-evidence commit) carries `1.0.0-rc.0` via Changesets pre mode; its
+> `release:certify` and the full matrix are still running/unrecorded, nothing is published to npm or GitHub, and **1.0 is not released**. Next: finish the matrix, record
+> hashes in the dossier, then await explicit authorization to dispatch the RC publication. L02/L03 not started.
+> _Previous header (2026-10-13, R04):_ roadmap 0.12 complete (R01–R04); `0.13.3` current; no release candidate.
+>
 > **Last updated: 2026-10-13 (spec 091 / roadmap 0.12 R04 — consumer documentation and release dossier — COMPLETE on
 > `feature/spec-091-consumer-docs-release-dossier`).** Roadmap 0.12 is **complete: R01 ✓ R02 ✓ R03 ✓ R04 ✓.** ForgeCMS is **not released as 1.0**; no release
 > candidate exists. Release truth: PR #95 (R03 closeout) and PR #96 (Version Packages) are merged; main `7aa8fa3` CI `38262008765` ✓ (checks, certify, reliability,
