@@ -3,7 +3,7 @@
 The question this page answers: **what must an existing 0.x ForgeCMS application review or change before adopting 1.0?** It lists consumer-visible changes that remain relevant, grouped by
 area, with the release that introduced them. It is not a changelog — per-package history is in each `CHANGELOG.md` — and it does not repeat changes that were already invisible to consumers.
 
-1.0 itself is **not released yet**: the frozen candidate surface is the `0.13.x` line ([1.0-PUBLIC-SURFACE.md](1.0-PUBLIC-SURFACE.md)). If you are on `0.13.3` there is nothing to do for 1.0 beyond
+1.0 itself is **not released yet**: the frozen candidate surface is the `0.13.x` line ([1.0-PUBLIC-SURFACE.md](1.0-PUBLIC-SURFACE.md)). If you are on `0.13.x` there is nothing to do for 1.0 beyond
 what the release notes of the release candidate say; if you are on an older line, work through the sections below, upgrading all eleven `@forge-cms/*` packages together (they are one fixed version).
 
 **How to upgrade safely:** back up first ([BACKUP-RESTORE.md](BACKUP-RESTORE.md)), upgrade to the latest `0.13.x`, run `pnpm build` and your tests, call `runtime.planSchema()` against a copy of

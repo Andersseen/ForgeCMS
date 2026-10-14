@@ -6,7 +6,7 @@ How ForgeCMS versions, what is supported, and what a "supported" claim is backed
 ## One version for eleven packages
 
 `@forge-cms/core`, `db`, `auth`, `storage`, `s3`, `api`, `runtime`, `cloudflare`, `angular`, `admin` and `testing` form one Changesets **fixed** group: they are always released
-together at the same version, and you should install matching versions. The current release is **`0.13.3`**. Roadmap checkpoints (0.5–0.12) are planning labels, not versions.
+together at the same version, and you should install matching versions. The current release is **`0.13.4`**. Roadmap checkpoints (0.5–0.12) are planning labels, not versions.
 
 ## Semantic versioning from 1.0
 

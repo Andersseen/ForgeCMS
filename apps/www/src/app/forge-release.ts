@@ -9,13 +9,12 @@
  * `0.8.0` carries M01, `0.8.1` added M02's code (its changelog entry is in `0.8.2`); roadmap `0.8`
  * (Angular DX) published as npm `0.9.0`; roadmap `0.9` (SSR) is the npm `0.10.x` line; roadmap `0.10` (portable storage) is the npm `0.11.x` line (`0.11.0` added `@forge-cms/s3`); roadmap `0.11` (admin) is the npm `0.12.x` line (`0.12.0` = U01, `0.12.1` = U02) and completed with `0.13.0` (U03, the 1.0 surface freeze); `0.13.1` and `0.13.2` are patch releases (roadmap 0.12 R02 fixes; R03 K3 D1 `in`-list fix) — see `ROADMAP_MILESTONES` and docs/STATE.md.
  *
- * Verified 2026-10-13 (spec 091): all eleven `@forge-cms/*` packages report `0.13.3` on npm (`latest`) and GitHub has the `0.13.3` release
- * (published by main CI run `38262008765` of `7aa8fa3`, after PR #96 — Version Packages — was merged). `0.13.3` is the R03 metadata-privacy patch
- * (anonymous collection/global metadata no longer lists fields nobody can read or write). A README-only patch from R04 stays unpublished until its own
- * Version Packages PR merges; this constant does not move until then.
+ * Verified 2026-10-14 (spec 092): all eleven `@forge-cms/*` packages report `0.13.4` on npm (`latest`) after PR #98 — Version Packages — was merged;
+ * `0.13.4` is the R04 README-only patch (package READMEs and docs). `0.13.3` was the R03 metadata-privacy patch. A `1.0.0-rc.N` published under the
+ * `rc` dist-tag does NOT move this constant: it stays on the stable line until 1.0.0 ships (spec 092).
  * The website reports the published fixed-group release, independently of unmerged roadmap work.
  */
-export const CURRENT_FORGE_VERSION = '0.13.3';
+export const CURRENT_FORGE_VERSION = '0.13.4';
 
 export interface ForgePackage {
   /** The name after `@forge-cms/`. */

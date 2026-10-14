@@ -66,7 +66,7 @@ hop between your Analog route and your content.
 
 Be honest with yourself about this list before adopting it for something that matters:
 
-- **Approaching 1.0.** The packages (currently `0.13.3` on npm) are installable, the 1.0 public surface is frozen
+- **Approaching 1.0.** The packages (currently `0.13.4` on npm) are installable, the 1.0 public surface is frozen
   and certified from packed artifacts, and a release candidate is next. Until 1.0 is released, treat the version as
   pre-1.0; what the compatibility promise will cover is in [Support and compatibility](https://github.com/Andersseen/ForgeCMS/blob/main/docs/SUPPORT.md).
 - **Schema upgrades are explicit.** Schema sync applies safe additive changes and refuses drift that

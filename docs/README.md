@@ -35,6 +35,6 @@ Entry point for agents: [/CLAUDE.md](../CLAUDE.md) (also referenced by [/AGENTS.
 
 The active delivery plan is [ROADMAP.md](ROADMAP.md): bounded product checkpoints **0.5 → 0.12** to 1.0, with a
 [repository assessment](roadmap/v1/AUDIT.md), [execution handbook](roadmap/v1/EXECUTION.md), [quality contract](roadmap/v1/QUALITY.md) and individual release briefs.
-They are **planning checkpoints, not npm versions**: the eleven public packages share one version (currently **`0.13.3`**), which runs ahead of the checkpoint
+They are **planning checkpoints, not npm versions**: the eleven public packages share one version (currently **`0.13.4`**), which runs ahead of the checkpoint
 numbers. Roadmaps 0.5–0.12 are complete; the next bounded responsibility is [L01 — the 1.0 release candidate](roadmap/v1/1.0-release.md). The previous roadmap is
 [archived](ROADMAP-LEGACY.md); historical specs remain the record of earlier decisions and are not updated to sound current.
