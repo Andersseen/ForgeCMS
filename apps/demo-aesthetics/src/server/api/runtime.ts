@@ -10,7 +10,7 @@ import {
 } from '@forge-cms/cloudflare';
 import { ForgeCmsRuntime } from '@forge-cms/runtime';
 import { collections, type DemoCollections } from './collections';
-import { seedContent } from './seed';
+import { ensureNotices, seedContent } from './seed';
 import { setRuntimeRef } from './runtime-ref';
 import { logStartupFailure, startupStage } from './startup';
 
@@ -116,6 +116,10 @@ async function buildRuntime(env?: ServerEnv): Promise<DemoRuntime> {
   );
   if (existing.length === 0) {
     await startupStage('seed', () => seedContent(runtime));
+  } else {
+    // A deployment seeded before the localized `notices` collection existed gets its two notices once
+    // (spec 094). Additive and idempotent: it writes only while the new table is empty.
+    await startupStage('seed', () => ensureNotices(runtime));
   }
 
   return runtime;

@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { VoltNativeButton } from '@voltui/components';
 import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
 import { LmnCheckIcon } from 'lumen-icons/check';
+import { FORGE_CHANNELS } from '../forge-release';
 import { ROADMAP_MILESTONES, type MilestoneStatus } from '../landing-data';
 
 const STATUS_LABELS: Record<MilestoneStatus, string> = {
@@ -30,9 +31,9 @@ const STATUS_LABELS: Record<MilestoneStatus, string> = {
               Built in the open. Getting stronger.
             </h2>
             <p class="mt-5 max-w-[48ch] leading-7 text-white/65">
-              Every checkpoint below is complete: upgrade safety, the Angular client, SSR, portable
-              S3 storage, the admin and packed-artifact certification. A 1.0 release candidate is
-              next; until it ships, ForgeCMS is a 1.0 candidate, not a released 1.0.
+              Upgrade safety, the Angular client, SSR, portable S3 storage, the admin and
+              packed-artifact certification are complete. {{ candidateCopy }} Until
+              <code>1.0.0</code> ships, ForgeCMS is a 1.0 candidate, not a released 1.0.
             </p>
             <a
               voltButton
@@ -81,7 +82,10 @@ const STATUS_LABELS: Record<MilestoneStatus, string> = {
 })
 export class RoadmapSectionComponent {
   protected readonly milestones = ROADMAP_MILESTONES.filter((milestone) =>
-    ['0.6', '0.7', '0.8'].includes(milestone.version)
+    ['0.6', '0.7', '0.8', '0.9', '0.10', '0.11', '0.12', '1.0'].includes(milestone.version)
   );
+  protected readonly candidateCopy = FORGE_CHANNELS.rcPublished
+    ? 'The 1.0 release candidate is published for validation.'
+    : 'The 1.0 release candidate is prepared and certified; publication and real-consumer validation come next.';
   protected readonly labels = STATUS_LABELS;
 }

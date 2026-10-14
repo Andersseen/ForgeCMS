@@ -232,6 +232,39 @@ export const promotions = defineCollection({
   }
 });
 
+// --- A localized notice (spec 094) ---------------------------------------------------------------
+
+/** The two languages the clinic's notices are written in. The first is the fallback (spec 067). */
+export const NOTICE_LOCALES = ['en', 'es'] as const;
+
+/**
+ * "From the clinic": a short announcement shown on the home page in English or Spanish.
+ *
+ * This is the demo's one localized collection, and it deliberately uses only the supported contract
+ * — top-level `text` / `textarea` fields — so it shows real Forge localization without pretending the
+ * rest of the site is translated. It is a *new* table, not a localized version of an existing one: a
+ * deployed D1 row stores a plain string where a localized field stores a locale map, and nothing
+ * reinterprets old rows. The slug, link target and draft status are shared by both languages.
+ */
+export const notices = defineCollection({
+  slug: 'notices',
+  drafts: true,
+  locales: [...NOTICE_LOCALES],
+  admin: { useAsTitle: 'title', defaultColumns: ['title', 'slug'] },
+  fields: {
+    title: defineField.text({ required: true, localized: true }),
+    message: defineField.textarea({ required: true, localized: true, maxLength: 320 }),
+    linkLabel: defineField.text({ localized: true }),
+    linkPath: defineField.text({ label: 'Link target (e.g. /booking)', defaultValue: '/booking' }),
+    slug: defineField.slug({
+      required: true,
+      unique: true,
+      autoGenerate: true,
+      sourceField: 'title'
+    })
+  }
+});
+
 // --- The journal ---------------------------------------------------------------------------------
 
 const WORDS_PER_MINUTE = 200;
@@ -387,8 +420,9 @@ export const pages = defineCollection({
  * FINDING 4: site-wide settings are a collection expected to hold exactly one row. ForgeCMS has had
  * globals since this was written (spec 066), and a new app should use `defineGlobal`. This one keeps
  * the collection because the deployed demo's D1 already stores the edited settings here; a global is
- * a separate table that would start empty, and copying the row across is a data migration — roadmap
- * 0.7 M02. Nothing stops a second row, so every read uses `findOne`.
+ * a separate table that would start empty, and copying the row across is a production data migration
+ * (reviewed migration + backup, docs/BACKUP-RESTORE.md). Nothing stops a second row, so every read
+ * uses `findOne`.
  */
 export const siteSettings = defineCollection({
   slug: 'site_settings',
@@ -461,6 +495,7 @@ export const collections = [
   testimonials,
   bookings,
   promotions,
+  notices,
   posts,
   media,
   pages,

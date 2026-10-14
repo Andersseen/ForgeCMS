@@ -1,5 +1,11 @@
 # STATE — Current implementation status
 
+> **Last updated: 2026-10-14 (spec 094 — ForgeCMS 1.0 product showcase polish — on `feature/spec-094-v1-showcase-polish`, PR pending review).** Presentation-only: `apps/www` (homepage: capabilities by value,
+> localization, client-site flow, experimental Agent Kit and Analytics sections, twelve-package inventory incl. `s3`/`agent`, honest release channels in `forge-release.ts`; `/demo` "What to explore") and
+> `apps/demo-aesthetics` (new additive localized `notices` collection + EN/ES switch, client-ready dashboard, honest Analytics states, declared `@angular/cdk` peer found by the Agent Kit doctor, DEMO-FINDINGS current-status table).
+> **No `packages/*`, `api-baseline`, or changeset change — public RC package artifacts unaffected.** Registry truth: npm `latest` `0.13.4`, no `rc` tag, `@forge-cms/agent` unpublished; the site shows no install command for it
+> and says "Coming with the 1.0 release candidate" until `FORGE_CHANNELS` is flipped after publication. Agent Kit dogfood: `scripts/agent-dogfood.test.mjs` points the MCP at `apps/demo-aesthetics`.
+>
 > **Last updated: 2026-10-14 (spec 092 L01 + spec 093 pre-L02 scope amendment - candidate `1.0.0-rc.1` PREPARED AND CERTIFIED, NOT PUBLISHED, on `release/spec-092-forgecms-1.0-rc`, PR #99).** ForgeCMS is **not released as 1.0**;
 > npm `latest` is `0.13.4` and nothing from this branch is published. J1 is closed (private vulnerability reporting enabled). Prerelease publication is fail-closed (`--tag rc`, GitHub prerelease mode, stable-only `release` job, manual
 > `release-rc.yml`). Spec 093 added the experimental `@forge-cms/agent` (read-only MCP server + skill pack; the fixed family is now **twelve** packages) and a verified Analytics onboarding recipe. The earlier `1.0.0-rc.0` was never

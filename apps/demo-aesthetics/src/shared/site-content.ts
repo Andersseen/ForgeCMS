@@ -4,8 +4,9 @@
  * The server side is typed from the schema (the Local API infers documents since spec 047, see
  * `server/api/mappers.ts`). These stay hand-written on purpose: they are the contract with the
  * browser, which must not import server collection definitions, and they differ from the documents
- * (richtext flattened, relations resolved, internal fields left out). Generating browser types from
- * the schema is roadmap 0.8 (C02).
+ * (richtext flattened, relations resolved, internal fields left out). The admin and `injectForgeClient`
+ * already use the schema-derived browser types (`app/forge-schema.ts`); these are the app's own
+ * public-site contract.
  */
 
 export interface MediaRef {
@@ -160,4 +161,23 @@ export interface BookingRequest {
   service?: string;
   preferredDate: string;
   notes?: string;
+}
+
+/** The languages the clinic's localized notices exist in (spec 094). Mirrors `NOTICE_LOCALES`. */
+export type SiteLocale = 'en' | 'es';
+
+export const SITE_LOCALES: readonly SiteLocale[] = ['en', 'es'];
+
+export function isSiteLocale(value: unknown): value is SiteLocale {
+  return value === 'en' || value === 'es';
+}
+
+/** One published clinic notice, already resolved to a single language. */
+export interface Notice {
+  id: string;
+  slug: string;
+  title: string;
+  message: string;
+  linkLabel: string;
+  linkPath: string;
 }

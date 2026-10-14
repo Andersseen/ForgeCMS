@@ -16,23 +16,82 @@
  */
 export const CURRENT_FORGE_VERSION = '0.13.4';
 
+/**
+ * Registry truth for the 1.0 candidate, verified 2026-10-14 (spec 094): npm `latest` is the stable
+ * `0.13.4`, no `rc` dist-tag exists and `@forge-cms/agent` is not on the registry (E404).
+ *
+ * Flip these only after the maintainer publishes the release candidate and the registry confirms it
+ * (`npm view @forge-cms/agent dist-tags`). Every "available in the RC" word and every `@rc` install
+ * command on the site derives from them, so an unpublished package can never show a working install.
+ */
+export const FORGE_CHANNELS = {
+  /** A `1.0.0-rc.N` exists under the npm `rc` dist-tag. */
+  rcPublished: false,
+  /** `@forge-cms/agent` exists on the registry (it first ships with the RC). */
+  agentPublished: false
+} as const;
+
+/** How a visitor should read a package: part of the frozen 1.0 surface, or experimental. */
+export type ForgeAvailability = 'stable' | 'experimental';
+
 export interface ForgePackage {
   /** The name after `@forge-cms/`. */
   name: string;
   purpose: string;
+  availability: ForgeAvailability;
+}
+
+/** The version label a package card shows: the stable line, or the honest channel for newer packages. */
+export function packageVersionLabel(pkg: Pick<ForgePackage, 'name'>): string {
+  if (pkg.name !== 'agent') return CURRENT_FORGE_VERSION;
+  return FORGE_CHANNELS.agentPublished ? 'rc' : 'RC · not yet published';
+}
+
+/** The install command for the experimental Agent Kit, or `null` while it is unpublished. */
+export function agentInstallCommand(): string | null {
+  return FORGE_CHANNELS.agentPublished ? 'pnpm add -D @forge-cms/agent@rc' : null;
 }
 
 /** Every public package, in dependency order. */
 export const FORGE_PACKAGES: readonly ForgePackage[] = [
-  { name: 'core', purpose: 'Schema DSL, validation, collection and global definitions' },
-  { name: 'db', purpose: 'Database contract, InMemory and libSQL adapters, schema sync' },
-  { name: 'auth', purpose: 'Users collection auth, sessions, API keys' },
-  { name: 'storage', purpose: 'Storage contract and InMemory adapter' },
-  { name: 's3', purpose: 'S3-compatible StorageAdapter for portable durable file storage' },
-  { name: 'api', purpose: 'ApiContext and HTTP handler contracts' },
-  { name: 'runtime', purpose: 'Local API, access, hooks, drafts, HTTP handlers' },
-  { name: 'cloudflare', purpose: 'D1 database and R2 storage adapters' },
-  { name: 'angular', purpose: 'Typed client, signal resources, auth session and guard' },
-  { name: 'admin', purpose: 'Embeddable Angular admin: content, users, sign-in' },
-  { name: 'testing', purpose: 'Adapter contract test suites' }
+  {
+    name: 'core',
+    purpose: 'Schema DSL, validation, collection and global definitions',
+    availability: 'stable'
+  },
+  {
+    name: 'db',
+    purpose: 'Database contract, InMemory and libSQL adapters, schema sync',
+    availability: 'stable'
+  },
+  { name: 'auth', purpose: 'Users collection auth, sessions, API keys', availability: 'stable' },
+  { name: 'storage', purpose: 'Storage contract and InMemory adapter', availability: 'stable' },
+  {
+    name: 's3',
+    purpose: 'S3-compatible StorageAdapter for portable durable file storage',
+    availability: 'stable'
+  },
+  { name: 'api', purpose: 'ApiContext and HTTP handler contracts', availability: 'stable' },
+  {
+    name: 'runtime',
+    purpose: 'Local API, access, hooks, drafts, HTTP handlers',
+    availability: 'stable'
+  },
+  { name: 'cloudflare', purpose: 'D1 database and R2 storage adapters', availability: 'stable' },
+  {
+    name: 'angular',
+    purpose: 'Typed client, signal resources, auth session and guard',
+    availability: 'stable'
+  },
+  {
+    name: 'admin',
+    purpose: 'Embeddable Angular admin: content, users, sign-in',
+    availability: 'stable'
+  },
+  { name: 'testing', purpose: 'Adapter contract test suites', availability: 'stable' },
+  {
+    name: 'agent',
+    purpose: 'Read-only MCP server and official skills for coding agents',
+    availability: 'experimental'
+  }
 ];

@@ -9,6 +9,7 @@ import {
   DEMO_ADMIN_URL,
   DEMO_APP_URL,
   DEMO_CREDENTIALS,
+  DEMO_EXPLORE,
   DEMO_SOURCE_URL,
   DEVELOPER_STEPS,
   EDITOR_STEPS
@@ -65,6 +66,34 @@ import { HeaderComponent } from '../components/header.component';
                 Sign in to the CMS
               </a>
             </div>
+          </div>
+        </section>
+
+        <section
+          class="mx-auto w-full max-w-7xl px-5 pb-14 md:px-8"
+          aria-labelledby="explore-title"
+        >
+          <p class="forge-section-mark">What to explore</p>
+          <h2 id="explore-title" class="mt-4 text-2xl font-semibold tracking-[-0.03em]">
+            Everything listed here is running in the live demo.
+          </h2>
+          <div class="mt-8 grid gap-4 md:grid-cols-2">
+            @for (group of explore; track group.audience) {
+              <div class="forge-flow-card">
+                <p class="forge-flow-role">{{ group.audience }}</p>
+                <ul class="mt-3 divide-y divide-border text-sm">
+                  @for (item of group.items; track item.label) {
+                    <li class="py-2.5">
+                      <span class="font-medium">{{ item.label }}</span>
+                      @if (item.experimental) {
+                        <span class="forge-experimental-badge ml-2">Experimental</span>
+                      }
+                      <span class="block text-xs text-muted-foreground">{{ item.where }}</span>
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
           </div>
         </section>
 
@@ -217,6 +246,7 @@ export class DemoPage {
   protected readonly adminUrl = DEMO_ADMIN_URL;
   protected readonly sourceUrl = DEMO_SOURCE_URL;
   protected readonly credentials = DEMO_CREDENTIALS;
+  protected readonly explore = DEMO_EXPLORE;
   protected readonly editorSteps = EDITOR_STEPS;
   protected readonly developerSteps = DEVELOPER_STEPS;
   protected readonly copied = signal<string | null>(null);

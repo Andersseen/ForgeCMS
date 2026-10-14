@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { CURRENT_FORGE_VERSION } from '../src/app/forge-release';
+import { CURRENT_FORGE_VERSION, FORGE_CHANNELS } from '../src/app/forge-release';
 
 test('presents ForgeCMS as an Angular-native product', async ({ page }) => {
   await page.goto('/');
@@ -64,26 +64,132 @@ test('packages derive from the single release version', async ({ page }) => {
   const packages = page.locator('#packages');
   await expect(packages.getByText('@forge-cms/core', { exact: true })).toBeVisible();
   await expect(packages.getByText('@forge-cms/testing', { exact: true })).toBeVisible();
-  await expect(packages.locator('volt-badge', { hasText: CURRENT_FORGE_VERSION })).toHaveCount(10);
+  await expect(packages.getByText('@forge-cms/s3', { exact: true })).toBeVisible();
+  await expect(packages.getByText('@forge-cms/agent', { exact: true })).toBeVisible();
+  await expect(packages.getByText(/Ten focused packages/)).toHaveCount(0);
+  await expect(packages.getByText(/Twelve focused packages/)).toBeVisible();
+  // Eleven stable packages share the stable line; the experimental agent never claims it.
+  await expect(packages.locator('volt-badge', { hasText: CURRENT_FORGE_VERSION })).toHaveCount(11);
   await expect(page.getByText('0.0.0')).toHaveCount(0);
 });
 
-test('the homepage separates shipped foundations from the next checkpoint', async ({ page }) => {
+test('the homepage groups what 1.0 gives you and keeps the Local API story', async ({ page }) => {
   await page.goto('/');
 
   const architecture = page.locator('#architecture');
-  await expect(architecture.getByText('Local API, no internal HTTP')).toBeVisible();
+  for (const group of ['Content', 'Backend', 'Angular', 'Operations'])
+    await expect(architecture.getByRole('heading', { name: group, exact: true })).toBeVisible();
+  await expect(architecture.getByText('Reviewed, atomic migrations')).toBeVisible();
   await expect(
     architecture.getByRole('heading', { name: /Compose content where your server code/ })
   ).toBeVisible();
+});
+
+test('stable core is not labelled experimental; Agent Kit and Analytics are', async ({ page }) => {
+  await page.goto('/');
+
+  // The hero names the core a 1.0 candidate at the stable version, not "Experimental".
+  const hero = page.locator('#product');
+  await expect(hero.locator('volt-badge').first()).toContainText('1.0 candidate');
+  await expect(hero.locator('volt-badge').first()).toContainText(CURRENT_FORGE_VERSION);
+  await expect(hero.locator('volt-badge').first()).not.toContainText('Experimental');
+
+  for (const id of ['agent-kit', 'analytics']) {
+    const section = page.locator(`#${id}`);
+    await expect(section.locator('.forge-experimental-badge').first()).toHaveText('Experimental');
+  }
+  // Nothing in the stable sections wears the badge.
+  for (const id of ['architecture', 'localization'])
+    await expect(page.locator(`#${id} .forge-experimental-badge`)).toHaveCount(0);
+});
+
+test('Agent Kit availability follows registry truth and links to its docs', async ({ page }) => {
+  await page.goto('/');
+
+  const agent = page.locator('#agent-kit');
+  await expect(agent.getByRole('link', { name: 'Read Agent Kit docs' })).toHaveAttribute(
+    'href',
+    new RegExp('/docs/agent-kit$')
+  );
+  await expect(agent).toContainText('read-only');
+  await expect(agent).toContainText('No telemetry');
+  if (FORGE_CHANNELS.agentPublished) {
+    await expect(agent.getByLabel('Agent Kit install command')).toContainText('@forge-cms/agent');
+  } else {
+    await expect(agent.getByText('Coming with the 1.0 release candidate')).toBeVisible();
+    // No working-looking install command for a package that is not on the registry.
+    await expect(agent.getByLabel('Agent Kit install command')).toHaveCount(0);
+    await expect(page.getByText(/pnpm add[^\n]*@forge-cms\/agent/)).toHaveCount(0);
+  }
+});
+
+test('Analytics shows only metrics that exist and states the privacy contract', async ({
+  page
+}) => {
+  await page.goto('/');
+
+  const analytics = page.locator('#analytics');
+  await expect(analytics.getByRole('link', { name: 'Analytics docs' })).toHaveAttribute(
+    'href',
+    new RegExp('/docs/analytics$')
+  );
+  await expect(analytics).toContainText('Pageviews');
+  await expect(analytics).toContainText('Top pages');
+  await expect(analytics).toContainText('No persistent tracking cookie');
+  await expect(analytics).toContainText('Referrer host only');
+  await expect(analytics).not.toContainText(/unique visitors|sessions|funnel|heatmap/i);
+});
+
+test('localization example is truthful about what is supported', async ({ page }) => {
+  await page.goto('/');
+
+  const localization = page.locator('#localization');
+  await expect(localization).toContainText('Facial treatments');
+  await expect(localization).toContainText('Tratamientos faciales');
+  await expect(localization).toContainText('text and textarea');
+  await expect(localization).toContainText('not localized in 1.0');
+  await expect(localization.getByRole('link', { name: /Localization guide/ })).toHaveAttribute(
+    'href',
+    new RegExp('/docs/collections$')
+  );
+});
+
+test('the roadmap never claims 1.0 is released', async ({ page }) => {
+  await page.goto('/');
 
   const roadmap = page.locator('#roadmap');
   await expect(roadmap.getByText('0.6', { exact: true })).toBeVisible();
-  await expect(roadmap.getByText('0.7', { exact: true })).toBeVisible();
-  await expect(roadmap.getByText('0.8', { exact: true })).toBeVisible();
-  await expect(roadmap.getByText('0.9', { exact: true })).toHaveCount(0);
+  await expect(roadmap.getByText('0.9', { exact: true })).toBeVisible();
+  await expect(roadmap.getByText('1.0', { exact: true })).toBeVisible();
   await expect(roadmap.getByText('Reviewed migrations')).toBeVisible();
   await expect(roadmap.getByText('Upgrade and backup/restore rehearsal')).toBeVisible();
+  await expect(roadmap).toContainText('not a released 1.0');
+  await expect(page.getByText(/1\.0 (is )?released|now available/i)).toHaveCount(0);
+});
+
+test('reaches agent, analytics and upgrade docs from the footer', async ({ page }) => {
+  await page.goto('/');
+  const footer = page.locator('footer');
+  await expect(footer.getByRole('link', { name: 'Agent Kit' })).toHaveAttribute(
+    'href',
+    new RegExp('/docs/agent-kit$')
+  );
+  await expect(footer.getByRole('link', { name: 'Analytics' })).toHaveAttribute(
+    'href',
+    new RegExp('/docs/analytics$')
+  );
+});
+
+test('the new sections do not overflow at 390, 768, 1440 and 1920', async ({ page }) => {
+  for (const width of [390, 768, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/');
+    await expect(page.locator('#analytics')).toBeAttached();
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow, `horizontal overflow at ${width}px`).toBeLessThanOrEqual(1);
+  }
 });
 
 test('mobile navigation remains usable and the page does not overflow', async ({ page }) => {

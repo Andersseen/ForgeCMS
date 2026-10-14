@@ -1,53 +1,158 @@
-import { CURRENT_FORGE_VERSION, FORGE_PACKAGES } from './forge-release';
+import { FORGE_CHANNELS, FORGE_PACKAGES, packageVersionLabel } from './forge-release';
 
 /**
- * What already works, in the order a first-time visitor cares about. Nothing here is planned work;
- * all capability copy describes released work rather than pending releases.
+ * What already works, grouped by what it gives you. Nothing here is planned work; every item is
+ * implemented in the 1.0 candidate (docs/STATE.md). Localization is deliberately worded as exactly
+ * what exists: top-level `text` / `textarea` fields.
  */
-export const features = [
-  {
-    title: 'TypeScript-first schema',
-    description:
-      'Collections, globals and fields are code. One definition drives validation, the database, the admin form and inferred Local API types.'
-  },
-  {
-    title: 'Local API, no internal HTTP',
-    description:
-      'Server code calls runtime.find/findOne/create/update/delete directly, with access control, hooks, drafts and relation population applied.'
-  },
-  {
-    title: 'Angular-native client and admin',
-    description:
-      'A typed client with signal resources, a cookie session and route guard, and an admin you mount under your own routes.'
-  },
-  {
-    title: 'Access, hooks, drafts, versions',
-    description:
-      'Access rules are functions that can return query constraints. The hook pipeline runs on every write. Drafts, versions and live preview are built in.'
-  },
-  {
-    title: 'Relations, localization, globals',
-    description:
-      'Relations are populated by depth and delete rules keep them intact. Localized fields and singleton globals share the same field DSL. Blocks, arrays and groups compose pages.'
-  },
-  {
-    title: 'Cloudflare D1/R2, portable libSQL',
-    description:
-      'D1 and R2 are the first-class deployment. libSQL runs the same adapter contract off Cloudflare. Both are proven by real consumer apps.'
-  },
-  {
-    title: 'Schema-drift safety',
-    description:
-      'Schema sync plans before it writes. It applies safe additive changes and refuses drift that needs a migration. Reviewed migrations run once, atomically, with a durable history.'
-  },
-  {
-    title: 'Real consumer fixtures',
-    description:
-      'A clinic site built on the CMS and a tiny external-style project exercise the published packages end to end, including a Strata controller integration.'
-  }
-] as const;
+export interface CapabilityGroup {
+  id: 'content' | 'backend' | 'angular' | 'operations';
+  title: string;
+  summary: string;
+  items: readonly string[];
+}
 
-export const packages = FORGE_PACKAGES.map((pkg) => ({ ...pkg, version: CURRENT_FORGE_VERSION }));
+export const capabilityGroups: readonly CapabilityGroup[] = [
+  {
+    id: 'content',
+    title: 'Content',
+    summary: 'One TypeScript schema drives validation, storage and the admin form.',
+    items: [
+      'Collections and singleton globals',
+      'Blocks, arrays and groups for composed pages',
+      'Drafts, versions and live preview',
+      'Relations populated by depth',
+      'Localization of text fields',
+      'Uploads to R2 or S3'
+    ]
+  },
+  {
+    id: 'backend',
+    title: 'Backend',
+    summary: 'Business rules live in the runtime, not in a route handler.',
+    items: [
+      'Local API with no internal HTTP hop',
+      'REST with a stable response envelope',
+      'Hooks on every write',
+      'Row- and field-level access functions',
+      'Browser sessions with CSRF',
+      'API keys for machine clients'
+    ]
+  },
+  {
+    id: 'angular',
+    title: 'Angular',
+    summary: 'Built for Angular and Analog, not adapted to them.',
+    items: [
+      'Typed client generated from your schema',
+      'Signal resources',
+      'SSR and hydration for Analog',
+      'A reusable admin you mount under your own routes',
+      'Custom admin navigation and mount path'
+    ]
+  },
+  {
+    id: 'operations',
+    title: 'Operations',
+    summary: 'The part most CMSs leave to you: changing a live site safely.',
+    items: [
+      'Schema drift detection before any write',
+      'Reviewed, atomic migrations',
+      'Backup and restore rehearsal',
+      'Cloudflare D1 + R2, first class',
+      'Portable libSQL + S3',
+      'Packed-artifact certification'
+    ]
+  }
+];
+
+export const experimentalBadgeLabel = 'Experimental';
+export const experimentalNote = 'Useful today. Compatibility may evolve.';
+
+/** Illustrative localization example. Same shape as the `notices` collection in the Lumea demo. */
+export const localizationExample = {
+  schema: `export const notices = defineCollection({
+  slug: 'notices',
+  locales: ['es', 'en'],
+  fields: {
+    title: defineField.text({ localized: true }),
+    message: defineField.textarea({ localized: true }),
+    slug: defineField.slug({ sourceField: 'title' })
+  }
+});`,
+  locales: [
+    {
+      code: 'ES',
+      title: 'Tratamientos faciales',
+      description: 'Cuidado de la piel con resultados naturales.'
+    },
+    {
+      code: 'EN',
+      title: 'Facial treatments',
+      description: 'Skin care with natural-looking results.'
+    }
+  ],
+  points: [
+    'Locales are declared in the schema.',
+    'Top-level text and textarea fields are editable per locale.',
+    'Editors switch locale in the admin; each language keeps its own value.',
+    'Slugs, numbers, relations and uploads stay shared.'
+  ],
+  limits: 'Rich text, blocks, arrays, uploads and relations are not localized in 1.0.'
+} as const;
+
+/** The Agent Kit story. Mirrors docs/agent-kit and the packed tool list. */
+export const agentKit = {
+  prompt: 'Make Services editable in Spanish and English.',
+  steps: [
+    { call: 'forge_project_detect', note: 'Angular + Analog, Cloudflare profile, no locales yet' },
+    { call: 'forge_docs_search("localization")', note: 'Version-matched docs, offline' },
+    { call: 'forgecms-localization', note: 'Skill: the supported pattern' }
+  ],
+  result: 'The agent edits your project with its normal tools, using the supported Forge pattern.',
+  facts: [
+    'Local stdio MCP, read-only',
+    'No telemetry',
+    'Project detection and doctor',
+    'Offline docs search',
+    'Support matrix',
+    'Eight official skills',
+    'Development only, no runtime dependency'
+  ]
+} as const;
+
+/** Only metrics the Analytics vertical really has (docs/analytics). No visitors, sessions or funnels. */
+export const analyticsFacts = {
+  metrics: [
+    'Pageviews',
+    'Change vs previous period',
+    'Timeline',
+    'Top pages',
+    'Referrers',
+    'Countries'
+  ],
+  ranges: ['24h', '7d', '30d', '90d'],
+  privacy: [
+    'No visitor id',
+    'No persistent tracking cookie',
+    'No IP stored by Forge',
+    'No email or user id',
+    'No query string or hash',
+    'Referrer host only'
+  ]
+} as const;
+
+/** The client-site flow, as plain steps. */
+export const clientFlow = {
+  developer: ['Angular site UI', 'Forge schema', 'Pages · Services · Posts · Media'],
+  client: ['Content', 'ES / EN', 'Uploads', 'Analytics'],
+  agent: ['Forge MCP', 'Forge skills']
+} as const;
+
+export const packages = FORGE_PACKAGES.map((pkg) => ({
+  ...pkg,
+  version: packageVersionLabel(pkg)
+}));
 
 export const installCommand =
   'pnpm add @forge-cms/core @forge-cms/runtime @forge-cms/db @forge-cms/auth @forge-cms/storage';
@@ -113,7 +218,13 @@ export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
   { version: '0.10', title: 'Portable storage and deployment profiles', status: 'complete' },
   { version: '0.11', title: 'Admin certification', status: 'complete' },
   { version: '0.12', title: 'Certification and documentation', status: 'complete' },
-  { version: '1.0', title: 'Release candidate', status: 'next' }
+  // Product-facing and truthful: the candidate is prepared and certified, not yet published, and 1.0
+  // is never "complete" until `1.0.0` exists on the registry (spec 094).
+  {
+    version: '1.0',
+    title: FORGE_CHANNELS.rcPublished ? 'Release candidate' : 'Candidate ready, validation next',
+    status: 'next'
+  }
 ];
 
 /** Static, illustrative content shared by the three product showcase views. */

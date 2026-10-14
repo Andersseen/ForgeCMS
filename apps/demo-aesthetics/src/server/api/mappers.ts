@@ -10,6 +10,7 @@
  */
 import type { CollectionDocument } from '@forge-cms/core';
 import type {
+  notices,
   pages,
   posts,
   promotions,
@@ -21,6 +22,7 @@ import type {
 import type {
   CategoryRef,
   MediaRef,
+  Notice,
   OpeningHours,
   PageBlock,
   PageContent,
@@ -243,5 +245,21 @@ export function toSiteSettings(record: CollectionDocument<typeof siteSettings>):
       facebook: str(socials?.facebook),
       tiktok: str(socials?.tiktok)
     }
+  };
+}
+
+/**
+ * A notice read with a `locale` comes back with plain strings (the Local API resolved each localized
+ * field), so this is a straight projection — the draft status and timestamps stay server-side.
+ */
+export function toNotice(doc: CollectionDocument<typeof notices>): Notice {
+  return {
+    id: String(doc.id),
+    slug: doc.slug,
+    title: String(doc.title ?? ''),
+    message: String(doc.message ?? ''),
+    linkLabel: String(doc.linkLabel ?? ''),
+    linkPath:
+      typeof doc.linkPath === 'string' && doc.linkPath.startsWith('/') ? doc.linkPath : '/booking'
   };
 }

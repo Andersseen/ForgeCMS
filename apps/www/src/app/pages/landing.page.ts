@@ -1,4 +1,8 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { AgentKitSectionComponent } from '../components/agent-kit-section.component';
+import { AnalyticsSectionComponent } from '../components/analytics-section.component';
+import { ClientFlowSectionComponent } from '../components/client-flow-section.component';
+import { LocalizationSectionComponent } from '../components/localization-section.component';
 import { ArchitectureSectionComponent } from '../components/architecture-section.component';
 import { DemoInvitationComponent } from '../components/demo-invitation.component';
 import { FooterComponent } from '../components/footer.component';
@@ -14,6 +18,10 @@ import { RoadmapSectionComponent } from '../components/roadmap-section.component
     HeaderComponent,
     HeroSectionComponent,
     ArchitectureSectionComponent,
+    LocalizationSectionComponent,
+    ClientFlowSectionComponent,
+    AgentKitSectionComponent,
+    AnalyticsSectionComponent,
     DemoInvitationComponent,
     PackagesSectionComponent,
     RoadmapSectionComponent,
@@ -27,6 +35,10 @@ import { RoadmapSectionComponent } from '../components/roadmap-section.component
       <main id="main-content" tabindex="-1">
         <forge-cms-hero-section />
         <forge-cms-architecture-section />
+        <forge-cms-localization-section />
+        <forge-cms-client-flow-section />
+        <forge-cms-agent-kit-section />
+        <forge-cms-analytics-section />
         <forge-cms-demo-invitation />
         <forge-cms-packages-section />
         <forge-cms-roadmap-section />

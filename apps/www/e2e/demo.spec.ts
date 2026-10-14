@@ -15,6 +15,18 @@ test('the demo guide is directly loadable and shows both journeys', async ({ pag
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
+test('the demo guide says what to explore, with experimental parts marked', async ({ page }) => {
+  await page.goto('/demo');
+
+  const explore = page.getByRole('region', { name: /Everything listed here is running/ });
+  await expect(explore).toContainText('Write the same notice in Spanish and English');
+  await expect(explore).toContainText('Local API composition');
+  const analytics = explore.locator('li', { hasText: 'See site traffic' });
+  await expect(analytics.locator('.forge-experimental-badge')).toHaveText('Experimental');
+  // The Agent Kit is described as tooling, never as part of the demo runtime.
+  await expect(explore).toContainText('not in the demo runtime');
+});
+
 test('the demo guide exposes the live destinations, credentials and source', async ({ page }) => {
   await page.goto('/demo');
 

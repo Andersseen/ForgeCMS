@@ -1186,3 +1186,68 @@ body {
   ) {
   color: var(--fc-code-function);
 }
+
+/* Spec 094: stable vs experimental. Restrained on purpose — "useful today, compatibility may evolve". */
+.forge-experimental-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--forge-cyan) 55%, transparent);
+  border-radius: 999px;
+  padding: 0.05rem 0.55rem;
+  color: var(--forge-cyan);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.forge-locale-chip {
+  display: inline-block;
+  border-radius: 0.4rem;
+  background: var(--forge-selected);
+  padding: 0.1rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.forge-flow-card {
+  border: 1px solid var(--border);
+  border-radius: 1.1rem;
+  background: var(--forge-raised);
+  padding: 1.25rem 1.4rem;
+}
+
+.forge-flow-card-secondary {
+  background: transparent;
+  border-style: dashed;
+}
+
+.forge-flow-role {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.forge-flow-steps {
+  margin-top: 0.9rem;
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.forge-flow-steps li {
+  border-radius: 0.55rem;
+  background: var(--forge-surface);
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+}
+
+.forge-install-inline {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--forge-surface);
+  padding: 0.4rem 0.7rem;
+  font-size: 0.8rem;
+}

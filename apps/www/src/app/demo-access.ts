@@ -43,9 +43,9 @@ export const EDITOR_STEPS: DemoStep[] = [
       'One treatment is a draft: it has a Draft badge and it is missing from the public menu. Hit Publish on its row and reload the site — it is there.'
   },
   {
-    title: 'Edit a treatment',
+    title: 'Switch the site between EN and ES',
     detail:
-      'Change the category by searching for it, add a benefit row, write a paragraph in the description. No ids, no JSON.'
+      'The "From the clinic" notice at the top is localized content. Open Content, then Notices, edit it in one locale, switch the locale and edit the other: each language keeps its own text.'
   },
   {
     title: 'Send yourself a booking',
@@ -53,9 +53,14 @@ export const EDITOR_STEPS: DemoStep[] = [
       'Fill in the booking form on the public site, then open Bookings in the CMS. It arrives as pending, and only staff can see it.'
   },
   {
-    title: 'Change the clinic settings',
+    title: 'Upload a photo, change the settings',
     detail:
-      'Phone, address and opening hours live in Clinic settings; the site header and footer follow immediately.'
+      'Add an image in Media. Phone, address and opening hours live in Clinic settings; the site header and footer follow immediately.'
+  },
+  {
+    title: 'Check the site traffic (experimental)',
+    detail:
+      'The overview and Analytics pages show real visits from Cloudflare Analytics Engine when it is configured, or say plainly that it is not. There are never placeholder numbers.'
   }
 ];
 
@@ -64,12 +69,17 @@ export const DEVELOPER_STEPS: DemoStep[] = [
   {
     title: 'The content model is one TypeScript file',
     detail:
-      'apps/demo-aesthetics/src/server/api/collections.ts — eleven collections with drafts, hooks, row-level access rules and composite fields. That file is the whole schema.'
+      'apps/demo-aesthetics/src/server/api/collections.ts — twelve collections with drafts, hooks, row-level access rules, composite fields and one localized collection. That file is the whole schema.'
   },
   {
     title: 'The server talks to the CMS with no HTTP hop',
     detail:
       'src/server/routes/api/site/home.get.ts composes five collections into one payload through the Local API (runtime.find/create), with access control and draft rules applied.'
+  },
+  {
+    title: 'Localization uses the supported contract',
+    detail:
+      'The notices collection localizes top-level text and textarea fields only. The public read passes a locale and runs as an anonymous visitor, so drafts never leak in either language.'
   },
   {
     title: 'Public writes are decided by the collection, not the route',
@@ -79,11 +89,62 @@ export const DEVELOPER_STEPS: DemoStep[] = [
   {
     title: 'The admin is a package, not app code',
     detail:
-      '@forge-cms/admin ships the layout, sign-in session, collection list, document editor and staff accounts. The app mounts its routes and keeps only clinic-specific pages (dashboard, media, settings).'
+      '@forge-cms/admin ships the layout, sign-in session, collection list, document editor and staff accounts. The app mounts its routes, sets its own navigation and keeps only clinic-specific pages.'
+  },
+  {
+    title: 'Analytics and Agent Kit are dogfooded',
+    detail:
+      'Analytics (experimental) is wired with the documented recipe. The Agent Kit is development tooling: a test points its read-only MCP at this project and checks it is detected. It is not part of the demo runtime.'
   },
   {
     title: 'Run the tests to see the rules',
     detail:
-      'pnpm test:demo drives the content model through the typed Local API: who can read a booking, what a draft is invisible to, what a hook rewrites, how a treatment page finds its specialists.'
+      'pnpm test:demo drives the content model through the typed Local API: who can read a booking, what a draft is invisible to, what a hook rewrites, how a notice resolves per locale.'
+  }
+];
+
+/** "What to explore": one line per capability the live demo really exercises. */
+export interface DemoExploreItem {
+  label: string;
+  where: string;
+  experimental?: boolean;
+}
+
+export const DEMO_EXPLORE: { audience: string; items: DemoExploreItem[] }[] = [
+  {
+    audience: 'Editor',
+    items: [
+      { label: 'Edit and publish content, drafts stay private', where: 'Admin → Treatments' },
+      { label: 'Upload and reuse media', where: 'Admin → Media' },
+      {
+        label: 'Role-aware admin with a custom navigation',
+        where: 'Sign in as Admin, then Front desk'
+      },
+      { label: 'Write the same notice in Spanish and English', where: 'Admin → Content → Notices' },
+      { label: 'See site traffic', where: 'Admin → Analytics', experimental: true }
+    ]
+  },
+  {
+    audience: 'Developer',
+    items: [
+      { label: 'Code-first schema', where: 'server/api/collections.ts' },
+      { label: 'Local API composition and access control', where: 'routes/api/site/*' },
+      { label: 'Typed Angular client and package admin', where: 'app.routes.ts, pages/admin' },
+      {
+        label: 'Uploads, and reviewed migrations / recovery',
+        where: 'migrations.ts, docs/BACKUP-RESTORE.md'
+      },
+      {
+        label: 'Analytics integration',
+        where: 'server/analytics, app.config.ts',
+        experimental: true
+      },
+      {
+        label:
+          'Agent Kit can inspect a project like this (development tooling, not in the demo runtime)',
+        where: 'scripts/agent-dogfood.test.mjs',
+        experimental: true
+      }
+    ]
   }
 ];
