@@ -10,14 +10,13 @@ ForgeCMS is published as eleven `@forge-cms/*` packages that always share one ve
 
 **Please do not publish exploit details in a public issue, pull request or discussion.**
 
-GitHub's _private vulnerability reporting_ is **not enabled** on this repository at the time of writing, and no security email address is published. Until that
-changes, the only mechanism that exists is:
+Report privately through GitHub's _private vulnerability reporting_:
 
-1. Open a GitHub issue in [Andersseen/ForgeCMS](https://github.com/Andersseen/ForgeCMS/issues) titled **"Security report — please contact me"**. State only that
-   you have a suspected vulnerability and which package it concerns. Include **no** technical detail, proof of concept, credentials or affected-deployment names.
-2. The maintainer will reply on the issue to arrange a private channel for the details. Report the problem there, not in the public thread.
+1. Go to the [Security tab of Andersseen/ForgeCMS](https://github.com/Andersseen/ForgeCMS/security) and choose **Report a vulnerability**
+   (direct link: <https://github.com/Andersseen/ForgeCMS/security/advisories/new>).
+2. Describe the affected package(s) and version, the impact, and steps to reproduce. The report is visible only to you and the maintainer.
 
-This file will be updated when a private reporting channel is enabled; do not assume one exists before it says so.
+No security email address is published; use the GitHub flow above.
 
 ### What to expect
 
@@ -28,7 +27,7 @@ allow time for a fix before any public disclosure.
 ## Not a security report
 
 Ordinary bugs, questions and feature requests belong in [GitHub issues](https://github.com/Andersseen/ForgeCMS/issues). If you are unsure whether something is security
-relevant, use the private path above rather than a public issue.
+relevant, use the private reporting path above rather than a public issue.
 
 ## Security properties worth knowing
 
