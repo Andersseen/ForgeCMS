@@ -1,0 +1,24 @@
+{
+  "mode": "pre",
+  "tag": "rc",
+  "initialVersions": {
+    "@forge-cms/demo-aesthetics": "0.0.29",
+    "@forge-cms/performance-baseline": "0.0.5",
+    "@forge-cms/playground": "0.0.30",
+    "@forge-cms/tiny-project": "0.0.24",
+    "@forge-cms/upgrade-rehearsal": "0.0.16",
+    "@forge-cms/www": "0.0.31",
+    "@forge-cms/admin": "0.13.4",
+    "@forge-cms/angular": "0.13.4",
+    "@forge-cms/api": "0.13.4",
+    "@forge-cms/auth": "0.13.4",
+    "@forge-cms/cloudflare": "0.13.4",
+    "@forge-cms/core": "0.13.4",
+    "@forge-cms/db": "0.13.4",
+    "@forge-cms/runtime": "0.13.4",
+    "@forge-cms/s3": "0.13.4",
+    "@forge-cms/storage": "0.13.4",
+    "@forge-cms/testing": "0.13.4"
+  },
+  "changesets": ["forgecms-1-0-compatibility-commitment"]
+}
