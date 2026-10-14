@@ -67,3 +67,144 @@ export function isAlreadyPublishedError(output) {
     /You cannot publish over the previously published versions?/i.test(output)
   );
 }
+
+// ---------------------------------------------------------------------------------------------------
+// Prerelease safety (spec 092). npm publishes to `latest` unless told otherwise, and Changesets does not
+// protect that for us, so every publication path states its mode and tag explicitly.
+// ---------------------------------------------------------------------------------------------------
+
+/** The one fixed public package family (`.changeset/config.json` → `fixed`). */
+export const PUBLIC_FAMILY = [
+  '@forge-cms/core',
+  '@forge-cms/db',
+  '@forge-cms/auth',
+  '@forge-cms/storage',
+  '@forge-cms/s3',
+  '@forge-cms/api',
+  '@forge-cms/runtime',
+  '@forge-cms/cloudflare',
+  '@forge-cms/angular',
+  '@forge-cms/admin',
+  '@forge-cms/testing'
+];
+
+/** The single npm dist-tag a ForgeCMS release candidate publishes under. */
+export const RC_TAG = 'rc';
+
+const stablePattern = /^\d+\.\d+\.\d+$/;
+const prereleasePattern = /^\d+\.\d+\.\d+-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*$/;
+const rcPattern = /^1\.0\.0-rc\.\d+$/;
+const tagPattern = /^[a-z][a-z0-9-]*$/;
+
+/**
+ * `stable` for `X.Y.Z`, `prerelease` for `X.Y.Z-id[.n]`. Anything else (build metadata, garbage) throws:
+ * a version we cannot classify must never be published.
+ *
+ * @param {string} version
+ * @returns {'stable' | 'prerelease'}
+ */
+export function classifyVersion(version) {
+  if (typeof version === 'string' && stablePattern.test(version)) return 'stable';
+  if (typeof version === 'string' && prereleasePattern.test(version)) return 'prerelease';
+  throw new Error(`Unrecognised package version: ${JSON.stringify(version)}`);
+}
+
+/** Whether `version` is a ForgeCMS 1.0 release candidate (`1.0.0-rc.N`). */
+export function isRcVersion(version) {
+  return typeof version === 'string' && rcPattern.test(version);
+}
+
+/**
+ * The release mode of the whole public family at HEAD: `stable`, `prerelease`, or `none` (no public
+ * packages). A family that mixes stable and prerelease versions is refused.
+ *
+ * @param {{ name: string, version: string }[]} packages
+ * @returns {'stable' | 'prerelease' | 'none'}
+ */
+export function detectReleaseMode(packages) {
+  if (packages.length === 0) return 'none';
+  const modes = new Set(packages.map((pkg) => classifyVersion(pkg.version)));
+  if (modes.size !== 1) {
+    const summary = packages.map((pkg) => `${pkg.name}@${pkg.version}`).join(', ');
+    throw new Error(`Public packages mix stable and prerelease versions: ${summary}`);
+  }
+  return [...modes][0];
+}
+
+/**
+ * The npm dist-tag a publication must use, or throws. Fail-closed:
+ * - stable version, no tag → `null` (npm default `latest`, existing behaviour);
+ * - stable version with an explicit tag → refused (the stable path never takes a custom tag);
+ * - prerelease version → an explicit tag is mandatory and may not be `latest`.
+ *
+ * @param {string} version
+ * @param {string | undefined} tag
+ * @returns {string | null}
+ */
+export function resolvePublishTag(version, tag) {
+  const mode = classifyVersion(version);
+  if (tag !== undefined && !tagPattern.test(tag)) {
+    throw new Error(`Invalid npm dist-tag ${JSON.stringify(tag)}`);
+  }
+  if (mode === 'stable') {
+    if (tag !== undefined) {
+      throw new Error(`Stable version ${version} must publish without --tag (got "${tag}")`);
+    }
+    return null;
+  }
+  if (tag === undefined) {
+    throw new Error(
+      `Prerelease ${version} requires an explicit --tag (e.g. --tag ${RC_TAG}); refusing implicit "latest"`
+    );
+  }
+  if (tag === 'latest') {
+    throw new Error(`Prerelease ${version} must never publish under the "latest" tag`);
+  }
+  return tag;
+}
+
+/**
+ * Asserts the family is exactly `PUBLIC_FAMILY`, with one shared version.
+ *
+ * @param {{ name: string, version: string }[]} packages
+ * @returns {string} the shared version
+ */
+export function assertFixedFamily(packages) {
+  const names = packages.map((pkg) => pkg.name).sort();
+  const expected = [...PUBLIC_FAMILY].sort();
+  if (names.length !== expected.length || names.some((name, i) => name !== expected[i])) {
+    throw new Error(`Public package set differs from the fixed family. Found: ${names.join(', ')}`);
+  }
+  const versions = new Set(packages.map((pkg) => pkg.version));
+  if (versions.size !== 1) {
+    const summary = packages.map((pkg) => `${pkg.name}@${pkg.version}`).join(', ');
+    throw new Error(`Expected all public packages to share one fixed version. Found: ${summary}`);
+  }
+  return packages[0].version;
+}
+
+/**
+ * The GitHub release to create for a version: tag `vX`, `prerelease` iff the version is a prerelease.
+ *
+ * @param {string} version
+ * @returns {{ tagName: string, prerelease: boolean }}
+ */
+export function githubReleasePlan(version) {
+  return { tagName: `v${version}`, prerelease: classifyVersion(version) === 'prerelease' };
+}
+
+/**
+ * Whether npm `latest` is an acceptable stable pointer: it must be a stable version, and (after a
+ * publication) unchanged from before.
+ *
+ * @param {string} before `latest` before publishing
+ * @param {string} [after] `latest` after publishing
+ */
+export function assertLatestSafe(before, after) {
+  if (classifyVersion(before) !== 'stable') {
+    throw new Error(`npm "latest" is ${before}, not a stable version`);
+  }
+  if (after !== undefined && after !== before) {
+    throw new Error(`npm "latest" moved from ${before} to ${after}`);
+  }
+}

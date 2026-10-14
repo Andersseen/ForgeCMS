@@ -2,9 +2,24 @@
 import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { isAlreadyPublishedError } from './release-decision.mjs';
+import { isAlreadyPublishedError, resolvePublishTag } from './release-decision.mjs';
 
 const dryRun = process.argv.includes('--dry-run');
+/** `--tag <name>` / `--tag=<name>`; `undefined` when absent. A bare `--tag` is an error, never "latest". */
+function readTagArgument(argv) {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--tag') {
+      const value = argv[i + 1];
+      if (value === undefined || value.startsWith('--')) throw new Error('--tag requires a value');
+      return value;
+    }
+    if (arg.startsWith('--tag=')) return arg.slice('--tag='.length);
+  }
+  return undefined;
+}
+
+const requestedTag = readTagArgument(process.argv.slice(2));
 const packageNamePattern = /^@forge-cms\/[a-z0-9-]+$/;
 
 function run(command, args, options = {}) {
@@ -44,6 +59,12 @@ const packages = readdirSync('packages')
   .filter((pkg) => !pkg.private)
   .sort((a, b) => a.name.localeCompare(b.name));
 
+// Fail closed before any registry call: a prerelease without an explicit non-latest tag, or any
+// stable package given a tag, aborts the whole run (spec 092).
+const publishTags = new Map(
+  packages.map((pkg) => [pkg.name, resolvePublishTag(pkg.version, requestedTag)])
+);
+
 for (const pkg of packages) {
   if (!packageNamePattern.test(pkg.name)) {
     throw new Error(`Refusing to publish unexpected package name: ${pkg.name}`);
@@ -69,7 +90,8 @@ for (const pkg of packages) {
       '--access',
       'public',
       '--no-git-checks',
-      '--provenance'
+      '--provenance',
+      ...(publishTags.get(pkg.name) ? ['--tag', publishTags.get(pkg.name)] : [])
     ]);
     process.stdout.write(publishResult.stdout ?? '');
     process.stderr.write(publishResult.stderr ?? '');
