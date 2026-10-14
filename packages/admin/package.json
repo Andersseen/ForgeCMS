@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/admin",
-  "version": "1.0.0-rc.0",
+  "version": "1.0.0-rc.1",
   "description": "Angular admin components and utilities for ForgeCMS.",
   "author": "ForgeCMS contributors",
   "license": "MIT",
