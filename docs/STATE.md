@@ -1,6 +1,13 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-15 (spec 096 — Agent Kit one-command install — on `feature/spec-096-agent-init-cli`, PR pending review).** Spec 095 is **merged** (PR #101, main `db60682`). Because nothing was published yet, the
+> **Last updated: 2026-10-15 (spec 097 — ForgeCMS 1.0 motion showcase — on `feature/spec-097-v1-motion-showcase`, PR pending review).** Spec 096 is **merged** (PR #102, main `2195275`, main CI `38702979083` ✓ incl.
+> Reliability · Coverage · Performance); that main is this branch's starting point. Spec 097 is **website-only** (`apps/www` + docs): the homepage gains a sticky Schema → Runtime → Angular → Admin → Deploy story, an
+> asymmetric capability bento (absorbing the old Architecture section), a developer ↔ client swap, an ES/EN editor, an Agent Kit `forge-cms-agent init` terminal story, an illustrative Analytics dashboard and a roadmap milestone-card track ending in the
+> 1.0 destination card (`/demo` steps became connected step cards), all on Angular Movement 1.2.0. **No `packages/*` or `api-baseline` change, no version change; one empty (no-release) changeset for the private app — the `1.0.0-rc.2` candidate's public package bytes are unchanged.** Registry
+> truth unchanged: npm `latest` `0.13.4`, no `rc` tag, `@forge-cms/agent` absent; the site keeps saying "1.0 candidate certified · Public RC next". **Next external release action:** after merge and exact-main green CI,
+> the maintainer authorizes `release-rc` (SHA + `1.0.0-rc.2`) → registry verification → L02. RC not published; L02 not started.
+>
+> _Previous header (spec 096, now merged as PR #102):_ **Last updated: 2026-10-15 (spec 096 — Agent Kit one-command install — on `feature/spec-096-agent-init-cli`, PR pending review).** Spec 095 is **merged** (PR #101, main `db60682`). Because nothing was published yet, the
 > candidate moves to **`1.0.0-rc.2`** (supersedes the never-published `rc.1`): `@forge-cms/agent` gains `forge-cms-agent init|sync|check` (merges `.mcp.json`, installs the eight stamped skills, never writes outside the project or
 > through a symlink, prints the Codex snippet, `--dry-run`/`--force`) plus `installAgentKit`/`checkAgentKit`; `/docs/agent-kit` leads with it. `agent` is now gated by the coverage floors (non-ui), and extra unit/e2e coverage
 > was added (`defineUsersCollection` access, `provideForgeAnalytics`, credential registry, linker transform, the Agent Kit docs page). `release:certify` CERTIFIED on rc.2; stability 0 first-attempt failures. **Not published**:

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { VoltBadge, VoltNativeButton } from '@voltui/components';
+import { MoveInViewDirective, MoveStaggerDirective } from 'angular-movement';
 import { LmnArrowTopRightOnSquareIcon } from 'lumen-icons/arrow-top-right-on-square';
 import { LmnCheckIcon } from 'lumen-icons/check';
 import { LmnClipboardIcon } from 'lumen-icons/clipboard';
@@ -21,6 +22,8 @@ import { HeaderComponent } from '../components/header.component';
   selector: 'forge-cms-demo-page',
   standalone: true,
   imports: [
+    MoveInViewDirective,
+    MoveStaggerDirective,
     VoltBadge,
     VoltNativeButton,
     HeaderComponent,
@@ -115,15 +118,15 @@ import { HeaderComponent } from '../components/header.component';
                   </p>
                 </div>
               </div>
-              <ol class="mt-9 border-t border-border">
+              <ol class="forge-journey" data-journey="editor" moveStagger="80ms">
                 @for (step of editorSteps; track step.title; let index = $index) {
-                  <li class="grid grid-cols-[2rem_1fr] gap-4 border-b border-border py-5">
-                    <span class="font-mono text-xs text-muted-foreground">{{
+                  <li class="forge-journey-step" [moveInView]="reveal">
+                    <span class="forge-journey-number" aria-hidden="true">{{
                       (index + 1).toString().padStart(2, '0')
                     }}</span>
-                    <div>
-                      <h3 class="font-semibold">{{ step.title }}</h3>
-                      <p class="mt-2 text-sm leading-6 text-muted-foreground">{{ step.detail }}</p>
+                    <div class="forge-journey-card">
+                      <h3>{{ step.title }}</h3>
+                      <p>{{ step.detail }}</p>
                     </div>
                   </li>
                 }
@@ -148,15 +151,15 @@ import { HeaderComponent } from '../components/header.component';
                   </p>
                 </div>
               </div>
-              <ol class="mt-9 border-t border-border">
+              <ol class="forge-journey" data-journey="developer" moveStagger="80ms">
                 @for (step of developerSteps; track step.title; let index = $index) {
-                  <li class="grid grid-cols-[2rem_1fr] gap-4 border-b border-border py-5">
-                    <span class="font-mono text-xs text-muted-foreground">{{
+                  <li class="forge-journey-step" [moveInView]="reveal">
+                    <span class="forge-journey-number" aria-hidden="true">{{
                       (index + 1).toString().padStart(2, '0')
                     }}</span>
-                    <div>
-                      <h3 class="font-semibold">{{ step.title }}</h3>
-                      <p class="mt-2 text-sm leading-6 text-muted-foreground">{{ step.detail }}</p>
+                    <div class="forge-journey-card">
+                      <h3>{{ step.title }}</h3>
+                      <p>{{ step.detail }}</p>
                     </div>
                   </li>
                 }
@@ -248,6 +251,7 @@ export class DemoPage {
   protected readonly credentials = DEMO_CREDENTIALS;
   protected readonly explore = DEMO_EXPLORE;
   protected readonly editorSteps = EDITOR_STEPS;
+  protected readonly reveal = { opacity: [0, 1], y: [16, 0] };
   protected readonly developerSteps = DEVELOPER_STEPS;
   protected readonly copied = signal<string | null>(null);
 

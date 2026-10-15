@@ -547,3 +547,39 @@ for (const width of [390, 768, 1440, 1920]) {
     }
   });
 }
+
+test('the roadmap track scrolls natively to the 1.0 destination card', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  const roadmap = page.locator('#roadmap');
+  const track = roadmap.getByRole('list', { name: 'Roadmap milestones' });
+  const previous = roadmap.getByRole('button', { name: 'Previous milestones' });
+  const next = roadmap.getByRole('button', { name: 'Next milestones' });
+  await track.scrollIntoViewIfNeeded();
+  await expect(previous).toBeDisabled();
+  // Every milestone is in the DOM and in order, whatever the scroll position.
+  await expect(track.locator('.forge-milestone-version')).toHaveText([
+    '0.6',
+    '0.7',
+    '0.8',
+    '0.9',
+    '0.10',
+    '0.11',
+    '0.12',
+    '1.0'
+  ]);
+  const destination = track.locator('[data-status="next"]');
+  await expect(destination).toContainText('1.0 candidate certified');
+  if (!FORGE_CHANNELS.rcPublished) await expect(destination).toContainText('Public RC next');
+  // Page until the end: each click scrolls instantly (reduced motion), then the edge state settles.
+  await expect(async () => {
+    if (await next.isEnabled()) await next.click({ timeout: 1000 });
+    await expect(next).toBeDisabled({ timeout: 500 });
+  }).toPass({ timeout: 10_000 });
+  await expect(destination).toBeInViewport();
+  await expect(previous).toBeEnabled();
+  // The track is a focusable scroll region, so keyboard users can scroll it too.
+  await track.focus();
+  await expect(track).toBeFocused();
+});
