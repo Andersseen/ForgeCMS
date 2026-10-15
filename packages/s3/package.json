@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/s3",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "description": "S3-compatible StorageAdapter for ForgeCMS (AWS S3, Garage, Backblaze B2, Wasabi and other S3 API services).",
   "author": "ForgeCMS contributors",
   "license": "MIT",

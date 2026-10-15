@@ -42,6 +42,7 @@ const floors = JSON.parse(
 test('floors cover every public package exactly once, with the QUALITY.md numbers', () => {
   assert.deepEqual(Object.keys(floors.packages).sort(), [
     'admin',
+    'agent',
     'angular',
     'api',
     'auth',

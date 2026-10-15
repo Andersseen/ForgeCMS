@@ -76,6 +76,7 @@ test('the agent kit is a dev-time Node >= 22 ESM package that declares its bin',
   assert.equal(pkg.type, 'module');
   assert.equal(pkg.engines.node, '>=22');
   assert.equal(pkg.bin['forge-cms-mcp'], './dist/bin.js');
+  assert.equal(pkg.bin['forge-cms-agent'], './dist/init-bin.js');
   assert.ok(pkg.files.includes('skills') && pkg.files.includes('docs'));
   assert.match(pkg.description, /EXPERIMENTAL/);
 });

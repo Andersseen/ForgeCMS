@@ -22,7 +22,9 @@
     "@forge-cms/agent": "0.13.4"
   },
   "changesets": [
+    "agent-init-cli",
     "forgecms-1-0-compatibility-commitment",
-    "forgecms-agent-kit-and-analytics-onboarding"
+    "forgecms-agent-kit-and-analytics-onboarding",
+    "showcase-polish-apps-only"
   ]
 }

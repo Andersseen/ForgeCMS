@@ -5,3 +5,12 @@ export { doctorProject, type DoctorCheck, type DoctorReport, type CheckStatus } 
 export { searchDocs, listDocs, type DocHit, type DocEntry } from './docs.js';
 export { supportFacts, type SupportFacts } from './support.js';
 export { fetchRuntimeMetadata, type RuntimeMetadataResult } from './runtime-metadata.js';
+export {
+  install as installAgentKit,
+  check as checkAgentKit,
+  type InstallOptions,
+  type InstallReport,
+  type InstallAction,
+  type SkillTarget,
+  type PackageManager
+} from './install.js';
