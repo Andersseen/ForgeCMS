@@ -19,7 +19,12 @@ const demoStatus = {
   data: { database: 'd1', auth: 'users-collection', storage: 'r2', mode: 'public', seeded: true }
 };
 const demoPolicy = {
-  data: { mode: 'public', editable: ['Edit notices'], restricted: ['Deleting'] }
+  data: {
+    mode: 'public',
+    editable: ['Edit notices'],
+    restricted: ['Deleting'],
+    remaining: { notice: 20, booking: 50 }
+  }
 };
 const deleteRefusal = { statusCode: 403, data: { code: 'demo_delete_disabled', demo: true } };
 const wwwStatus = {
@@ -42,6 +47,14 @@ test('status validators accept complete payloads and reject partial ones', () =>
   assert.equal(isHealthyDemoStatus({ data: { ...demoStatus.data, mode: 'other' } }), false);
   assert.equal(isPublicDemoPolicy(demoPolicy), true);
   assert.equal(isPublicDemoPolicy({ data: { ...demoPolicy.data, mode: 'full' } }), false);
+  // Budget table missing (migration not applied): the endpoint omits `remaining`; that must fail.
+  const { remaining: _omitted, ...withoutBudget } = demoPolicy.data;
+  assert.equal(isPublicDemoPolicy({ data: withoutBudget }), false);
+  assert.equal(isPublicDemoPolicy({ data: { ...withoutBudget, remaining: {} } }), false);
+  assert.equal(
+    isPublicDemoPolicy({ data: { ...withoutBudget, remaining: { notice: -1 } } }),
+    false
+  );
   assert.equal(isDemoDeleteRefusal(deleteRefusal), true);
   assert.equal(isDemoDeleteRefusal({ data: { code: 'other' } }), false);
   assert.equal(isHealthyWwwStatus(wwwStatus), true);
