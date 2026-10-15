@@ -1,6 +1,7 @@
 import '@angular/compiler';
 import { describe, expect, it, vi } from 'vitest';
-import { Injector, createEnvironmentInjector, EnvironmentInjector } from '@angular/core';
+import { Injector, createEnvironmentInjector } from '@angular/core';
+import type { EnvironmentInjector } from '@angular/core';
 import { FORGE_ANALYTICS_CONFIG } from './analytics-config.js';
 import { ForgeAnalyticsTracker } from './analytics-tracker.service.js';
 import { provideForgeAnalytics } from './analytics.js';
