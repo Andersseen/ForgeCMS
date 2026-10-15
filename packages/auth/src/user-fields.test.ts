@@ -106,3 +106,28 @@ describe('withAuthFields', () => {
     expect(defineUsersCollection({ slug: 'members' }).slug).toBe('members');
   });
 });
+
+describe('defineUsersCollection default access', () => {
+  const access = defineUsersCollection().access!;
+  const admin = { id: 'a', email: 'a@x.test', role: 'admin' } as never;
+  const editor = { id: 'e', email: 'e@x.test', role: 'editor' } as never;
+  const call = (fn: unknown, user: unknown) =>
+    (fn as (args: { user: unknown }) => unknown)({ user });
+
+  it('lets any authenticated user read, and nobody anonymous', () => {
+    expect(call(access.read, editor)).toBe(true);
+    expect(call(access.read, null)).toBe(false);
+  });
+  it('lets only an admin create or delete', () => {
+    expect(call(access.create, admin)).toBe(true);
+    expect(call(access.create, editor)).toBe(false);
+    expect(call(access.create, null)).toBe(false);
+    expect(call(access.delete, admin)).toBe(true);
+    expect(call(access.delete, editor)).toBe(false);
+  });
+  it('lets an admin update anyone and a user update only their own record', () => {
+    expect(call(access.update, admin)).toBe(true);
+    expect(call(access.update, editor)).toEqual({ id: 'e' });
+    expect(call(access.update, null)).toBe(false);
+  });
+});

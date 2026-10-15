@@ -5,6 +5,8 @@
 //   - install `@forge-cms/agent` (+ `@forge-cms/core`, so an installed Forge version can be detected);
 //   - launch the MCP server through the package binary (`pnpm exec forge-cms-mcp`) over real stdio;
 //   - handshake, list tools/resources, call project detection, docs search, support and the doctor;
+//   - run `forge-cms-agent init` (spec 096): the written .mcp.json must start the real MCP server, the skills must be
+//     installed and stamped, `check` must agree, and a second run must change nothing;
 //   - inspect the packed assets (skills, docs corpus, bin) and refuse anything that must not ship.
 // Exits non-zero on any problem. Publishes nothing, touches no remote resource.
 import { execFileSync } from 'node:child_process';
@@ -98,6 +100,7 @@ try {
     'README.md',
     'dist/index.js',
     'dist/bin.js',
+    'dist/init-bin.js',
     'docs/index.json',
     ...REQUIRED_SKILLS.map((name) => `skills/${name}/SKILL.md`)
   ]) {
@@ -105,6 +108,8 @@ try {
   }
   if (agentPackage.bin?.['forge-cms-mcp'] !== './dist/bin.js')
     fail('the forge-cms-mcp bin is not declared');
+  if (agentPackage.bin?.['forge-cms-agent'] !== './dist/init-bin.js')
+    fail('the forge-cms-agent bin is not declared');
   if (
     Object.values({ ...agentPackage.dependencies, ...agentPackage.peerDependencies }).some(
       (range) => /^(workspace|catalog|link|file):/.test(String(range))
@@ -239,8 +244,67 @@ console.log(JSON.stringify(out));
       !result.traversal.includes('root:'),
     'a secret or foreign file leaked through the MCP'
   );
+  // `forge-cms-agent init` (spec 096): one command connects the agent.
+  const cli = (...args) => run('pnpm', ['exec', 'forge-cms-agent', ...args], project);
+  const checkExit = () => {
+    try {
+      cli('check');
+      return 0;
+    } catch (error) {
+      return error.status;
+    }
+  };
+  if (checkExit() !== 1) fail('check must exit 1 before init');
+  const initOut = cli('init', '--target', 'claude,agents');
+  if (!initOut.includes('[mcp_servers.forge-cms]')) fail('init did not print the Codex snippet');
+  const mcpConfig = JSON.parse(readFileSync(join(project, '.mcp.json'), 'utf8'));
+  const written = mcpConfig.mcpServers?.['forge-cms'];
+  if (written?.command !== 'pnpm' || JSON.stringify(written.args) !== '["exec","forge-cms-mcp"]')
+    fail(`init wrote an unexpected MCP entry: ${JSON.stringify(written)}`);
+  for (const dir of ['.claude/skills', '.agents/skills']) {
+    const installedSkills = readdirSync(join(project, dir)).sort();
+    if (JSON.stringify(installedSkills) !== JSON.stringify(REQUIRED_SKILLS))
+      fail(`init installed skills in ${dir}: ${installedSkills.join(', ')}`);
+    const stamp = JSON.parse(
+      readFileSync(join(project, dir, 'forgecms-setup', '.forge-cms-agent.json'), 'utf8')
+    );
+    if (stamp.version !== agentPackage.version) fail(`skill stamp ${JSON.stringify(stamp)}`);
+  }
+  if (checkExit() !== 0) fail('check must exit 0 after init');
+  if (/\+ create|~ update/.test(cli('init', '--target', 'claude,agents')))
+    fail('a second init changed something (not idempotent)');
+  // The server started from the config init wrote really answers.
+  writeFileSync(
+    join(project, 'probe-config.mjs'),
+    `import { readFileSync } from 'node:fs';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+const entry = JSON.parse(readFileSync('.mcp.json', 'utf8')).mcpServers['forge-cms'];
+const client = new Client({ name: 'forge-init-probe', version: '0.0.0' });
+await client.connect(new StdioClientTransport({ command: entry.command, args: entry.args, cwd: process.cwd(), stderr: 'inherit' }));
+const tools = (await client.listTools()).tools.map((t) => t.name).sort();
+await client.close();
+console.log(JSON.stringify(tools));
+`
+  );
+  const initTools = JSON.parse(
+    run('node', ['probe-config.mjs'], project).trim().split('\n').at(-1)
+  );
+  expect(
+    JSON.stringify(initTools) === JSON.stringify(REQUIRED_TOOLS),
+    `the MCP entry written by init did not start the server: ${initTools}`
+  );
+  // A stale skill is reported, and `sync` repairs it.
+  rmSync(join(project, '.claude/skills/forgecms-admin'), { recursive: true });
+  if (checkExit() !== 1) fail('check must exit 1 when a skill is missing');
+  cli('sync', '--target', 'claude,agents');
+  if (checkExit() !== 0) fail('sync did not repair the missing skill');
+  if (readFileSync(join(project, '.env'), 'utf8') !== `AUTH_SECRET=${secret}\n`)
+    fail('init touched .env');
+  if (readFileSync(join(project, '.mcp.json'), 'utf8').includes(secret))
+    fail('a secret reached .mcp.json');
   console.log(
-    `  ✓ agent kit ${agentPackage.version}: packed tarball installs in a clean project, stdio handshake, ${result.tools.length} tools, ${result.resources.length} resources, ${skills.length} skills, no secret leaked`
+    `  ✓ agent kit ${agentPackage.version}: packed tarball installs in a clean project, stdio handshake, ${result.tools.length} tools, ${result.resources.length} resources, ${skills.length} skills, no secret leaked, init/check/sync verified`
   );
   console.log('\nPacked Agent Kit consumer passed.');
 } finally {

@@ -19,43 +19,51 @@ The agent still edits **your** project through its normal coding tools. The MCP 
 
 1. Create an Angular/Analog project and install the ForgeCMS packages (see the [Angular quickstart](/docs/angular-quickstart)).
 2. Install the kit as a **dev** dependency: `pnpm add -D @forge-cms/agent`.
-3. Connect your agent to the MCP server (below).
-4. Install the skills (below).
-5. Ask the agent to model the site ("add a `services` collection editable in Spanish and English").
-6. The agent calls `forge_project_detect`, `forge_project_doctor` and `forge_docs_search`, and follows the skills.
-7. **You review** the generated code.
-8. Run the normal gates: `typecheck`, `lint`, `test`, `build`, then deploy as usual.
+3. Connect your agent with one command: `pnpm exec forge-cms-agent init`.
+4. Ask the agent to model the site ("add a `services` collection editable in Spanish and English").
+5. The agent calls `forge_project_detect`, `forge_project_doctor` and `forge_docs_search`, and follows the skills.
+6. **You review** the generated code.
+7. Run the normal gates: `typecheck`, `lint`, `test`, `build`, then deploy as usual.
 
-## Connect the MCP server
+## Connect your agent
 
-The command is always `pnpm exec forge-cms-mcp` (no global install). It inspects the directory it is started in, or `--root <dir>`.
-
-```json
-// .mcp.json (Claude Code) - or: claude mcp add forge-cms -- pnpm exec forge-cms-mcp
-{ "mcpServers": { "forge-cms": { "command": "pnpm", "args": ["exec", "forge-cms-mcp"] } } }
+```bash
+pnpm exec forge-cms-agent init
 ```
 
+One command does both jobs:
+
+- merges the MCP entry into `.mcp.json` (your other servers and keys are kept), and
+- copies the eight skills into `.claude/skills/`.
+
+It is idempotent, picks `pnpm`, `npm`, `yarn` or `bun` from your lockfile, writes only inside your project (never through a symlink), and never overwrites something you wrote unless you pass `--force`.
+
+| Command / option                    | What it does                                                                                 |
+| ----------------------------------- | -------------------------------------------------------------------------------------------- |
+| `forge-cms-agent init`              | Connect the agent (`sync` is an alias)                                                       |
+| `forge-cms-agent check`             | Writes nothing; exits 1 if the entry or a skill is missing or stale, so you can run it in CI |
+| `--target claude,agents`            | Also install the skills to `.agents/skills/` (Codex and other agents that read that folder)  |
+| `--dry-run`                         | Print the plan, change nothing                                                               |
+| `--root <dir>`, `--package-manager` | Another project directory, or force the package manager                                      |
+
+After upgrading ForgeCMS, run `pnpm exec forge-cms-agent sync` so the skills match the new version (`check` tells you when they do not).
+
+**Codex** reads `~/.codex/config.toml`, which is outside your project, so `init` prints this snippet for you to add instead of writing it:
+
 ```toml
-# ~/.codex/config.toml (Codex)
 [mcp_servers.forge-cms]
 command = "pnpm"
 args = ["exec", "forge-cms-mcp"]
 ```
 
-No token, password, `AUTH_SECRET` or Cloudflare credential is ever needed or accepted.
+No token, password, `AUTH_SECRET` or Cloudflare credential is ever needed or accepted. The MCP server is `forge-cms-mcp` (local stdio, read-only); it inspects the directory it is started in, or `--root <dir>`.
 
-## Install the skills
+### Manual setup
 
-The skills ship inside the package as plain `SKILL.md` files (tool-neutral). Copy them to where your agent reads project skills:
+If you prefer to do it by hand, the `.mcp.json` entry is `{ "mcpServers": { "forge-cms": { "command": "pnpm", "args": ["exec", "forge-cms-mcp"] } } }` and the skills are plain `SKILL.md` files under
+`node_modules/@forge-cms/agent/skills/` that you copy to `.claude/skills/` (or `.agents/skills/`). The Agentyx tool (0.11) has no supported way to install third-party packs yet, so there is no Agentyx manifest.
 
-```bash
-# Claude Code
-mkdir -p .claude/skills && cp -R node_modules/@forge-cms/agent/skills/* .claude/skills/
-# Codex and other agents that read .agents/skills
-mkdir -p .agents/skills && cp -R node_modules/@forge-cms/agent/skills/* .agents/skills/
-```
-
-Re-copy after upgrading ForgeCMS so the skills match the new version. The Agentyx tool (0.11) has no supported way to install third-party packs yet, so there is no Agentyx manifest; the files above are the single source of truth.
+## The skills
 
 | Skill                          | Teaches                                                                           |
 | ------------------------------ | --------------------------------------------------------------------------------- |

@@ -260,9 +260,9 @@ The adapter contract suites an adapter must pass: `runDatabaseAdapterContractTes
 ## `@forge-cms/agent`
 
 **Experimental development tooling** - outside the stable 1.x compatibility promise (tool names, resource ids and skill names may change in a compatible minor). Dev dependency only: no Forge package, no application and no browser bundle may depend on it.
-Node >= 22, ESM. Binary: `forge-cms-mcp` (`pnpm exec forge-cms-mcp [--root <dir>]`), a **read-only, local, stdio** MCP server with no telemetry. Guide: [Agent Kit](../apps/www/src/content/docs/agent-kit.md).
+Node >= 22, ESM. Binaries: `forge-cms-agent` (`init` / `sync` / `check`: writes the MCP entry and skills inside the project) and `forge-cms-mcp` (`pnpm exec forge-cms-mcp [--root <dir>]`), a **read-only, local, stdio** MCP server with no telemetry. Guide: [Agent Kit](../apps/www/src/content/docs/agent-kit.md).
 
-**Programmatic surface.** `createForgeMcpServer({ projectRoot })` returns the server; `detectProject(root)`, `doctorProject(root)`, `searchDocs(query, limit?)`, `listDocs()`, `supportFacts(version)` and `fetchRuntimeMetadata(origin)` are the functions behind the tools.
+**Programmatic surface.** `createForgeMcpServer({ projectRoot })` returns the server; `detectProject(root)`, `doctorProject(root)`, `searchDocs(query, limit?)`, `listDocs()`, `supportFacts(version)` and `fetchRuntimeMetadata(origin)` are the functions behind the tools; `installAgentKit({ root, targets, force?, dryRun?, packageManager? })` and `checkAgentKit(...)` are what `forge-cms-agent init|sync` and `check` run.
 
 **MCP tools** (all read-only, none takes a path): `forge_project_detect`, `forge_project_doctor`, `forge_docs_search`, `forge_support`, `forge_runtime_metadata`.
 **MCP resources:** `forge://docs/<guide>`, `forge://skills/<skill>`, `forge://support`, `forge://project`.

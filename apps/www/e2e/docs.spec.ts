@@ -76,3 +76,21 @@ test('the schema-upgrades page is in the sidebar and states availability and lim
   await expect(prose).toContainText('No down migrations');
   await expect(prose).toContainText('never at application startup');
 });
+
+test('the Agent Kit page leads with the one-command install and keeps the manual route', async ({
+  page
+}) => {
+  await page.goto('/docs/agent-kit');
+
+  const prose = page.locator('.forge-prose');
+  await expect(
+    page.getByRole('heading', { name: 'Agent Kit (experimental)', level: 1 })
+  ).toBeVisible();
+  await expect(prose.getByRole('heading', { name: 'Connect your agent', level: 2 })).toBeVisible();
+  await expect(prose).toContainText('pnpm exec forge-cms-agent init');
+  await expect(prose).toContainText('forge-cms-agent check');
+  await expect(prose.getByRole('heading', { name: 'Manual setup' })).toBeVisible();
+  // No Prism-escaped TOML/JSON dumped as raw markdown, and the Codex snippet is shown, not written.
+  await expect(prose).toContainText('[mcp_servers.forge-cms]');
+  await expect(prose).not.toContainText('```');
+});
