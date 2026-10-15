@@ -1,6 +1,12 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-15 (spec 095 — first-publication prerelease registry safety — on `fix/spec-095-first-rc-registry-safety`, PR pending review).** Spec 094 is **merged** (PR #100, main `6cf6f07`, main CI `38586044834` ✓);
+> **Last updated: 2026-10-15 (spec 096 — Agent Kit one-command install — on `feature/spec-096-agent-init-cli`, PR pending review).** Spec 095 is **merged** (PR #101, main `db60682`). Because nothing was published yet, the
+> candidate moves to **`1.0.0-rc.2`** (supersedes the never-published `rc.1`): `@forge-cms/agent` gains `forge-cms-agent init|sync|check` (merges `.mcp.json`, installs the eight stamped skills, never writes outside the project or
+> through a symlink, prints the Codex snippet, `--dry-run`/`--force`) plus `installAgentKit`/`checkAgentKit`; `/docs/agent-kit` leads with it. `agent` is now gated by the coverage floors (non-ui), and extra unit/e2e coverage
+> was added (`defineUsersCollection` access, `provideForgeAnalytics`, credential registry, linker transform, the Agent Kit docs page). `release:certify` CERTIFIED on rc.2; stability 0 first-attempt failures. **Not published**:
+> after merge, exact-main green CI → maintainer authorizes → dispatch `release-rc` (SHA + `1.0.0-rc.2`) → verify → L02. npm `latest` stays `0.13.4`.
+>
+> _Previous header (spec 095, now merged as PR #101):_ **Last updated: 2026-10-15 (spec 095 — first-publication prerelease registry safety — on `fix/spec-095-first-rc-registry-safety`, PR pending review).** Spec 094 is **merged** (PR #100, main `6cf6f07`, main CI `38586044834` ✓);
 > showcase polish is complete and no public package source changed. Registry truth (read 2026-10-15): npm `latest` `0.13.4` on the eleven existing packages, `@forge-cms/agent` **absent** (E404), no `rc` tag, no GitHub `v1.0.0-rc.1`.
 > `1.0.0-rc.1` is still **prepared and certified, unpublished**. Before publishing, the `release-rc` verifier was found to reject both a never-published package (E404) and a package with no `latest` — it would have failed the first
 > Agent Kit publication. Spec 095 replaces the scalar `latest` check with a per-package PRE snapshot (absent / stable / prerelease-only) that POST consumes (every `rc` correct, every existing `latest` unchanged, a first-published
