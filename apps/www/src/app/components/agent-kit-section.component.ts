@@ -1,91 +1,132 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { VoltNativeButton } from '@voltui/components';
+import { MoveInViewDirective, MoveStaggerDirective } from 'angular-movement';
 import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
 import { agentInstallCommand } from '../forge-release';
-import { agentKit } from '../landing-data';
+import { agentAvailabilityNote, agentRoles, agentTerminal } from '../showcase-data';
 
+/**
+ * Spec 097: the experimental Agent Kit as a terminal story — the spec 096 one-command `init`, then one
+ * developer intent answered by read-only consultations. Rows reveal in order (Movement stagger) but
+ * are all in the DOM from the start; under reduced motion they are simply there. The install command
+ * appears only when `FORGE_CHANNELS` confirms the package is on the registry.
+ */
 @Component({
   selector: 'forge-cms-agent-kit-section',
   standalone: true,
-  imports: [RouterLink, VoltNativeButton, LmnArrowRightIcon],
+  imports: [
+    RouterLink,
+    VoltNativeButton,
+    MoveInViewDirective,
+    MoveStaggerDirective,
+    LmnArrowRightIcon
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section
-      id="agent-kit"
-      class="mx-auto w-full max-w-7xl px-5 py-18 md:px-8 md:py-22"
-      aria-labelledby="agent-kit-title"
-    >
-      <div class="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
-        <div>
-          <p class="forge-section-mark">
-            Agent Kit <span class="forge-experimental-badge ml-1">Experimental</span>
-          </p>
-          <h2 id="agent-kit-title" class="forge-section-title mt-5">
-            Your coding agent should not have to guess how ForgeCMS works.
-          </h2>
-          <p class="mt-5 max-w-[50ch] leading-7 text-muted-foreground">
-            <code class="font-semibold text-foreground">&#64;forge-cms/agent</code> pairs a local
-            MCP server with official skills and the documentation for the exact version you
-            installed. Useful today; compatibility may evolve.
-          </p>
-          <ul class="mt-6 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-            @for (fact of kit.facts; track fact) {
-              <li class="flex gap-2.5">
-                <span
-                  class="mt-[0.55rem] size-1.5 shrink-0 rounded-full bg-primary"
-                  aria-hidden="true"
-                ></span>
-                <span>{{ fact }}</span>
-              </li>
-            }
-          </ul>
-          <div class="mt-8 flex flex-wrap items-center gap-4">
-            <a voltButton routerLink="/docs/agent-kit">
-              Read Agent Kit docs
-              <lmn-arrow-right [size]="16" />
-            </a>
-            @if (install) {
-              <code class="forge-install-inline" aria-label="Agent Kit install command">{{
-                install
-              }}</code>
-            } @else {
-              <span class="text-sm text-muted-foreground" data-agent-availability>
-                Coming with the 1.0 release candidate
-              </span>
-            }
-          </div>
-        </div>
+    <section id="agent-kit" class="forge-agent-section" aria-labelledby="agent-kit-title">
+      <div class="mx-auto w-full max-w-7xl px-5 py-20 md:px-8 md:py-28">
+        <div class="grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16">
+          <div>
+            <p class="forge-section-mark">
+              Agent Kit <span class="forge-experimental-badge ml-1">Experimental</span>
+            </p>
+            <h2 id="agent-kit-title" class="forge-section-title mt-5">
+              Your coding agent shouldn’t have to guess ForgeCMS.
+            </h2>
+            <p class="mt-5 max-w-[48ch] leading-7 text-muted-foreground">
+              One command connects a local, read-only MCP server and the official skills for the
+              exact version you installed. Development tooling around ForgeCMS; compatibility may
+              evolve.
+            </p>
 
-        <figure
-          class="forge-themed-panel m-0 rounded-[1.25rem] border border-border p-6 md:p-7"
-          aria-label="Illustrative Agent Kit session"
-        >
-          <figcaption class="text-xs font-medium text-muted-foreground">
-            Illustrative · the MCP only reads; the agent edits your project with its own tools
-          </figcaption>
-          <p class="mt-5 text-sm text-muted-foreground">Developer</p>
-          <p class="mt-1 font-medium">“{{ kit.prompt }}”</p>
-          <p class="mt-6 text-sm text-muted-foreground">Agent consults</p>
-          <ul class="mt-2 space-y-2 font-mono text-[0.8rem]">
-            @for (step of kit.steps; track step.call) {
-              <li class="rounded-lg border border-border bg-background px-3 py-2">
-                <span class="text-primary" aria-hidden="true">✓</span>
-                <span class="sr-only">Done: </span>
-                {{ step.call }}
-                <span class="block pl-5 font-sans text-xs text-muted-foreground">{{
-                  step.note
-                }}</span>
-              </li>
-            }
-          </ul>
-          <p class="mt-5 text-sm leading-6">→ {{ kit.result }}</p>
-        </figure>
+            <dl class="forge-agent-roles">
+              @for (item of roles; track item.name) {
+                <div>
+                  <dt>{{ item.name }}</dt>
+                  <dd>{{ item.role }}</dd>
+                </div>
+              }
+            </dl>
+
+            <ul class="forge-agent-facts" aria-label="Agent Kit guarantees">
+              <li>Local</li>
+              <li>read-only</li>
+              <li>No telemetry</li>
+            </ul>
+
+            <div class="mt-8 flex flex-wrap items-center gap-4">
+              <a voltButton routerLink="/docs/agent-kit">
+                Read Agent Kit docs
+                <lmn-arrow-right [size]="16" />
+              </a>
+              @if (install) {
+                <code class="forge-install-inline" aria-label="Agent Kit install command">{{
+                  install
+                }}</code>
+              }
+            </div>
+            <p class="mt-4 text-sm text-muted-foreground" data-agent-availability>
+              @if (install) {
+                {{ availability }}
+              } @else {
+                Coming with the 1.0 release candidate
+              }
+            </p>
+          </div>
+
+          <figure class="forge-terminal" aria-labelledby="agent-terminal-caption">
+            <div class="forge-terminal-bar" aria-hidden="true">
+              <span></span><span></span><span></span>
+              <p>your-angular-project</p>
+            </div>
+            <ol class="forge-terminal-body" moveStagger="110ms">
+              @for (row of rows; track row.text) {
+                <li [class]="'forge-terminal-row is-' + row.kind" [moveInView]="reveal">
+                  @switch (row.kind) {
+                    @case ('command') {
+                      <span class="forge-terminal-sigil" aria-hidden="true">$</span>
+                      <code>{{ row.text }}</code>
+                    }
+                    @case ('prompt') {
+                      <span class="forge-terminal-label">You</span>
+                      <span class="forge-terminal-prompt">“{{ row.text }}”</span>
+                    }
+                    @case ('result') {
+                      <span class="forge-terminal-sigil" aria-hidden="true">→</span>
+                      <span
+                        ><strong>{{ row.text }}</strong>
+                        <span class="forge-terminal-detail">{{ row.detail }}</span></span
+                      >
+                    }
+                    @default {
+                      <span class="forge-terminal-check" aria-hidden="true">✓</span>
+                      <span class="sr-only">Done: </span>
+                      <span
+                        ><span [class.font-mono]="row.kind === 'tool'">{{ row.text }}</span>
+                        @if (row.detail) {
+                          <span class="forge-terminal-detail">{{ row.detail }}</span>
+                        }
+                      </span>
+                    }
+                  }
+                </li>
+              }
+            </ol>
+            <figcaption id="agent-terminal-caption" class="forge-terminal-caption">
+              Illustrative · {{ install ? 'Candidate workflow.' : availability }} The MCP only
+              reads; your agent edits the project with its own tools.
+            </figcaption>
+          </figure>
+        </div>
       </div>
     </section>
   `
 })
 export class AgentKitSectionComponent {
-  protected readonly kit = agentKit;
+  protected readonly rows = agentTerminal;
+  protected readonly roles = agentRoles;
   protected readonly install = agentInstallCommand();
+  protected readonly availability = agentAvailabilityNote();
+  protected readonly reveal = { opacity: [0, 1], x: [-10, 0] };
 }

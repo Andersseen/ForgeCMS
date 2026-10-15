@@ -4,6 +4,7 @@ import { VoltNativeButton } from '@voltui/components';
 import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
 import { LmnCheckIcon } from 'lumen-icons/check';
 import { FORGE_CHANNELS } from '../forge-release';
+import { releaseSteps } from '../showcase-data';
 import { ROADMAP_MILESTONES, type MilestoneStatus } from '../landing-data';
 
 const STATUS_LABELS: Record<MilestoneStatus, string> = {
@@ -44,6 +45,21 @@ const STATUS_LABELS: Record<MilestoneStatus, string> = {
               How schema upgrades work
               <lmn-arrow-right [size]="16" />
             </a>
+            <ol class="forge-release-steps" aria-label="Release status">
+              @for (step of steps; track step.label) {
+                <li [attr.data-state]="step.state">
+                  @if (step.state === 'done') {
+                    <lmn-check tone="success" [size]="16" />
+                  } @else {
+                    <span class="forge-release-dot" aria-hidden="true"></span>
+                  }
+                  <span>{{ step.label }}</span>
+                  @if (step.state === 'next') {
+                    <span class="forge-release-next">Next</span>
+                  }
+                </li>
+              }
+            </ol>
           </div>
 
           <ol class="border-t border-white/15">
@@ -88,4 +104,5 @@ export class RoadmapSectionComponent {
     ? 'The 1.0 release candidate is published for validation.'
     : 'The 1.0 release candidate is prepared and certified; publication and real-consumer validation come next.';
   protected readonly labels = STATUS_LABELS;
+  protected readonly steps = releaseSteps();
 }

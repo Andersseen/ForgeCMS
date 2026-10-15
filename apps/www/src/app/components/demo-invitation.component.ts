@@ -28,14 +28,28 @@ import { LmnRectangleStackIcon } from 'lumen-icons/rectangle-stack';
         </div>
       </div>
       <div class="forge-demo-copy">
-        <h2 id="demo-invitation-title">From a collection<br />to a real experience.</h2>
+        <p class="forge-section-mark">The proof</p>
+        <h2 id="demo-invitation-title">You build the interface.<br />Your client gets control.</h2>
         <p>
-          Meet Lumea, a clinic built on ForgeCMS. Explore the public site, follow the editor
-          journey, or see how its Angular application fits together.
+          Lumea is a clinic site built on ForgeCMS. Everything above runs there, against a real
+          runtime:
         </p>
-        <a voltButton routerLink="/demo">Meet the demo <lmn-arrow-right [size]="16" /></a>
+        <ul class="forge-demo-proof">
+          @for (item of proof; track item) {
+            <li>
+              {{ item }}
+              @if (item === 'Analytics') {
+                <span class="forge-experimental-badge ml-1">Experimental</span>
+              }
+            </li>
+          }
+        </ul>
+        <a voltButton routerLink="/demo">Explore Lumea demo <lmn-arrow-right [size]="16" /></a>
       </div>
     </section>
   `
 })
-export class DemoInvitationComponent {}
+export class DemoInvitationComponent {
+  /** What the live demo exercises today (see DEMO_EXPLORE on /demo). */
+  protected readonly proof = ['Content', 'Drafts', 'Uploads', 'Roles', 'ES / EN', 'Analytics'];
+}

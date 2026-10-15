@@ -101,26 +101,6 @@ export const localizationExample = {
   limits: 'Rich text, blocks, arrays, uploads and relations are not localized in 1.0.'
 } as const;
 
-/** The Agent Kit story. Mirrors docs/agent-kit and the packed tool list. */
-export const agentKit = {
-  prompt: 'Make Services editable in Spanish and English.',
-  steps: [
-    { call: 'forge_project_detect', note: 'Angular + Analog, Cloudflare profile, no locales yet' },
-    { call: 'forge_docs_search("localization")', note: 'Version-matched docs, offline' },
-    { call: 'forgecms-localization', note: 'Skill: the supported pattern' }
-  ],
-  result: 'The agent edits your project with its normal tools, using the supported Forge pattern.',
-  facts: [
-    'Local stdio MCP, read-only',
-    'No telemetry',
-    'Project detection and doctor',
-    'Offline docs search',
-    'Support matrix',
-    'Eight official skills',
-    'Development only, no runtime dependency'
-  ]
-} as const;
-
 /** Only metrics the Analytics vertical really has (docs/analytics). No visitors, sessions or funnels. */
 export const analyticsFacts = {
   metrics: [
@@ -142,13 +122,6 @@ export const analyticsFacts = {
   ]
 } as const;
 
-/** The client-site flow, as plain steps. */
-export const clientFlow = {
-  developer: ['Angular site UI', 'Forge schema', 'Pages · Services · Posts · Media'],
-  client: ['Content', 'ES / EN', 'Uploads', 'Analytics'],
-  agent: ['Forge MCP', 'Forge skills']
-} as const;
-
 export const packages = FORGE_PACKAGES.map((pkg) => ({
   ...pkg,
   version: packageVersionLabel(pkg)
@@ -167,16 +140,6 @@ export const posts = defineCollection({
     slug: defineField.slug({ autoGenerate: true, sourceField: 'title' }),
     author: defineField.relation({ collection: 'users' })
   }
-});`;
-
-/** The Local API in the shape a server route uses it. */
-export const localApiCode = `// An Analog server route: no HTTP hop, same access rules as a visitor.
-const post = await runtime.findOne({
-  collection: 'posts',
-  where: { slug },
-  depth: 1,
-  overrideAccess: false,
-  user: null
 });`;
 
 export type MilestoneStatus = 'complete' | 'in-progress' | 'next' | 'pending' | 'planned';

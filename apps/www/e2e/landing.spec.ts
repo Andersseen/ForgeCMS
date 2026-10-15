@@ -80,10 +80,192 @@ test('the homepage groups what 1.0 gives you and keeps the Local API story', asy
   for (const group of ['Content', 'Backend', 'Angular', 'Operations'])
     await expect(architecture.getByRole('heading', { name: group, exact: true })).toBeVisible();
   await expect(architecture.getByText('Reviewed, atomic migrations')).toBeVisible();
-  await expect(
-    architecture.getByRole('heading', { name: /Compose content where your server code/ })
-  ).toBeVisible();
+  // The Local API panel moved into the story's Runtime stage (spec 097).
+  const runtime = page.locator('#story-runtime');
+  await expect(runtime).toContainText('runtime.find(');
+  await expect(runtime.getByRole('link', { name: /Local API guide/ })).toHaveAttribute(
+    'href',
+    new RegExp('/docs/local-api$')
+  );
 });
+
+/** Which story stage is active and how present every stage is, in one atomic read. */
+const storySnapshot = () =>
+  Array.from(document.querySelectorAll<HTMLElement>('.forge-story-step')).map((step) => ({
+    stage: step.dataset['stage'],
+    active: step.dataset['active'] === 'true',
+    opacity: Number(getComputedStyle(step).opacity)
+  }));
+
+test('desktop story: scrolling walks Schema → Deploy and the index follows', async ({ page }) => {
+  const problems: string[] = [];
+  page.on('pageerror', (error) => problems.push(error.message));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  const index = page.getByRole('navigation', { name: 'Story stages' });
+  await expect(index).toBeVisible();
+
+  for (const [i, stage] of ['schema', 'runtime', 'angular', 'admin', 'deploy'].entries()) {
+    // Native scrolling only: put the stage just past the reading line (half the viewport).
+    await page.evaluate((id) => {
+      const step = document.getElementById(`story-${id}`)!;
+      window.scrollTo(0, step.getBoundingClientRect().top + window.scrollY - 300);
+    }, stage);
+    await expect
+      .poll(async () => (await page.evaluate(storySnapshot)).find((s) => s.active)?.stage)
+      .toBe(stage);
+    await expect(index.getByRole('link').nth(i)).toHaveAttribute('aria-current', 'step');
+    await expect(page.locator(`#story-${stage} h3`)).toBeInViewport();
+  }
+  // The final stage settles fully present; the earlier ones recede but stay readable.
+  await expect
+    .poll(async () => (await page.evaluate(storySnapshot)).map((s) => s.opacity))
+    .toEqual([0.55, 0.55, 0.55, 0.55, 1]);
+  await expect(page.locator('#story-deploy')).toContainText('libSQL');
+  // The sticky index releases at the end of the section instead of covering what follows.
+  await page.locator('#capabilities').scrollIntoViewIfNeeded();
+  await expect(index).not.toBeInViewport();
+  expect(problems).toEqual([]);
+});
+
+test('keyboard focus inside a receding stage brings it fully forward', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await page.locator('#story-schema').scrollIntoViewIfNeeded();
+  await page.locator('#story-runtime .forge-story-code').focus();
+  await expect.poll(async () => (await page.evaluate(storySnapshot))[1]?.opacity).toBe(1);
+});
+
+test('mobile story is a plain readable flow with no sticky index', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await expect(page.getByRole('navigation', { name: 'Story stages' })).toBeHidden();
+  for (const stage of ['schema', 'runtime', 'angular', 'admin', 'deploy']) {
+    const step = page.locator(`#story-${stage}`);
+    await step.scrollIntoViewIfNeeded();
+    await expect(step.locator('h3')).toBeVisible();
+  }
+  // No stage is ever dimmed below lg, wherever the reader is.
+  expect((await page.evaluate(storySnapshot)).map((s) => s.opacity)).toEqual([1, 1, 1, 1, 1]);
+  // Nothing traps scrolling: the page keeps going past the story.
+  await page.locator('#packages').scrollIntoViewIfNeeded();
+  await expect(page.locator('#packages')).toBeInViewport();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    )
+  ).toBeLessThanOrEqual(1);
+});
+
+test('reduced motion: every stage and revealed element is readable without scrolling to it', async ({
+  page
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await page.locator('#story-admin').scrollIntoViewIfNeeded();
+  expect((await page.evaluate(storySnapshot)).map((s) => s.opacity)).toEqual([1, 1, 1, 1, 1]);
+  // Nothing waits for an animation: content far below the fold is already fully opaque.
+  const hidden = await page.evaluate(
+    () =>
+      Array.from(
+        document.querySelectorAll(
+          '.forge-story-panel, .forge-bento-card, .forge-terminal-row, .forge-dash-bars span'
+        )
+      ).filter((el) => getComputedStyle(el).opacity !== '1').length
+  );
+  expect(hidden).toBe(0);
+  await page.getByRole('link', { name: 'Explore Lumea demo' }).click();
+  await expect(page).toHaveURL(/\/demo$/);
+});
+
+test('swap, localization and analytics respond to the user, never on their own', async ({
+  page
+}) => {
+  await page.goto('/');
+  const swap = page.locator('#client-site');
+  await expect(swap.getByRole('tabpanel')).toContainText("slug: 'services'");
+  await swap.getByRole('tab', { name: 'Publish', exact: true }).click();
+  await expect(swap.locator('.forge-swap-stage')).toHaveClass(/is-client-first/);
+  await expect(swap.getByRole('tabpanel')).toContainText('Skin consultation');
+  await expect(swap).toContainText('not a page builder');
+
+  const l10n = page.locator('#localization');
+  const editor = l10n.getByRole('group', { name: /Notices/ });
+  await expect(editor).toContainText('Tratamientos faciales');
+  await l10n.getByRole('button', { name: 'EN', exact: true }).click();
+  await expect(l10n.getByRole('button', { name: 'EN', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
+  await expect(editor).toContainText('Facial treatments');
+  // Both stored values stay visible regardless of the switch.
+  await expect(l10n.getByRole('table')).toContainText('Tratamientos faciales');
+
+  const analytics = page.locator('#analytics');
+  await expect(analytics).toContainText('Illustrative preview · not live data');
+  await expect(analytics).toContainText('1,284');
+  await analytics.getByRole('button', { name: '30d', exact: true }).click();
+  await expect(analytics).toContainText('5,310');
+  await expect(analytics).toContainText('vs previous 30d');
+});
+
+test('the Agent Kit terminal shows the one-command init as a labelled candidate workflow', async ({
+  page
+}) => {
+  await page.goto('/');
+  const agent = page.locator('#agent-kit');
+  const terminal = agent.getByRole('figure');
+  await expect(terminal).toContainText('pnpm exec forge-cms-agent init');
+  await expect(terminal).toContainText('8 ForgeCMS skills installed');
+  await expect(terminal).toContainText('forge_project_detect');
+  await expect(terminal).toContainText('Illustrative');
+  if (!FORGE_CHANNELS.agentPublished) await expect(terminal).toContainText('not on npm yet');
+});
+
+/** WCAG contrast ratio of an element's text against its first opaque ancestor background. */
+const contrastOf = (selector: string) => {
+  const el = document.querySelector(selector);
+  if (!el) return null;
+  const parse = (c: string) => (c.match(/[\d.]+/g) ?? []).map(Number);
+  const lum = ([r, g, b]: number[]) => {
+    const f = (v: number) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * f(r!) + 0.7152 * f(g!) + 0.0722 * f(b!);
+  };
+  let bg: number[] | null = null;
+  for (let node: Element | null = el; node && !bg; node = node.parentElement) {
+    const c = parse(getComputedStyle(node).backgroundColor);
+    if (c.length >= 3 && (c[3] ?? 1) === 1) bg = c;
+  }
+  const [a, b] = [lum(parse(getComputedStyle(el).color)), lum(bg ?? [255, 255, 255])];
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+};
+
+for (const mode of ['light', 'dark'] as const) {
+  test(`new sections keep readable contrast in ${mode} mode`, async ({ page }) => {
+    await page.addInitScript((theme) => localStorage.setItem('forgecms-theme', theme), mode);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    await expect(page.locator('html')).toHaveClass(mode === 'dark' ? /dark/ : /^(?!.*dark).*$/);
+    for (const selector of [
+      '#story-runtime h3',
+      '.forge-story-body',
+      '.forge-bento-card h3',
+      '.forge-bento-card > p',
+      '.forge-swap-input',
+      '.forge-l10n-value',
+      '.forge-terminal-prompt',
+      '.forge-terminal-detail',
+      '.forge-dash-value',
+      '.forge-dash-label'
+    ]) {
+      // Polled: the element exists once the landing page has rendered (null until then).
+      await expect
+        .poll(() => page.evaluate(contrastOf, selector), { message: `${selector} in ${mode}` })
+        .toBeGreaterThanOrEqual(4.5);
+    }
+  });
+}
 
 test('stable core is not labelled experimental; Agent Kit and Analytics are', async ({ page }) => {
   await page.goto('/');
@@ -239,7 +421,7 @@ test('showcase connects the schema, content and API without a mutation', async (
   const content = page.getByRole('tab', { name: 'Content', exact: true });
   const api = page.getByRole('tab', { name: 'API', exact: true });
   await expect(schema).toHaveAttribute('aria-selected', 'true');
-  const schemaPanel = page.getByRole('tabpanel');
+  const schemaPanel = page.locator('.forge-showcase').getByRole('tabpanel');
   await expect(schemaPanel).toHaveAttribute(
     'id',
     (await schema.getAttribute('aria-controls')) ?? ''
@@ -249,12 +431,18 @@ test('showcase connects the schema, content and API without a mutation', async (
   await page.keyboard.press('ArrowRight');
   await expect(content).toBeFocused();
   await expect(content).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByRole('tabpanel')).toContainText('A home for your next idea');
-  await expect(page.getByRole('tabpanel')).toContainText('a-home-for-your-next-idea');
+  await expect(page.locator('.forge-showcase').getByRole('tabpanel')).toContainText(
+    'A home for your next idea'
+  );
+  await expect(page.locator('.forge-showcase').getByRole('tabpanel')).toContainText(
+    'a-home-for-your-next-idea'
+  );
   await page.keyboard.press('End');
   await expect(api).toBeFocused();
-  await expect(page.getByRole('tabpanel')).toContainText('"data"');
-  await expect(page.getByRole('tabpanel')).toContainText('a-home-for-your-next-idea');
+  await expect(page.locator('.forge-showcase').getByRole('tabpanel')).toContainText('"data"');
+  await expect(page.locator('.forge-showcase').getByRole('tabpanel')).toContainText(
+    'a-home-for-your-next-idea'
+  );
   await page.keyboard.press('Home');
   await expect(schema).toBeFocused();
   await expect(schema).toHaveAttribute('aria-selected', 'true');
@@ -345,7 +533,7 @@ for (const width of [390, 768, 1440, 1920]) {
     await page.goto('/');
     for (const name of ['Schema', 'Content', 'API']) {
       await page.getByRole('tab', { name, exact: true }).click();
-      await expect(page.getByRole('tabpanel')).toBeVisible();
+      await expect(page.locator('.forge-showcase').getByRole('tabpanel')).toBeVisible();
       expect(
         await page.evaluate(
           () => document.documentElement.scrollWidth - document.documentElement.clientWidth

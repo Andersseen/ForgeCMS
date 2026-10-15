@@ -3,7 +3,8 @@ import { AgentKitSectionComponent } from '../components/agent-kit-section.compon
 import { AnalyticsSectionComponent } from '../components/analytics-section.component';
 import { ClientFlowSectionComponent } from '../components/client-flow-section.component';
 import { LocalizationSectionComponent } from '../components/localization-section.component';
-import { ArchitectureSectionComponent } from '../components/architecture-section.component';
+import { BentoSectionComponent } from '../components/bento-section.component';
+import { StorySectionComponent } from '../components/story-section.component';
 import { DemoInvitationComponent } from '../components/demo-invitation.component';
 import { FooterComponent } from '../components/footer.component';
 import { HeaderComponent } from '../components/header.component';
@@ -17,7 +18,8 @@ import { RoadmapSectionComponent } from '../components/roadmap-section.component
   imports: [
     HeaderComponent,
     HeroSectionComponent,
-    ArchitectureSectionComponent,
+    StorySectionComponent,
+    BentoSectionComponent,
     LocalizationSectionComponent,
     ClientFlowSectionComponent,
     AgentKitSectionComponent,
@@ -34,9 +36,10 @@ import { RoadmapSectionComponent } from '../components/roadmap-section.component
       <forge-cms-header />
       <main id="main-content" tabindex="-1">
         <forge-cms-hero-section />
-        <forge-cms-architecture-section />
-        <forge-cms-localization-section />
+        <forge-cms-story-section />
+        <forge-cms-bento-section />
         <forge-cms-client-flow-section />
+        <forge-cms-localization-section />
         <forge-cms-agent-kit-section />
         <forge-cms-analytics-section />
         <forge-cms-demo-invitation />
