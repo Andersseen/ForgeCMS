@@ -23,11 +23,11 @@ pnpm exec forge-cms-agent init
 It writes the MCP entry to `.mcp.json` (merging with what is there) and copies the eight skills to `.claude/skills/`. Use `--target agents` (or `--target claude,agents`) for agents that read `.agents/skills/`, and
 `--dry-run` to see the plan first. It is idempotent, picks `pnpm`/`npm`/`yarn`/`bun` from your lockfile, and writes only inside the project, never through a symlink.
 
-| Command                 | Purpose                                                                                              |
-| ----------------------- | ---------------------------------------------------------------------------------------------------- |
-| `forge-cms-agent init`  | Connect the agent. Re-run (or `sync`) after upgrading ForgeCMS so the skills match the new version.  |
-| `forge-cms-agent check` | Writes nothing; exits 1 if the entry or a skill is missing or stale (usable in CI).                  |
-| `--force`               | Replace a differing `forge-cms` entry or a skill folder you created yourself (never done by default).|
+| Command                 | Purpose                                                                                               |
+| ----------------------- | ----------------------------------------------------------------------------------------------------- |
+| `forge-cms-agent init`  | Connect the agent. Re-run (or `sync`) after upgrading ForgeCMS so the skills match the new version.   |
+| `forge-cms-agent check` | Writes nothing; exits 1 if the entry or a skill is missing or stale (usable in CI).                   |
+| `--force`               | Replace a differing `forge-cms` entry or a skill folder you created yourself (never done by default). |
 
 Codex reads `~/.codex/config.toml`, outside your project, so `init` prints the snippet instead of writing it:
 

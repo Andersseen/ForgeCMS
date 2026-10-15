@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/agent",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "description": "EXPERIMENTAL development-time tooling for ForgeCMS: a one-command installer (`forge-cms-agent init`), a read-only local MCP server and an official skill pack for AI coding agents.",
   "author": "ForgeCMS contributors",
   "license": "MIT",

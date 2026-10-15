@@ -1,6 +1,6 @@
 {
   "name": "@forge-cms/auth",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "description": "Authentication adapter contracts for ForgeCMS.",
   "author": "ForgeCMS contributors",
   "license": "MIT",
