@@ -2,7 +2,11 @@
 import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { isAlreadyPublishedError, resolvePublishTag } from './release-decision.mjs';
+import {
+  isAlreadyPublishedError,
+  isRegistryNotFound,
+  resolvePublishTag
+} from './release-decision.mjs';
 
 const dryRun = process.argv.includes('--dry-run');
 /** `--tag <name>` / `--tag=<name>`; `undefined` when absent. A bare `--tag` is an error, never "latest". */
@@ -42,7 +46,7 @@ function assertOk(result, description) {
 }
 
 function isNotFound(result) {
-  return result.status !== 0 && /E404|404 Not Found|is not in this registry/.test(result.stderr);
+  return result.status !== 0 && isRegistryNotFound(result.stderr);
 }
 
 const packages = readdirSync('packages')

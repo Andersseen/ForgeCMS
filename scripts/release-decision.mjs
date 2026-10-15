@@ -210,6 +210,89 @@ export function assertLatestSafe(before, after) {
   }
 }
 
+/** Whether npm output means "this package does not exist in the registry" (a genuine 404, nothing else). */
+export function isRegistryNotFound(output) {
+  return /E404|404 Not Found|is not in this registry/.test(String(output));
+}
+
+/**
+ * Registry state of one package from `npm view <name> dist-tags --json`: `{ exists, latest }`.
+ * `latest` is `null` when the package has no `latest` tag (never published stable, or prerelease-only).
+ *
+ * @param {unknown} tags parsed dist-tags, or `null` for a genuinely absent package
+ * @returns {{ exists: boolean, latest: string | null }}
+ */
+export function registryStateFromDistTags(tags) {
+  if (tags === null) return { exists: false, latest: null };
+  if (typeof tags !== 'object' || Array.isArray(tags)) {
+    throw new Error(`Malformed dist-tags response: ${JSON.stringify(tags)}`);
+  }
+  const latest = /** @type {Record<string, unknown>} */ (tags).latest;
+  if (latest === undefined) return { exists: true, latest: null };
+  if (typeof latest !== 'string')
+    throw new Error(`Malformed npm "latest": ${JSON.stringify(latest)}`);
+  return { exists: true, latest };
+}
+
+/**
+ * The PRE snapshot of the fixed family's registry state (spec 095). Every existing `latest` must be a
+ * stable version and all of them must agree; a package may be absent or prerelease-only (no `latest`),
+ * but at least one package must establish the stable baseline.
+ *
+ * @param {Record<string, { exists: boolean, latest: string | null }>} states by package name
+ * @returns {{ stableBaseline: string, packages: Record<string, { exists: boolean, latest: string | null }> }}
+ */
+export function buildPreSnapshot(states) {
+  const names = Object.keys(states).sort();
+  if (names.join() !== [...PUBLIC_FAMILY].sort().join()) {
+    throw new Error(`Registry states do not cover exactly the fixed family: ${names}`);
+  }
+  const packages = {};
+  const baselines = new Set();
+  for (const name of names) {
+    const state = states[name];
+    if (!state.exists && state.latest !== null)
+      throw new Error(`${name}: absent package has a latest`);
+    if (state.latest !== null) {
+      assertLatestSafe(state.latest);
+      baselines.add(state.latest);
+    }
+    packages[name] = { exists: state.exists, latest: state.latest };
+  }
+  if (baselines.size === 0)
+    throw new Error('No package has a stable "latest": no baseline to protect');
+  if (baselines.size > 1) {
+    throw new Error(`npm "latest" differs across the family: ${[...baselines].join(', ')}`);
+  }
+  return { stableBaseline: [...baselines][0], packages };
+}
+
+/**
+ * POST check against the exact PRE snapshot: every package exists, `rc` → candidate, a package that had a
+ * stable `latest` still has exactly that one, and a package that had none still has none (a first
+ * publication must never end up with `latest` → RC).
+ *
+ * @param {{ packages: Record<string, { exists: boolean, latest: string | null }> }} snapshot
+ * @param {string} version candidate version
+ * @param {Record<string, { exists: boolean, tags: Record<string, string> | null }>} observed
+ */
+export function assertPostSnapshot(snapshot, version, observed) {
+  for (const name of PUBLIC_FAMILY) {
+    const before = snapshot.packages?.[name];
+    if (!before) throw new Error(`${name}: missing from the PRE snapshot`);
+    const now = observed[name];
+    if (!now?.exists || !now.tags)
+      throw new Error(`${name}: not found in the registry after publication`);
+    if (now.tags[RC_TAG] !== version) {
+      throw new Error(`${name}: "${RC_TAG}" is ${now.tags[RC_TAG]}, expected ${version}`);
+    }
+    const latest = now.tags.latest ?? null;
+    if (latest !== before.latest) {
+      throw new Error(`${name}: npm "latest" moved from ${before.latest} to ${latest}`);
+    }
+  }
+}
+
 /**
  * `changeset status` ignores changesets that a prerelease version commit already consumed (they are listed in
  * `.changeset/pre.json`). A pull request that both changes packages and contains the Changesets prerelease

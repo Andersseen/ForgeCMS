@@ -1,7 +1,8 @@
 # Manual release-candidate publication (spec 092). workflow_dispatch ONLY: never push/PR/merge triggered.
 # Publishes an already-prepared `1.0.0-rc.N` commit under the fixed `rc` dist-tag and verifies npm `latest`
-# did not move. It does not deploy any website. Re-running after a partial publish only publishes the
-# packages still missing from npm (scripts/publish-unpublished.mjs skips existing versions, never overwrites).
+# did not move (a package never published before, e.g. a new one, may legitimately have no `latest`;
+# the pre/post registry snapshot is passed through $RUNNER_TEMP, spec 095). It does not deploy any
+# website. Re-running after a partial publish only publishes the packages still missing from npm (scripts/publish-unpublished.mjs skips existing versions, never overwrites).
 name: Release candidate
 
 on:
@@ -69,12 +70,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify candidate identity and npm latest (pre)
-        id: pre
-        run: |
-          latest=$(node scripts/release-rc-verify.mjs --phase pre "${{ inputs.version }}")
-          echo "latest=$latest" >> "$GITHUB_OUTPUT"
-          echo "npm latest before: $latest"
+      - name: Verify candidate identity and snapshot npm registry state (pre)
+        run: node scripts/release-rc-verify.mjs --phase pre "${{ inputs.version }}" --snapshot "$RUNNER_TEMP/forge-rc-pre.json"
 
       - name: Build all packages
         run: pnpm build
@@ -88,8 +85,8 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
 
-      - name: Verify rc tags and that npm latest did not move (post)
-        run: node scripts/release-rc-verify.mjs --phase post "${{ inputs.version }}" "${{ steps.pre.outputs.latest }}"
+      - name: Verify rc tags and that no npm latest moved (post)
+        run: node scripts/release-rc-verify.mjs --phase post "${{ inputs.version }}" --snapshot "$RUNNER_TEMP/forge-rc-pre.json"
 
       - name: Create GitHub prerelease
         run: pnpm release:github --mode prerelease
