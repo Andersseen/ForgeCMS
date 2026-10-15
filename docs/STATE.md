@@ -1,6 +1,12 @@
 # STATE — Current implementation status
 
-> **Last updated: 2026-10-14 (spec 094 — ForgeCMS 1.0 product showcase polish — on `feature/spec-094-v1-showcase-polish`, PR pending review).** Presentation-only: `apps/www` (homepage: capabilities by value,
+> **Last updated: 2026-10-15 (spec 095 — first-publication prerelease registry safety — on `fix/spec-095-first-rc-registry-safety`, PR pending review).** Spec 094 is **merged** (PR #100, main `6cf6f07`, main CI `38586044834` ✓);
+> showcase polish is complete and no public package source changed. Registry truth (read 2026-10-15): npm `latest` `0.13.4` on the eleven existing packages, `@forge-cms/agent` **absent** (E404), no `rc` tag, no GitHub `v1.0.0-rc.1`.
+> `1.0.0-rc.1` is still **prepared and certified, unpublished**. Before publishing, the `release-rc` verifier was found to reject both a never-published package (E404) and a package with no `latest` — it would have failed the first
+> Agent Kit publication. Spec 095 replaces the scalar `latest` check with a per-package PRE snapshot (absent / stable / prerelease-only) that POST consumes (every `rc` correct, every existing `latest` unchanged, a first-published
+> package must have no `latest`); tooling only — no `packages/*`, `api-baseline`, version or changeset change. RC publication remains a separate maintainer-authorized action; L02 not started.
+>
+> _Previous header (spec 094, now merged as PR #100):_ **Last updated: 2026-10-14 (spec 094 — ForgeCMS 1.0 product showcase polish — on `feature/spec-094-v1-showcase-polish`).** Presentation-only: `apps/www` (homepage: capabilities by value,
 > localization, client-site flow, experimental Agent Kit and Analytics sections, twelve-package inventory incl. `s3`/`agent`, honest release channels in `forge-release.ts`; `/demo` "What to explore") and
 > `apps/demo-aesthetics` (new additive localized `notices` collection + EN/ES switch, client-ready dashboard, honest Analytics states, declared `@angular/cdk` peer found by the Agent Kit doctor, DEMO-FINDINGS current-status table).
 > **No `packages/*`, `api-baseline`, or changeset change — public RC package artifacts unaffected.** Registry truth: npm `latest` `0.13.4`, no `rc` tag, `@forge-cms/agent` unpublished; the site shows no install command for it
