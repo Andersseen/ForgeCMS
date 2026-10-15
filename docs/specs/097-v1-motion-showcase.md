@@ -98,7 +98,15 @@ the Agent Kit fact list (now three role rows + three chips), the Analytics metri
 - **Accessibility:** no wheel/touch listeners, no `preventDefault`, no snap, no auto-rotation, no focus moves. Focus inside a receding stage brings it forward (`focusin`). The story index is a `nav` of in-page
   anchors with `aria-current="step"`. Hover-only emphasis is mirrored by `:focus-within`. Locale and range switches are `aria-pressed` buttons; the per-locale values table is always visible.
 
-**Bundle (www production, gzip -9):** landing route chunk 11.1 → 17.9 KB (+6.7 KB; raw 36.2 → 60.1 KB), global CSS 15.1 → 18.1 KB (+3.0 KB), entry JS 190.2 → 193.5 KB (+3.3 KB — the newly used Movement
-directives are hoisted into the shared chunk with the rest of `angular-movement`), all JS 429.8 → 441.9 KB (+12.1 KB). No dependency added. The spec 089 budgets (packed consumer bundles) are unaffected.
+**Bundle (www production, gzip -9, final commit vs `main`):** landing route chunk 11.1 → 16.0 KB, global CSS 15.1 → 19.4 KB (+4.3 KB), entry JS 190.2 → 193.5 KB (+3.3 KB — the newly used Movement
+directives are hoisted into the shared chunk with the rest of `angular-movement`), all JS 429.8 → 445.1 KB (+15.3 KB). No dependency added. The spec 089 budgets (packed consumer bundles) are unaffected.
 
-**Verification:** RESULTS_PLACEHOLDER
+**Agent Kit docs:** `/docs/agent-kit` now installs with `@forge-cms/agent@rc` — after publication the kit has an `rc` tag and deliberately no `latest`, so the bare name would not resolve until `1.0.0`.
+`packages/agent/README.md` says the bare name and is left unchanged (it is inside the frozen rc.2 tarball; it becomes correct at `1.0.0`).
+
+**Verification (local, on the clean commit `d85072b`):** `format:check`, `lint`, `typecheck`, `test`, `build`, `check:api`, `docs:verify`, `test:cloudflare`, `test:libsql`, `e2e:www`, `e2e:www:prod`,
+`e2e:tiny-project`, `test:coverage` (every package meets its floor), `test:performance` (hard budgets green), `test:stability` (every run of every journey passed on its first attempt, demo ×3 included),
+`release:consumers`, `release:verify`, `release:compat`, `release:ssr`, `release:certify` (**CERTIFIED**; `s3` and `upgrade` ran inside it, not separately), `docs:verify:consumers`, changeset gate — all green.
+`e2e:demo` failed once in that sequence because a maintainer dev server was listening on `:5174` (the suite reuses an existing server locally) and passed when re-run in isolation; it also passed twice earlier
+on this branch. `git diff 2195275 -- packages api-baseline` is empty; all twelve manifests are `1.0.0-rc.2`; the only changeset is empty (no release) because Changesets versions the private `apps/www`.
+Tarball hashes: see the J11 note in the dossier (key-order-only differences for runtime/cloudflare; contents identical).
