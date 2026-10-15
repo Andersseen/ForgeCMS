@@ -35,7 +35,12 @@ export function isHealthyDemoStatus(body) {
   );
 }
 
-/** `/api/demo-policy`: the deployed Lumea must be running the shared public policy (spec 098). */
+/**
+ * `/api/demo-policy`: the deployed Lumea must be running the shared public policy (spec 098) AND its
+ * daily budget must be readable. The endpoint omits `remaining` when the `demo_budget` table is
+ * missing (migration `20261015_001_demo_budget` not applied): the demo then fails closed, answering
+ * 503 `demo_budget_unavailable` to every notice edit and booking, so that is an unhealthy deployment.
+ */
 export function isPublicDemoPolicy(body) {
   const data = isObject(body) ? body.data : undefined;
   return (
@@ -44,7 +49,10 @@ export function isPublicDemoPolicy(body) {
     Array.isArray(data.editable) &&
     data.editable.length > 0 &&
     Array.isArray(data.restricted) &&
-    data.restricted.length > 0
+    data.restricted.length > 0 &&
+    isObject(data.remaining) &&
+    Object.values(data.remaining).length > 0 &&
+    Object.values(data.remaining).every(count)
   );
 }
 
