@@ -50,6 +50,11 @@ Lumea proof → Packages → Release status → Footer.
    (scope on a quiet line, name, purpose, honest version label) plus a 12 / 11 / 1 count. Same twelve packages and labels.
 9. **`/demo` journeys** (maintainer review feedback): the "See it as an editor" / "Inspect it as an Angular developer" steps become numbered step cards on a connecting line (violet for editors, cyan for
    developers) with a staggered reveal. Same content.
+10. **`/docs` polish** (maintainer request): breadcrumb (group) in the site's section-mark style and display typography; an "On this page" rail on `xl` built from the article's `h2`s with the
+    current section marked (`aria-current="location"`; links use `routerLink` + `fragment`, because a bare `#id` resolves against `<base href="/">` to the homepage); every code block gains a language
+    label and a real Copy button (`docs-enhance.ts`, idempotent, jsdom-tested; clipboard refusal says "Select to copy"); callout-style blockquotes, bordered tables, card pager, a sidebar release chip
+    (`v0.13.4 stable · 1.0 candidate`, from `CURRENT_FORGE_VERSION`) and an active-link accent; a short Movement entrance per page. Found and fixed on the way: a long inline `code` (forced `nowrap`)
+    widened `/docs/agent-kit` by 414 px at 390 px — inline code may now wrap (table cells keep `nowrap`). All 24 docs pages swept at 390/768/1440: no overflow, no page errors.
 
 **Motion** (Angular Movement 1.2.0 only): `moveInView` + `moveStagger` (reveals), `moveVariants`/`moveVariant` (story recede/enter, ES/EN), `[move]` (tab and range swaps), `moveWhileHover="lift"` (bento cards).
 Reduced motion: Movement jumps to end states itself; the dimmed "idle" variant is not used under reduced motion, so every stage is fully legible. No wheel/touch listeners, no `preventDefault`, no snap.

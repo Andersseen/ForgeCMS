@@ -3,7 +3,7 @@
 > **Last updated: 2026-10-15 (spec 097 — ForgeCMS 1.0 motion showcase — on `feature/spec-097-v1-motion-showcase`, PR pending review).** Spec 096 is **merged** (PR #102, main `2195275`, main CI `38702979083` ✓ incl.
 > Reliability · Coverage · Performance); that main is this branch's starting point. Spec 097 is **website-only** (`apps/www` + docs): the homepage gains a sticky Schema → Runtime → Angular → Admin → Deploy story, an
 > asymmetric capability bento (absorbing the old Architecture section), a developer ↔ client swap, an ES/EN editor, an Agent Kit `forge-cms-agent init` terminal story, an illustrative Analytics dashboard and a layered package stack, a 0.1 → 1.0 roadmap milestone-card track ending in the
-> 1.0 destination card (`/demo` steps became connected step cards), all on Angular Movement 1.2.0. **No `packages/*` or `api-baseline` change, no version change; one empty (no-release) changeset for the private app — the `1.0.0-rc.2` candidate's public package bytes are unchanged.** Registry
+> 1.0 destination card (`/demo` steps became connected step cards; `/docs` gained an "On this page" rail, copy buttons and a release chip), all on Angular Movement 1.2.0. **No `packages/*` or `api-baseline` change, no version change; one empty (no-release) changeset for the private app — the `1.0.0-rc.2` candidate's public package bytes are unchanged.** Registry
 > truth unchanged: npm `latest` `0.13.4`, no `rc` tag, `@forge-cms/agent` absent; the site keeps saying "1.0 candidate certified · Public RC next". **Next external release action:** after merge and exact-main green CI,
 > the maintainer authorizes `release-rc` (SHA + `1.0.0-rc.2`) → registry verification → L02. RC not published; L02 not started.
 >
