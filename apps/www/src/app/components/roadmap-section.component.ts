@@ -92,6 +92,7 @@ const STATUS_LABELS: Record<MilestoneStatus, string> = {
           #track
           class="forge-roadmap-track"
           tabindex="0"
+          data-scroll-x
           aria-label="Roadmap milestones"
           moveStagger="70ms"
           (scroll)="syncEdges()"
@@ -147,9 +148,8 @@ const STATUS_LABELS: Record<MilestoneStatus, string> = {
 export class RoadmapSectionComponent {
   private readonly track = viewChild.required<ElementRef<HTMLElement>>('track');
 
-  protected readonly milestones = ROADMAP_MILESTONES.filter((milestone) =>
-    ['0.6', '0.7', '0.8', '0.9', '0.10', '0.11', '0.12', '1.0'].includes(milestone.version)
-  );
+  /** The whole journey, 0.1 → 1.0. */
+  protected readonly milestones = ROADMAP_MILESTONES;
   protected readonly completeCount = this.milestones.filter((m) => m.status === 'complete').length;
   protected readonly candidateCopy = FORGE_CHANNELS.rcPublished
     ? 'The 1.0 release candidate is published for validation.'

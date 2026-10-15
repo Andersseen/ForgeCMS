@@ -560,6 +560,11 @@ test('the roadmap track scrolls natively to the 1.0 destination card', async ({ 
   await expect(previous).toBeDisabled();
   // Every milestone is in the DOM and in order, whatever the scroll position.
   await expect(track.locator('.forge-milestone-version')).toHaveText([
+    '0.1',
+    '0.2',
+    '0.3',
+    '0.4',
+    '0.5',
     '0.6',
     '0.7',
     '0.8',

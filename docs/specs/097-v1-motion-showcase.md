@@ -44,9 +44,11 @@ Lumea proof → Packages → Release status → Footer.
 6. **Analytics** (experimental): compact dashboard preview — range control (24h/7d/30d/90d), pageviews + change vs previous period, timeline bars, top pages, referrers, countries — all deterministic illustrative
    numbers under a visible "Illustrative preview · not live data" label. Privacy guarantees as a compact chip row. No visitors/sessions/funnels/events/heatmaps/revenue.
 7. **Roadmap + release status** (maintainer review feedback): the milestone list becomes a native horizontal track of milestone cards (scroll-snap, swipe, focusable region; previous/next buttons only
-   `scrollBy`, instant under reduced motion) with a progress rail ("7 of 8 complete"). It ends in the highlighted 1.0 destination card carrying the release status (candidate certified ✓ → public RC next →
+   `scrollBy`, instant under reduced motion) covering the whole journey **0.1 → 1.0** (0.1–0.5 worded from STATE's Phase history and spec 058) with a progress rail ("12 of 13 milestones complete"). It ends in the highlighted 1.0 destination card carrying the release status (candidate certified ✓ → public RC next →
    `1.0.0` after validation), derived from `FORGE_CHANNELS`.
-8. **`/demo` journeys** (maintainer review feedback): the "See it as an editor" / "Inspect it as an Angular developer" steps become numbered step cards on a connecting line (violet for editors, cyan for
+8. **Packages** (maintainer review feedback): the 2×2 table becomes the stack the packages form — Angular experience over runtime/platform over foundation, with quality/tooling alongside — as tiles
+   (scope on a quiet line, name, purpose, honest version label) plus a 12 / 11 / 1 count. Same twelve packages and labels.
+9. **`/demo` journeys** (maintainer review feedback): the "See it as an editor" / "Inspect it as an Angular developer" steps become numbered step cards on a connecting line (violet for editors, cyan for
    developers) with a staggered reveal. Same content.
 
 **Motion** (Angular Movement 1.2.0 only): `moveInView` + `moveStagger` (reveals), `moveVariants`/`moveVariant` (story recede/enter, ES/EN), `[move]` (tab and range swaps), `moveWhileHover="lift"` (bento cards).
@@ -74,7 +76,7 @@ Existing production e2e (`e2e-prod`) covers console, overflow/clipping at four w
 
 **Information architecture.** Hero + product showcase unchanged → new Forge story (`#how-it-works`) → new capability bento (`#capabilities`, the old Architecture capability groups kept as a quiet list under
 `#architecture`; its Local API panel became story stage 02) → developer ↔ client swap (`#client-site`, replaces the three flow cards) → localization editor → Agent Kit terminal → Analytics dashboard → Lumea proof
-("You build the interface. Your client gets control.") → packages (unchanged, twelve) → roadmap milestone-card track ending in the 1.0 destination card → footer. On `/demo`, the editor/developer step lists became connected step cards. Removed/consolidated: `architecture-section.component.ts`, the client-flow cards,
+("You build the interface. Your client gets control.") → packages as a layered stack (twelve) → roadmap milestone-card track (0.1 → 1.0) ending in the 1.0 destination card → footer. On `/demo`, the editor/developer step lists became connected step cards. Removed/consolidated: `architecture-section.component.ts`, the client-flow cards,
 the Agent Kit fact list (now three role rows + three chips), the Analytics metric list (now the dashboard), and the unused `agentKit`, `clientFlow`, `localApiCode` data.
 
 **Angular Movement 1.2.0 APIs used** (all stable): `moveVariants` + `moveVariant` (story stages recede/enter; ES/EN value settle), `moveInView` (story visuals, bento cards, terminal rows), `moveStagger`

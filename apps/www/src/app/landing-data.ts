@@ -156,6 +156,40 @@ export interface RoadmapMilestone {
  * {@link CURRENT_FORGE_VERSION}.
  */
 export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
+  // 0.1–0.5: the early phases as docs/STATE.md records them (Phase 1, Phase 0.2, Phase 0.3.x, the
+  // automated 0.4.0 npm family + small-project readiness, ROADMAP's 0.5 contract baseline).
+  {
+    version: '0.1',
+    title: 'Structural core',
+    status: 'complete',
+    steps: [
+      { title: 'Local API', status: 'complete' },
+      { title: 'Access control as functions', status: 'complete' },
+      { title: 'Full hook pipeline and composite fields', status: 'complete' }
+    ]
+  },
+  { version: '0.2', title: 'Trust and production hardening', status: 'complete' },
+  {
+    version: '0.3',
+    title: 'Content model',
+    status: 'complete',
+    steps: [
+      { title: 'Globals and versions', status: 'complete' },
+      { title: 'Live preview and localization', status: 'complete' },
+      { title: 'Relation integrity', status: 'complete' }
+    ]
+  },
+  {
+    version: '0.4',
+    title: 'Published package family',
+    status: 'complete',
+    steps: [
+      { title: 'Automated npm releases', status: 'complete' },
+      { title: 'API keys and browser auth', status: 'complete' },
+      { title: 'Embeddable content admin', status: 'complete' }
+    ]
+  },
+  { version: '0.5', title: 'Contract and access foundation', status: 'complete' },
   { version: '0.6', title: 'Auth and data integrity', status: 'complete' },
   {
     version: '0.7',
