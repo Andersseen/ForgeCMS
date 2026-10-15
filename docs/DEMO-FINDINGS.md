@@ -569,3 +569,10 @@ completeness, typed Local API and the linker plugin have shipped and are no long
 7. **A richtext renderer** (rest of finding 7) and **currency/timezone types** (finding 3).
 8. **The `allowedRoles` precedence** (finding 5) — correct today, but implicit enough to be worth a
    spec of its own.
+
+## Spec 098 — the hosted demo as a bounded shared example (2026-10-15)
+
+Not a new finding about Forge: a statement about _this deployment_. The hosted Lumea (`FORGE_PUBLIC_DEMO=1`) is an allowlist (sign in; edit and publish the localized Notices; booking; Analytics), with a global
+daily D1 budget, uploads refused and the seeded documents protected from pruning — all in `apps/demo-aesthetics`, nothing in `packages/*`. Cost control for a public example therefore stayed an app concern; if
+Forge ever needs a first-class answer (per-environment write quotas, sandbox tenants, preview clones, a generic rate-limit API) that is **post-1.0** and not in scope. No earlier finding was rewritten or closed by this spec;
+the local/full demo is unrestricted and still dogfoods create, delete, drafts, publish and uploads.

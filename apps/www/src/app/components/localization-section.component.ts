@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { VoltNativeButton } from '@voltui/components';
+import { VoltNativeButton, VoltToggleGroup, VoltToggleGroupItem } from '@voltui/components';
 import { MoveVariantsDirective } from 'angular-movement';
 import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
 import { localizationExample } from '../landing-data';
@@ -16,7 +16,14 @@ type LocaleCode = 'ES' | 'EN';
 @Component({
   selector: 'forge-cms-localization-section',
   standalone: true,
-  imports: [RouterLink, VoltNativeButton, MoveVariantsDirective, LmnArrowRightIcon],
+  imports: [
+    RouterLink,
+    VoltNativeButton,
+    VoltToggleGroup,
+    VoltToggleGroupItem,
+    MoveVariantsDirective,
+    LmnArrowRightIcon
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section
@@ -51,17 +58,19 @@ type LocaleCode = 'ES' | 'EN';
               <p id="l10n-editor-title">
                 <span class="text-muted-foreground">Notices /</span> {{ current().title }}
               </p>
-              <div class="forge-l10n-switch" role="group" aria-label="Editing locale">
+              <volt-toggle-group
+                class="forge-l10n-switch"
+                type="single"
+                aria-label="Editing locale"
+                [value]="[locale()]"
+                (valueChange)="selectLocale($event)"
+              >
                 @for (code of codes; track code) {
-                  <button
-                    type="button"
-                    [attr.aria-pressed]="locale() === code"
-                    (click)="locale.set(code)"
-                  >
-                    {{ code }}
-                  </button>
+                  <volt-toggle-group-item [value]="code" size="sm">{{
+                    code
+                  }}</volt-toggle-group-item>
                 }
-              </div>
+              </volt-toggle-group>
             </div>
             <div class="forge-l10n-fields">
               <div class="forge-l10n-field">
@@ -139,6 +148,11 @@ export class LocalizationSectionComponent {
     () =>
       this.example.locales.find((entry) => entry.code === this.locale()) ?? this.example.locales[0]
   );
+  /** `single` groups report an empty array on deselection; keep the current locale then. */
+  protected selectLocale(values: readonly string[]): void {
+    const next = values.find((v): v is LocaleCode => v === 'ES' || v === 'EN');
+    if (next) this.locale.set(next);
+  }
   /** Same end state for both locales: the variant change replays a short settle as the value swaps. */
   protected readonly swap = {
     ES: { opacity: [0.2, 1], y: [6, 0], duration: 260 },

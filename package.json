@@ -44,6 +44,7 @@
     "e2e:www": "pnpm --filter @forge-cms/www e2e",
     "e2e:www:prod": "pnpm --filter @forge-cms/www e2e:prod",
     "e2e:demo": "pnpm --filter @forge-cms/demo-aesthetics e2e",
+    "e2e:demo:public": "pnpm --filter @forge-cms/demo-aesthetics e2e:public",
     "e2e:tiny-project": "pnpm --filter @forge-cms/tiny-project e2e",
     "test": "turbo run test && pnpm test:scripts",
     "test:scripts": "node --test scripts/*.test.mjs",

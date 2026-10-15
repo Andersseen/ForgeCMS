@@ -193,11 +193,11 @@ test('swap, localization and analytics respond to the user, never on their own',
   const l10n = page.locator('#localization');
   const editor = l10n.getByRole('group', { name: /Notices/ });
   await expect(editor).toContainText('Tratamientos faciales');
-  await l10n.getByRole('button', { name: 'EN', exact: true }).click();
-  await expect(l10n.getByRole('button', { name: 'EN', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true'
-  );
+  const locales = l10n.getByRole('group', { name: 'Editing locale' });
+  await expect(locales.getByRole('radio', { checked: true })).toHaveCount(1);
+  await locales.getByRole('radio', { name: 'EN', exact: true }).click();
+  await expect(locales.getByRole('radio', { name: 'EN', exact: true })).toBeChecked();
+  await expect(locales.getByRole('radio', { name: 'ES', exact: true })).not.toBeChecked();
   await expect(editor).toContainText('Facial treatments');
   // Both stored values stay visible regardless of the switch.
   await expect(l10n.getByRole('table')).toContainText('Tratamientos faciales');
@@ -205,8 +205,16 @@ test('swap, localization and analytics respond to the user, never on their own',
   const analytics = page.locator('#analytics');
   await expect(analytics).toContainText('Illustrative preview · not live data');
   await expect(analytics).toContainText('1,284');
-  await analytics.getByRole('button', { name: '30d', exact: true }).click();
+  const ranges = analytics.getByRole('group', { name: 'Date range' });
+  await ranges.getByRole('radio', { name: '30d', exact: true }).focus();
+  await page.keyboard.press('Space');
+  await expect(ranges.getByRole('radio', { name: '30d', exact: true })).toBeChecked();
+  await expect(ranges.getByRole('radio', { checked: true })).toHaveCount(1);
   await expect(analytics).toContainText('5,310');
+  // Top-pages bars are real meters with an accessible name and value.
+  const meter = analytics.getByRole('meter').first();
+  await expect(meter).toHaveAttribute('aria-valuenow', /\d/);
+  await expect(meter).toHaveAccessibleName(/share/);
   await expect(analytics).toContainText('vs previous 30d');
 });
 
@@ -554,6 +562,10 @@ test('the roadmap track scrolls natively to the 1.0 destination card', async ({ 
   await page.goto('/');
   const roadmap = page.locator('#roadmap');
   const track = roadmap.getByRole('list', { name: 'Roadmap milestones' });
+  await expect(roadmap.getByRole('progressbar', { name: 'Milestones complete' })).toHaveAttribute(
+    'aria-valuenow',
+    /\d/
+  );
   const previous = roadmap.getByRole('button', { name: 'Previous milestones' });
   const next = roadmap.getByRole('button', { name: 'Next milestones' });
   await track.scrollIntoViewIfNeeded();

@@ -12,8 +12,10 @@
   "include": [
     "src/**/*.ts",
     "e2e/**/*.ts",
+    "e2e-public/**/*.ts",
     "vite.config.ts",
     "vite-plugins/**/*.ts",
-    "playwright.config.ts"
+    "playwright.config.ts",
+    "playwright.public.config.ts"
   ]
 }

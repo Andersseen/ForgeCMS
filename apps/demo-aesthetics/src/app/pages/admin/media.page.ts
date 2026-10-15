@@ -1,8 +1,11 @@
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import type { OnInit } from '@angular/core';
 import { EmptyStateComponent, PageHeaderComponent, describeAdminError } from '@forge-cms/admin';
 import { injectForgeClient } from '@forge-cms/angular';
+import { VoltButton, VoltError, VoltInput } from '@voltui/components';
 import type { DemoDocument, DemoSchema } from '../../forge-schema';
+import { DemoNoticeComponent } from '../../components/demo-notice.component';
+import { DemoPolicyService } from '../../services/demo-policy.service';
 
 /**
  * The media library — and the only place in the demo that exercises spec 016's multipart upload
@@ -11,7 +14,14 @@ import type { DemoDocument, DemoSchema } from '../../forge-schema';
 @Component({
   selector: 'lumea-admin-media',
   standalone: true,
-  imports: [PageHeaderComponent, EmptyStateComponent],
+  imports: [
+    PageHeaderComponent,
+    EmptyStateComponent,
+    DemoNoticeComponent,
+    VoltButton,
+    VoltError,
+    VoltInput
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-6">
@@ -20,39 +30,50 @@ import type { DemoDocument, DemoSchema } from '../../forge-schema';
         subtitle="Images used by treatments, the team and the journal."
       />
 
-      <div class="rounded-xl border border-dashed border-border bg-card p-5">
-        <label class="block text-sm font-medium">Upload an image</label>
-        <p class="mt-1 text-xs text-muted-foreground">
-          Goes through the storage adapter (in-memory locally, R2 when the binding exists) and is
-          served back by <code>handleFile</code>. Local uploads live in memory, so they disappear on
-          reload — seeded images live in <code>public/images</code>.
-        </p>
-        <div class="mt-3 flex flex-wrap items-center gap-3">
-          <input
-            type="file"
-            accept="image/*"
-            (change)="pick($event)"
-            class="text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-muted file:px-3 file:py-1.5 file:text-sm"
-          />
-          <input
-            placeholder="Alt text"
-            [value]="alt()"
-            (input)="alt.set(value($event))"
-            class="rounded-lg border border-border bg-background px-3 py-2 text-sm"
-          />
-          <button
-            type="button"
-            (click)="upload()"
-            [disabled]="!file() || uploading()"
-            class="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50"
-          >
-            {{ uploading() ? 'Uploading…' : 'Upload' }}
-          </button>
+      <lumea-demo-notice />
+
+      @if (demo.isPublic()) {
+        <div class="rounded-xl border border-border bg-card p-5" data-uploads-disabled>
+          <p class="text-sm font-medium">Uploads are disabled in the shared public demo</p>
+          <p class="mt-1 text-xs text-muted-foreground">
+            This keeps the hosted example inexpensive. Clone the demo, or use ForgeCMS in your own
+            project, to exercise uploads to object storage. The images below are the seeded ones.
+          </p>
         </div>
-        @if (uploadError(); as message) {
-          <p class="mt-3 text-sm text-destructive">{{ message }}</p>
-        }
-      </div>
+      } @else {
+        <div class="rounded-xl border border-dashed border-border bg-card p-5">
+          <label class="block text-sm font-medium" for="media-file">Upload an image</label>
+          <p class="mt-1 text-xs text-muted-foreground">
+            Goes through the storage adapter (in-memory locally, R2 when the binding exists) and is
+            served back by <code>handleFile</code>. Local uploads live in memory, so they disappear
+            on reload &mdash; seeded images live in <code>public/images</code>.
+          </p>
+          <div class="mt-3 flex flex-wrap items-center gap-3">
+            <!-- Native on purpose: a single image picker. Volt's file-upload primitive is a
+                 dropzone that creates its input on demand, which buys nothing here. -->
+            <input
+              id="media-file"
+              type="file"
+              accept="image/*"
+              (change)="pick($event)"
+              class="text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-muted file:px-3 file:py-1.5 file:text-sm"
+            />
+            <volt-input
+              class="w-56"
+              [placeholder]="'Alt text'"
+              [ariaLabel]="'Alt text'"
+              [value]="alt()"
+              (valueChange)="alt.set($event)"
+            />
+            <volt-button type="button" [disabled]="!file() || uploading()" (click)="upload()">
+              {{ uploading() ? 'Uploading…' : 'Upload' }}
+            </volt-button>
+          </div>
+          @if (uploadError(); as message) {
+            <volt-error class="mt-3" role="alert">{{ message }}</volt-error>
+          }
+        </div>
+      }
 
       @if (loading()) {
         <p class="text-sm text-muted-foreground">Loading…</p>
@@ -82,6 +103,7 @@ import type { DemoDocument, DemoSchema } from '../../forge-schema';
 })
 export class AdminMediaPage implements OnInit {
   private readonly api = injectForgeClient<DemoSchema>();
+  protected readonly demo = inject(DemoPolicyService);
 
   protected readonly documents = signal<DemoDocument<'media'>[]>([]);
   protected readonly loading = signal(true);
@@ -92,10 +114,6 @@ export class AdminMediaPage implements OnInit {
 
   ngOnInit(): void {
     void this.load();
-  }
-
-  protected value(event: Event): string {
-    return (event.target as HTMLInputElement).value;
   }
 
   protected pick(event: Event): void {

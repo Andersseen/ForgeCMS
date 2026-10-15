@@ -120,6 +120,11 @@ jobs:
       - name: E2E tests — apps/demo-aesthetics
         run: pnpm e2e:demo
 
+      # Spec 098: the same app as the shared public demo (FORGE_PUBLIC_DEMO=1) — mutation allowlist,
+      # daily budget, canonical content. No Cloudflare account involved.
+      - name: E2E tests — apps/demo-aesthetics (shared public demo profile)
+        run: pnpm e2e:demo:public
+
   # Roadmap 0.12 / R01 (spec 088): the packed-artifact certification of this commit. One `pnpm release:certify` builds,
   # packs the twelve public packages ONCE (SHA-256 per tarball, `artifacts.json`), hands that exact set to every packed
   # verifier and seals it: the server-only + entry-point consumers (release:consumers), packed installation and

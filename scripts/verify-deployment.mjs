@@ -19,7 +19,10 @@ const isObject = (value) => typeof value === 'object' && value !== null;
 const nonEmptyString = (value) => typeof value === 'string' && value.length > 0;
 const count = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 
-/** `/api/status` of apps/demo-aesthetics: adapter names plus per-collection counts. */
+/**
+ * `/api/status` of apps/demo-aesthetics (spec 098): adapter names, the demo mode and whether the seed is
+ * present. Deliberately no per-collection counts: it is a public endpoint and must not spend D1 reads.
+ */
 export function isHealthyDemoStatus(body) {
   const data = isObject(body) ? body.data : undefined;
   return (
@@ -27,10 +30,27 @@ export function isHealthyDemoStatus(body) {
     nonEmptyString(data.database) &&
     nonEmptyString(data.auth) &&
     nonEmptyString(data.storage) &&
-    isObject(data.collections) &&
-    Object.keys(data.collections).length > 0 &&
-    Object.values(data.collections).every(count)
+    (data.mode === 'public' || data.mode === 'full') &&
+    data.seeded === true
   );
+}
+
+/** `/api/demo-policy`: the deployed Lumea must be running the shared public policy (spec 098). */
+export function isPublicDemoPolicy(body) {
+  const data = isObject(body) ? body.data : undefined;
+  return (
+    isObject(data) &&
+    data.mode === 'public' &&
+    Array.isArray(data.editable) &&
+    data.editable.length > 0 &&
+    Array.isArray(data.restricted) &&
+    data.restricted.length > 0
+  );
+}
+
+/** A destructive request answered with the demo's own refusal code, proving the allowlist is live. */
+export function isDemoDeleteRefusal(body) {
+  return isObject(body) && isObject(body.data) && body.data.code === 'demo_delete_disabled';
 }
 
 /** `/api/status` of apps/www: `{ database: { name, records }, auth: { name }, storage: { name }, api }`. */
@@ -87,8 +107,17 @@ export const PROFILES = {
     origin: 'https://forge-cms-demo.pages.dev',
     endpoints: [
       { path: '/api/status', validate: isHealthyDemoStatus },
+      { path: '/api/demo-policy', validate: isPublicDemoPolicy },
       { path: '/api/site/home', validate: isPopulatedDemoHome },
-      { path: '/api/site/settings', validate: isPopulatedDemoSettings }
+      { path: '/api/site/settings', validate: isPopulatedDemoSettings },
+      // Rejected by the policy before authentication or any database access: proves the public
+      // allowlist is active without mutating anything.
+      {
+        path: '/api/v1/services/policy-probe',
+        method: 'DELETE',
+        status: 403,
+        validate: isDemoDeleteRefusal
+      }
     ]
   }
 };
@@ -128,6 +157,7 @@ async function checkEndpoint(url, endpoint, { attempts, delayMs, timeoutMs, fetc
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       const response = await fetchImpl(url, {
+        method: endpoint.method ?? 'GET',
         headers: { accept: 'application/json' },
         signal: AbortSignal.timeout(timeoutMs)
       });

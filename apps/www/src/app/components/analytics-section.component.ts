@@ -1,7 +1,14 @@
 import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
 import { DecimalPipe, PercentPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { VoltNativeButton } from '@voltui/components';
+import {
+  VoltMeter,
+  VoltMeterIndicator,
+  VoltMeterTrack,
+  VoltNativeButton,
+  VoltToggleGroup,
+  VoltToggleGroupItem
+} from '@voltui/components';
 import { MoveAnimateDirective, MoveStaggerDirective } from 'angular-movement';
 import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
 import { analyticsFacts } from '../landing-data';
@@ -22,6 +29,11 @@ import {
   selector: 'forge-cms-analytics-section',
   standalone: true,
   imports: [
+    VoltMeter,
+    VoltMeterTrack,
+    VoltMeterIndicator,
+    VoltToggleGroup,
+    VoltToggleGroupItem,
     DecimalPipe,
     PercentPipe,
     RouterLink,
@@ -63,17 +75,19 @@ import {
                 <p id="dash-title" class="font-semibold">Analytics</p>
                 <p class="forge-dash-label">Illustrative preview · not live data</p>
               </div>
-              <div class="forge-dash-ranges" role="group" aria-label="Date range">
+              <volt-toggle-group
+                class="forge-dash-ranges"
+                type="single"
+                aria-label="Date range"
+                [value]="[range()]"
+                (valueChange)="selectRange($event)"
+              >
                 @for (option of ranges; track option) {
-                  <button
-                    type="button"
-                    [attr.aria-pressed]="range() === option"
-                    (click)="range.set(option)"
-                  >
-                    {{ option }}
-                  </button>
+                  <volt-toggle-group-item [value]="option" size="sm">{{
+                    option
+                  }}</volt-toggle-group-item>
                 }
-              </div>
+              </volt-toggle-group>
             </div>
 
             <div class="forge-dash-grid">
@@ -103,7 +117,13 @@ import {
                     <li>
                       <span>{{ page.path }}</span
                       ><span>{{ page.share | percent }}</span>
-                      <i [style.width.%]="page.share * 100" aria-hidden="true"></i>
+                      <volt-meter
+                        class="forge-dash-meter"
+                        [attr.aria-label]="page.path + ' share'"
+                        [value]="page.share * 100"
+                        [valueLabel]="shareLabel"
+                        ><volt-meter-track><volt-meter-indicator /></volt-meter-track
+                      ></volt-meter>
                     </li>
                   }
                 </ul>
@@ -116,7 +136,13 @@ import {
                     <li>
                       <span>{{ ref.host }}</span
                       ><span>{{ ref.share | percent }}</span>
-                      <i [style.width.%]="ref.share * 100" aria-hidden="true"></i>
+                      <volt-meter
+                        class="forge-dash-meter"
+                        [attr.aria-label]="ref.host + ' share'"
+                        [value]="ref.share * 100"
+                        [valueLabel]="shareLabel"
+                        ><volt-meter-track><volt-meter-indicator /></volt-meter-track
+                      ></volt-meter>
                     </li>
                   }
                 </ul>
@@ -129,7 +155,13 @@ import {
                     <li>
                       <span>{{ country.code }}</span
                       ><span>{{ country.share | percent }}</span>
-                      <i [style.width.%]="country.share * 100" aria-hidden="true"></i>
+                      <volt-meter
+                        class="forge-dash-meter"
+                        [attr.aria-label]="country.code + ' share'"
+                        [value]="country.share * 100"
+                        [valueLabel]="shareLabel"
+                        ><volt-meter-track><volt-meter-indicator /></volt-meter-track
+                      ></volt-meter>
                     </li>
                   }
                 </ul>
@@ -147,5 +179,10 @@ export class AnalyticsSectionComponent {
   protected readonly range = signal<AnalyticsRange>('7d');
   protected readonly data = computed(() => analyticsPreview[this.range()]);
   protected readonly change = computed(() => formatChange(this.data().change));
+  protected readonly shareLabel = (value: number): string => `${Math.round(value)}%`;
+  protected selectRange(values: readonly string[]): void {
+    const next = this.ranges.find((option) => values.includes(option));
+    if (next) this.range.set(next);
+  }
   protected readonly grow = { opacity: [0, 1], transform: ['scaleY(0.15)', 'scaleY(1)'] };
 }

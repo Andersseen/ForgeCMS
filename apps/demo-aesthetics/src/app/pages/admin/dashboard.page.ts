@@ -3,6 +3,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import type { OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { PageHeaderComponent, describeAdminError } from '@forge-cms/admin';
+import { VoltNativeButton } from '@voltui/components';
+import { DemoNoticeComponent } from '../../components/demo-notice.component';
 import { ForgeAnalyticsApiService, injectForgeClient } from '@forge-cms/angular';
 import type { AnalyticsSummaryResponse } from '@forge-cms/angular';
 import type { DemoDocument, DemoSchema } from '../../forge-schema';
@@ -10,7 +12,7 @@ import type { DemoDocument, DemoSchema } from '../../forge-schema';
 @Component({
   selector: 'lumea-admin-dashboard',
   standalone: true,
-  imports: [RouterLink, DatePipe, PageHeaderComponent],
+  imports: [RouterLink, DatePipe, PageHeaderComponent, VoltNativeButton, DemoNoticeComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-6">
@@ -18,6 +20,8 @@ import type { DemoDocument, DemoSchema } from '../../forge-schema';
         title="Clinic overview"
         subtitle="Bookings waiting on a reply, what is live on the site, and who is visiting."
       />
+
+      <lumea-demo-notice />
 
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         @for (stat of stats(); track stat.label) {
@@ -57,7 +61,16 @@ import type { DemoDocument, DemoSchema } from '../../forge-schema';
           } @else if (error(); as message) {
             <div class="px-5 py-6 text-sm" role="alert">
               <p class="text-destructive">{{ message }}</p>
-              <button type="button" class="mt-2 underline" (click)="retry()">Try again</button>
+              <button
+                type="button"
+                voltButton
+                variant="link"
+                size="sm"
+                class="mt-2"
+                (click)="retry()"
+              >
+                Try again
+              </button>
             </div>
           } @else {
             <ul class="divide-y divide-border">
@@ -111,7 +124,14 @@ import type { DemoDocument, DemoSchema } from '../../forge-schema';
             } @else if (analyticsError(); as message) {
               <div role="alert" class="text-sm">
                 <p class="text-destructive">{{ message }}</p>
-                <button type="button" class="mt-2 underline" (click)="retryAnalytics()">
+                <button
+                  type="button"
+                  voltButton
+                  variant="link"
+                  size="sm"
+                  class="mt-2"
+                  (click)="retryAnalytics()"
+                >
                   Try again
                 </button>
               </div>

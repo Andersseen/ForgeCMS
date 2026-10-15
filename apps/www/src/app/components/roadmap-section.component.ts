@@ -9,7 +9,7 @@ import {
   viewChild
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { VoltNativeButton } from '@voltui/components';
+import { VoltNativeButton, VoltProgress } from '@voltui/components';
 import { MoveInViewDirective, MoveStaggerDirective } from 'angular-movement';
 import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
 import { LmnCheckIcon } from 'lumen-icons/check';
@@ -39,6 +39,7 @@ const STATUS_LABELS: Record<MilestoneStatus, string> = {
   imports: [
     RouterLink,
     VoltNativeButton,
+    VoltProgress,
     MoveInViewDirective,
     MoveStaggerDirective,
     LmnArrowRightIcon,
@@ -63,13 +64,19 @@ const STATUS_LABELS: Record<MilestoneStatus, string> = {
         </div>
 
         <div class="forge-roadmap-controls">
-          <div class="forge-roadmap-rail" aria-hidden="true">
-            <span [style.width.%]="(completeCount / milestones.length) * 100"></span>
-          </div>
+          <volt-progress
+            class="forge-roadmap-rail"
+            aria-label="Milestones complete"
+            [value]="completeCount"
+            [max]="milestones.length"
+            [valueLabel]="progressLabel"
+          />
           <div class="flex gap-2">
             <button
               type="button"
-              class="forge-roadmap-nav"
+              voltButton
+              variant="outline"
+              size="icon"
               aria-label="Previous milestones"
               [disabled]="atStart()"
               (click)="page(-1)"
@@ -78,7 +85,9 @@ const STATUS_LABELS: Record<MilestoneStatus, string> = {
             </button>
             <button
               type="button"
-              class="forge-roadmap-nav"
+              voltButton
+              variant="outline"
+              size="icon"
               aria-label="Next milestones"
               [disabled]="atEnd()"
               (click)="page(1)"
@@ -157,6 +166,9 @@ export class RoadmapSectionComponent {
   protected readonly labels = STATUS_LABELS;
   protected readonly steps = releaseSteps();
   protected readonly reveal = { opacity: [0, 1], y: [20, 0], scale: [0.98, 1] };
+
+  protected readonly progressLabel = (value: number, max: number): string =>
+    `${value} of ${max} milestones complete`;
 
   protected readonly atStart = signal(true);
   protected readonly atEnd = signal(false);

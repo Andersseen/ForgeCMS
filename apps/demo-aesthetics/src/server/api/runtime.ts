@@ -22,6 +22,12 @@ export interface ServerEnv {
   DB?: D1Database;
   BUCKET?: R2Bucket;
   AUTH_SECRET?: string;
+  /**
+   * `1` turns on the shared public demo's mutation allowlist and daily budgets (`demo-policy.ts`).
+   * Explicit on purpose — never inferred from the hostname or a missing secret. Unset locally, so
+   * development and e2e run the full demo.
+   */
+  FORGE_PUBLIC_DEMO?: string;
   /** Opt-in flag for `POST /api/auth/signup` — unset (disabled) by default, see spec 054 §7. */
   FORGE_ENABLE_SIGNUP?: string;
   /**

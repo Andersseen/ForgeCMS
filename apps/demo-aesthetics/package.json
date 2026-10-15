@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "e2e": "playwright test",
+    "e2e:public": "playwright test -c playwright.public.config.ts",
     "clean": "rm -rf dist .analog coverage"
   },
   "dependencies": {

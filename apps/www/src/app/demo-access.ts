@@ -38,14 +38,14 @@ export const EDITOR_STEPS: DemoStep[] = [
       'Every word, price, image and opening hour on it is content, not code. The home page itself is a list of blocks an editor arranged.'
   },
   {
-    title: 'Sign in and open Treatments',
+    title: 'Sign in and browse the content',
     detail:
-      'One treatment is a draft: it has a Draft badge and it is missing from the public menu. Hit Publish on its row and reload the site — it is there.'
+      'Open Treatments, Team and Journal. Each is a collection with its own fields, drafts and relations. The hosted demo keeps these read-only so it stays intact for everyone.'
   },
   {
     title: 'Switch the site between EN and ES',
     detail:
-      'The "From the clinic" notice at the top is localized content. Open Content, then Notices, edit it in one locale, switch the locale and edit the other: each language keeps its own text.'
+      'The "From the clinic" notice at the top is localized content. Open Content, then Notices, edit it in one locale, switch the locale and edit the other, then publish: each language keeps its own text and the public site updates. Notices are the part of the hosted demo you can edit.'
   },
   {
     title: 'Send yourself a booking',
@@ -53,9 +53,9 @@ export const EDITOR_STEPS: DemoStep[] = [
       'Fill in the booking form on the public site, then open Bookings in the CMS. It arrives as pending, and only staff can see it.'
   },
   {
-    title: 'Upload a photo, change the settings',
+    title: 'See what the hosted demo limits',
     detail:
-      'Add an image in Media. Phone, address and opening hours live in Clinic settings; the site header and footer follow immediately.'
+      'The hosted demo limits deletes, new documents, uploads and settings changes so the example stays available. Your own ForgeCMS project has none of these demo limits. Clone the demo to try uploads and every edit.'
   },
   {
     title: 'Check the site traffic (experimental)',
