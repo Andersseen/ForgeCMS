@@ -108,7 +108,7 @@ secret: it never issues or verifies sessions and never reads the production `AUT
 `forge-cms-demo` runs the shared public policy (`FORGE_PUBLIC_DEMO=1` in `apps/demo-aesthetics/wrangler.toml`). Its global daily budget lives in a table created by the reviewed, additive,
 non-destructive migration `20261015_001_demo_budget` (`CREATE TABLE IF NOT EXISTS demo_budget …`). **Apply it before merging** the change that deploys the flag; until it exists the public demo fails closed
 (notice edits and bookings answer 503 `demo_budget_unavailable`, browsing is unaffected). It was rehearsed locally (a throwaway local D1; both migrations `applied`, no drift reported for `demo_budget`). Sequence:
-back up (step 1 above) → plan (step 2) → local restore rehearsal (step 3) → `--apply` (step 4) → `node scripts/verify-deployment.mjs demo` (checks `/api/status`, `/api/demo-policy` is `public` **and reports a readable daily `remaining` budget — it is omitted, and the check fails, while the `demo_budget` table is missing**, and that an
+back up (step 1 above) → plan (step 2) → local restore rehearsal (step 3) → `--apply` (step 4) → `node scripts/verify-deployment.mjs demo` (checks `/api/status`, `/api/demo-policy` is `public`, and that an
 unauthenticated `DELETE` is refused with `demo_delete_disabled`). Rollback: `DROP TABLE demo_budget` (fail-closed again); nothing else depends on it.
 
 ## Status log
