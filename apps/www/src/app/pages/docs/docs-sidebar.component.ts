@@ -1,6 +1,7 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
+import { CURRENT_FORGE_VERSION } from '../../forge-release';
 import type { DocsNavGroup } from './docs-nav';
 
 /**
@@ -35,7 +36,11 @@ import type { DocsNavGroup } from './docs-nav';
     </aside>
 
     <ng-template #nav>
-      <nav class="flex flex-col gap-6">
+      <p class="forge-docs-release">
+        <span>Documentation</span>
+        <span class="forge-docs-release-chip">v{{ version }} stable · 1.0 candidate</span>
+      </p>
+      <nav class="mt-6 flex flex-col gap-6">
         @for (group of groups(); track group.heading) {
           <div>
             <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -45,8 +50,9 @@ import type { DocsNavGroup } from './docs-nav';
               @for (link of group.links; track link.slug) {
                 <li>
                   <a
-                    class="block truncate rounded-md px-2 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                    routerLinkActive="bg-muted font-medium text-foreground"
+                    class="forge-docs-link block truncate rounded-md px-2 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                    routerLinkActive="is-active bg-muted font-medium text-foreground"
+                    ariaCurrentWhenActive="page"
                     [routerLink]="['/docs', link.slug]"
                     >{{ link.title }}</a
                   >
@@ -61,4 +67,5 @@ import type { DocsNavGroup } from './docs-nav';
 })
 export class DocsSidebarComponent {
   readonly groups = input.required<DocsNavGroup[]>();
+  protected readonly version = CURRENT_FORGE_VERSION;
 }

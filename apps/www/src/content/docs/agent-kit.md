@@ -18,7 +18,7 @@ The agent still edits **your** project through its normal coding tools. The MCP 
 ## The workflow
 
 1. Create an Angular/Analog project and install the ForgeCMS packages (see the [Angular quickstart](/docs/angular-quickstart)).
-2. Install the kit as a **dev** dependency: `pnpm add -D @forge-cms/agent`.
+2. Install the kit as a **dev** dependency: `pnpm add -D @forge-cms/agent@rc` (during the 1.0 release candidate the kit has only the `rc` dist-tag; from `1.0.0` on, `pnpm add -D @forge-cms/agent`).
 3. Connect your agent with one command: `pnpm exec forge-cms-agent init`.
 4. Ask the agent to model the site ("add a `services` collection editable in Spanish and English").
 5. The agent calls `forge_project_detect`, `forge_project_doctor` and `forge_docs_search`, and follows the skills.

@@ -1,10 +1,23 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import type { ElementRef } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  afterNextRender,
+  inject,
+  signal,
+  viewChild
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { VoltNativeButton } from '@voltui/components';
+import { MoveInViewDirective, MoveStaggerDirective } from 'angular-movement';
 import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
 import { LmnCheckIcon } from 'lumen-icons/check';
+import { LmnChevronLeftIcon } from 'lumen-icons/chevron-left';
+import { LmnChevronRightIcon } from 'lumen-icons/chevron-right';
 import { FORGE_CHANNELS } from '../forge-release';
 import { ROADMAP_MILESTONES, type MilestoneStatus } from '../landing-data';
+import { releaseSteps } from '../showcase-data';
 
 const STATUS_LABELS: Record<MilestoneStatus, string> = {
   complete: 'Complete',
@@ -14,78 +27,167 @@ const STATUS_LABELS: Record<MilestoneStatus, string> = {
   planned: 'Planned'
 };
 
+/**
+ * Spec 097: the road to 1.0 as a track of milestone cards ending in the 1.0 destination card. The track
+ * is a native horizontal scroller (scroll-snap, swipe, keyboard arrows once focused); the previous /
+ * next buttons only call `scrollBy` on it, instantly under reduced motion. Every card is in the DOM and
+ * in reading order, so nothing depends on the buttons or on animation.
+ */
 @Component({
   selector: 'forge-cms-roadmap-section',
   standalone: true,
-  imports: [RouterLink, VoltNativeButton, LmnArrowRightIcon, LmnCheckIcon],
+  imports: [
+    RouterLink,
+    VoltNativeButton,
+    MoveInViewDirective,
+    MoveStaggerDirective,
+    LmnArrowRightIcon,
+    LmnCheckIcon,
+    LmnChevronLeftIcon,
+    LmnChevronRightIcon
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section id="roadmap" class="bg-[#0A0F1A] px-5 py-22 text-white md:px-8 md:py-28">
-      <div class="mx-auto w-full max-w-7xl">
-        <div class="grid gap-12 lg:grid-cols-[0.72fr_1.28fr] lg:gap-18">
-          <div>
-            <p class="text-sm font-medium text-[#22D3EE]">Approaching 1.0 deliberately</p>
-            <h2
-              class="mt-5 max-w-[14ch] text-4xl font-semibold leading-[1.05] tracking-[-0.045em] md:text-5xl"
-            >
-              Built in the open. Getting stronger.
-            </h2>
-            <p class="mt-5 max-w-[48ch] leading-7 text-white/65">
-              Upgrade safety, the Angular client, SSR, portable S3 storage, the admin and
-              packed-artifact certification are complete. {{ candidateCopy }} Until
-              <code>1.0.0</code> ships, ForgeCMS is a 1.0 candidate, not a released 1.0.
-            </p>
-            <a
-              voltButton
-              variant="outline"
-              class="mt-8 border-white/25 bg-white/5 text-white hover:bg-white/10"
-              routerLink="/docs/schema-upgrades"
-            >
-              How schema upgrades work
-              <lmn-arrow-right [size]="16" />
-            </a>
-          </div>
+    <section id="roadmap" class="forge-roadmap" aria-labelledby="roadmap-title">
+      <div class="mx-auto w-full max-w-7xl px-5 py-20 md:px-8 md:py-28">
+        <div>
+          <p class="forge-section-mark">Approaching 1.0 deliberately</p>
+          <h2 id="roadmap-title" class="forge-section-title mt-5">
+            Built in the open. Getting stronger.
+          </h2>
+          <p class="mt-5 max-w-[56ch] leading-7 text-muted-foreground">
+            {{ completeCount }} of {{ milestones.length }} milestones complete.
+            {{ candidateCopy }} Until <code>1.0.0</code> ships, ForgeCMS is a 1.0 candidate, not a
+            released 1.0.
+          </p>
+        </div>
 
-          <ol class="border-t border-white/15">
-            @for (milestone of milestones; track milestone.version) {
-              <li class="grid gap-4 border-b border-white/15 py-6 sm:grid-cols-[7rem_1fr_auto]">
-                <span class="font-mono text-sm text-white/45">{{ milestone.version }}</span>
-                <div>
-                  <h3 class="font-semibold">{{ milestone.title }}</h3>
-                  @if (milestone.steps; as steps) {
-                    <ul class="mt-3 space-y-2 text-sm text-white/60">
-                      @for (step of steps; track step.title) {
-                        <li class="flex items-center gap-2">
-                          @if (step.status === 'complete') {
-                            <lmn-check tone="success" [size]="16" />
-                          } @else {
-                            <span class="size-1.5 rounded-full bg-[#8B5CF6]"></span>
-                          }
-                          <span>{{ step.title }}</span>
-                        </li>
-                      }
-                    </ul>
+        <div class="forge-roadmap-controls">
+          <div class="forge-roadmap-rail" aria-hidden="true">
+            <span [style.width.%]="(completeCount / milestones.length) * 100"></span>
+          </div>
+          <div class="flex gap-2">
+            <button
+              type="button"
+              class="forge-roadmap-nav"
+              aria-label="Previous milestones"
+              [disabled]="atStart()"
+              (click)="page(-1)"
+            >
+              <lmn-chevron-left [size]="20" />
+            </button>
+            <button
+              type="button"
+              class="forge-roadmap-nav"
+              aria-label="Next milestones"
+              [disabled]="atEnd()"
+              (click)="page(1)"
+            >
+              <lmn-chevron-right [size]="20" />
+            </button>
+          </div>
+        </div>
+
+        <ol
+          #track
+          class="forge-roadmap-track"
+          tabindex="0"
+          data-scroll-x
+          aria-label="Roadmap milestones"
+          moveStagger="70ms"
+          (scroll)="syncEdges()"
+        >
+          @for (milestone of milestones; track milestone.version) {
+            <li class="forge-milestone" [attr.data-status]="milestone.status" [moveInView]="reveal">
+              <div class="forge-milestone-top">
+                <span class="forge-milestone-version">{{ milestone.version }}</span>
+                <span class="forge-milestone-status">
+                  @if (milestone.status === 'complete') {
+                    <lmn-check [size]="14" />
                   }
-                </div>
-                <span
-                  class="h-fit rounded-full border border-white/20 px-3 py-1 text-xs text-white/70"
-                >
                   {{ labels[milestone.status] }}
                 </span>
-              </li>
-            }
-          </ol>
-        </div>
+              </div>
+              <h3>{{ milestone.title }}</h3>
+              @if (milestone.steps; as steps) {
+                <ul>
+                  @for (step of steps; track step.title) {
+                    <li>{{ step.title }}</li>
+                  }
+                </ul>
+              }
+              @if (milestone.version === '1.0') {
+                <ol class="forge-release-steps" aria-label="Release status">
+                  @for (step of steps; track step.label) {
+                    <li [attr.data-state]="step.state">
+                      @if (step.state === 'done') {
+                        <lmn-check tone="success" [size]="16" />
+                      } @else {
+                        <span class="forge-release-dot" aria-hidden="true"></span>
+                      }
+                      <span>{{ step.label }}</span>
+                      @if (step.state === 'next') {
+                        <span class="forge-release-next">Next</span>
+                      }
+                    </li>
+                  }
+                </ol>
+              }
+            </li>
+          }
+        </ol>
+
+        <a voltButton variant="outline" class="mt-10" routerLink="/docs/schema-upgrades">
+          How schema upgrades work
+          <lmn-arrow-right [size]="16" />
+        </a>
       </div>
     </section>
   `
 })
 export class RoadmapSectionComponent {
-  protected readonly milestones = ROADMAP_MILESTONES.filter((milestone) =>
-    ['0.6', '0.7', '0.8', '0.9', '0.10', '0.11', '0.12', '1.0'].includes(milestone.version)
-  );
+  private readonly track = viewChild.required<ElementRef<HTMLElement>>('track');
+
+  /** The whole journey, 0.1 → 1.0. */
+  protected readonly milestones = ROADMAP_MILESTONES;
+  protected readonly completeCount = this.milestones.filter((m) => m.status === 'complete').length;
   protected readonly candidateCopy = FORGE_CHANNELS.rcPublished
     ? 'The 1.0 release candidate is published for validation.'
     : 'The 1.0 release candidate is prepared and certified; publication and real-consumer validation come next.';
   protected readonly labels = STATUS_LABELS;
+  protected readonly steps = releaseSteps();
+  protected readonly reveal = { opacity: [0, 1], y: [20, 0], scale: [0.98, 1] };
+
+  protected readonly atStart = signal(true);
+  protected readonly atEnd = signal(false);
+
+  constructor() {
+    const destroyRef = inject(DestroyRef);
+    afterNextRender(() => {
+      const view = this.track().nativeElement.ownerDocument.defaultView;
+      this.syncEdges();
+      view?.addEventListener('resize', this.#onResize, { passive: true });
+      destroyRef.onDestroy(() => view?.removeEventListener('resize', this.#onResize));
+    });
+  }
+
+  readonly #onResize = (): void => this.syncEdges();
+
+  /** Scroll the track by most of its visible width; instant when the reader prefers reduced motion. */
+  protected page(direction: -1 | 1): void {
+    const track = this.track().nativeElement;
+    const reduced = track.ownerDocument.defaultView?.matchMedia(
+      '(prefers-reduced-motion: reduce)'
+    ).matches;
+    track.scrollBy({
+      left: direction * track.clientWidth * 0.8,
+      behavior: reduced ? 'auto' : 'smooth'
+    });
+  }
+
+  protected syncEdges(): void {
+    const track = this.track().nativeElement;
+    this.atStart.set(track.scrollLeft <= 4);
+    this.atEnd.set(track.scrollLeft + track.clientWidth >= track.scrollWidth - 4);
+  }
 }

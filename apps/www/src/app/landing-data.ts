@@ -101,26 +101,6 @@ export const localizationExample = {
   limits: 'Rich text, blocks, arrays, uploads and relations are not localized in 1.0.'
 } as const;
 
-/** The Agent Kit story. Mirrors docs/agent-kit and the packed tool list. */
-export const agentKit = {
-  prompt: 'Make Services editable in Spanish and English.',
-  steps: [
-    { call: 'forge_project_detect', note: 'Angular + Analog, Cloudflare profile, no locales yet' },
-    { call: 'forge_docs_search("localization")', note: 'Version-matched docs, offline' },
-    { call: 'forgecms-localization', note: 'Skill: the supported pattern' }
-  ],
-  result: 'The agent edits your project with its normal tools, using the supported Forge pattern.',
-  facts: [
-    'Local stdio MCP, read-only',
-    'No telemetry',
-    'Project detection and doctor',
-    'Offline docs search',
-    'Support matrix',
-    'Eight official skills',
-    'Development only, no runtime dependency'
-  ]
-} as const;
-
 /** Only metrics the Analytics vertical really has (docs/analytics). No visitors, sessions or funnels. */
 export const analyticsFacts = {
   metrics: [
@@ -140,13 +120,6 @@ export const analyticsFacts = {
     'No query string or hash',
     'Referrer host only'
   ]
-} as const;
-
-/** The client-site flow, as plain steps. */
-export const clientFlow = {
-  developer: ['Angular site UI', 'Forge schema', 'Pages · Services · Posts · Media'],
-  client: ['Content', 'ES / EN', 'Uploads', 'Analytics'],
-  agent: ['Forge MCP', 'Forge skills']
 } as const;
 
 export const packages = FORGE_PACKAGES.map((pkg) => ({
@@ -169,16 +142,6 @@ export const posts = defineCollection({
   }
 });`;
 
-/** The Local API in the shape a server route uses it. */
-export const localApiCode = `// An Analog server route: no HTTP hop, same access rules as a visitor.
-const post = await runtime.findOne({
-  collection: 'posts',
-  where: { slug },
-  depth: 1,
-  overrideAccess: false,
-  user: null
-});`;
-
 export type MilestoneStatus = 'complete' | 'in-progress' | 'next' | 'pending' | 'planned';
 
 export interface RoadmapMilestone {
@@ -193,6 +156,40 @@ export interface RoadmapMilestone {
  * {@link CURRENT_FORGE_VERSION}.
  */
 export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
+  // 0.1–0.5: the early phases as docs/STATE.md records them (Phase 1, Phase 0.2, Phase 0.3.x, the
+  // automated 0.4.0 npm family + small-project readiness, ROADMAP's 0.5 contract baseline).
+  {
+    version: '0.1',
+    title: 'Structural core',
+    status: 'complete',
+    steps: [
+      { title: 'Local API', status: 'complete' },
+      { title: 'Access control as functions', status: 'complete' },
+      { title: 'Full hook pipeline and composite fields', status: 'complete' }
+    ]
+  },
+  { version: '0.2', title: 'Trust and production hardening', status: 'complete' },
+  {
+    version: '0.3',
+    title: 'Content model',
+    status: 'complete',
+    steps: [
+      { title: 'Globals and versions', status: 'complete' },
+      { title: 'Live preview and localization', status: 'complete' },
+      { title: 'Relation integrity', status: 'complete' }
+    ]
+  },
+  {
+    version: '0.4',
+    title: 'Published package family',
+    status: 'complete',
+    steps: [
+      { title: 'Automated npm releases', status: 'complete' },
+      { title: 'API keys and browser auth', status: 'complete' },
+      { title: 'Embeddable content admin', status: 'complete' }
+    ]
+  },
+  { version: '0.5', title: 'Contract and access foundation', status: 'complete' },
   { version: '0.6', title: 'Auth and data integrity', status: 'complete' },
   {
     version: '0.7',

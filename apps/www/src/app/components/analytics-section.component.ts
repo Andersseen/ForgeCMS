@@ -1,73 +1,140 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
+import { DecimalPipe, PercentPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { VoltNativeButton } from '@voltui/components';
+import { MoveAnimateDirective, MoveStaggerDirective } from 'angular-movement';
 import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
 import { analyticsFacts } from '../landing-data';
+import {
+  analyticsPreview,
+  analyticsRanges,
+  formatChange,
+  type AnalyticsRange
+} from '../showcase-data';
 
+/**
+ * Spec 097: the experimental Analytics vertical as a compact dashboard preview. Every number is
+ * illustrative, deterministic and labelled so; only the metrics the vertical really has are drawn
+ * (pageviews, change vs previous period, timeline, top pages, referrers, countries). Changing the range
+ * re-creates the bars, so Movement's entrance plays as feedback for the switch.
+ */
 @Component({
   selector: 'forge-cms-analytics-section',
   standalone: true,
-  imports: [RouterLink, VoltNativeButton, LmnArrowRightIcon],
+  imports: [
+    DecimalPipe,
+    PercentPipe,
+    RouterLink,
+    VoltNativeButton,
+    MoveAnimateDirective,
+    MoveStaggerDirective,
+    LmnArrowRightIcon
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section
-      id="analytics"
-      class="border-y border-border bg-background"
-      aria-labelledby="analytics-title"
-    >
-      <div class="mx-auto w-full max-w-7xl px-5 py-18 md:px-8 md:py-22">
-        <div class="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
-          <div
-            class="forge-themed-panel order-2 rounded-[1.25rem] border border-border p-6 md:p-7 lg:order-1"
-          >
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <p class="text-sm font-medium">What the client sees</p>
-              <p class="flex gap-1.5 text-xs" aria-label="Date ranges">
-                @for (range of facts.ranges; track range) {
-                  <span class="rounded-full border border-border px-2.5 py-1">{{ range }}</span>
-                }
-              </p>
-            </div>
-            <ul class="mt-5 grid gap-2 sm:grid-cols-2">
-              @for (metric of facts.metrics; track metric) {
-                <li class="rounded-lg border border-border bg-background px-3 py-2.5 text-sm">
-                  {{ metric }}
-                </li>
-              }
-            </ul>
-            <p class="mt-5 text-xs leading-5 text-muted-foreground">
-              Illustrative list of the dashboard's views. The numbers always come from your own
-              Cloudflare Analytics Engine dataset; Forge never invents them.
-            </p>
-          </div>
-
-          <div class="order-1 lg:order-2">
+    <section id="analytics" class="forge-analytics-section" aria-labelledby="analytics-title">
+      <div class="mx-auto w-full max-w-7xl px-5 py-20 md:px-8 md:py-28">
+        <div class="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
+          <div>
             <p class="forge-section-mark">
               Analytics <span class="forge-experimental-badge ml-1">Experimental</span>
             </p>
             <h2 id="analytics-title" class="forge-section-title mt-5">
               Is anyone visiting? The client can see.
             </h2>
-            <p class="mt-5 max-w-[48ch] leading-7 text-muted-foreground">
-              Your client opens the same admin they use for content and sees whether people are
-              actually visiting the site. Built on Cloudflare Analytics Engine.
+            <p class="mt-5 max-w-[46ch] leading-7 text-muted-foreground">
+              Optional pageview analytics inside the same admin, built on Cloudflare Analytics
+              Engine. Private by construction:
             </p>
-            <h3 class="mt-6 text-sm font-semibold">Privacy by construction</h3>
-            <ul class="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+            <ul class="forge-privacy-chips" aria-label="Privacy guarantees">
               @for (item of facts.privacy; track item) {
-                <li class="flex gap-2.5">
-                  <span
-                    class="mt-[0.55rem] size-1.5 shrink-0 rounded-full bg-primary"
-                    aria-hidden="true"
-                  ></span>
-                  <span>{{ item }}</span>
-                </li>
+                <li>{{ item }}</li>
               }
             </ul>
             <a voltButton class="mt-8" routerLink="/docs/analytics">
               Analytics docs
               <lmn-arrow-right [size]="16" />
             </a>
+          </div>
+
+          <div class="forge-dash" role="group" aria-labelledby="dash-title">
+            <div class="forge-dash-head">
+              <div>
+                <p id="dash-title" class="font-semibold">Analytics</p>
+                <p class="forge-dash-label">Illustrative preview · not live data</p>
+              </div>
+              <div class="forge-dash-ranges" role="group" aria-label="Date range">
+                @for (option of ranges; track option) {
+                  <button
+                    type="button"
+                    [attr.aria-pressed]="range() === option"
+                    (click)="range.set(option)"
+                  >
+                    {{ option }}
+                  </button>
+                }
+              </div>
+            </div>
+
+            <div class="forge-dash-grid">
+              <div class="forge-dash-card forge-dash-metric">
+                <p class="forge-dash-card-title">Pageviews</p>
+                <p class="forge-dash-value">{{ data().pageviews | number }}</p>
+                <p class="forge-dash-change" [class.is-down]="data().change < 0">
+                  {{ change() }} <span>vs previous {{ range() }}</span>
+                </p>
+              </div>
+
+              <div class="forge-dash-card forge-dash-timeline">
+                <p class="forge-dash-card-title">Timeline</p>
+                @for (snapshot of [data()]; track snapshot.range) {
+                  <div class="forge-dash-bars" moveStagger="35ms" aria-hidden="true">
+                    @for (bar of snapshot.timeline; track $index) {
+                      <span [style.height.%]="bar * 100" [move]="grow" moveDuration="420ms"></span>
+                    }
+                  </div>
+                }
+              </div>
+
+              <div class="forge-dash-card">
+                <p class="forge-dash-card-title">Top pages</p>
+                <ul class="forge-dash-list">
+                  @for (page of data().topPages; track page.path) {
+                    <li>
+                      <span>{{ page.path }}</span
+                      ><span>{{ page.share | percent }}</span>
+                      <i [style.width.%]="page.share * 100" aria-hidden="true"></i>
+                    </li>
+                  }
+                </ul>
+              </div>
+
+              <div class="forge-dash-card">
+                <p class="forge-dash-card-title">Referrers</p>
+                <ul class="forge-dash-list">
+                  @for (ref of data().referrers; track ref.host) {
+                    <li>
+                      <span>{{ ref.host }}</span
+                      ><span>{{ ref.share | percent }}</span>
+                      <i [style.width.%]="ref.share * 100" aria-hidden="true"></i>
+                    </li>
+                  }
+                </ul>
+              </div>
+
+              <div class="forge-dash-card">
+                <p class="forge-dash-card-title">Countries</p>
+                <ul class="forge-dash-list">
+                  @for (country of data().countries; track country.code) {
+                    <li>
+                      <span>{{ country.code }}</span
+                      ><span>{{ country.share | percent }}</span>
+                      <i [style.width.%]="country.share * 100" aria-hidden="true"></i>
+                    </li>
+                  }
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -76,4 +143,9 @@ import { analyticsFacts } from '../landing-data';
 })
 export class AnalyticsSectionComponent {
   protected readonly facts = analyticsFacts;
+  protected readonly ranges = analyticsRanges;
+  protected readonly range = signal<AnalyticsRange>('7d');
+  protected readonly data = computed(() => analyticsPreview[this.range()]);
+  protected readonly change = computed(() => formatChange(this.data().change));
+  protected readonly grow = { opacity: [0, 1], transform: ['scaleY(0.15)', 'scaleY(1)'] };
 }

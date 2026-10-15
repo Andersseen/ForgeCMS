@@ -145,7 +145,7 @@ test('reduced motion keeps the product showcase usable without continuous animat
     'aria-selected',
     'true'
   );
-  await expect(page.getByRole('tabpanel')).toBeVisible();
+  await expect(page.locator('.forge-showcase').getByRole('tabpanel')).toBeVisible();
   const running = await page.evaluate(
     () =>
       document

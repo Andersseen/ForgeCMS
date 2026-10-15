@@ -1,18 +1,27 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { VoltNativeButton } from '@voltui/components';
+import { MoveVariantsDirective } from 'angular-movement';
 import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
 import { localizationExample } from '../landing-data';
 
+type LocaleCode = 'ES' | 'EN';
+
+/**
+ * Spec 097: localization as an editor. The ES/EN switch changes the values the editor shows (a short
+ * Movement variant marks the change); the per-locale grid underneath always shows both, so nothing
+ * depends on clicking or on motion. Only top-level `text`/`textarea` fields are localized in 1.0, and
+ * the shared fields say so.
+ */
 @Component({
   selector: 'forge-cms-localization-section',
   standalone: true,
-  imports: [RouterLink, VoltNativeButton, LmnArrowRightIcon],
+  imports: [RouterLink, VoltNativeButton, MoveVariantsDirective, LmnArrowRightIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section
       id="localization"
-      class="mx-auto w-full max-w-7xl px-5 py-18 md:px-8 md:py-22"
+      class="mx-auto w-full max-w-7xl px-5 py-20 md:px-8 md:py-24"
       aria-labelledby="localization-title"
     >
       <div class="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
@@ -21,52 +30,102 @@ import { localizationExample } from '../landing-data';
           <h2 id="localization-title" class="forge-section-title mt-5">
             Spanish and English, side by side.
           </h2>
-          <ul class="mt-6 space-y-3 text-sm leading-6">
-            @for (point of example.points; track point) {
-              <li class="flex gap-2.5">
-                <span
-                  class="mt-[0.6rem] size-1.5 shrink-0 rounded-full bg-primary"
-                  aria-hidden="true"
-                ></span>
-                <span>{{ point }}</span>
-              </li>
-            }
-          </ul>
+          <p class="mt-5 max-w-[46ch] leading-7 text-muted-foreground">
+            Declare the locales in the schema. Top-level text and textarea fields keep a separate
+            value per language; slugs, images and relations stay shared.
+          </p>
+          <pre
+            class="forge-code mt-7 hidden md:block"
+            tabindex="0"
+          ><code>{{ example.schema }}</code></pre>
           <p class="mt-5 text-sm leading-6 text-muted-foreground">{{ example.limits }}</p>
-          <a voltButton variant="outline" class="mt-7" routerLink="/docs/collections">
+          <a voltButton variant="outline" class="mt-6" routerLink="/docs/collections">
             Localization guide
             <lmn-arrow-right [size]="16" />
           </a>
         </div>
 
-        <div class="grid gap-4 md:grid-cols-[1.05fr_0.95fr]">
-          <pre class="forge-code m-0" tabindex="0"><code>{{ example.schema }}</code></pre>
-          <div
-            class="forge-themed-panel rounded-[1.1rem] border border-border p-5"
-            role="group"
-            aria-label="Illustrative admin view: one document, two locales"
-          >
-            <p class="text-xs font-medium text-muted-foreground">
-              Illustrative · the admin edits one locale at a time
-            </p>
-            @for (locale of example.locales; track locale.code) {
-              <div
-                class="mt-4 border-t border-border pt-4 first-of-type:border-t-0 first-of-type:pt-0"
-              >
-                <span class="forge-locale-chip">{{ locale.code }}</span>
-                <dl class="mt-3 space-y-2 text-sm">
-                  <div class="grid grid-cols-[6rem_1fr] gap-3">
-                    <dt class="text-muted-foreground">Title</dt>
-                    <dd class="font-medium">{{ locale.title }}</dd>
-                  </div>
-                  <div class="grid grid-cols-[6rem_1fr] gap-3">
-                    <dt class="text-muted-foreground">Description</dt>
-                    <dd>{{ locale.description }}</dd>
-                  </div>
-                </dl>
+        <div class="forge-l10n">
+          <div class="forge-l10n-editor" role="group" aria-labelledby="l10n-editor-title">
+            <div class="forge-l10n-bar">
+              <p id="l10n-editor-title">
+                <span class="text-muted-foreground">Notices /</span> {{ current().title }}
+              </p>
+              <div class="forge-l10n-switch" role="group" aria-label="Editing locale">
+                @for (code of codes; track code) {
+                  <button
+                    type="button"
+                    [attr.aria-pressed]="locale() === code"
+                    (click)="locale.set(code)"
+                  >
+                    {{ code }}
+                  </button>
+                }
               </div>
-            }
+            </div>
+            <div class="forge-l10n-fields">
+              <div class="forge-l10n-field">
+                <span class="forge-l10n-label"
+                  >Title <em>{{ locale() }}</em></span
+                >
+                <span
+                  class="forge-l10n-value"
+                  [moveVariants]="swap"
+                  [moveVariant]="locale()"
+                  aria-live="polite"
+                  >{{ current().title }}</span
+                >
+              </div>
+              <div class="forge-l10n-field">
+                <span class="forge-l10n-label"
+                  >Description <em>{{ locale() }}</em></span
+                >
+                <span
+                  class="forge-l10n-value is-multiline"
+                  [moveVariants]="swap"
+                  [moveVariant]="locale()"
+                  >{{ current().description }}</span
+                >
+              </div>
+              <div class="forge-l10n-field is-shared">
+                <span class="forge-l10n-label">Slug <em>Shared</em></span>
+                <span class="forge-l10n-value">tratamientos-faciales</span>
+              </div>
+              <div class="forge-l10n-field is-shared">
+                <span class="forge-l10n-label">Image <em>Shared</em></span>
+                <span class="forge-l10n-value">facial.jpg</span>
+              </div>
+            </div>
+            <p class="forge-l10n-foot">Illustrative · the admin edits one locale at a time</p>
           </div>
+
+          <table class="forge-l10n-table">
+            <caption>
+              One document, a stored value per locale
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Field</th>
+                @for (entry of example.locales; track entry.code) {
+                  <th scope="col">{{ entry.code }}</th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Title</th>
+                @for (entry of example.locales; track entry.code) {
+                  <td [class.is-current]="entry.code === locale()">{{ entry.title }}</td>
+                }
+              </tr>
+              <tr>
+                <th scope="row">Description</th>
+                @for (entry of example.locales; track entry.code) {
+                  <td [class.is-current]="entry.code === locale()">{{ entry.description }}</td>
+                }
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -74,4 +133,15 @@ import { localizationExample } from '../landing-data';
 })
 export class LocalizationSectionComponent {
   protected readonly example = localizationExample;
+  protected readonly codes: readonly LocaleCode[] = ['ES', 'EN'];
+  protected readonly locale = signal<LocaleCode>('ES');
+  protected readonly current = computed(
+    () =>
+      this.example.locales.find((entry) => entry.code === this.locale()) ?? this.example.locales[0]
+  );
+  /** Same end state for both locales: the variant change replays a short settle as the value swaps. */
+  protected readonly swap = {
+    ES: { opacity: [0.2, 1], y: [6, 0], duration: 260 },
+    EN: { opacity: [0.2, 1], y: [6, 0], duration: 260 }
+  };
 }

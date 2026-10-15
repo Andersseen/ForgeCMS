@@ -1,9 +1,21 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  ElementRef,
+  afterNextRender,
+  computed,
+  effect,
+  inject,
+  signal
+} from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Meta, Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { MarkdownComponent, injectContent, injectContentFiles } from '@analogjs/content';
-import { VoltButton } from '@voltui/components';
+import { MoveAnimateDirective } from 'angular-movement';
+import { activeStageIndex } from '../../showcase-data';
+import { collectOutline, enhanceCodeBlocks, type OutlineItem } from './docs-enhance';
 import {
   buildDocsNav,
   findAdjacent,
@@ -17,61 +29,101 @@ import {
  *
  * The markdown was parsed and syntax-highlighted at build time by Analog's content plugin
  * (`content: { highlighter: 'prism' }` in vite.config.ts), so `injectContent` hands back HTML and
- * nothing has to be fetched or parsed here.
+ * nothing has to be fetched or parsed here. Spec 097 adds, in the browser only: a breadcrumb, an
+ * "On this page" outline with the current section marked, and copy buttons on code blocks — all
+ * progressive, so the article reads the same without them.
  */
 @Component({
   selector: 'forge-cms-docs-article',
   standalone: true,
-  imports: [MarkdownComponent, RouterLink, VoltButton],
+  imports: [MarkdownComponent, RouterLink, MoveAnimateDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    @if (doc(); as page) {
-      <article>
-        <header class="border-b border-border pb-6">
-          <h1 class="text-4xl font-semibold tracking-tight text-foreground">{{ title() }}</h1>
-          @if (page.attributes.description) {
-            <p class="mt-3 text-lg text-muted-foreground">{{ page.attributes.description }}</p>
-          }
-        </header>
+    @for (page of pages(); track page.slug) {
+      <div class="forge-docs-layout">
+        <article class="forge-docs-article" [move]="enter" moveDuration="280ms">
+          <header class="forge-docs-header">
+            @if (group(); as heading) {
+              <p class="forge-section-mark">{{ heading }}</p>
+            }
+            <h1>{{ title() }}</h1>
+            @if (page.attributes.description) {
+              <p class="forge-docs-lede">{{ page.attributes.description }}</p>
+            }
+          </header>
 
-        <analog-markdown class="forge-prose" [content]="page.content" />
+          <analog-markdown class="forge-prose" [content]="page.content" />
 
-        <nav
-          class="mt-14 flex flex-col gap-3 border-t border-border pt-6 sm:flex-row sm:justify-between"
-          aria-label="Pagination"
-        >
-          @if (adjacent().prev; as prev) {
-            <a [routerLink]="['/docs', prev.slug]">
-              <volt-button variant="outline">← {{ prev.title }}</volt-button>
-            </a>
-          } @else {
-            <span></span>
-          }
-          @if (adjacent().next; as next) {
-            <a [routerLink]="['/docs', next.slug]">
-              <volt-button variant="outline">{{ next.title }} →</volt-button>
-            </a>
-          }
-        </nav>
-      </article>
+          <nav class="forge-docs-pager" aria-label="Pagination">
+            @if (adjacent().prev; as prev) {
+              <a [routerLink]="['/docs', prev.slug]" rel="prev">
+                <span>← Previous</span>
+                <strong>{{ prev.title }}</strong>
+              </a>
+            } @else {
+              <span></span>
+            }
+            @if (adjacent().next; as next) {
+              <a [routerLink]="['/docs', next.slug]" rel="next" class="is-next">
+                <span>Next →</span>
+                <strong>{{ next.title }}</strong>
+              </a>
+            }
+          </nav>
+        </article>
+
+        @if (outline().length > 1) {
+          <aside class="forge-docs-outline">
+            <nav aria-label="On this page">
+              <p>On this page</p>
+              <ul>
+                @for (item of outline(); track item.id; let i = $index) {
+                  <li>
+                    <a
+                      [routerLink]="[]"
+                      [fragment]="item.id"
+                      [class.is-active]="i === activeSection()"
+                      [attr.aria-current]="i === activeSection() ? 'location' : null"
+                      >{{ item.text }}</a
+                    >
+                  </li>
+                }
+              </ul>
+            </nav>
+          </aside>
+        }
+      </div>
     }
   `
 })
 export class DocsArticlePage {
   private readonly titleService = inject(Title);
   private readonly meta = inject(Meta);
+  readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  private readonly links = flattenDocsNav(
-    buildDocsNav(injectContentFiles<DocsFrontmatter>(isDocsFile))
-  );
+  private readonly groups = buildDocsNav(injectContentFiles<DocsFrontmatter>(isDocsFile));
+  private readonly links = flattenDocsNav(this.groups);
 
   protected readonly doc = toSignal(
     injectContent<DocsFrontmatter>({ subdirectory: 'docs', param: 'slug' })
   );
+  /** One entry per page, keyed by slug, so each navigation re-creates the article and its entrance. */
+  protected readonly pages = computed(() => {
+    const page = this.doc();
+    return page ? [page] : [];
+  });
 
   protected readonly title = computed(() => this.doc()?.attributes.title ?? 'Documentation');
-
+  protected readonly group = computed(
+    () =>
+      this.groups.find((group) => group.links.some((link) => link.slug === this.doc()?.slug))
+        ?.heading
+  );
   protected readonly adjacent = computed(() => findAdjacent(this.links, this.doc()?.slug ?? ''));
+
+  protected readonly outline = signal<OutlineItem[]>([]);
+  protected readonly activeSection = signal(0);
+  protected readonly enter = { opacity: [0, 1], y: [10, 0] };
 
   constructor() {
     effect(() => {
@@ -81,6 +133,54 @@ export class DocsArticlePage {
       this.titleService.setTitle(`${this.title()} — ForgeCMS docs`);
       const description = page.attributes.description;
       if (description) this.meta.updateTag({ name: 'description', content: description });
+    });
+
+    const destroyRef = inject(DestroyRef);
+    afterNextRender(() => {
+      const host = this.#host.nativeElement;
+      const view = host.ownerDocument.defaultView;
+      if (!view) return;
+      const copy = (text: string): Promise<void> => view.navigator.clipboard.writeText(text);
+
+      // The markdown arrives after the view renders (and again on every page change): enhance it
+      // whenever the article's DOM changes. Enhancement is idempotent, so repeated passes are cheap.
+      let frame: number | null = null;
+      const refresh = (): void => {
+        frame = null;
+        const prose = host.querySelector('.forge-prose');
+        if (!prose) return;
+        enhanceCodeBlocks(prose, copy);
+        const next = collectOutline(prose);
+        const current = this.outline();
+        if (next.map((i) => i.id).join() !== current.map((i) => i.id).join())
+          this.outline.set(next);
+        measure();
+      };
+      const schedule = (): void => {
+        frame ??= view.requestAnimationFrame(refresh);
+      };
+      const measure = (): void => {
+        const headings = this.outline()
+          .map((item) => host.ownerDocument.getElementById(item.id))
+          .filter((el): el is HTMLElement => el !== null);
+        // The reading line sits near the top: a section is "current" once its heading passes it.
+        this.activeSection.set(
+          activeStageIndex(
+            headings.map((h) => h.getBoundingClientRect().top),
+            view.innerHeight * 0.3
+          )
+        );
+      };
+      const observer = new MutationObserver(schedule);
+      observer.observe(host, { childList: true, subtree: true });
+      view.addEventListener('scroll', measure, { passive: true });
+      schedule();
+
+      destroyRef.onDestroy(() => {
+        observer.disconnect();
+        view.removeEventListener('scroll', measure);
+        if (frame !== null) view.cancelAnimationFrame(frame);
+      });
     });
   }
 }
