@@ -15,6 +15,14 @@ pages_build_output_dir = "dist/analog/public"
 # exactly once because it checks for an existing `site_settings` row.
 #
 # Created with `pnpm exec wrangler d1 create forge-cms-demo`.
+# The deployed Lumea is the *shared public demo*: published credentials, anyone on the internet. This
+# flag switches on the mutation allowlist and daily budgets (src/server/api/demo-policy.ts). It is
+# explicit on purpose; local development and e2e leave it unset and run the full demo. The budget
+# needs the `demo_budget` table from the reviewed migration 20261015_001_demo_budget — without it the
+# public demo fails closed (edits and bookings pause, browsing keeps working).
+[vars]
+FORGE_PUBLIC_DEMO = "1"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "forge-cms-demo"

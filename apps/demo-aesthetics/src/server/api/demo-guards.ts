@@ -1,5 +1,11 @@
 import type { CollectionDefinition, CollectionHooks } from '@forge-cms/core';
-import { MAX_DOCUMENTS, MIN_DOCUMENTS, clearReadCache } from './demo-limits';
+import {
+  MAX_DOCUMENTS,
+  MAX_PRUNE_PER_WRITE,
+  MIN_DOCUMENTS,
+  SEEDED_DOCUMENTS,
+  clearReadCache
+} from './demo-limits';
 import { getRuntimeRef } from './runtime-ref';
 
 /**
@@ -29,7 +35,13 @@ async function countDocuments(slug: string): Promise<number> {
 }
 
 /**
- * Deletes the oldest rows beyond `ceiling`.
+ * Deletes the oldest *disposable* rows beyond `ceiling`.
+ *
+ * The seeded documents are the oldest by construction, so the first `SEEDED_DOCUMENTS[slug]` rows by
+ * `created_at` are canonical and never pruned — otherwise enough creates would eventually evict the
+ * seeded services, staff and media that make the clinic coherent. A single write prunes at most
+ * `MAX_PRUNE_PER_WRITE` rows, and the deletes run `afterDelete` hooks only (never `afterChange`), so
+ * pruning cannot trigger more pruning.
  *
  * Sorting by `created_at` only works because every adapter stamps it (spec 040 — the in-memory one
  * did not, so this would have silently pruned arbitrary rows in local development).
@@ -38,19 +50,20 @@ async function pruneOldest(slug: string, ceiling: number): Promise<void> {
   const runtime = getRuntimeRef();
   if (!runtime) return;
 
+  const protectedCount = SEEDED_DOCUMENTS[slug] ?? 0;
   const total = await runtime.count({ collection: slug });
-  const excess = total - ceiling;
+  const excess = Math.min(total - ceiling, total - protectedCount, MAX_PRUNE_PER_WRITE);
   if (excess <= 0) return;
 
   const { docs } = await runtime.find({
     collection: slug,
     sort: 'created_at',
     order: 'asc',
-    limit: excess,
+    limit: protectedCount + excess,
     status: 'all'
   });
 
-  for (const doc of docs) {
+  for (const doc of docs.slice(protectedCount, protectedCount + excess)) {
     await runtime.delete({ collection: slug, id: String(doc.id) });
   }
 }
@@ -79,6 +92,16 @@ function guardsFor(slug: string): CollectionHooks {
     afterChange: [() => clearReadCache()],
     afterDelete: [() => clearReadCache()]
   };
+
+  if (slug === 'notices') {
+    // A notice's link is rendered as a router link on the public site: keep it an in-site path.
+    hooks.beforeChange = [
+      ({ data }) =>
+        typeof data.linkPath === 'string' && !/^\/(?!\/)/.test(data.linkPath)
+          ? { ...data, linkPath: '/booking' }
+          : data
+    ];
+  }
 
   if (floor !== undefined) {
     hooks.beforeDelete = [

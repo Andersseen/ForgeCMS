@@ -119,9 +119,18 @@ export class SiteApiService {
 
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as {
-        data?: { details?: { field: string; message: string }[] };
+        data?: { details?: { field: string; message: string }[]; code?: string; demo?: boolean };
         statusMessage?: string;
       } | null;
+      // The shared public demo (spec 098) refuses with its own stable code and a visitor-safe
+      // sentence; say so plainly rather than pretending the clinic took the booking.
+      if (body?.data?.demo === true) {
+        throw new Error(
+          body.data.code === 'demo_budget_exhausted'
+            ? "The shared demo has reached today's appointment-write limit. Try again later."
+            : (body.statusMessage ?? 'The shared demo cannot take this request right now.')
+        );
+      }
       const detail = body?.data?.details?.[0]?.message;
       throw new Error(detail ?? 'We could not send your request. Please try again.');
     }

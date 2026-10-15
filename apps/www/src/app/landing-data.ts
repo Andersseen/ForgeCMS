@@ -168,7 +168,16 @@ export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
       { title: 'Full hook pipeline and composite fields', status: 'complete' }
     ]
   },
-  { version: '0.2', title: 'Trust and production hardening', status: 'complete' },
+  {
+    version: '0.2',
+    title: 'Trust and production hardening',
+    status: 'complete',
+    steps: [
+      { title: 'Strict runtime validation', status: 'complete' },
+      { title: 'A stable API envelope and typed errors', status: 'complete' },
+      { title: 'Production-minded defaults', status: 'complete' }
+    ]
+  },
   {
     version: '0.3',
     title: 'Content model',
@@ -189,8 +198,26 @@ export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
       { title: 'Embeddable content admin', status: 'complete' }
     ]
   },
-  { version: '0.5', title: 'Contract and access foundation', status: 'complete' },
-  { version: '0.6', title: 'Auth and data integrity', status: 'complete' },
+  {
+    version: '0.5',
+    title: 'Contract and access foundation',
+    status: 'complete',
+    steps: [
+      { title: 'Consistent access rules across routes', status: 'complete' },
+      { title: 'Atomic and conditional writes', status: 'complete' },
+      { title: 'One policy across the runtime', status: 'complete' }
+    ]
+  },
+  {
+    version: '0.6',
+    title: 'Auth and data integrity',
+    status: 'complete',
+    steps: [
+      { title: 'Bounded auth and abuse limits', status: 'complete' },
+      { title: 'Relation and delete integrity', status: 'complete' },
+      { title: 'Upload and global lifecycle', status: 'complete' }
+    ]
+  },
   {
     version: '0.7',
     title: 'Upgrade safety',
@@ -211,10 +238,46 @@ export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
       { title: 'Resource reliability and peer compatibility', status: 'complete' }
     ]
   },
-  { version: '0.9', title: 'SSR for Analog', status: 'complete' },
-  { version: '0.10', title: 'Portable storage and deployment profiles', status: 'complete' },
-  { version: '0.11', title: 'Admin certification', status: 'complete' },
-  { version: '0.12', title: 'Certification and documentation', status: 'complete' },
+  {
+    version: '0.9',
+    title: 'SSR for Analog',
+    status: 'complete',
+    steps: [
+      { title: 'Request-scoped server transport', status: 'complete' },
+      { title: 'Safe public hydration', status: 'complete' },
+      { title: 'A production SSR consumer journey', status: 'complete' }
+    ]
+  },
+  {
+    version: '0.10',
+    title: 'Portable storage and deployment profiles',
+    status: 'complete',
+    steps: [
+      { title: 'An S3-compatible storage adapter', status: 'complete' },
+      { title: 'A portable upload lifecycle', status: 'complete' },
+      { title: 'Deployment and recovery profiles', status: 'complete' }
+    ]
+  },
+  {
+    version: '0.11',
+    title: 'Admin certification',
+    status: 'complete',
+    steps: [
+      { title: 'Reliable content state and recovery', status: 'complete' },
+      { title: 'Keyboard, focus and field interactions', status: 'complete' },
+      { title: 'A reusable admin and a frozen 1.0 surface', status: 'complete' }
+    ]
+  },
+  {
+    version: '0.12',
+    title: 'Certification and documentation',
+    status: 'complete',
+    steps: [
+      { title: 'Packed consumers and durable profiles', status: 'complete' },
+      { title: 'Coverage, performance and stability gates', status: 'complete' },
+      { title: 'Rehearsed deployment and consumer docs', status: 'complete' }
+    ]
+  },
   // Product-facing and truthful: the candidate is prepared and certified, not yet published, and 1.0
   // is never "complete" until `1.0.0` exists on the registry (spec 094).
   {

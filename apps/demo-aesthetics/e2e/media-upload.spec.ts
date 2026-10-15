@@ -37,7 +37,7 @@ test('media upload: the browser uploads a file and it is served through its docu
     buffer: PNG
   });
   await page.getByPlaceholder('Alt text').fill(alt);
-  await page.getByRole('button', { name: 'Upload' }).click();
+  await page.getByRole('button', { name: 'Upload', exact: true }).click();
 
   const image = page.getByRole('img', { name: alt });
   await expect(image).toBeVisible();

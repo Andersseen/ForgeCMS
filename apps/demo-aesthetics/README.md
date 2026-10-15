@@ -151,22 +151,44 @@ bytes refuses to start.
 
 ## Running in public without going bankrupt
 
-The demo publishes its own admin password, so anyone can write to it. On a free Cloudflare plan
-(100k Worker requests/day, 100k D1 rows written/day, 10 GB in R2) that needs limits, and they all
-live in this app — `getServerRuntime` is a deployment, not a CMS feature:
+The demo publishes its own admin password, so anyone can write to it. Everything below lives in this app —
+`getServerRuntime` is a deployment, not a CMS feature — and none of it is security: it is a spending limit.
+Your own ForgeCMS project has none of these limits.
 
-| Guardrail                                                                       | Where                                                  | What it stops                                                                            |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| Public reads cached 60 s per isolate (`s-maxage` for CDNs; browsers revalidate) | [`public-route.ts`](src/server/api/public-route.ts)    | The marketing site hammering D1. Any write clears it, so publishing looks instant.       |
-| 12 writes/minute per IP, 240 per isolate                                        | [`demo-guard.ts`](src/server/middleware/demo-guard.ts) | A loop from one machine. Per-IP, not per person — that needs accounts.                   |
-| Body ≤ 256 KB, uploads ≤ 2 MB                                                   | same                                                   | Oversized payloads and R2 filling up.                                                    |
-| `/api/auth/users` returns 403                                                   | same                                                   | Account spam, and someone deleting the demo admin.                                       |
-| Ceilings per collection, oldest pruned                                          | [`demo-guards.ts`](src/server/api/demo-guards.ts)      | Unbounded growth. Writes still succeed — a demo that starts refusing bookings is broken. |
-| Floors per collection                                                           | same                                                   | Someone emptying the treatment menu and leaving the site blank.                          |
+**Two explicit modes** (spec 098). `FORGE_PUBLIC_DEMO=1` is the **shared public demo** (set in
+[`wrangler.toml`](wrangler.toml); the hosted Lumea). Unset is the **full demo**: local development, e2e and
+any clone, where every dogfood operation works (create, delete, uploads, settings…). Never inferred from the
+hostname or a missing secret.
 
-The numbers are all in [`demo-limits.ts`](src/server/api/demo-limits.ts). None of it is security: it
-is a spending limit. If the demo ever moves to a custom domain, a WAF rate-limiting rule (one is free
-per zone) filters abuse before it reaches the Worker and is worth adding on top.
+**What a visitor can do in the shared demo:** sign in with the published account, browse every collection,
+**edit and publish the localized Notices (EN / ES)** and see the public site change, send a booking, view
+Analytics. **What is limited:** deleting, creating documents, uploading files (R2 is not written),
+accounts, and editing services/staff/pages/settings. The admin says so up front
+([`demo-notice.component.ts`](src/app/components/demo-notice.component.ts)); a refusal is a `403` with a
+stable `data.code` (`demo_delete_disabled`, `demo_uploads_disabled`, …), exhaustion a `429`, an unavailable
+budget a `503` — never a bare 500.
+
+| Guardrail                                                                                                                       | Where                                                                                                     | What it stops                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Mutation **allowlist** (public mode): login/logout, bookings, notice updates, analytics beacons; everything else default-denied | [`demo-policy.ts`](src/server/api/demo-policy.ts) `decide()`                                              | Using the demo as a general database or object store           |
+| **Global daily budget in D1** per class (`CONTENT_UPDATE`, `BOOKING_CREATE`), atomic, fail-closed, no IP stored                 | `demo-policy.ts` + migration `20261015_001_demo_budget`                                                   | Unbounded create→prune→create write volume across all isolates |
+| Per-IP limiters per class (in memory, per isolate) + API read throttle                                                          | [`demo-limits.ts`](src/server/api/demo-limits.ts), [`demo-guard.ts`](src/server/middleware/demo-guard.ts) | A loop from one machine; scripts hammering admin reads         |
+| Public bodies ≤ 16 KB with a declared length; uploads refused (full mode keeps ≤ 2 MB)                                          | same                                                                                                      | Oversized payloads; R2 filling up                              |
+| `/api/auth/users` and signup refused                                                                                            | same                                                                                                      | Account spam, deleting the demo admin                          |
+| Ceilings per collection, oldest **disposable** pruned; the seeded documents are never pruned                                    | [`demo-guards.ts`](src/server/api/demo-guards.ts)                                                         | Unbounded growth _and_ the seeded clinic being evicted         |
+| Floors per collection                                                                                                           | same                                                                                                      | Emptying the treatment menu                                    |
+| Public reads cached 60 s per isolate; `/api/status` does one memoised count                                                     | [`public-route.ts`](src/server/api/public-route.ts), `status.get.ts`                                      | The site and the health probe spending D1 reads                |
+
+Every number is in [`demo-limits.ts`](src/server/api/demo-limits.ts) with the reasoning; none is a provider
+price. Behind a budget outage or exhaustion the demo **fails closed** for edits/bookings and keeps serving
+reads. `GET /api/demo-policy` shows the active mode and the remaining budget; the post-deploy check
+(`scripts/verify-deployment.mjs demo`) proves the policy is live with an unauthenticated `DELETE` that must be
+refused. Applying the budget migration to the remote D1 needs the maintainer — see
+[`DEPLOYMENT-HEALTH.md`](../../docs/DEPLOYMENT-HEALTH.md).
+
+**Optional owner follow-up (not done):** an application can only refuse a request after the Functions
+runtime has started. Put the demo on a custom subdomain of a Cloudflare zone and add a zone rate-limiting
+rule on `/api/*` write paths to reject abuse earlier. `*.pages.dev` has no such rule — do not assume one.
 
 ## Forge Analytics (experimental, spec 057)
 
@@ -206,6 +228,10 @@ true })`; a first-party tracker beacons `POST /api/analytics/collect` on load an
   - localization: the EN / ES switch reads real per-locale content and never shows the draft notice;
   - the admin at phone width;
   - signup.
+- `pnpm e2e:demo:public` (Playwright against the same dev server with `FORGE_PUBLIC_DEMO=1`, port 5175)
+  covers the shared-demo profile: the policy endpoint, sign-in and the up-front notice, EN/ES notice
+  edit → public site, every refused mutation with its code, an oversized body, and the booking budget
+  failing closed while reads keep working. No Cloudflare account is needed.
 
 ## Still worked around here
 

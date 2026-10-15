@@ -16,5 +16,21 @@ export const migrations = [
     description: 'Add media._storageKey; seeded static images keep no stored object (NULL)',
     destructive: false,
     statements: [{ sql: 'ALTER TABLE "media" ADD COLUMN "_storageKey" TEXT' }]
+  }),
+
+  // Spec 098. The shared public demo's global daily mutation budget (`demo-policy.ts`): one counter
+  // row per mutation class per UTC day — `{ bucket: 'YYYY-MM-DD:CLASS', used }`, no IP, no user, no
+  // payload. App operational state, not a Forge collection, so `syncSchema()` neither creates nor
+  // owns it. Additive and idempotent; rollback is `DROP TABLE demo_budget` (the public demo then fails
+  // closed: edits and bookings pause, browsing is unaffected).
+  defineMigration({
+    id: '20261015_001_demo_budget',
+    description: 'Add demo_budget: the public demo daily mutation counters (operational, no PII)',
+    destructive: false,
+    statements: [
+      {
+        sql: 'CREATE TABLE IF NOT EXISTS "demo_budget" ("bucket" TEXT PRIMARY KEY NOT NULL, "used" INTEGER NOT NULL DEFAULT 0)'
+      }
+    ]
   })
 ];

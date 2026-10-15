@@ -177,8 +177,10 @@ import { HeaderComponent } from '../components/header.component';
               Use the same CMS the clinic uses.
             </h2>
             <p class="mt-4 max-w-[56ch] leading-7 text-muted-foreground">
-              Everyone shares the database. Content may change between visits, and the demo is
-              bounded so one visitor cannot make it unusable for the next.
+              Try the real admin. Everyone shares the database, so the hosted demo limits
+              destructive and storage-heavy actions &mdash; you can edit and publish the localized
+              notices and send a booking &mdash; to keep the example available for the next visitor.
+              Your own ForgeCMS project does not have these shared-demo limits.
             </p>
             <div class="mt-8 overflow-hidden rounded-xl border border-border bg-background">
               @for (account of credentials; track account.email) {
