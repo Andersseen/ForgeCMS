@@ -268,29 +268,135 @@ export function buildPreSnapshot(states) {
 }
 
 /**
- * POST check against the exact PRE snapshot: every package exists, `rc` → candidate, a package that had a
- * stable `latest` still has exactly that one, and a package that had none still has none (a first
- * publication must never end up with `latest` → RC).
+ * Classifies one POST observation of the registry against the PRE snapshot, without throwing.
+ *
+ * - `pending`: transient by nature — npm accepted the publication ("may take a few minutes to become
+ *   available") but the version or its `rc` tag is not visible yet (workflow 38883295228: `core` took ~10 min).
+ * - `violations`: proven invariant breaks that no amount of waiting repairs — `rc` pointing at another version,
+ *   or `latest` differing from the PRE snapshot.
+ * - `repairs`: first-publication packages whose `latest` npm auto-assigned to the candidate. npm sets `latest`
+ *   on a package's first version whatever `--tag` says; a violation unless `allowFirstPublicationLatest`.
  *
  * @param {{ packages: Record<string, { exists: boolean, latest: string | null }> }} snapshot
  * @param {string} version candidate version
  * @param {Record<string, { exists: boolean, tags: Record<string, string> | null }>} observed
+ * @param {{ allowFirstPublicationLatest?: boolean }} [options]
+ * @returns {{ pending: string[], violations: string[], repairs: string[] }}
  */
-export function assertPostSnapshot(snapshot, version, observed) {
+export function classifyPostObservation(snapshot, version, observed, options = {}) {
+  const pending = [];
+  const violations = [];
+  const repairs = [];
   for (const name of PUBLIC_FAMILY) {
     const before = snapshot.packages?.[name];
-    if (!before) throw new Error(`${name}: missing from the PRE snapshot`);
+    if (!before) {
+      violations.push(`${name}: missing from the PRE snapshot`);
+      continue;
+    }
     const now = observed[name];
-    if (!now?.exists || !now.tags)
-      throw new Error(`${name}: not found in the registry after publication`);
-    if (now.tags[RC_TAG] !== version) {
-      throw new Error(`${name}: "${RC_TAG}" is ${now.tags[RC_TAG]}, expected ${version}`);
+    if (!now?.exists || !now.tags) {
+      pending.push(`${name}: not found in the registry yet`);
+      continue;
     }
     const latest = now.tags.latest ?? null;
     if (latest !== before.latest) {
-      throw new Error(`${name}: npm "latest" moved from ${before.latest} to ${latest}`);
+      if (
+        options.allowFirstPublicationLatest &&
+        !before.exists &&
+        before.latest === null &&
+        latest === version
+      ) {
+        repairs.push(name);
+      } else {
+        violations.push(`${name}: npm "latest" moved from ${before.latest} to ${latest}`);
+      }
     }
+    const rc = now.tags[RC_TAG];
+    if (rc === undefined) pending.push(`${name}: "${RC_TAG}" tag not visible yet`);
+    else if (rc !== version) violations.push(`${name}: "${RC_TAG}" is ${rc}, expected ${version}`);
   }
+  return { pending, violations, repairs };
+}
+
+/**
+ * Strict single-shot POST check: any pending, violated or repairable state throws.
+ *
+ * @param {Parameters<typeof classifyPostObservation>[0]} snapshot
+ * @param {string} version
+ * @param {Parameters<typeof classifyPostObservation>[2]} observed
+ */
+export function assertPostSnapshot(snapshot, version, observed) {
+  const { pending, violations, repairs } = classifyPostObservation(snapshot, version, observed);
+  const problems = [
+    ...violations,
+    ...pending,
+    ...repairs.map((name) => `${name}: npm "latest" moved from null to ${version}`)
+  ];
+  if (problems.length > 0) throw new Error(problems[0]);
+}
+
+/**
+ * POST verification with a bounded wait for registry propagation. Only `pending` observations are retried,
+ * until `timeoutMs`; a violation fails at once and a package still pending at the deadline fails too. When
+ * `allowFirstPublicationLatest` is set, `latest` tags npm auto-assigned to a first-published candidate are
+ * removed through `removeLatest` (and re-observed), never any other tag.
+ *
+ * @param {object} input
+ * @param {{ packages: Record<string, { exists: boolean, latest: string | null }> }} input.snapshot
+ * @param {string} input.version
+ * @param {() => Promise<Record<string, { exists: boolean, tags: Record<string, string> | null }>> | Record<string, { exists: boolean, tags: Record<string, string> | null }>} input.observe fresh registry read; throws on auth/network/malformed responses (never retried)
+ * @param {(ms: number) => Promise<void>} input.sleep
+ * @param {() => number} input.now
+ * @param {number} input.timeoutMs
+ * @param {number} input.intervalMs
+ * @param {boolean} [input.allowFirstPublicationLatest]
+ * @param {(name: string) => Promise<void> | void} [input.removeLatest]
+ * @param {(message: string) => void} [input.log]
+ */
+export async function verifyPostWithRetry(input) {
+  const { snapshot, version, observe, sleep, now, timeoutMs, intervalMs } = input;
+  const log = input.log ?? (() => {});
+  const deadline = now() + timeoutMs;
+  for (let attempt = 1; ; attempt++) {
+    const observed = await observe();
+    const { pending, violations, repairs } = classifyPostObservation(snapshot, version, observed, {
+      allowFirstPublicationLatest: input.allowFirstPublicationLatest ?? false
+    });
+    if (violations.length > 0) throw new Error(violations.join('; '));
+    for (const name of repairs) {
+      if (!input.removeLatest) throw new Error(`${name}: no latest-removal handler configured`);
+      log(`${name}: removing the "latest" tag npm auto-assigned to its first version ${version}`);
+      await input.removeLatest(name);
+    }
+    if (pending.length === 0 && repairs.length === 0) return { attempts: attempt };
+    if (now() >= deadline) {
+      throw new Error(
+        `Registry still incomplete after ${Math.round(timeoutMs / 1000)}s: ${pending.join('; ') || 'a latest-tag repair did not take effect'}`
+      );
+    }
+    log(`attempt ${attempt}: ${pending.length ? pending.join('; ') : 'rechecking after repair'}`);
+    await sleep(intervalMs);
+  }
+}
+
+/**
+ * Reconstructs the PRE snapshot of an earlier run whose snapshot file is gone (finalize mode): the stable
+ * baseline every pre-existing package had, and the packages that were first-published by that run.
+ *
+ * @param {string} baseline stable `latest` (e.g. `0.13.4`)
+ * @param {string[]} firstPublication packages absent from npm before the run
+ */
+export function snapshotFromBaseline(baseline, firstPublication) {
+  assertLatestSafe(baseline);
+  const unknown = firstPublication.filter((name) => !PUBLIC_FAMILY.includes(name));
+  if (unknown.length > 0) throw new Error(`Not in the fixed family: ${unknown.join(', ')}`);
+  const packages = {};
+  for (const name of PUBLIC_FAMILY) {
+    packages[name] = firstPublication.includes(name)
+      ? { exists: false, latest: null }
+      : { exists: true, latest: baseline };
+  }
+  return { stableBaseline: baseline, packages };
 }
 
 /**

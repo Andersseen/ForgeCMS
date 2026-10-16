@@ -13,6 +13,10 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
   PUBLIC_FAMILY,
+  assertPostSnapshot,
+  classifyPostObservation,
+  snapshotFromBaseline,
+  verifyPostWithRetry,
   assertFixedFamily,
   assertLatestSafe,
   changesetsCoveredByPrerelease,
@@ -222,6 +226,225 @@ describe('changesetsCoveredByPrerelease (CI changeset check in pre mode)', () =>
         preChangesets: ['a']
       }).ok,
       false
+    );
+  });
+});
+
+describe('POST verification waits out registry propagation (workflow 38883295228)', () => {
+  const V = '1.0.0-rc.2';
+  const snapshot = snapshotFromBaseline('0.13.4', ['@forge-cms/agent']);
+  /** Fully propagated registry: rc → V everywhere, latest untouched (agent has none). */
+  const settled = () =>
+    Object.fromEntries(
+      PUBLIC_FAMILY.map((name) => [
+        name,
+        {
+          exists: true,
+          tags: name === '@forge-cms/agent' ? { rc: V } : { latest: '0.13.4', rc: V }
+        }
+      ])
+    );
+  const clock = () => {
+    let t = 0;
+    return { now: () => t, sleep: async (ms) => void (t += ms) };
+  };
+
+  it('snapshotFromBaseline marks first-published packages absent without latest', () => {
+    assert.deepEqual(snapshot.packages['@forge-cms/agent'], { exists: false, latest: null });
+    assert.deepEqual(snapshot.packages['@forge-cms/core'], { exists: true, latest: '0.13.4' });
+    assert.throws(() => snapshotFromBaseline('1.0.0-rc.1', []), /not a stable/);
+    assert.throws(() => snapshotFromBaseline('0.13.4', ['@forge-cms/nope']), /fixed family/);
+  });
+
+  it('eventual success: a package invisible for several reads is retried, not failed', async () => {
+    let reads = 0;
+    const { now, sleep } = clock();
+    const logs = [];
+    const { attempts } = await verifyPostWithRetry({
+      snapshot,
+      version: V,
+      observe: () => {
+        reads += 1;
+        const observed = settled();
+        if (reads < 4) observed['@forge-cms/core'] = { exists: false, tags: null };
+        return observed;
+      },
+      sleep,
+      now,
+      timeoutMs: 20 * 60_000,
+      intervalMs: 30_000,
+      log: (m) => logs.push(m)
+    });
+    assert.equal(attempts, 4);
+    assert.ok(logs.some((m) => m.includes('@forge-cms/core: not found in the registry yet')));
+  });
+
+  it('an rc tag that is not visible yet is pending; once visible it passes', async () => {
+    let reads = 0;
+    const { now, sleep } = clock();
+    await verifyPostWithRetry({
+      snapshot,
+      version: V,
+      observe: () => {
+        const observed = settled();
+        if (++reads < 3) observed['@forge-cms/db'].tags = { latest: '0.13.4' };
+        return observed;
+      },
+      sleep,
+      now,
+      timeoutMs: 600_000,
+      intervalMs: 30_000
+    });
+    assert.equal(reads, 3);
+  });
+
+  it('permanent failure: still missing at the deadline fails, naming the package, and does not spin', async () => {
+    let reads = 0;
+    const { now, sleep } = clock();
+    await assert.rejects(
+      verifyPostWithRetry({
+        snapshot,
+        version: V,
+        observe: () => {
+          reads += 1;
+          const observed = settled();
+          observed['@forge-cms/core'] = { exists: true, tags: { latest: '0.13.4' } };
+          return observed;
+        },
+        sleep,
+        now,
+        timeoutMs: 120_000,
+        intervalMs: 30_000
+      }),
+      /incomplete after 120s: @forge-cms\/core: "rc" tag not visible yet/
+    );
+    assert.equal(reads, 5);
+  });
+
+  it('proven violations fail at once, without waiting', async () => {
+    for (const mutate of [
+      (o) => (o['@forge-cms/core'].tags.rc = '1.0.0-rc.1'),
+      (o) => (o['@forge-cms/core'].tags.latest = V),
+      (o) => (o['@forge-cms/core'].tags.latest = '0.13.5'),
+      (o) => delete o['@forge-cms/core'].tags.latest
+    ]) {
+      let reads = 0;
+      const { now, sleep } = clock();
+      await assert.rejects(
+        verifyPostWithRetry({
+          snapshot,
+          version: V,
+          observe: () => {
+            reads += 1;
+            const observed = settled();
+            mutate(observed);
+            return observed;
+          },
+          sleep,
+          now,
+          timeoutMs: 600_000,
+          intervalMs: 30_000
+        }),
+        /@forge-cms\/core: (npm "latest" moved|"rc" is)/
+      );
+      assert.equal(reads, 1);
+    }
+  });
+
+  it('a registry error (auth, network, malformed) propagates and is never retried', async () => {
+    let reads = 0;
+    const { now, sleep } = clock();
+    await assert.rejects(
+      verifyPostWithRetry({
+        snapshot,
+        version: V,
+        observe: () => {
+          reads += 1;
+          throw new Error('npm view @forge-cms/core dist-tags failed\nE401');
+        },
+        sleep,
+        now,
+        timeoutMs: 600_000,
+        intervalMs: 30_000
+      }),
+      /E401/
+    );
+    assert.equal(reads, 1);
+  });
+
+  it("a first publication keeps no latest: npm's auto-assigned latest is a violation unless repair is enabled", () => {
+    const observed = settled();
+    observed['@forge-cms/agent'].tags = { latest: V, rc: V };
+    assert.deepEqual(classifyPostObservation(snapshot, V, observed).violations, [
+      `@forge-cms/agent: npm "latest" moved from null to ${V}`
+    ]);
+    assert.throws(() => assertPostSnapshot(snapshot, V, observed), /@forge-cms\/agent/);
+    const repair = classifyPostObservation(snapshot, V, observed, {
+      allowFirstPublicationLatest: true
+    });
+    assert.deepEqual(repair.repairs, ['@forge-cms/agent']);
+    assert.deepEqual(repair.violations, []);
+  });
+
+  it('repair removes only the first-publication latest, then verifies the re-read', async () => {
+    const observed = settled();
+    observed['@forge-cms/agent'].tags = { latest: V, rc: V };
+    const removed = [];
+    const { now, sleep } = clock();
+    await verifyPostWithRetry({
+      snapshot,
+      version: V,
+      observe: () => structuredClone(observed),
+      removeLatest: (name) => {
+        removed.push(name);
+        delete observed[name].tags.latest;
+      },
+      allowFirstPublicationLatest: true,
+      sleep,
+      now,
+      timeoutMs: 600_000,
+      intervalMs: 30_000
+    });
+    assert.deepEqual(removed, ['@forge-cms/agent']);
+  });
+
+  it('repair never touches a package that already had a stable latest', async () => {
+    const observed = settled();
+    observed['@forge-cms/core'].tags.latest = V;
+    const { now, sleep } = clock();
+    await assert.rejects(
+      verifyPostWithRetry({
+        snapshot,
+        version: V,
+        observe: () => structuredClone(observed),
+        removeLatest: () => assert.fail('must not remove latest'),
+        allowFirstPublicationLatest: true,
+        sleep,
+        now,
+        timeoutMs: 600_000,
+        intervalMs: 30_000
+      }),
+      /@forge-cms\/core: npm "latest" moved from 0.13.4/
+    );
+  });
+
+  it('a repair that does not take effect fails at the deadline instead of looping', async () => {
+    const observed = settled();
+    observed['@forge-cms/agent'].tags = { latest: V, rc: V };
+    const { now, sleep } = clock();
+    await assert.rejects(
+      verifyPostWithRetry({
+        snapshot,
+        version: V,
+        observe: () => structuredClone(observed),
+        removeLatest: () => {},
+        allowFirstPublicationLatest: true,
+        sleep,
+        now,
+        timeoutMs: 90_000,
+        intervalMs: 30_000
+      }),
+      /did not take effect/
     );
   });
 });
