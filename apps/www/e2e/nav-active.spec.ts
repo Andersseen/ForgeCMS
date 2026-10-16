@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
-const primary = (page: import('@playwright/test').Page) =>
-  page.getByRole('navigation', { name: 'Primary' });
+const primary = (page: Page) => page.getByRole('navigation', { name: 'Primary' });
 
 test('the primary nav marks the current section, including nested docs pages', async ({ page }) => {
   await page.goto('/docs/introduction');
