@@ -123,7 +123,9 @@ describe('Cloudflare Rate Limiting bindings → AuthAttemptThrottle (local worke
       statuses.push(response.status);
     }
     expect(statuses).toEqual([201, 201, 201, 429]);
-  });
+    // Three real signups each run PBKDF2 at the production work factor inside workerd (~1.5 s each, ~5 s in
+    // total on a busy CI runner), which left no margin under Vitest's 5 s default (main push CI, 2026-10-16).
+  }, 30_000);
 });
 
 describe('PBKDF2 on workerd (spec 069 work-factor audit)', () => {
