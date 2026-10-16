@@ -3,6 +3,14 @@
 # did not move (a package never published before, e.g. a new one, may legitimately have no `latest`;
 # the pre/post registry snapshot is passed through $RUNNER_TEMP, spec 095). It does not deploy any
 # website. Re-running after a partial publish only publishes the packages still missing from npm (scripts/publish-unpublished.mjs skips existing versions, never overwrites).
+#
+# Recovery (`mode: finalize`, workflow 38883295228): when publication succeeded but the POST check or the GitHub
+# prerelease did not complete (npm registry propagation), finalize NEVER publishes. It checks out the original
+# candidate SHA (package contents, GitHub tag target) and runs the CURRENT tooling from the dispatched ref
+# against it: bounded wait for the registry, verification that no `rc` is wrong and no stable `latest` moved,
+# then the idempotent prerelease. npm assigns `latest` to a package's first version whatever `--tag` says; the
+# only tag mutation either mode can perform is removing exactly that `latest`, and only when the maintainer
+# dispatches with `remove_first_publication_latest: true` (default false: such a `latest` fails the check).
 name: Release candidate
 
 on:
@@ -15,6 +23,25 @@ on:
       version:
         description: 'Expected candidate version, e.g. 1.0.0-rc.0'
         required: true
+        type: string
+      mode:
+        description: 'publish (default), or finalize = verify + GitHub prerelease for an already-published candidate (never publishes)'
+        required: false
+        default: publish
+        type: choice
+        options: [publish, finalize]
+      remove_first_publication_latest:
+        description: 'Remove the `latest` tag npm auto-assigned to a first-published package (only that tag, only when it equals the candidate)'
+        required: false
+        default: false
+        type: boolean
+      baseline:
+        description: 'finalize only: the stable npm latest of the pre-existing packages, e.g. 0.13.4'
+        required: false
+        type: string
+      first_publication:
+        description: 'finalize only: comma-separated packages first published by the candidate run, e.g. @forge-cms/agent'
+        required: false
         type: string
 
 permissions:
@@ -29,8 +56,9 @@ concurrency:
 jobs:
   publish-rc:
     name: Publish release candidate to npm (tag rc)
+    if: inputs.mode != 'finalize'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout the exact candidate commit
         uses: actions/checkout@v4
@@ -86,10 +114,74 @@ jobs:
           NPM_CONFIG_PROVENANCE: true
 
       - name: Verify rc tags and that no npm latest moved (post)
-        run: node scripts/release-rc-verify.mjs --phase post "${{ inputs.version }}" --snapshot "$RUNNER_TEMP/forge-rc-pre.json"
+        run: |
+          flag=""
+          if [ "${{ inputs.remove_first_publication_latest }}" = "true" ]; then flag="--remove-first-publication-latest"; fi
+          node scripts/release-rc-verify.mjs --phase post "${{ inputs.version }}" --snapshot "$RUNNER_TEMP/forge-rc-pre.json" $flag
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub prerelease
         run: pnpm release:github --mode prerelease
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_SHA: ${{ inputs.sha }}
+
+  finalize-rc:
+    name: Finalize an already-published candidate (verify + GitHub prerelease, never publishes)
+    if: inputs.mode == 'finalize'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout the exact candidate commit (package contents and release tag target)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+          fetch-depth: 1
+          path: candidate
+
+      - name: Checkout the recovery tooling (the dispatched ref)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          path: tooling
+
+      - name: Verify the candidate checkout is the requested SHA and is clean
+        working-directory: candidate
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.sha }}"
+          test -z "$(git status --porcelain)"
+
+      - name: Require green CI on the candidate commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          conclusion=$(gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?head_sha=${{ inputs.sha }}&status=completed" \
+            --jq '[.workflow_runs[] | select(.conclusion=="success")] | length')
+          if [ "$conclusion" -lt 1 ]; then
+            echo "No successful CI run for ${{ inputs.sha }}; refusing to finalize." >&2
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'tooling/.nvmrc'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify the published family (bounded wait for the registry)
+        working-directory: candidate
+        run: |
+          flag=""
+          if [ "${{ inputs.remove_first_publication_latest }}" = "true" ]; then flag="--remove-first-publication-latest"; fi
+          node ../tooling/scripts/release-rc-verify.mjs --phase finalize "${{ inputs.version }}" \
+            --baseline "${{ inputs.baseline }}" --first-publication "${{ inputs.first_publication }}" $flag
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub prerelease (tag target = the candidate SHA)
+        working-directory: candidate
+        run: node ../tooling/scripts/create-github-release.mjs --mode prerelease
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_SHA: ${{ inputs.sha }}
