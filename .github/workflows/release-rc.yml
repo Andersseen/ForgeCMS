@@ -8,9 +8,10 @@
 # prerelease did not complete (npm registry propagation), finalize NEVER publishes. It checks out the original
 # candidate SHA (package contents, GitHub tag target) and runs the CURRENT tooling from the dispatched ref
 # against it: bounded wait for the registry, verification that no `rc` is wrong and no stable `latest` moved,
-# then the idempotent prerelease. npm assigns `latest` to a package's first version whatever `--tag` says; the
-# only tag mutation either mode can perform is removing exactly that `latest`, and only when the maintainer
-# dispatches with `remove_first_publication_latest: true` (default false: such a `latest` fails the check).
+# then the idempotent prerelease. npm assigns `latest` to a package's first version whatever `--tag` says and the
+# registry refuses to remove it (run 38957899976: 403 from the CI token, 400 for the maintainer). Neither mode
+# mutates any tag; `accept_first_publication_latest: true` (default false) tolerates exactly that `latest` on a
+# first-published package, never on a pre-existing one.
 name: Release candidate
 
 on:
@@ -30,8 +31,8 @@ on:
         default: publish
         type: choice
         options: [publish, finalize]
-      remove_first_publication_latest:
-        description: 'Remove the `latest` tag npm auto-assigned to a first-published package (only that tag, only when it equals the candidate)'
+      accept_first_publication_latest:
+        description: 'Tolerate the `latest` tag npm auto-assigned to a first-published package (only when it equals the candidate; nothing is removed)'
         required: false
         default: false
         type: boolean
@@ -116,7 +117,7 @@ jobs:
       - name: Verify rc tags and that no npm latest moved (post)
         run: |
           flag=""
-          if [ "${{ inputs.remove_first_publication_latest }}" = "true" ]; then flag="--remove-first-publication-latest"; fi
+          if [ "${{ inputs.accept_first_publication_latest }}" = "true" ]; then flag="--accept-first-publication-latest"; fi
           node scripts/release-rc-verify.mjs --phase post "${{ inputs.version }}" --snapshot "$RUNNER_TEMP/forge-rc-pre.json" $flag
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -173,7 +174,7 @@ jobs:
         working-directory: candidate
         run: |
           flag=""
-          if [ "${{ inputs.remove_first_publication_latest }}" = "true" ]; then flag="--remove-first-publication-latest"; fi
+          if [ "${{ inputs.accept_first_publication_latest }}" = "true" ]; then flag="--accept-first-publication-latest"; fi
           node ../tooling/scripts/release-rc-verify.mjs --phase finalize "${{ inputs.version }}" \
             --baseline "${{ inputs.baseline }}" --first-publication "${{ inputs.first_publication }}" $flag
         env:

@@ -10,12 +10,13 @@
 //        (a package that had none must still have none). Registry propagation is waited out (bounded
 //        `--timeout-seconds`, default 1200, every `--interval-seconds`, default 30): only a missing
 //        version / `rc` tag is retried; a wrong `rc` or a moved `latest` fails at once. npm assigns `latest` to
-//        a package's first version whatever `--tag` says, so `--remove-first-publication-latest` deletes exactly
-//        that `latest` (candidate version, package absent before) — never any other tag.
+//        a package's first version whatever `--tag` says and the registry refuses to remove a `latest` tag
+//        (HTTP 400), so `--accept-first-publication-latest` tolerates exactly that `latest` (candidate version,
+//        package absent before) — never any other tag, and nothing is ever mutated.
 //   --phase finalize <expected-version> --baseline <stable> [--first-publication <a,b>]
 //        the same POST check for a run whose snapshot is gone (recovery of an already-published candidate):
 //        the snapshot is rebuilt from the stable baseline and the first-published packages. Never publishes, and never
-//        touches a tag unless `--remove-first-publication-latest` is passed explicitly.
+//        touches a tag; `--accept-first-publication-latest` is the only tolerance.
 import { spawnSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -111,7 +112,7 @@ if (phase === 'pre') {
     if (!Number.isFinite(value) || value < 0) throw new Error(`${flag} must be a number >= 0`);
     return value;
   };
-  const removeFirstPublicationLatest = argv.includes('--remove-first-publication-latest');
+  const acceptFirstPublicationLatest = argv.includes('--accept-first-publication-latest');
   const { attempts } = await verifyPostWithRetry({
     snapshot,
     version,
@@ -127,24 +128,10 @@ if (phase === 'pre') {
     now: () => Date.now(),
     timeoutMs: number('--timeout-seconds', 1200) * 1000,
     intervalMs: number('--interval-seconds', 30) * 1000,
-    allowFirstPublicationLatest: removeFirstPublicationLatest,
-    removeLatest: (name) => removeLatest(name),
+    acceptFirstPublicationLatest,
     log: (message) => console.log(message)
   });
   console.log(
     `all ${packages.length} packages: rc → ${version}, every existing latest unchanged (${attempts} registry read(s))`
   );
-}
-
-/** `npm dist-tag rm <name> latest` — only ever called for a first-published package whose latest is the candidate. */
-function removeLatest(name) {
-  const result = spawnSync('npm', ['dist-tag', 'rm', name, 'latest'], {
-    encoding: 'utf8',
-    timeout: 60_000
-  });
-  if (result.error || result.status !== 0) {
-    throw new Error(
-      `npm dist-tag rm ${name} latest failed: ${result.error?.message ?? result.stderr}`
-    );
-  }
 }

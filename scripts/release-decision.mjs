@@ -280,13 +280,17 @@ export function buildPreSnapshot(states) {
  * @param {{ packages: Record<string, { exists: boolean, latest: string | null }> }} snapshot
  * @param {string} version candidate version
  * @param {Record<string, { exists: boolean, tags: Record<string, string> | null }>} observed
- * @param {{ allowFirstPublicationLatest?: boolean }} [options]
- * @returns {{ pending: string[], violations: string[], repairs: string[] }}
+ * - `accepted`: the same state when `acceptFirstPublicationLatest` is set — the registry refuses to remove a
+ *   `latest` tag (HTTP 400), so the maintainer may accept it for that package alone (no registry mutation).
+ *
+ * @param {{ allowFirstPublicationLatest?: boolean, acceptFirstPublicationLatest?: boolean }} [options]
+ * @returns {{ pending: string[], violations: string[], repairs: string[], accepted: string[] }}
  */
 export function classifyPostObservation(snapshot, version, observed, options = {}) {
   const pending = [];
   const violations = [];
   const repairs = [];
+  const accepted = [];
   for (const name of PUBLIC_FAMILY) {
     const before = snapshot.packages?.[name];
     if (!before) {
@@ -300,13 +304,11 @@ export function classifyPostObservation(snapshot, version, observed, options = {
     }
     const latest = now.tags.latest ?? null;
     if (latest !== before.latest) {
-      if (
-        options.allowFirstPublicationLatest &&
-        !before.exists &&
-        before.latest === null &&
-        latest === version
-      ) {
+      const firstPublicationLatest = !before.exists && before.latest === null && latest === version;
+      if (options.allowFirstPublicationLatest && firstPublicationLatest) {
         repairs.push(name);
+      } else if (options.acceptFirstPublicationLatest && firstPublicationLatest) {
+        accepted.push(name);
       } else {
         violations.push(`${name}: npm "latest" moved from ${before.latest} to ${latest}`);
       }
@@ -315,7 +317,7 @@ export function classifyPostObservation(snapshot, version, observed, options = {
     if (rc === undefined) pending.push(`${name}: "${RC_TAG}" tag not visible yet`);
     else if (rc !== version) violations.push(`${name}: "${RC_TAG}" is ${rc}, expected ${version}`);
   }
-  return { pending, violations, repairs };
+  return { pending, violations, repairs, accepted };
 }
 
 /**
@@ -350,6 +352,7 @@ export function assertPostSnapshot(snapshot, version, observed) {
  * @param {number} input.timeoutMs
  * @param {number} input.intervalMs
  * @param {boolean} [input.allowFirstPublicationLatest]
+ * @param {boolean} [input.acceptFirstPublicationLatest] tolerate (never remove) a first-publication `latest`
  * @param {(name: string) => Promise<void> | void} [input.removeLatest]
  * @param {(message: string) => void} [input.log]
  */
@@ -360,7 +363,8 @@ export async function verifyPostWithRetry(input) {
   for (let attempt = 1; ; attempt++) {
     const observed = await observe();
     const { pending, violations, repairs } = classifyPostObservation(snapshot, version, observed, {
-      allowFirstPublicationLatest: input.allowFirstPublicationLatest ?? false
+      allowFirstPublicationLatest: input.allowFirstPublicationLatest ?? false,
+      acceptFirstPublicationLatest: input.acceptFirstPublicationLatest ?? false
     });
     if (violations.length > 0) throw new Error(violations.join('; '));
     for (const name of repairs) {
