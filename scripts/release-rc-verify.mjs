@@ -7,8 +7,17 @@
 //        publication) or have no `latest` (prerelease-only); existing `latest` tags must be stable and equal.
 //   --phase post <expected-version> --snapshot <file>
 //        every package exists, `rc` → version, and `latest` is exactly what the PRE snapshot recorded
-//        (a package that had none must still have none).
+//        (a package that had none must still have none). Registry propagation is waited out (bounded
+//        `--timeout-seconds`, default 1200, every `--interval-seconds`, default 30): only a missing
+//        version / `rc` tag is retried; a wrong `rc` or a moved `latest` fails at once. npm assigns `latest` to
+//        a package's first version whatever `--tag` says, so `--remove-first-publication-latest` deletes exactly
+//        that `latest` (candidate version, package absent before) — never any other tag.
+//   --phase finalize <expected-version> --baseline <stable> [--first-publication <a,b>]
+//        the same POST check for a run whose snapshot is gone (recovery of an already-published candidate):
+//        the snapshot is rebuilt from the stable baseline and the first-published packages. Never publishes, and never
+//        touches a tag unless `--remove-first-publication-latest` is passed explicitly.
 import { spawnSync } from 'node:child_process';
+import { setTimeout as delay } from 'node:timers/promises';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -17,19 +26,32 @@ import {
   buildPreSnapshot,
   isRcVersion,
   isRegistryNotFound,
-  registryStateFromDistTags
+  registryStateFromDistTags,
+  snapshotFromBaseline,
+  verifyPostWithRetry
 } from './release-decision.mjs';
 
 const argv = process.argv.slice(2);
-const usage = 'usage: release-rc-verify.mjs --phase pre|post <expected-version> --snapshot <file>';
+const usage =
+  'usage: release-rc-verify.mjs --phase pre|post <expected-version> --snapshot <file> | --phase finalize <expected-version> --baseline <stable>';
 const phaseIndex = argv.indexOf('--phase');
-const snapshotIndex = argv.indexOf('--snapshot');
-const phase = phaseIndex >= 0 ? argv[phaseIndex + 1] : undefined;
-const snapshotPath = snapshotIndex >= 0 ? argv[snapshotIndex + 1] : undefined;
-const expected = argv.find(
-  (arg, i) => !arg.startsWith('--') && i !== phaseIndex + 1 && i !== snapshotIndex + 1
-);
-if ((phase !== 'pre' && phase !== 'post') || !expected || !snapshotPath) throw new Error(usage);
+const optionValue = (flag) => {
+  const index = argv.indexOf(flag);
+  return index >= 0 ? argv[index + 1] : undefined;
+};
+const phase = optionValue('--phase');
+const snapshotPath = optionValue('--snapshot');
+const valueFlags = [
+  '--phase',
+  '--snapshot',
+  '--baseline',
+  '--first-publication',
+  '--timeout-seconds',
+  '--interval-seconds'
+];
+const expected = argv.find((arg, i) => !arg.startsWith('--') && !valueFlags.includes(argv[i - 1]));
+if (!['pre', 'post', 'finalize'].includes(phase) || !expected) throw new Error(usage);
+if (phase !== 'finalize' && !snapshotPath) throw new Error(usage);
 
 const packages = readdirSync('packages')
   .map((directory) => JSON.parse(readFileSync(join('packages', directory, 'package.json'), 'utf8')))
@@ -42,7 +64,7 @@ if (version !== expected) throw new Error(`Checked-out version ${version} != exp
 
 /** Parsed dist-tags, or `null` only for a genuine registry 404. Any other failure throws. */
 function distTags(name) {
-  const result = spawnSync('npm', ['view', name, 'dist-tags', '--json'], {
+  const result = spawnSync('npm', ['view', name, 'dist-tags', '--json', '--prefer-online'], {
     encoding: 'utf8',
     timeout: 60_000
   });
@@ -72,12 +94,57 @@ if (phase === 'pre') {
       `${absent.length} not yet published (${absent.map(([name]) => name).join(', ') || 'none'})`
   );
 } else {
-  const snapshot = JSON.parse(readFileSync(snapshotPath, 'utf8'));
-  const observed = {};
-  for (const pkg of packages) {
-    const tags = distTags(pkg.name);
-    observed[pkg.name] = { exists: tags !== null, tags };
+  const finalize = phase === 'finalize';
+  let snapshot;
+  if (finalize) {
+    const baseline = optionValue('--baseline');
+    if (!baseline) throw new Error(usage);
+    const first = (optionValue('--first-publication') ?? '').split(',').filter(Boolean);
+    snapshot = snapshotFromBaseline(baseline, first);
+  } else {
+    snapshot = JSON.parse(readFileSync(snapshotPath, 'utf8'));
   }
-  assertPostSnapshot(snapshot, version, observed);
-  console.log(`all ${packages.length} packages: rc → ${version}, every existing latest unchanged`);
+  const number = (flag, fallback) => {
+    const raw = optionValue(flag);
+    if (raw === undefined) return fallback;
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value < 0) throw new Error(`${flag} must be a number >= 0`);
+    return value;
+  };
+  const removeFirstPublicationLatest = argv.includes('--remove-first-publication-latest');
+  const { attempts } = await verifyPostWithRetry({
+    snapshot,
+    version,
+    observe: () => {
+      const observed = {};
+      for (const pkg of packages) {
+        const tags = distTags(pkg.name);
+        observed[pkg.name] = { exists: tags !== null, tags };
+      }
+      return observed;
+    },
+    sleep: (ms) => delay(ms),
+    now: () => Date.now(),
+    timeoutMs: number('--timeout-seconds', 1200) * 1000,
+    intervalMs: number('--interval-seconds', 30) * 1000,
+    allowFirstPublicationLatest: removeFirstPublicationLatest,
+    removeLatest: (name) => removeLatest(name),
+    log: (message) => console.log(message)
+  });
+  console.log(
+    `all ${packages.length} packages: rc → ${version}, every existing latest unchanged (${attempts} registry read(s))`
+  );
+}
+
+/** `npm dist-tag rm <name> latest` — only ever called for a first-published package whose latest is the candidate. */
+function removeLatest(name) {
+  const result = spawnSync('npm', ['dist-tag', 'rm', name, 'latest'], {
+    encoding: 'utf8',
+    timeout: 60_000
+  });
+  if (result.error || result.status !== 0) {
+    throw new Error(
+      `npm dist-tag rm ${name} latest failed: ${result.error?.message ?? result.stderr}`
+    );
+  }
 }

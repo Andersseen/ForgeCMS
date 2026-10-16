@@ -67,7 +67,9 @@ function run(box, phase, version = RC) {
       phase,
       version,
       '--snapshot',
-      box.snapshot
+      box.snapshot,
+      // No propagation wait in these process-level tests: a permanently missing state fails at once.
+      ...(phase === 'post' ? ['--timeout-seconds', '0', '--interval-seconds', '0'] : [])
     ],
     {
       cwd: box.dir,
@@ -211,7 +213,7 @@ describe('release-rc-verify --phase post', () => {
       afterAll(firstPublished, { '@forge-cms/db': stable() })
     );
     assert.notEqual(post.status, 0);
-    assert.match(post.stderr, /"rc" is undefined/);
+    assert.match(post.stderr, /"rc" tag not visible yet/);
   });
 
   it('9. wrong rc version fails', () => {
@@ -247,7 +249,7 @@ describe('release-rc-verify --phase post', () => {
   it('12. E404 after publication fails (every package must exist)', () => {
     const { post } = preThenPost(allStable(), afterAll(E404));
     assert.notEqual(post.status, 0);
-    assert.match(post.stderr, /not found in the registry after publication/);
+    assert.match(post.stderr, /not found in the registry yet/);
   });
 
   it('13/14/15. network, 403 and invalid JSON fail', () => {
