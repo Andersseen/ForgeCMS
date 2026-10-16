@@ -7,8 +7,10 @@ import {
   assertFixedFamily,
   detectReleaseMode,
   githubReleasePlan,
+  assertTagTarget,
   isRcVersion,
-  releaseCommit
+  releaseCommit,
+  releaseTargetSha
 } from './release-decision.mjs';
 
 const dryRun = process.argv.includes('--dry-run');
@@ -144,10 +146,10 @@ if (expectedMode === 'prerelease') {
 }
 
 const { tagName, prerelease } = githubReleasePlan(version);
-const targetCommitish = process.env.GITHUB_SHA;
+const targetCommitish = releaseTargetSha(process.env);
 
 if (!targetCommitish) {
-  throw new Error('GITHUB_SHA is required to create a GitHub release.');
+  throw new Error('GITHUB_SHA (or RELEASE_TARGET_SHA) is required to create a GitHub release.');
 }
 
 const packageList = packages.map((pkg) => `- ${pkg.name}@${pkg.version}`).join('\n');
@@ -163,6 +165,10 @@ if (dryRun) {
 const existingRelease = await githubFetch(`/releases/tags/${encodeURIComponent(tagName)}`);
 
 if (existingRelease) {
+  if (prerelease) {
+    const tag = await githubFetch(`/git/ref/tags/${encodeURIComponent(tagName)}`);
+    assertTagTarget(tagName, tag?.object?.sha, targetCommitish);
+  }
   console.log(`GitHub release ${tagName} already exists: ${existingRelease.html_url}`);
   process.exit(0);
 }

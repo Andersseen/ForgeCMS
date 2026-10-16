@@ -54,6 +54,41 @@ export function releaseCommit(env) {
 }
 
 /**
+ * The commit a GitHub release/tag must point at. `GITHUB_SHA` is reserved by the runner (a step `env:` cannot
+ * override it), so a recovery run that dispatches from a newer ref passes the original publication commit as
+ * `RELEASE_TARGET_SHA` (finalize run 38962585601 tagged the tooling commit instead). When set it must be a full
+ * 40-hex SHA and wins over `GITHUB_SHA`.
+ *
+ * @param {Record<string, string | undefined>} env
+ * @returns {string | undefined}
+ */
+export function releaseTargetSha(env) {
+  const explicit = env.RELEASE_TARGET_SHA?.trim();
+  if (explicit !== undefined && explicit !== '') {
+    if (!/^[0-9a-f]{40}$/.test(explicit)) {
+      throw new Error(
+        `RELEASE_TARGET_SHA must be a full 40-character lowercase SHA: "${explicit}"`
+      );
+    }
+    return explicit;
+  }
+  return env.GITHUB_SHA?.trim() || undefined;
+}
+
+/**
+ * Idempotency must not hide a release whose tag points at the wrong commit.
+ *
+ * @param {string} tagName
+ * @param {string | undefined} tagSha commit the existing tag points at
+ * @param {string} targetSha commit the release must target
+ */
+export function assertTagTarget(tagName, tagSha, targetSha) {
+  if (tagSha !== targetSha) {
+    throw new Error(`Tag ${tagName} points at ${tagSha ?? 'nothing'}, expected ${targetSha}`);
+  }
+}
+
+/**
  * npm's answers for "that version already exists", including the short window right after
  * `changeset publish` in which `npm view` still says 404 but a second publish is refused (the `v0.7.0`
  * run failed exactly here). Treated as already published, never as a failure.
