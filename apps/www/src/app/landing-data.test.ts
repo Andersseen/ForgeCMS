@@ -113,4 +113,11 @@ describe('landing content', () => {
       'complete'
     );
   });
+
+  it('explains the jump to 1.0: checkpoint 0.12 shipped as npm 0.13.x', () => {
+    const find = (v: string) => ROADMAP_MILESTONES.find((m) => m.version === v);
+    expect(find('0.12')?.npm).toBe('0.13.x');
+    expect(find('0.11')?.npm).toBe('0.12.x – 0.13.0');
+    expect(ROADMAP_MILESTONES.some((m) => m.version === '0.13')).toBe(false);
+  });
 });
