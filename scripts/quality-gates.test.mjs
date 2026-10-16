@@ -223,3 +223,17 @@ test('the committed budgets are well-formed: unique ids, hard gates carry a numb
     }
   }
 });
+
+test('every CI-profile stability journey runs in exactly one `stability` shard of ci.yml', () => {
+  const ci = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+  const script = readFileSync(new URL('./quality/stability.mjs', import.meta.url), 'utf8');
+  const sharded = [...ci.matchAll(/^\s+journeys: (\S+)$/gm)].flatMap((m) => m[1].split(','));
+  // A journey object is `id: '…'` followed by its settings; `ci: { runs: 0 }` opts it out of the CI profile.
+  const inCiProfile = script
+    .split(/^ {4}id: '/m)
+    .slice(1)
+    .filter((block) => !/ci: \{ runs: 0 \}/.test(block))
+    .map((block) => block.slice(0, block.indexOf("'")));
+  assert.deepEqual([...sharded].sort(), [...inCiProfile].sort());
+  assert.equal(new Set(sharded).size, sharded.length, 'a journey appears in two shards');
+});

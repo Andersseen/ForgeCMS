@@ -61,6 +61,10 @@ const STATUS_LABELS: Record<MilestoneStatus, string> = {
             {{ candidateCopy }} Until <code>1.0.0</code> ships, ForgeCMS is a 1.0 candidate, not a
             released 1.0.
           </p>
+          <p class="mt-3 max-w-[56ch] text-sm leading-6 text-muted-foreground">
+            Card numbers are product checkpoints, not npm versions. The checkpoint 0.12 shipped as
+            npm 0.13.x, which is why the track goes from 0.12 straight to 1.0.
+          </p>
         </div>
 
         <div class="forge-roadmap-controls">
@@ -118,6 +122,9 @@ const STATUS_LABELS: Record<MilestoneStatus, string> = {
                 </span>
               </div>
               <h3>{{ milestone.title }}</h3>
+              @if (milestone.npm; as npm) {
+                <p class="forge-milestone-npm">npm {{ npm }}</p>
+              }
               @if (milestone.steps; as steps) {
                 <ul>
                   @for (step of steps; track step.title) {

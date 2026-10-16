@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal, viewChild } from '@angular/core';
 import type { ElementRef } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { RouterLink, RouterLinkActive } from '@angular/router';
 import { VoltNativeButton } from '@voltui/components';
 import { LmnArrowTopRightOnSquareIcon } from 'lumen-icons/arrow-top-right-on-square';
 import { LmnBars3Icon } from 'lumen-icons/bars-3';
@@ -14,6 +14,7 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
   standalone: true,
   imports: [
     RouterLink,
+    RouterLinkActive,
     VoltNativeButton,
     LmnArrowTopRightOnSquareIcon,
     LmnBars3Icon,
@@ -45,8 +46,20 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
 
         <nav class="hidden items-center gap-1 text-sm font-medium md:flex" aria-label="Primary">
           <a class="forge-nav-link" routerLink="/" fragment="product">Product</a>
-          <a class="forge-nav-link" routerLink="/demo">Demo</a>
-          <a class="forge-nav-link" routerLink="/docs">Docs</a>
+          <a
+            class="forge-nav-link"
+            routerLink="/demo"
+            routerLinkActive="is-active"
+            ariaCurrentWhenActive="page"
+            >Demo</a
+          >
+          <a
+            class="forge-nav-link"
+            routerLink="/docs"
+            routerLinkActive="is-active"
+            ariaCurrentWhenActive="page"
+            >Docs</a
+          >
         </nav>
 
         <div class="hidden items-center gap-3 md:flex">
@@ -110,8 +123,22 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
             <a class="forge-mobile-link" routerLink="/" fragment="product" (click)="close()"
               >Product</a
             >
-            <a class="forge-mobile-link" routerLink="/demo" (click)="close()">Demo</a>
-            <a class="forge-mobile-link" routerLink="/docs" (click)="close()">Docs</a>
+            <a
+              class="forge-mobile-link"
+              routerLink="/demo"
+              routerLinkActive="is-active"
+              ariaCurrentWhenActive="page"
+              (click)="close()"
+              >Demo</a
+            >
+            <a
+              class="forge-mobile-link"
+              routerLink="/docs"
+              routerLinkActive="is-active"
+              ariaCurrentWhenActive="page"
+              (click)="close()"
+              >Docs</a
+            >
             <a
               class="forge-mobile-link flex items-center justify-between"
               href="https://github.com/Andersseen/ForgeCMS"

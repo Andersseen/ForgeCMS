@@ -95,6 +95,35 @@ jobs:
       - name: libSQL portable-profile integration tests
         run: pnpm test:libsql
 
+  # The browser suites of the apps, split out of `checks` so the two run on separate runners (measured
+  # 2026-10-16: `checks` alone was 11.6 min). Same commands, same build, nothing skipped or retried.
+  e2e:
+    name: E2E · apps (www, tiny-project, demo)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages and apps
+        run: pnpm build
+
       # One install is enough: www, tiny-project and demo-aesthetics pin the same @playwright/test
       # version, so they share the browser cache. Filtering all three ran three `--with-deps`
       # installs in parallel and they raced for the apt lock (E: Could not get lock
@@ -186,7 +215,7 @@ jobs:
   # `certify` (which artifacts were built and certified): this job answers "how well tested, how stable, how
   # expensive". It runs per-package coverage against the 1.0 floors (pnpm test:coverage), the fixed performance
   # fixture with its frozen budgets and the production bundle sizes (pnpm test:performance), and repeated
-  # first-attempt-only runs of the critical journeys (pnpm test:stability --profile ci). `release` needs it, and there
+  # first-attempt-only runs of the critical journeys (now the sharded `stability` job below). `release` needs both, and there
   # is no path filter: a package change can never publish without it. Retries are never used to hide a failure.
   reliability:
     name: Reliability · Coverage · Performance
@@ -251,18 +280,59 @@ jobs:
             .quality/performance/bundle.json
           if-no-files-found: ignore
 
+  # Same journeys, same repeat counts, retries still OFF (`stability.mjs --profile ci --only <ids>`): only the
+  # runners differ. Sharded because the serial run was 14 of the pipeline's 20 minutes (measured 2026-10-16), and
+  # a journey no longer shares a machine with the performance measurements. Every shard uploads its own
+  # first-attempt record. Adding a journey to scripts/quality/stability.mjs means adding its id here.
+  stability:
+    name: Stability · ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: www
+            journeys: www-theme-flake,www-e2e
+          - shard: tiny-project-demo
+            journeys: tiny-project,demo-aesthetics
+          - shard: packed-and-profiles
+            journeys: packed-ssr-technical,cloudflare-local,libsql-profile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages and apps
+        run: pnpm build
+
       - name: Install Playwright (chromium)
         run: pnpm --filter @forge-cms/www exec playwright install --with-deps chromium
 
       # Critical journeys, repeated in fresh processes with retries OFF; every run's first-attempt result is recorded.
       - name: Stability of the critical journeys
-        run: pnpm test:stability --profile ci
+        run: pnpm test:stability --profile ci --only ${{ matrix.journeys }}
 
       - name: Upload stability evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: stability-evidence
+          name: stability-evidence-${{ matrix.shard }}
           path: |
             .quality/stability/results.json
             apps/*/test-results/**
@@ -313,7 +383,7 @@ jobs:
     name: Release packages to npm
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [checks, certify, reliability]
+    needs: [checks, e2e, certify, reliability, stability]
     # Same guard as deploy/deploy-demo: real pushes to main only, never PRs or forks.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
@@ -406,7 +476,7 @@ jobs:
     name: Deploy to Cloudflare Pages
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: checks
+    needs: [checks, e2e]
     # Deploy only on a real push to main — never on PRs or forks.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment:
@@ -473,7 +543,7 @@ jobs:
     name: Deploy the demo app to Cloudflare Pages
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: checks
+    needs: [checks, e2e]
     # Same guard as `deploy`: real pushes to main only, never PRs or forks.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment:

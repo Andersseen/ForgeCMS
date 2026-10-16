@@ -72,6 +72,21 @@ body {
   color: var(--foreground);
 }
 
+/* Current section: stronger text, a filled pill and an accent underline (not colour alone). */
+.forge-public .forge-header .forge-nav-link.is-active,
+.forge-public .forge-header .forge-mobile-link.is-active {
+  background: var(--forge-raised);
+  color: var(--foreground);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--ring);
+}
+
+.forge-milestone-npm {
+  margin: 0.15rem 0 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
 .forge-nav-link:focus-visible,
 .forge-mobile-link:focus-visible,
 .forge-footer-link:focus-visible {

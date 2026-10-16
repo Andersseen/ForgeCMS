@@ -148,6 +148,8 @@ export interface RoadmapMilestone {
   version: string;
   title: string;
   status: MilestoneStatus;
+  /** The npm line that shipped this checkpoint, where it differs from the checkpoint number. */
+  npm?: string;
   steps?: { title: string; status: MilestoneStatus }[];
 }
 
@@ -220,6 +222,7 @@ export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
   },
   {
     version: '0.7',
+    npm: '0.8.x',
     title: 'Upgrade safety',
     status: 'complete',
     steps: [
@@ -230,6 +233,7 @@ export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
   },
   {
     version: '0.8',
+    npm: '0.9.0',
     title: 'Angular client and DX',
     status: 'complete',
     steps: [
@@ -240,6 +244,7 @@ export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
   },
   {
     version: '0.9',
+    npm: '0.10.x',
     title: 'SSR for Analog',
     status: 'complete',
     steps: [
@@ -250,6 +255,7 @@ export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
   },
   {
     version: '0.10',
+    npm: '0.11.x',
     title: 'Portable storage and deployment profiles',
     status: 'complete',
     steps: [
@@ -260,6 +266,7 @@ export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
   },
   {
     version: '0.11',
+    npm: '0.12.x – 0.13.0',
     title: 'Admin certification',
     status: 'complete',
     steps: [
@@ -270,6 +277,7 @@ export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
   },
   {
     version: '0.12',
+    npm: '0.13.x',
     title: 'Certification and documentation',
     status: 'complete',
     steps: [
