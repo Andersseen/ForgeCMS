@@ -447,4 +447,70 @@ describe('POST verification waits out registry propagation (workflow 38883295228
       /did not take effect/
     );
   });
+
+  it('accepting the first-publication latest tolerates it without any registry mutation', async () => {
+    const observed = settled();
+    observed['@forge-cms/agent'].tags = { latest: V, rc: V };
+    const accepted = classifyPostObservation(snapshot, V, observed, {
+      acceptFirstPublicationLatest: true
+    });
+    assert.deepEqual(accepted.accepted, ['@forge-cms/agent']);
+    assert.deepEqual(accepted.violations, []);
+    assert.deepEqual(accepted.repairs, []);
+    const { now, sleep } = clock();
+    const { attempts } = await verifyPostWithRetry({
+      snapshot,
+      version: V,
+      observe: () => structuredClone(observed),
+      removeLatest: () => assert.fail('must not mutate the registry'),
+      acceptFirstPublicationLatest: true,
+      sleep,
+      now,
+      timeoutMs: 600_000,
+      intervalMs: 30_000
+    });
+    assert.equal(attempts, 1);
+  });
+
+  it('accepting never tolerates a moved stable latest or a first-publication latest at another version', async () => {
+    const { now, sleep } = clock();
+    const stable = settled();
+    stable['@forge-cms/core'].tags.latest = V;
+    const other = settled();
+    other['@forge-cms/agent'].tags = { latest: '1.0.0-rc.1', rc: V };
+    for (const observed of [stable, other]) {
+      await assert.rejects(
+        verifyPostWithRetry({
+          snapshot,
+          version: V,
+          observe: () => structuredClone(observed),
+          acceptFirstPublicationLatest: true,
+          sleep,
+          now,
+          timeoutMs: 600_000,
+          intervalMs: 30_000
+        }),
+        /npm "latest" moved/
+      );
+    }
+  });
+
+  it('accepting still requires the rc tag to be right', async () => {
+    const observed = settled();
+    observed['@forge-cms/agent'].tags = { latest: V, rc: '1.0.0-rc.1' };
+    const { now, sleep } = clock();
+    await assert.rejects(
+      verifyPostWithRetry({
+        snapshot,
+        version: V,
+        observe: () => structuredClone(observed),
+        acceptFirstPublicationLatest: true,
+        sleep,
+        now,
+        timeoutMs: 600_000,
+        intervalMs: 30_000
+      }),
+      /"rc" is 1.0.0-rc.1/
+    );
+  });
 });
