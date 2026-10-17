@@ -24,3 +24,15 @@ test('the primary nav marks the current section, including nested docs pages', a
     'page'
   );
 });
+
+test('Product is active on the landing page (with and without #product) and only there', async ({
+  page
+}) => {
+  const product = primary(page).getByRole('link', { name: 'Product' });
+  await page.goto('/');
+  await expect(product).toHaveAttribute('aria-current', 'page');
+  await page.goto('/#product');
+  await expect(product).toHaveAttribute('aria-current', 'page');
+  await page.goto('/demo');
+  await expect(product).not.toHaveAttribute('aria-current', 'page');
+});

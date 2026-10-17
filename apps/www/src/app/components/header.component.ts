@@ -45,7 +45,15 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
         </a>
 
         <nav class="hidden items-center gap-1 text-sm font-medium md:flex" aria-label="Primary">
-          <a class="forge-nav-link" routerLink="/" fragment="product">Product</a>
+          <a
+            class="forge-nav-link"
+            routerLink="/"
+            fragment="product"
+            routerLinkActive="is-active"
+            [routerLinkActiveOptions]="landingMatch"
+            ariaCurrentWhenActive="page"
+            >Product</a
+          >
           <a
             class="forge-nav-link"
             routerLink="/demo"
@@ -120,7 +128,14 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
           aria-label="Mobile"
         >
           <div class="mx-auto flex max-w-7xl flex-col gap-1">
-            <a class="forge-mobile-link" routerLink="/" fragment="product" (click)="close()"
+            <a
+              class="forge-mobile-link"
+              routerLink="/"
+              fragment="product"
+              routerLinkActive="is-active"
+              [routerLinkActiveOptions]="landingMatch"
+              ariaCurrentWhenActive="page"
+              (click)="close()"
               >Product</a
             >
             <a
@@ -158,6 +173,13 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
 export class HeaderComponent {
   protected readonly theme = inject(SiteThemeService);
   protected readonly open = signal(false);
+  /** Product is the landing page: active on `/` whatever the fragment, never on nested routes. */
+  protected readonly landingMatch = {
+    paths: 'exact',
+    queryParams: 'ignored',
+    fragment: 'ignored',
+    matrixParams: 'ignored'
+  } as const;
   private readonly menuTrigger = viewChild<ElementRef<HTMLButtonElement>>('menuTrigger');
 
   protected dismiss(): void {
