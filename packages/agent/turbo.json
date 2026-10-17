@@ -1,0 +1,16 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*",
+        "../../scripts/build-agent-docs.mjs",
+        "../../docs/*.md",
+        "../../apps/www/src/content/docs/*.md"
+      ],
+      "outputs": ["dist/**", "docs/**"]
+    }
+  }
+}

@@ -17,18 +17,26 @@
 export const CURRENT_FORGE_VERSION = '0.13.4';
 
 /**
- * Registry truth for the 1.0 candidate, verified 2026-10-14 (spec 094): npm `latest` is the stable
- * `0.13.4`, no `rc` dist-tag exists and `@forge-cms/agent` is not on the registry (E404).
+ * The published 1.0 release candidate. It lives under the npm `rc` dist-tag only; `latest` stays on
+ * {@link CURRENT_FORGE_VERSION} until `1.0.0` ships (spec 092). Never describe it as stable or shipped.
+ */
+export const CURRENT_RC_VERSION = '1.0.0-rc.2';
+
+/**
+ * Registry truth for the 1.0 candidate, verified 2026-10-17 (roadmap L01 closeout): all twelve `@forge-cms/*`
+ * packages report `rc` → `1.0.0-rc.2`; the eleven stable ones keep `latest` `0.13.4`; `@forge-cms/agent` was
+ * first published at `1.0.0-rc.2`, so npm assigned it `latest` `1.0.0-rc.2` too (the registry refuses to
+ * remove a first-publication `latest`, PR #110) - which is why its install command names the `rc` tag.
  *
- * Flip these only after the maintainer publishes the release candidate and the registry confirms it
- * (`npm view @forge-cms/agent dist-tags`). Every "available in the RC" word and every `@rc` install
- * command on the site derives from them, so an unpublished package can never show a working install.
+ * Flip these only after the registry confirms it (`npm view @forge-cms/agent dist-tags`). Every "available in
+ * the RC" word and every `@rc` install command on the site derives from them, so an unpublished package can
+ * never show a working install.
  */
 export const FORGE_CHANNELS = {
   /** A `1.0.0-rc.N` exists under the npm `rc` dist-tag. */
-  rcPublished: false,
-  /** `@forge-cms/agent` exists on the registry (it first ships with the RC). */
-  agentPublished: false
+  rcPublished: true,
+  /** `@forge-cms/agent` exists on the registry (it first shipped with the RC). */
+  agentPublished: true
 } as const;
 
 /** How a visitor should read a package: part of the frozen 1.0 surface, or experimental. */

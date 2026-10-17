@@ -17,6 +17,7 @@ import { join } from 'node:path';
 import { assertCleanConsumer } from '../certification/artifacts.mjs';
 import { countUnlinkedDeclarations, findDuplicateStoreEntries } from '../angular-compat.mjs';
 import {
+  DEFAULT_INSTALL,
   NPMRC,
   TSCONFIG,
   VERSIONS,
@@ -27,6 +28,7 @@ import {
   jsFiles,
   loadChromium,
   ng,
+  registryOptions,
   recordBundle,
   run,
   transferState,
@@ -735,14 +737,16 @@ async function hydration(origin) {
  * bundle checks. Split from {@link verifyTechnicalConsumer} so the bundle-size measurement (spec 089,
  * `pnpm test:performance`) can build the same production output without starting a server or a browser.
  */
-export function buildTechnicalConsumer({ workDir, tarballs }) {
+export function buildTechnicalConsumer({ workDir, tarballs, install = DEFAULT_INSTALL }) {
   const dir = join(workDir, 'technical-app');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'package.json'), `${JSON.stringify(manifest(tarballs), null, 2)}\n`);
   write(dir, APP);
+  writeFileSync(join(dir, '.npmrc'), install.npmrc);
 
-  assertCleanConsumer(dir, 'technical SSR consumer');
-  run('pnpm', ['install', '--prefer-offline'], dir);
+  assertCleanConsumer(dir, 'technical SSR consumer', registryOptions(install));
+  run('pnpm', ['install', ...install.args], dir);
+  install.afterInstall?.(dir);
   const duplicates = findDuplicateStoreEntries(readdirSync(join(dir, 'node_modules', '.pnpm')));
   if (duplicates.length > 0) fail(`more than one Angular copy: ${JSON.stringify(duplicates)}`);
   run('pnpm', ['exec', 'tsc', '-p', 'tsconfig.json', '--noEmit'], dir);
@@ -752,8 +756,8 @@ export function buildTechnicalConsumer({ workDir, tarballs }) {
   return dir;
 }
 
-export async function verifyTechnicalConsumer({ workDir, tarballs }) {
-  const dir = buildTechnicalConsumer({ workDir, tarballs });
+export async function verifyTechnicalConsumer({ workDir, tarballs, install = DEFAULT_INSTALL }) {
+  const dir = buildTechnicalConsumer({ workDir, tarballs, install });
 
   const server = await startServer(dir);
   try {

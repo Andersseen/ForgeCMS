@@ -168,7 +168,7 @@ export class RoadmapSectionComponent {
   protected readonly milestones = ROADMAP_MILESTONES;
   protected readonly completeCount = this.milestones.filter((m) => m.status === 'complete').length;
   protected readonly candidateCopy = FORGE_CHANNELS.rcPublished
-    ? 'The 1.0 release candidate is published for validation.'
+    ? 'The 1.0.0-rc.2 release candidate is public on npm (the rc tag) for real-consumer validation; the stable line stays 0.13.4.'
     : 'The 1.0 release candidate is prepared and certified; publication and real-consumer validation come next.';
   protected readonly labels = STATUS_LABELS;
   protected readonly steps = releaseSteps();
