@@ -464,3 +464,42 @@ export function changesetsCoveredByPrerelease({ added, preChangesets }) {
       }
     : { ok: false, reason: `changeset(s) not recorded in pre.json: ${unrecorded.join(', ')}` };
 }
+
+/**
+ * Whether a PR is the generated, fixed-family promotion from the accepted 1.0.0-rc.2 candidate.
+ * The status check uses this only after Changesets reports package changes without pending changesets.
+ */
+export function isStablePromotion({
+  basePre,
+  headPreActive,
+  basePackages,
+  headPackages,
+  changelogs
+}) {
+  if (basePre?.mode !== 'pre' || basePre.tag !== RC_TAG || headPreActive) return false;
+
+  const expected = [...PUBLIC_FAMILY].sort();
+  const baseNames = basePackages.map((pkg) => pkg.name).sort();
+  const headNames = headPackages.map((pkg) => pkg.name).sort();
+  if (
+    baseNames.length !== expected.length ||
+    baseNames.some((name, index) => name !== expected[index]) ||
+    headNames.length !== expected.length ||
+    headNames.some((name, index) => name !== expected[index])
+  ) {
+    return false;
+  }
+
+  const baseVersions = new Map(basePackages.map((pkg) => [pkg.name, pkg.version]));
+  const headVersions = new Map(headPackages.map((pkg) => [pkg.name, pkg.version]));
+  if (
+    expected.some(
+      (name) => baseVersions.get(name) !== '1.0.0-rc.2' || headVersions.get(name) !== '1.0.0'
+    )
+  ) {
+    return false;
+  }
+
+  const changelogNames = new Set(changelogs);
+  return expected.every((name) => changelogNames.has(name));
+}

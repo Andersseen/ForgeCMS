@@ -23,6 +23,7 @@ import {
   classifyVersion,
   detectReleaseMode,
   githubReleasePlan,
+  isStablePromotion,
   isRcVersion,
   resolvePublishTag
 } from './release-decision.mjs';
@@ -225,6 +226,39 @@ describe('changesetsCoveredByPrerelease (CI changeset check in pre mode)', () =>
         added: ['.changeset/a.md', '.changeset/new.md'],
         preChangesets: ['a']
       }).ok,
+      false
+    );
+  });
+});
+
+describe('isStablePromotion (CI changeset check for L03)', () => {
+  const basePackages = family('1.0.0-rc.2');
+  const headPackages = family('1.0.0');
+  const changelogs = [...PUBLIC_FAMILY];
+  const input = {
+    basePre: { mode: 'pre', tag: 'rc' },
+    headPreActive: false,
+    basePackages,
+    headPackages,
+    changelogs
+  };
+
+  it('accepts only a complete generated rc.2 to stable fixed-family promotion', () => {
+    assert.equal(isStablePromotion(input), true);
+    assert.equal(isStablePromotion({ ...input, headPreActive: true }), false);
+    assert.equal(isStablePromotion({ ...input, basePre: { mode: 'pre', tag: 'beta' } }), false);
+    assert.equal(isStablePromotion({ ...input, changelogs: changelogs.slice(1) }), false);
+  });
+
+  it('rejects package sets or versions outside the accepted transition', () => {
+    assert.equal(isStablePromotion({ ...input, headPackages: headPackages.slice(1) }), false);
+    assert.equal(
+      isStablePromotion({
+        ...input,
+        headPackages: headPackages.map((pkg, index) =>
+          index === 0 ? { ...pkg, version: '1.0.1' } : pkg
+        )
+      }),
       false
     );
   });
