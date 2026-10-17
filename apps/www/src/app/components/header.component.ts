@@ -1,13 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal, viewChild } from '@angular/core';
 import type { ElementRef } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-import {
-  VoltNativeButton,
-  VoltNavigationMenu,
-  VoltNavigationMenuItem,
-  VoltNavigationMenuLink,
-  VoltNavigationMenuList
-} from '@voltui/components';
+import { VoltNativeButton } from '@voltui/components';
 import { LmnArrowTopRightOnSquareIcon } from 'lumen-icons/arrow-top-right-on-square';
 import { LmnBars3Icon } from 'lumen-icons/bars-3';
 import { SiteThemeService } from '../site-theme.service';
@@ -22,10 +16,6 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
     RouterLink,
     RouterLinkActive,
     VoltNativeButton,
-    VoltNavigationMenu,
-    VoltNavigationMenuList,
-    VoltNavigationMenuItem,
-    VoltNavigationMenuLink,
     LmnArrowTopRightOnSquareIcon,
     LmnBars3Icon,
     LmnXMarkIcon,
@@ -54,49 +44,30 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
           <span class="text-[0.95rem] tracking-[-0.02em]">ForgeCMS</span>
         </a>
 
-        <nav class="hidden text-sm font-medium md:block" aria-label="Primary">
-          <volt-navigation-menu>
-            <volt-navigation-menu-list>
-              <volt-navigation-menu-item>
-                <a
-                  voltNavigationMenuLink
-                  class="forge-nav-link"
-                  routerLink="/"
-                  fragment="product"
-                  routerLinkActive="is-active"
-                  #product="routerLinkActive"
-                  [active]="product.isActive"
-                  [routerLinkActiveOptions]="landingMatch"
-                  ariaCurrentWhenActive="page"
-                  >Product</a
-                >
-              </volt-navigation-menu-item>
-              <volt-navigation-menu-item>
-                <a
-                  voltNavigationMenuLink
-                  class="forge-nav-link"
-                  routerLink="/demo"
-                  routerLinkActive="is-active"
-                  #demo="routerLinkActive"
-                  [active]="demo.isActive"
-                  ariaCurrentWhenActive="page"
-                  >Demo</a
-                >
-              </volt-navigation-menu-item>
-              <volt-navigation-menu-item>
-                <a
-                  voltNavigationMenuLink
-                  class="forge-nav-link"
-                  routerLink="/docs"
-                  routerLinkActive="is-active"
-                  #docs="routerLinkActive"
-                  [active]="docs.isActive"
-                  ariaCurrentWhenActive="page"
-                  >Docs</a
-                >
-              </volt-navigation-menu-item>
-            </volt-navigation-menu-list>
-          </volt-navigation-menu>
+        <nav class="hidden items-center gap-1 text-sm font-medium md:flex" aria-label="Primary">
+          <a
+            class="forge-nav-link"
+            routerLink="/"
+            fragment="product"
+            routerLinkActive="is-active"
+            [routerLinkActiveOptions]="landingMatch"
+            ariaCurrentWhenActive="page"
+            >Product</a
+          >
+          <a
+            class="forge-nav-link"
+            routerLink="/demo"
+            routerLinkActive="is-active"
+            ariaCurrentWhenActive="page"
+            >Demo</a
+          >
+          <a
+            class="forge-nav-link"
+            routerLink="/docs"
+            routerLinkActive="is-active"
+            ariaCurrentWhenActive="page"
+            >Docs</a
+          >
         </nav>
 
         <div class="hidden items-center gap-3 md:flex">
