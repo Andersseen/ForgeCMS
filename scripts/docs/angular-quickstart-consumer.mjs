@@ -254,15 +254,27 @@ async function browser(origin) {
   );
 }
 
-export async function verifyAngularQuickstart({ workDir, tarballs }) {
+/**
+ * `tarballs` maps each Forge package to its `file:` tarball (packed mode, the default) or to an exact registry version
+ * (`scripts/registry/registry-consumers.mjs`). `install` swaps the `.npmrc`, the `pnpm install` arguments and adds an
+ * `afterInstall(dir)` hook for the registry mode; the default is unchanged.
+ */
+export async function verifyAngularQuickstart({
+  workDir,
+  tarballs,
+  install = { npmrc: NPMRC, args: ['--prefer-offline'] }
+}) {
   const dir = join(workDir, 'angular');
   mkdirSync(dir, { recursive: true });
   copyExample('analog-quickstart', dir);
   writeFileSync(join(dir, 'package.json'), `${JSON.stringify(manifest(tarballs), null, 2)}\n`);
-  writeFileSync(join(dir, '.npmrc'), NPMRC);
+  writeFileSync(join(dir, '.npmrc'), install.npmrc);
 
-  assertCleanConsumer(dir, 'Angular/Analog quickstart');
-  run('pnpm', ['install', '--prefer-offline'], dir);
+  assertCleanConsumer(dir, 'Angular/Analog quickstart', {
+    ...(install.registryVersion !== undefined && { registryVersion: install.registryVersion })
+  });
+  run('pnpm', ['install', ...install.args], dir);
+  install.afterInstall?.(dir);
   const duplicates = findDuplicateStoreEntries(readdirSync(join(dir, 'node_modules', '.pnpm')));
   if (duplicates.length > 0) fail(`more than one Angular copy: ${JSON.stringify(duplicates)}`);
 
@@ -286,6 +298,7 @@ export async function verifyAngularQuickstart({ workDir, tarballs }) {
   try {
     await exercise(server.origin);
     await browser(server.origin);
+    await install.browserChecks?.(server.origin);
     const output = server.logs.join('');
     for (const problem of ['JIT compiler unavailable', 'NG0', 'ERROR', 'Unhandled']) {
       if (output.includes(problem)) fail(`the server logged '${problem}':\n${output}`);

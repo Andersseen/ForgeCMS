@@ -25,7 +25,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { verifyJourneyConsumer } from './ssr-consumer/journey.mjs';
-import { keep, pack } from './ssr-consumer/shared.mjs';
+import { isolateProcess, registryInstallOptions } from './registry/registry-consumers.mjs';
+import { assertExactVersion, registrySpecs } from './registry/lib.mjs';
+import { FORGE_PACKAGES, keep, pack } from './ssr-consumer/shared.mjs';
 import { verifyTechnicalConsumer } from './ssr-consumer/technical.mjs';
 
 const stages = process.argv.slice(2);
@@ -51,12 +53,31 @@ function s3FromEnvironment() {
 
 const workDir = mkdtempSync(join(tmpdir(), 'forge-cms-ssr-'));
 try {
-  const tarballs = pack(join(workDir, 'packs'));
-  if (selected('technical')) await verifyTechnicalConsumer({ workDir, tarballs });
-  if (selected('journey')) {
-    await verifyJourneyConsumer({ workDir, tarballs, s3: s3FromEnvironment() });
+  // FORGE_REGISTRY_VERSION=<exact version> is the explicit real-registry mode (roadmap L02, `pnpm registry:ssr`): the same
+  // consumers install the published packages instead of packed tarballs. Unset, behaviour is unchanged.
+  const registryVersion = process.env.FORGE_REGISTRY_VERSION;
+  let tarballs;
+  let install;
+  if (registryVersion === undefined) {
+    tarballs = pack(join(workDir, 'packs'));
+  } else {
+    assertExactVersion(registryVersion);
+    isolateProcess(workDir);
+    tarballs = registrySpecs(FORGE_PACKAGES, registryVersion);
+    install = registryInstallOptions(registryVersion);
+    console.log(
+      `Real-registry mode: @forge-cms/* ${registryVersion} from npm (no packed tarballs)`
+    );
   }
-  console.log('\nPacked production SSR gate passed.');
+  if (selected('technical')) await verifyTechnicalConsumer({ workDir, tarballs, install });
+  if (selected('journey')) {
+    await verifyJourneyConsumer({ workDir, tarballs, s3: s3FromEnvironment(), install });
+  }
+  console.log(
+    registryVersion === undefined
+      ? '\nPacked production SSR gate passed.'
+      : `\nReal-registry production SSR gate passed (${registryVersion}).`
+  );
 } finally {
   if (keep) console.log(`Keeping ${workDir}`);
   else rmSync(workDir, { recursive: true, force: true });

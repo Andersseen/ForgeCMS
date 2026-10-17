@@ -68,8 +68,8 @@ import { ProductShowcaseComponent } from './product-showcase.component';
         <p class="forge-copy-status" role="status">{{ copyStatus() }}</p>
       </div>
       <p class="forge-hero-note">
-        MIT licensed. The core is a certified 1.0 candidate; Agent Kit and Analytics are
-        experimental.
+        MIT licensed. The core is the public 1.0.0-rc.2 release candidate (npm tag rc; stable stays
+        v{{ version }}). Agent Kit and Analytics are experimental.
       </p>
     </section>
   `

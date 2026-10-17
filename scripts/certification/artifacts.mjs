@@ -307,8 +307,12 @@ function sourceFiles(dir, relative = '') {
   return output;
 }
 
-/** Pure scan of one generated consumer file; returns problems. Exported for unit tests. */
-export function scanConsumerFile(file, text) {
+/**
+ * Pure scan of one generated consumer file; returns problems. Exported for unit tests.
+ * `registryVersion` (the explicit real-registry mode, roadmap L02) swaps "must be a packed tarball" for "must be
+ * exactly this registry version"; everything else (no workspace/link, no path alias, no repository reach-in) stays.
+ */
+export function scanConsumerFile(file, text, { registryVersion } = {}) {
   const problems = [];
   if (file === 'package.json') {
     const manifest = JSON.parse(text);
@@ -317,12 +321,16 @@ export function scanConsumerFile(file, text) {
         if (String(range).startsWith('workspace:') || String(range).startsWith('link:')) {
           problems.push(`${file}: ${section}.${name} is "${range}"`);
         }
-        if (
-          name.startsWith('@forge-cms/') &&
-          !String(range).startsWith('file:') &&
-          section !== 'peerDependencies'
-        ) {
-          problems.push(`${file}: ${section}.${name} is "${range}", not a packed tarball`);
+        if (name.startsWith('@forge-cms/') && section !== 'peerDependencies') {
+          if (registryVersion !== undefined) {
+            if (range !== registryVersion) {
+              problems.push(
+                `${file}: ${section}.${name} is "${range}", not exactly ${registryVersion}`
+              );
+            }
+          } else if (!String(range).startsWith('file:')) {
+            problems.push(`${file}: ${section}.${name} is "${range}", not a packed tarball`);
+          }
         }
       }
     }
@@ -346,9 +354,9 @@ export function scanConsumerFile(file, text) {
 }
 
 /** Throws if a generated consumer takes a workspace/private shortcut. Run before `pnpm install`. */
-export function assertCleanConsumer(dir, label = dir) {
+export function assertCleanConsumer(dir, label = dir, options = {}) {
   const problems = sourceFiles(dir).flatMap((file) =>
-    scanConsumerFile(file, readFileSync(join(dir, file), 'utf8'))
+    scanConsumerFile(file, readFileSync(join(dir, file), 'utf8'), options)
   );
   if (problems.length > 0) {
     throw new Error(`${label} is not a clean external consumer:\n  - ${problems.join('\n  - ')}`);

@@ -80,6 +80,16 @@ export const ng = (name) => [`@angular/${name}`, VERSIONS.angular];
 /** Strict peers, no automatic peer installation (the C03 foundation). */
 export const NPMRC = 'strict-peer-dependencies=true\nauto-install-peers=false\n';
 
+/**
+ * How a consumer installs Forge. The default is the packed-tarball mode every certification run uses; the explicit
+ * real-registry mode (`scripts/registry/`, roadmap L02) passes `{ npmrc, args: [], registryVersion, afterInstall }`.
+ */
+export const DEFAULT_INSTALL = Object.freeze({ npmrc: NPMRC, args: ['--prefer-offline'] });
+
+/** The `assertCleanConsumer` options an install mode implies. */
+export const registryOptions = (install) =>
+  install.registryVersion === undefined ? {} : { registryVersion: install.registryVersion };
+
 export const TSCONFIG = {
   compilerOptions: {
     target: 'ES2022',

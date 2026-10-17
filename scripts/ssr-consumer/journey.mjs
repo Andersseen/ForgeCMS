@@ -30,6 +30,7 @@ import { join } from 'node:path';
 import { assertCleanConsumer } from '../certification/artifacts.mjs';
 import { countUnlinkedDeclarations, findDuplicateStoreEntries } from '../angular-compat.mjs';
 import {
+  DEFAULT_INSTALL,
   NPMRC,
   TSCONFIG,
   VERSIONS,
@@ -40,6 +41,7 @@ import {
   jsFiles,
   loadChromium,
   ng,
+  registryOptions,
   recordBundle,
   repoRoot,
   run,
@@ -975,12 +977,14 @@ async function expectProductionFailsClosed(dir, outDir, s3) {
 }
 
 /** Assembles, installs and type-checks the journey consumer (the tiny-project app with the reusable admin). */
-function installJourneyConsumer({ workDir, tarballs }) {
+function installJourneyConsumer({ workDir, tarballs, install = DEFAULT_INSTALL }) {
   const dir = join(workDir, 'journey-app');
   mkdirSync(dir, { recursive: true });
   assembleApp(dir, tarballs);
-  assertCleanConsumer(dir, 'journey SSR consumer');
-  run('pnpm', ['install', '--prefer-offline'], dir);
+  writeFileSync(join(dir, '.npmrc'), install.npmrc);
+  assertCleanConsumer(dir, 'journey SSR consumer', registryOptions(install));
+  run('pnpm', ['install', ...install.args], dir);
+  install.afterInstall?.(dir);
   const duplicates = findDuplicateStoreEntries(readdirSync(join(dir, 'node_modules', '.pnpm')));
   if (duplicates.length > 0) fail(`more than one Angular copy: ${JSON.stringify(duplicates)}`);
   run('pnpm', ['exec', 'tsc', '-p', 'tsconfig.json', '--noEmit'], dir);
@@ -991,16 +995,16 @@ function installJourneyConsumer({ workDir, tarballs }) {
  * Builds the journey consumer's Node production output and runs the bundle checks — no server, browser,
  * database or S3 service (spec 089: the admin's production bundle size is measured without Docker).
  */
-export function buildJourneyConsumer({ workDir, tarballs }) {
+export function buildJourneyConsumer({ workDir, tarballs, install = DEFAULT_INSTALL }) {
   runtimeSecrets = [];
-  const dir = installJourneyConsumer({ workDir, tarballs });
+  const dir = installJourneyConsumer({ workDir, tarballs, install });
   return build(dir, PROFILES[0]);
 }
 
 /** Installs the journey consumer once, then builds and walks each profile. */
-export async function verifyJourneyConsumer({ workDir, tarballs, s3 }) {
+export async function verifyJourneyConsumer({ workDir, tarballs, s3, install = DEFAULT_INSTALL }) {
   runtimeSecrets = [s3.secretAccessKey, s3.accessKeyId].filter(Boolean);
-  const dir = installJourneyConsumer({ workDir, tarballs });
+  const dir = installJourneyConsumer({ workDir, tarballs, install });
 
   for (const profile of PROFILES) {
     console.log(`\nJourney — ${profile.label}`);

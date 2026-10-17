@@ -75,6 +75,8 @@
     "release:certify": "node scripts/release-certify.mjs",
     "docs:verify": "node scripts/docs/verify-docs.mjs",
     "docs:verify:consumers": "node scripts/docs/quickstart-consumers.mjs",
+    "registry:consumers": "node scripts/registry/registry-consumers.mjs",
+    "registry:compare": "node scripts/registry/artifact-compare.mjs",
     "check:api": "node scripts/check-public-api.mjs",
     "check:api:update": "node scripts/check-public-api.mjs --update",
     "release:publish-unpublished": "node scripts/publish-unpublished.mjs",

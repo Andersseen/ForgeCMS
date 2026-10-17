@@ -34,7 +34,7 @@ import { packages } from '../landing-data';
           <p class="mt-5 max-w-[52ch] leading-7 text-muted-foreground">
             Twelve focused packages. The eleven stable ones move together at
             <strong class="font-semibold text-foreground">v{{ version }}</strong
-            >; the experimental Agent Kit joins with the 1.0 release candidate.
+            >; the experimental Agent Kit first shipped with the 1.0.0-rc.2 release candidate.
           </p>
         </div>
         <dl class="forge-pkg-stats">
