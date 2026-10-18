@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { CURRENT_FORGE_VERSION } from '../src/app/forge-release';
 
 /**
  * The `/docs` markdown pipeline runs at **build time** (Analog's content plugin: marked + Prism), so
@@ -148,6 +149,6 @@ test('docs show the release truth and fit a phone without overflow', async ({ pa
     )
   ).toBeLessThanOrEqual(0);
   await page.getByText('Browse documentation').click();
-  await expect(page.getByText(/stable · 1\.0 candidate/).first()).toBeVisible();
+  await expect(page.getByText(`v${CURRENT_FORGE_VERSION} stable`).first()).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Pagination' })).toBeAttached();
 });
