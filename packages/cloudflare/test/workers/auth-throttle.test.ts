@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { UsersCollectionAuthAdapter, defineUsersCollection } from '@forge-cms/auth';
 import type { AuthAttemptThrottle } from '@forge-cms/runtime';
 import { ForgeCmsRuntime, handleLogin, handleSignup } from '@forge-cms/runtime';
@@ -30,13 +30,13 @@ function cloudflareAuthThrottle(bindings: Cloudflare.Env): AuthAttemptThrottle {
 }
 
 /**
- * Miniflare buckets by `floor(Date.now() / period)`. A scenario of a few requests takes well under a
- * second, so start it only when at least 5 s of the current 60 s window remain — otherwise a window
- * boundary in the middle would reset the counters and make the expected 429 a flaky 401.
+ * Miniflare buckets by `floor(Date.now() / period)`. Leave enough of the current 60 s window for
+ * the slowest auth scenario; otherwise a window boundary in the middle resets the counters and makes
+ * the expected 429 a flaky 401. The wait runs in a setup hook, outside Vitest's 5 s test-body timeout.
  */
 async function withinOneWindow(): Promise<void> {
   const remaining = 60_000 - (Date.now() % 60_000);
-  if (remaining < 5_000) await scheduler.wait(remaining + 50);
+  if (remaining < 10_000) await scheduler.wait(remaining + 50);
 }
 
 let runId = 0;
@@ -73,9 +73,17 @@ function login(runtime: ForgeCmsRuntime, email: string, password: string, client
 }
 
 describe('Cloudflare Rate Limiting bindings → AuthAttemptThrottle (local workerd emulation)', () => {
-  it('one client: the client bucket allows 3 attempts, then 429 RATE_LIMITED with Retry-After', async () => {
-    const { runtime, admin, tag } = await buildRuntime();
+  let runtime: ForgeCmsRuntime;
+  let admin: string;
+  let tag: string;
+
+  beforeEach(async () => {
+    const setup = await buildRuntime();
+    ({ runtime, admin, tag } = setup);
     await withinOneWindow();
+  }, 15_000);
+
+  it('one client: the client bucket allows 3 attempts, then 429 RATE_LIMITED with Retry-After', async () => {
     const client = `198.51.100.1-${tag}`;
     const statuses: number[] = [];
     for (let i = 0; i < 3; i++) {
@@ -91,9 +99,7 @@ describe('Cloudflare Rate Limiting bindings → AuthAttemptThrottle (local worke
   });
 
   it('many clients, one account: the account bucket stops a distributed guess at 5 — the same for an unknown email', async () => {
-    const { runtime, admin, tag } = await buildRuntime();
     for (const email of [admin, `nobody-${tag}@example.com`]) {
-      await withinOneWindow();
       const statuses: number[] = [];
       for (let i = 0; i < 6; i++) {
         const client = `203.0.113.${i}-${email}`;
@@ -104,8 +110,6 @@ describe('Cloudflare Rate Limiting bindings → AuthAttemptThrottle (local worke
   });
 
   it('signup is limited per client only: new emails from one client cannot get past the client bucket', async () => {
-    const { runtime, tag } = await buildRuntime();
-    await withinOneWindow();
     const client = `192.0.2.7-${tag}`;
     const statuses: number[] = [];
     for (let i = 0; i < 4; i++) {
