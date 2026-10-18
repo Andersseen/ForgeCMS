@@ -9,8 +9,21 @@ import {
   changesetsCoveredByPrerelease,
   isStablePromotion
 } from './release-decision.mjs';
+import { requiresChangeset } from './changeset-check.mjs';
 
 const base = process.argv[2] ?? 'origin/main';
+const changedFiles = spawnSync('git', ['diff', '--name-only', `${base}...HEAD`], {
+  encoding: 'utf8'
+});
+if (changedFiles.status !== 0) {
+  console.error('Changeset check failed: could not inspect changed files against the base ref.');
+  process.exit(changedFiles.status ?? 1);
+}
+if (!requiresChangeset(changedFiles.stdout.split('\n').filter(Boolean))) {
+  console.log('Changeset check passed: no files under packages/ changed.');
+  process.exit(0);
+}
+
 const status = spawnSync('pnpm', ['changeset', 'status', `--since=${base}`], { stdio: 'inherit' });
 if (status.status === 0) process.exit(0);
 

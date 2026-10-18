@@ -134,12 +134,12 @@ describe('Analytics preview', () => {
 });
 
 describe('release status', () => {
-  it('never claims a released 1.0, and says "next" for an unpublished RC', () => {
+  it('shows the stable release as published after the stable channel is recorded', () => {
     const steps = releaseSteps();
     expect(steps[0]).toEqual({ label: '1.0 candidate certified', state: 'done' });
-    if (!FORGE_CHANNELS.rcPublished)
+    if (!FORGE_CHANNELS.rcPublished) {
       expect(steps[1]).toEqual({ label: 'Public RC next', state: 'next' });
-    expect(JSON.stringify(steps)).not.toMatch(/1\.0(\.0)? (is )?released/i);
-    expect(steps.at(-1)?.state).not.toBe('done');
+    }
+    expect(steps.at(-1)).toEqual({ label: 'ForgeCMS 1.0.0 published', state: 'done' });
   });
 });

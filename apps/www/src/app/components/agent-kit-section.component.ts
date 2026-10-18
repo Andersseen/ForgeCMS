@@ -70,7 +70,7 @@ import { agentAvailabilityNote, agentRoles, agentTerminal } from '../showcase-da
               @if (install) {
                 {{ availability }}
               } @else {
-                Coming with the 1.0 release candidate
+                Published in the experimental Agent Kit package
               }
             </p>
           </div>

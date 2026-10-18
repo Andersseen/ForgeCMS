@@ -68,8 +68,16 @@ test('packages derive from the single release version', async ({ page }) => {
   await expect(packages.getByText('@forge-cms/agent', { exact: true })).toBeVisible();
   await expect(packages.getByText(/Ten focused packages/)).toHaveCount(0);
   await expect(packages.getByText(/Twelve focused packages/)).toBeVisible();
-  // Eleven stable packages share the stable line; the experimental agent never claims it.
-  await expect(packages.locator('volt-badge', { hasText: CURRENT_FORGE_VERSION })).toHaveCount(11);
+  // All twelve packages are published at the stable version; Agent Kit stays explicitly experimental.
+  await expect(packages.locator('volt-badge', { hasText: CURRENT_FORGE_VERSION })).toHaveCount(
+    FORGE_CHANNELS.stablePublished ? 12 : 11
+  );
+  await expect(
+    packages
+      .locator('.forge-pkg-tile')
+      .filter({ hasText: '@forge-cms/agent' })
+      .locator('.forge-experimental-badge')
+  ).toHaveText('Experimental');
   await expect(page.getByText('0.0.0')).toHaveCount(0);
 });
 
@@ -275,14 +283,15 @@ for (const mode of ['light', 'dark'] as const) {
   });
 }
 
-test('stable core is not labelled experimental; Agent Kit and Analytics are', async ({ page }) => {
+test('stable core is published; Agent Kit and Analytics remain experimental', async ({ page }) => {
   await page.goto('/');
 
-  // The hero names the core a 1.0 candidate at the stable version, not "Experimental".
+  // The hero reports the stable release without labelling the core as experimental.
   const hero = page.locator('#product');
-  await expect(hero.locator('volt-badge').first()).toContainText('1.0 candidate');
+  await expect(hero.locator('volt-badge').first()).toContainText('stable');
   await expect(hero.locator('volt-badge').first()).toContainText(CURRENT_FORGE_VERSION);
   await expect(hero.locator('volt-badge').first()).not.toContainText('Experimental');
+  await expect(hero).toContainText('ForgeCMS 1.0.0 is published');
 
   for (const id of ['agent-kit', 'analytics']) {
     const section = page.locator(`#${id}`);
@@ -344,7 +353,7 @@ test('localization example is truthful about what is supported', async ({ page }
   );
 });
 
-test('the roadmap never claims 1.0 is released', async ({ page }) => {
+test('the roadmap reports the stable release and preserves RC history', async ({ page }) => {
   await page.goto('/');
 
   const roadmap = page.locator('#roadmap');
@@ -353,8 +362,15 @@ test('the roadmap never claims 1.0 is released', async ({ page }) => {
   await expect(roadmap.getByText('1.0', { exact: true })).toBeVisible();
   await expect(roadmap.getByText('Reviewed migrations')).toBeVisible();
   await expect(roadmap.getByText('Upgrade and backup/restore rehearsal')).toBeVisible();
-  await expect(roadmap).toContainText('not a released 1.0');
-  await expect(page.getByText(/1\.0 (is )?released|now available/i)).toHaveCount(0);
+  await expect(roadmap).toContainText(
+    'ForgeCMS 1.0.0 is published. The accepted 1.0.0-rc.2 remains part of release history.'
+  );
+  await expect(
+    roadmap
+      .locator('.forge-milestone[data-status="complete"]')
+      .filter({ hasText: 'Stable release' })
+  ).toContainText('Stable release');
+  await expect(roadmap).toContainText('ForgeCMS 1.0.0 published');
 });
 
 test('reaches agent, analytics and upgrade docs from the footer', async ({ page }) => {
@@ -586,9 +602,10 @@ test('the roadmap track scrolls natively to the 1.0 destination card', async ({ 
     '0.12',
     '1.0'
   ]);
-  const destination = track.locator('[data-status="next"]');
-  await expect(destination).toContainText('1.0 candidate certified');
-  if (!FORGE_CHANNELS.rcPublished) await expect(destination).toContainText('Public RC next');
+  const destination = track.locator('.forge-milestone[data-status="complete"]').filter({
+    hasText: 'Stable release'
+  });
+  await expect(destination).toContainText('ForgeCMS 1.0.0 published');
   // Page until the end: each click scrolls instantly (reduced motion), then the edge state settles.
   await expect(async () => {
     if (await next.isEnabled()) await next.click({ timeout: 1000 });

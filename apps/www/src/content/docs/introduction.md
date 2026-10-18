@@ -66,10 +66,10 @@ hop between your Analog route and your content.
 
 Be honest with yourself about this list before adopting it for something that matters:
 
-- **Approaching 1.0.** The packages (currently `0.13.4` on npm) are installable, the 1.0 public surface is frozen
-  and certified from packed artifacts, and `1.0.0-rc.2` is public as a release candidate under the npm `rc` tag
-  (`npm install @forge-cms/core@rc`); it is being observed in real projects. Until 1.0 is released, treat the version as
-  pre-1.0; what the compatibility promise will cover is in [Support and compatibility](https://github.com/Andersseen/ForgeCMS/blob/main/docs/SUPPORT.md).
+- **Stable 1.0.** The twelve-package fixed family is published at `1.0.0`. The accepted `1.0.0-rc.2`
+  remains part of release history. Install stable packages at matching versions; the experimental Agent Kit
+  and Cloudflare Analytics remain outside the 1.x compatibility promise. See
+  [Support and compatibility](https://github.com/Andersseen/ForgeCMS/blob/main/docs/SUPPORT.md).
 - **Schema upgrades are explicit.** Schema sync applies safe additive changes and refuses drift that
   needs a data migration. Reviewed migrations apply those changes from your deploy script, exactly
   once. There are no down migrations. Upgrades from older releases and backup/restore are rehearsed

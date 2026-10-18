@@ -11,7 +11,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/Andersseen/ForgeCMS/ci.yml?branch=main&label=CI&style=flat-square&logo=githubactions&logoColor=white)](https://github.com/Andersseen/ForgeCMS/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-8B5CF6.svg?style=flat-square)](./LICENSE)
 [![npm](https://img.shields.io/npm/v/@forge-cms/runtime?style=flat-square&label=npm)](https://www.npmjs.com/package/@forge-cms/runtime)
-[![Status](https://img.shields.io/badge/status-1.0%20candidate-22D3EE.svg?style=flat-square)](docs/1.0-RELEASE-DOSSIER.md)
+[![Status](https://img.shields.io/badge/status-1.0.0%20stable-22D3EE.svg?style=flat-square)](docs/1.0-RELEASE-DOSSIER.md)
 
 **[Documentation](https://forge-cms.pages.dev/docs)** · **[Server quickstart](apps/www/src/content/docs/server-quickstart.md)** · **[Angular quickstart](apps/www/src/content/docs/angular-quickstart.md)** · **[Reference](docs/REFERENCE.md)** · **[Support](docs/SUPPORT.md)** · **[Security](SECURITY.md)**
 
@@ -20,10 +20,9 @@
 ---
 
 > [!NOTE]
-> **Status.** The eleven `@forge-cms/*` packages are published as one fixed family; the current release is **`0.13.4`**. The 1.0 public
-> surface is frozen ([docs/1.0-PUBLIC-SURFACE.md](docs/1.0-PUBLIC-SURFACE.md)) and the 1.0 release candidate is the next step — ForgeCMS is
-> **not released as 1.0 yet**. Until then a minor release may still change the frozen surface only to fix a release blocker. What is proven, by
-> which gate, and what is deliberately out of scope: [docs/1.0-RELEASE-DOSSIER.md](docs/1.0-RELEASE-DOSSIER.md) and
+> **Status.** ForgeCMS 1.0.0 was published through the main release workflow. All twelve public packages are the fixed family; the accepted
+> `1.0.0-rc.2` remains in release history. Agent Kit and Cloudflare Analytics remain experimental. Release workflow and verification evidence:
+> [docs/1.0-RELEASE-DOSSIER.md](docs/1.0-RELEASE-DOSSIER.md). Support boundaries and known limitations:
 > [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
 
 ## What is ForgeCMS?
@@ -150,9 +149,9 @@ particular production deployment. A production build never silently falls back t
 
 Two separate numbering schemes:
 
-- **npm versions.** The eleven packages always share one version; the latest is **`0.13.4`**. They are not the roadmap numbers.
+- **npm versions.** The twelve public packages always share one version; the stable release is **`1.0.0`**. They are not the roadmap numbers.
 - **Roadmap checkpoints** ([docs/ROADMAP.md](docs/ROADMAP.md)) are product guarantees (0.5 → 0.12, then the 1.0 release). Roadmaps 0.5–0.12 are
-  complete; the next bounded responsibility is the 1.0 release candidate (L01 in [docs/roadmap/v1/1.0-release.md](docs/roadmap/v1/1.0-release.md)).
+  complete; roadmap 1.0 has shipped. See [docs/roadmap/v1/1.0-release.md](docs/roadmap/v1/1.0-release.md) for its closeout.
 
 What is implemented right now is [docs/STATE.md](docs/STATE.md); what the 1.0 release will stand on is [docs/1.0-RELEASE-DOSSIER.md](docs/1.0-RELEASE-DOSSIER.md).
 

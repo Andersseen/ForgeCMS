@@ -25,7 +25,7 @@ import { ProductShowcaseComponent } from './product-showcase.component';
     <section id="product" class="forge-product-hero">
       <div class="forge-hero-intro">
         <volt-badge variant="secondary" class="forge-release-badge"
-          >Open source · 1.0 candidate · stable v{{ version }}</volt-badge
+          >Open source · ForgeCMS {{ version }} · stable</volt-badge
         >
         <h1>Your content.<br />Your code. Your Angular.</h1>
         <p>
@@ -68,8 +68,8 @@ import { ProductShowcaseComponent } from './product-showcase.component';
         <p class="forge-copy-status" role="status">{{ copyStatus() }}</p>
       </div>
       <p class="forge-hero-note">
-        MIT licensed. The core is the public 1.0.0-rc.2 release candidate (npm tag rc; stable stays
-        v{{ version }}). Agent Kit and Analytics are experimental.
+        MIT licensed. ForgeCMS {{ version }} is published. The 1.0.0-rc.2 candidate remains in
+        release history; Agent Kit and Analytics are experimental.
       </p>
     </section>
   `

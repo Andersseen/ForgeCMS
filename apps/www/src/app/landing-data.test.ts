@@ -51,10 +51,10 @@ describe('landing content', () => {
     ).toEqual(['agent']);
   });
 
-  it('never shows the stable version, or an install command, for an unpublished agent kit', () => {
+  it('shows the stable version for the published experimental Agent Kit', () => {
     const agent = packages.find((pkg) => pkg.name === 'agent');
     expect(agent?.version).toBe(packageVersionLabel({ name: 'agent' }));
-    expect(agent?.version).not.toBe(CURRENT_FORGE_VERSION);
+    expect(agent?.version).toBe(CURRENT_FORGE_VERSION);
     // The install command exists exactly when the registry confirms the package.
     expect(agentInstallCommand() !== null).toBe(FORGE_CHANNELS.agentPublished);
     if (!FORGE_CHANNELS.agentPublished) expect(agentInstallCommand()).toBeNull();
@@ -86,9 +86,10 @@ describe('landing content', () => {
     expect(analyticsFacts.ranges).toEqual(['24h', '7d', '30d', '90d']);
   });
 
-  it('does not mark the 1.0 candidate complete before 1.0.0 exists', () => {
+  it('marks the stable 1.0 release complete after publication', () => {
     const one = ROADMAP_MILESTONES.find((milestone) => milestone.version === '1.0');
-    expect(one?.status).not.toBe('complete');
+    expect(one?.status).toBe('complete');
+    expect(one?.npm).toBe('1.0.0');
   });
 
   it('shows 0.7 and 0.8 Angular DX (C01–C03) complete, with 0.9 SSR next', () => {
