@@ -1,4 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
+import { readdir } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 
 /**
  * Spec 075: the official site's public surface under the production build — health, layout at the
@@ -158,7 +161,7 @@ test('reduced motion keeps the product showcase usable without continuous animat
   await context.close();
 });
 
-test('shared-link metadata is present and follows the route', async ({ page }) => {
+test('shared-link metadata is present and follows the route', async ({ page, request }) => {
   await page.goto('/');
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.locator('meta[name="viewport"]')).toHaveAttribute(
@@ -170,17 +173,135 @@ test('shared-link metadata is present and follows the route', async ({ page }) =
   await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/favicon.svg');
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     'href',
-    'https://forge-cms.pages.dev/'
+    'https://forgecms.dev/'
   );
+  await expect(page.locator('link[rel="canonical"]')).toHaveCount(1);
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+    'content',
+    'https://forgecms.dev/social-card.png'
+  );
+  await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
+    'content',
+    'summary_large_image'
+  );
+  const structuredData = await page.locator('script[type="application/ld+json"]').textContent();
+  expect(JSON.parse(structuredData ?? 'null')).toMatchObject({
+    '@context': 'https://schema.org',
+    '@graph': expect.arrayContaining([
+      expect.objectContaining({ '@type': 'WebSite', url: 'https://forgecms.dev/' }),
+      expect.objectContaining({ '@type': 'SoftwareSourceCode', softwareVersion: '1.0.0' })
+    ])
+  });
 
   await page.goto('/docs/quickstart');
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     'href',
-    'https://forge-cms.pages.dev/docs/quickstart'
+    'https://forgecms.dev/docs/quickstart'
   );
   await expect(page).toHaveTitle(/ForgeCMS docs/);
   await page.goto('/demo');
   await expect(page).toHaveTitle('Demo — ForgeCMS');
+  await expect(page.locator('link[rel="canonical"]')).toHaveCount(1);
+  await expect(page.locator('meta[property="og:title"]')).toHaveCount(1);
+  const tracked = await request.get('/docs/quickstart?utm_source=launch');
+  expect(await tracked.text()).toContain('href="https://forgecms.dev/docs/quickstart"');
+});
+
+test('robots and sitemap are real, valid public files', async ({ request }) => {
+  const robots = await request.get('/robots.txt');
+  expect(robots.status()).toBe(200);
+  expect(robots.headers()['content-type']).toContain('text/plain');
+  const robotsText = await robots.text();
+  expect(robotsText).toContain('User-agent: *');
+  expect(robotsText).toContain('Allow: /');
+  expect(robotsText).toContain('Disallow: /api/');
+  expect(robotsText).not.toContain('Disallow: /admin/');
+  expect(robotsText).toContain('Sitemap: https://forgecms.dev/sitemap.xml');
+  const docsRedirect = await request.get('/docs', { maxRedirects: 0 });
+  expect(docsRedirect.status()).toBe(301);
+  expect(docsRedirect.headers().location).toBe('/docs/introduction');
+
+  const sitemap = await request.get('/sitemap.xml');
+  expect(sitemap.status()).toBe(200);
+  expect(sitemap.headers()['content-type']).toContain('application/xml');
+  const xml = await sitemap.text();
+  expect(xml).toMatch(/^<\?xml version="1\.0" encoding="UTF-8"\?>/);
+  expect(xml).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
+  const locations = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)]
+    .map((match) => match[1])
+    .filter((location): location is string => location !== undefined);
+  const root = dirname(fileURLToPath(import.meta.url));
+  const docs = (await readdir(resolve(root, '../src/content/docs')))
+    .filter((name) => name.endsWith('.md'))
+    .map((name) => `https://forgecms.dev/docs/${name.slice(0, -3)}`);
+  expect(new Set(locations).size).toBe(locations.length);
+  expect(locations).toEqual(['https://forgecms.dev/', 'https://forgecms.dev/demo', ...docs]);
+  for (const path of [
+    '/',
+    '/demo',
+    '/docs/introduction',
+    '/docs/quickstart',
+    '/docs/schema-upgrades'
+  ]) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('<h1');
+    expect(html).toContain('forgecms.dev');
+  }
+});
+
+test('public content and route metadata are in HTTP HTML without JavaScript', async ({
+  browser
+}) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  const pages: Array<[string, string]> = [
+    ['/', 'Your content.'],
+    ['/demo', 'Lumea is a clinic built from content'],
+    ['/docs/introduction', 'Introduction'],
+    ['/docs/quickstart', 'Quickstart'],
+    ['/docs/schema-upgrades', 'Schema upgrades']
+  ];
+  for (const [route, heading] of pages) {
+    const response = await page.goto(route);
+    expect(response?.status(), route).toBe(200);
+    await expect(page.locator('h1').first(), route).toContainText(heading);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+      'href',
+      `https://forgecms.dev${route === '/' ? '/' : route}`
+    );
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      'content',
+      'https://forgecms.dev/social-card.png'
+    );
+  }
+  await context.close();
+});
+
+test('unknown documentation paths are real noindex 404 responses', async ({ request }) => {
+  const response = await request.get('/docs/not-a-real-article');
+  expect(response.status()).toBe(404);
+  const html = await response.text();
+  expect(html).toContain('Page not found');
+  expect(html).toContain('name="robots" content="noindex, nofollow"');
+});
+
+test('admin routes stay out of search results at the HTTP boundary', async ({ request }) => {
+  const response = await request.get('/admin/login');
+  expect(response.status()).toBe(200);
+  expect(response.headers()['x-robots-tag']).toBe('noindex, nofollow');
+});
+
+test('social image is publicly served at its declared dimensions', async ({ request }) => {
+  const response = await request.get('/social-card.png');
+  expect(response.status()).toBe(200);
+  expect(response.headers()['content-type']).toContain('image/png');
+  const image = await response.body();
+  expect(image.byteLength).toBeLessThan(300_000);
+  expect(image.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  expect(image.readUInt32BE(16)).toBe(1200);
+  expect(image.readUInt32BE(20)).toBe(630);
 });
 
 test('no first-party internal link is dead', async ({ page, request }) => {

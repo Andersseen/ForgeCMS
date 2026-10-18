@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">ForgeCMS</title>
+  <desc id="desc">TypeScript content modeling for Angular applications.</desc>
+  <defs>
+    <linearGradient id="glow" x1="780" y1="80" x2="1120" y2="550" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3EE" stop-opacity=".24"/>
+      <stop offset="1" stop-color="#8B5CF6" stop-opacity=".16"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#0A0F1A"/>
+  <circle cx="1020" cy="300" r="280" fill="url(#glow)"/>
+  <rect x="76" y="74" width="76" height="76" rx="18" fill="#0A0F1A" stroke="#344052"/>
+  <path d="M98 94h37v10h-26v9h22v10h-22v17H98V94Z" fill="#fff"/>
+  <path d="M109 113h22l-7 10h-15v-10Z" fill="#8B5CF6"/>
+  <path d="M109 94h26l-7 10h-19V94Z" fill="#22D3EE"/>
+  <text x="172" y="124" fill="#F8FAFC" font-family="Arial, Helvetica, sans-serif" font-size="31" font-weight="700">ForgeCMS</text>
+  <text x="76" y="285" fill="#F8FAFC" font-family="Arial, Helvetica, sans-serif" font-size="67" font-weight="700" letter-spacing="-2">Your content. Your code.</text>
+  <text x="76" y="365" fill="#F8FAFC" font-family="Arial, Helvetica, sans-serif" font-size="67" font-weight="700" letter-spacing="-2">Your Angular.</text>
+  <text x="80" y="435" fill="#CBD5E1" font-family="Arial, Helvetica, sans-serif" font-size="28">The TypeScript code-first headless CMS for Angular.</text>
+  <rect x="80" y="494" width="182" height="44" rx="22" fill="#182232" stroke="#39485C"/>
+  <text x="105" y="523" fill="#E2E8F0" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="600">Stable 1.0.0</text>
+  <text x="1120" y="548" fill="#94A3B8" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="19">forgecms.dev</text>
+</svg>

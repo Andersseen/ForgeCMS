@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "vite build",
+    "build": "pnpm generate:sitemap && vite build && node ./scripts/configure-pages-routes.mjs",
+    "generate:sitemap": "node ./scripts/generate-sitemap.mjs",
     "e2e": "playwright test",
     "e2e:prod": "playwright test -c playwright.prod.config.ts",
     "test": "vitest run --dir .",
@@ -22,6 +23,7 @@
     "@angular/core": "21.2.10",
     "@angular/forms": "21.2.10",
     "@angular/platform-browser": "21.2.10",
+    "@angular/platform-server": "21.2.10",
     "@angular/router": "21.2.10",
     "@forge-cms/admin": "workspace:*",
     "@forge-cms/angular": "workspace:*",

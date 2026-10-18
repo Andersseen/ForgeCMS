@@ -8,7 +8,10 @@ const STORAGE_KEY = 'forgecms-theme';
 export class SiteThemeService {
   private readonly document = inject(DOCUMENT);
   private readonly view = this.document.defaultView;
-  private readonly media = this.view?.matchMedia('(prefers-color-scheme: dark)');
+  private readonly media =
+    this.view && typeof this.view.matchMedia === 'function'
+      ? this.view.matchMedia('(prefers-color-scheme: dark)')
+      : null;
   private mode: SiteTheme = 'system';
   readonly isDark = signal(false);
 

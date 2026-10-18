@@ -2,6 +2,11 @@ import { provideZonelessChangeDetection, type ApplicationConfig } from '@angular
 import { provideRouter, withComponentInputBinding, withInMemoryScrolling } from '@angular/router';
 import { provideContent, withMarkdownRenderer } from '@analogjs/content';
 import { provideVoltTheme } from '@voltui/components';
+import {
+  provideClientHydration,
+  withEventReplay,
+  withNoHttpTransferCache
+} from '@angular/platform-browser';
 import { provideForgeCms } from '@forge-cms/angular';
 import { provideMovement } from 'angular-movement';
 import { routes } from './app.routes';
@@ -9,6 +14,7 @@ import { routes } from './app.routes';
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZonelessChangeDetection(),
+    provideClientHydration(withNoHttpTransferCache(), withEventReplay()),
     provideRouter(
       routes,
       withComponentInputBinding(),

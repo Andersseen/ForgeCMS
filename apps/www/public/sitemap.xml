@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://forgecms.dev/</loc></url>
+  <url><loc>https://forgecms.dev/demo</loc></url>
+  <url><loc>https://forgecms.dev/docs/access-control</loc></url>
+  <url><loc>https://forgecms.dev/docs/adapters</loc></url>
+  <url><loc>https://forgecms.dev/docs/admin-ui</loc></url>
+  <url><loc>https://forgecms.dev/docs/agent-kit</loc></url>
+  <url><loc>https://forgecms.dev/docs/analytics</loc></url>
+  <url><loc>https://forgecms.dev/docs/angular-client</loc></url>
+  <url><loc>https://forgecms.dev/docs/angular-quickstart</loc></url>
+  <url><loc>https://forgecms.dev/docs/browser-auth</loc></url>
+  <url><loc>https://forgecms.dev/docs/collections</loc></url>
+  <url><loc>https://forgecms.dev/docs/concepts</loc></url>
+  <url><loc>https://forgecms.dev/docs/deployment</loc></url>
+  <url><loc>https://forgecms.dev/docs/fields</loc></url>
+  <url><loc>https://forgecms.dev/docs/hooks</loc></url>
+  <url><loc>https://forgecms.dev/docs/introduction</loc></url>
+  <url><loc>https://forgecms.dev/docs/local-api</loc></url>
+  <url><loc>https://forgecms.dev/docs/machine-auth</loc></url>
+  <url><loc>https://forgecms.dev/docs/quickstart</loc></url>
+  <url><loc>https://forgecms.dev/docs/rest-api</loc></url>
+  <url><loc>https://forgecms.dev/docs/schema-upgrades</loc></url>
+  <url><loc>https://forgecms.dev/docs/server-quickstart</loc></url>
+  <url><loc>https://forgecms.dev/docs/small-project-guide</loc></url>
+  <url><loc>https://forgecms.dev/docs/ssr</loc></url>
+  <url><loc>https://forgecms.dev/docs/troubleshooting</loc></url>
+  <url><loc>https://forgecms.dev/docs/uploads</loc></url>
+</urlset>

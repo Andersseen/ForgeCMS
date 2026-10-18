@@ -3,15 +3,18 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  PLATFORM_ID,
+  RESPONSE_INIT,
   afterNextRender,
   computed,
   effect,
   inject,
   signal
 } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Meta, Title } from '@angular/platform-browser';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MarkdownComponent, injectContent, injectContentFiles } from '@analogjs/content';
 import { MoveAnimateDirective } from 'angular-movement';
 import { activeStageIndex } from '../../showcase-data';
@@ -93,16 +96,25 @@ import {
           </aside>
         }
       </div>
+    } @empty {
+      <article class="forge-docs-article">
+        <h1>Documentation page not found</h1>
+        <p class="forge-docs-lede">This guide does not exist or may have moved.</p>
+        <a routerLink="/docs/introduction">Go to the introduction</a>
+      </article>
     }
   `
 })
 export class DocsArticlePage {
   private readonly titleService = inject(Title);
   private readonly meta = inject(Meta);
+  private readonly responseInit = inject(RESPONSE_INIT, { optional: true });
+  private readonly platformId = inject(PLATFORM_ID);
   readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   private readonly groups = buildDocsNav(injectContentFiles<DocsFrontmatter>(isDocsFile));
   private readonly links = flattenDocsNav(this.groups);
+  private readonly requestedSlug = inject(ActivatedRoute).snapshot.paramMap.get('slug');
 
   protected readonly doc = toSignal(
     injectContent<DocsFrontmatter>({ subdirectory: 'docs', param: 'slug' })
@@ -113,7 +125,9 @@ export class DocsArticlePage {
     return page ? [page] : [];
   });
 
-  protected readonly title = computed(() => this.doc()?.attributes.title ?? 'Documentation');
+  protected readonly title = computed(
+    () => this.doc()?.attributes.title ?? 'Documentation page not found'
+  );
   protected readonly group = computed(
     () =>
       this.groups.find((group) => group.links.some((link) => link.slug === this.doc()?.slug))
@@ -126,17 +140,30 @@ export class DocsArticlePage {
   protected readonly enter = { opacity: [0, 1], y: [10, 0] };
 
   constructor() {
+    if (this.requestedSlug && !this.links.some((link) => link.slug === this.requestedSlug)) {
+      if (this.responseInit) this.responseInit.status = 404;
+      this.titleService.setTitle('Documentation page not found — ForgeCMS');
+      this.meta.updateTag({ name: 'robots', content: 'noindex, nofollow' });
+    }
+
     effect(() => {
       const page = this.doc();
       if (!page) return;
 
       this.titleService.setTitle(`${this.title()} — ForgeCMS docs`);
       const description = page.attributes.description;
-      if (description) this.meta.updateTag({ name: 'description', content: description });
+      if (description) {
+        this.meta.updateTag({ name: 'description', content: description });
+        this.meta.updateTag({ property: 'og:description', content: description });
+        this.meta.updateTag({ name: 'twitter:description', content: description });
+      }
+      this.meta.updateTag({ property: 'og:title', content: `${this.title()} — ForgeCMS docs` });
+      this.meta.updateTag({ name: 'twitter:title', content: `${this.title()} — ForgeCMS docs` });
     });
 
     const destroyRef = inject(DestroyRef);
     afterNextRender(() => {
+      if (!isPlatformBrowser(this.platformId)) return;
       const host = this.#host.nativeElement;
       const view = host.ownerDocument.defaultView;
       if (!view) return;
