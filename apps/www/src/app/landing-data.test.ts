@@ -7,7 +7,6 @@ import {
   packageVersionLabel
 } from './forge-release';
 import {
-  ROADMAP_MILESTONES,
   analyticsFacts,
   capabilityGroups,
   localizationExample,
@@ -16,6 +15,7 @@ import {
   showcasePost,
   showcaseResponse
 } from './landing-data';
+import { V2_MILESTONES } from './roadmap-data';
 
 describe('landing content', () => {
   it('uses the same illustrative record for the content and item API preview', () => {
@@ -86,39 +86,11 @@ describe('landing content', () => {
     expect(analyticsFacts.ranges).toEqual(['24h', '7d', '30d', '90d']);
   });
 
-  it('marks the stable 1.0 release complete after publication', () => {
-    const one = ROADMAP_MILESTONES.find((milestone) => milestone.version === '1.0');
-    expect(one?.status).toBe('complete');
-    expect(one?.npm).toBe('1.0.0');
-  });
-
-  it('shows 0.7 and 0.8 Angular DX (C01–C03) complete, with 0.9 SSR next', () => {
-    const upgrades = ROADMAP_MILESTONES.find((milestone) => milestone.version === '0.7');
-    expect(upgrades?.status).toBe('complete');
-    expect(upgrades?.steps?.map((step) => step.status)).toEqual([
-      'complete',
-      'complete',
-      'complete'
-    ]);
-    const angular = ROADMAP_MILESTONES.find((milestone) => milestone.version === '0.8');
-    expect(angular?.status).toBe('complete');
-    expect(angular?.steps?.map((step) => step.status)).toEqual([
-      'complete',
-      'complete',
-      'complete'
-    ]);
-    expect(ROADMAP_MILESTONES.find((milestone) => milestone.version === '0.9')?.status).toBe(
-      'complete'
-    );
-    expect(ROADMAP_MILESTONES.find((milestone) => milestone.version === '0.6')?.status).toBe(
-      'complete'
-    );
-  });
-
-  it('explains the jump to 1.0: checkpoint 0.12 shipped as npm 0.13.x', () => {
-    const find = (v: string) => ROADMAP_MILESTONES.find((m) => m.version === v);
-    expect(find('0.12')?.npm).toBe('0.13.x');
-    expect(find('0.11')?.npm).toBe('0.12.x – 0.13.0');
-    expect(ROADMAP_MILESTONES.some((m) => m.version === '0.13')).toBe(false);
+  it('shows one shipped baseline and the canonical V2 checkpoint statuses', () => {
+    expect(CURRENT_FORGE_VERSION).toBe('1.0.0');
+    expect(V2_MILESTONES).toHaveLength(10);
+    expect(V2_MILESTONES[0]?.id).toBe('V2-01');
+    expect(V2_MILESTONES[0]?.status).toBe('Next');
+    expect(V2_MILESTONES.slice(1).every((milestone) => milestone.status === 'Planned')).toBe(true);
   });
 });

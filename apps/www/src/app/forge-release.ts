@@ -5,9 +5,8 @@
  * so every package card derives from this constant. Update it when a release is published to npm,
  * not when a changeset merges: the Version Packages PR publishes on merge.
  *
- * Product checkpoints are a separate axis. npm `0.8.x` is the roadmap `0.7` (upgrade safety) line:
- * `0.8.0` carries M01, `0.8.1` added M02's code (its changelog entry is in `0.8.2`); roadmap `0.8`
- * (Angular DX) published as npm `0.9.0`; roadmap `0.9` (SSR) is the npm `0.10.x` line; roadmap `0.10` (portable storage) is the npm `0.11.x` line (`0.11.0` added `@forge-cms/s3`); roadmap `0.11` (admin) is the npm `0.12.x` line (`0.12.0` = U01, `0.12.1` = U02) and completed with `0.13.0` (U03, the 1.0 surface freeze); `0.13.1` and `0.13.2` are patch releases (roadmap 0.12 R02 fixes; R03 K3 D1 `in`-list fix) — see `ROADMAP_MILESTONES` and docs/STATE.md.
+ * Product milestones are a separate axis from package versions. The current milestone definitions
+ * and status live in `docs/roadmap/v2/milestones.json`; the V1 checkpoint history remains in docs.
  *
  * Stable publication recorded by main CI run 39063229523 (2026-10-17): all twelve fixed-family
  * packages were published at 1.0.0 and the GitHub v1.0.0 release targets the stable-version merge.

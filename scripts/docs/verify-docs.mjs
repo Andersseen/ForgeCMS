@@ -22,6 +22,7 @@ import {
   checkStalePhrases,
   markdownFiles
 } from './lib.mjs';
+import { verifyV2Roadmap } from './verify-v2-roadmap.mjs';
 
 const root = process.cwd();
 const at = (...parts) => join(root, ...parts);
@@ -95,6 +96,7 @@ report(
 );
 
 report('stale claims', checkStalePhrases({ root, files: currentFacing }).failures);
+report('V2 roadmap inventory/public consistency', verifyV2Roadmap(root));
 
 console.log(`\nExternal links (report-only, not checked here): ${links.external.length}`);
 if (failures.length > 0) {

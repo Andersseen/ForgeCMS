@@ -30,6 +30,21 @@ describe('buildDocsNav', () => {
     ]);
   });
 
+  it('keeps the Project group directly after Getting started', () => {
+    const nav = buildDocsNav([
+      file('roadmap', { title: 'ForgeCMS roadmap', group: 'Project', order: 1 }),
+      file('collections', { title: 'Collections', group: 'Content modelling' }),
+      file('introduction', { title: 'Introduction', group: 'Getting started' })
+    ]);
+
+    expect(nav.map((group) => group.heading)).toEqual([
+      'Getting started',
+      'Project',
+      'Content modelling'
+    ]);
+    expect(nav[1]?.links[0]?.slug).toBe('roadmap');
+  });
+
   it('sorts within a group by `order`, then by title', () => {
     const nav = buildDocsNav([
       file('concepts', { title: 'Concepts', group: 'Getting started', order: 3 }),

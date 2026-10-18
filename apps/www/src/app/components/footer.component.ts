@@ -46,6 +46,7 @@ import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
           <a class="forge-footer-link" routerLink="/">Product</a>
           <a class="forge-footer-link" routerLink="/demo">Demo</a>
           <a class="forge-footer-link" routerLink="/docs">Docs</a>
+          <a class="forge-footer-link" routerLink="/docs/roadmap">Roadmap</a>
           <a class="forge-footer-link" routerLink="/docs/agent-kit">Agent Kit</a>
           <a class="forge-footer-link" routerLink="/docs/analytics">Analytics</a>
           <a class="forge-footer-link" routerLink="/docs/schema-upgrades">Upgrades</a>

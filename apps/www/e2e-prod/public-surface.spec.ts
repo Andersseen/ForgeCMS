@@ -16,6 +16,7 @@ const ROUTES = [
   '/docs/introduction',
   '/docs/quickstart',
   '/docs/schema-upgrades',
+  '/docs/roadmap',
   '/admin/login'
 ];
 
@@ -241,7 +242,8 @@ test('robots and sitemap are real, valid public files', async ({ request }) => {
     '/demo',
     '/docs/introduction',
     '/docs/quickstart',
-    '/docs/schema-upgrades'
+    '/docs/schema-upgrades',
+    '/docs/roadmap'
   ]) {
     const response = await request.get(path);
     expect(response.status(), path).toBe(200);
@@ -261,7 +263,8 @@ test('public content and route metadata are in HTTP HTML without JavaScript', as
     ['/demo', 'Lumea is a clinic built from content'],
     ['/docs/introduction', 'Introduction'],
     ['/docs/quickstart', 'Quickstart'],
-    ['/docs/schema-upgrades', 'Schema upgrades']
+    ['/docs/schema-upgrades', 'Schema upgrades'],
+    ['/docs/roadmap', 'ForgeCMS roadmap']
   ];
   for (const [route, heading] of pages) {
     const response = await page.goto(route);
@@ -330,7 +333,7 @@ test('no first-party internal link is dead', async ({ page, request }) => {
     }
   }
   expect([...internal]).toEqual(
-    expect.arrayContaining(['/demo', '/docs/schema-upgrades', '/docs/quickstart'])
+    expect.arrayContaining(['/demo', '/docs/schema-upgrades', '/docs/quickstart', '/docs/roadmap'])
   );
   expect([...external]).toEqual(
     expect.arrayContaining([

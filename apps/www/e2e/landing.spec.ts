@@ -353,24 +353,22 @@ test('localization example is truthful about what is supported', async ({ page }
   );
 });
 
-test('the roadmap reports the stable release and preserves RC history', async ({ page }) => {
+test('the homepage roadmap shows the shipped baseline and canonical V2 statuses', async ({
+  page
+}) => {
   await page.goto('/');
 
   const roadmap = page.locator('#roadmap');
-  await expect(roadmap.getByText('0.6', { exact: true })).toBeVisible();
-  await expect(roadmap.getByText('0.9', { exact: true })).toBeVisible();
-  await expect(roadmap.getByText('1.0', { exact: true })).toBeVisible();
-  await expect(roadmap.getByText('Reviewed migrations')).toBeVisible();
-  await expect(roadmap.getByText('Upgrade and backup/restore rehearsal')).toBeVisible();
-  await expect(roadmap).toContainText(
-    'ForgeCMS 1.0.0 is published. The accepted 1.0.0-rc.2 remains part of release history.'
-  );
+  await expect(roadmap).toContainText('ForgeCMS 1.0.0 is shipped');
   await expect(
-    roadmap
-      .locator('.forge-milestone[data-status="complete"]')
-      .filter({ hasText: 'Stable release' })
-  ).toContainText('Stable release');
-  await expect(roadmap).toContainText('ForgeCMS 1.0.0 published');
+    roadmap.getByRole('list', { name: 'ForgeCMS 2.0 milestones' }).getByRole('listitem')
+  ).toHaveCount(10);
+  await expect(roadmap.locator('[data-status="Next"]')).toContainText('V2-01');
+  await expect(roadmap.locator('[data-status="Planned"]')).toHaveCount(9);
+  await expect(roadmap.getByRole('link', { name: 'Read the full roadmap' })).toHaveAttribute(
+    'href',
+    /\/docs\/roadmap$/
+  );
 });
 
 test('reaches agent, analytics and upgrade docs from the footer', async ({ page }) => {
@@ -427,6 +425,10 @@ test('footer keeps the project destinations available', async ({ page }) => {
   await expect(footer.getByRole('link', { name: 'Docs' })).toHaveAttribute(
     'href',
     new RegExp('/docs$')
+  );
+  await expect(footer.getByRole('link', { name: 'Roadmap' })).toHaveAttribute(
+    'href',
+    new RegExp('/docs/roadmap$')
   );
   await expect(footer.getByRole('link', { name: 'npm' })).toHaveAttribute(
     'href',
@@ -572,48 +574,16 @@ for (const width of [390, 768, 1440, 1920]) {
   });
 }
 
-test('the roadmap track scrolls natively to the 1.0 destination card', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.setViewportSize({ width: 1440, height: 900 });
+test('the V2 roadmap exposes every milestone and a keyboard-reachable article link', async ({
+  page
+}) => {
   await page.goto('/');
   const roadmap = page.locator('#roadmap');
-  const track = roadmap.getByRole('list', { name: 'Roadmap milestones' });
-  await expect(roadmap.getByRole('progressbar', { name: 'Milestones complete' })).toHaveAttribute(
-    'aria-valuenow',
-    /\d/
-  );
-  const previous = roadmap.getByRole('button', { name: 'Previous milestones' });
-  const next = roadmap.getByRole('button', { name: 'Next milestones' });
-  await track.scrollIntoViewIfNeeded();
-  await expect(previous).toBeDisabled();
-  // Every milestone is in the DOM and in order, whatever the scroll position.
-  await expect(track.locator('.forge-milestone-version')).toHaveText([
-    '0.1',
-    '0.2',
-    '0.3',
-    '0.4',
-    '0.5',
-    '0.6',
-    '0.7',
-    '0.8',
-    '0.9',
-    '0.10',
-    '0.11',
-    '0.12',
-    '1.0'
-  ]);
-  const destination = track.locator('.forge-milestone[data-status="complete"]').filter({
-    hasText: 'Stable release'
-  });
-  await expect(destination).toContainText('ForgeCMS 1.0.0 published');
-  // Page until the end: each click scrolls instantly (reduced motion), then the edge state settles.
-  await expect(async () => {
-    if (await next.isEnabled()) await next.click({ timeout: 1000 });
-    await expect(next).toBeDisabled({ timeout: 500 });
-  }).toPass({ timeout: 10_000 });
-  await expect(destination).toBeInViewport();
-  await expect(previous).toBeEnabled();
-  // The track is a focusable scroll region, so keyboard users can scroll it too.
-  await track.focus();
-  await expect(track).toBeFocused();
+  const list = roadmap.getByRole('list', { name: 'ForgeCMS 2.0 milestones' });
+  await expect(list.getByRole('listitem')).toHaveCount(10);
+  const fullRoadmap = roadmap.getByRole('link', { name: 'Read the full roadmap' });
+  await fullRoadmap.focus();
+  await expect(fullRoadmap).toBeFocused();
+  await fullRoadmap.press('Enter');
+  await expect(page).toHaveURL(/\/docs\/roadmap$/);
 });
