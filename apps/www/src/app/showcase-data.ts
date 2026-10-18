@@ -255,7 +255,7 @@ export const agentRoles = [
 /** What the Agent Kit section says about availability. Derived from registry truth only. */
 export function agentAvailabilityNote(): string {
   return FORGE_CHANNELS.agentPublished
-    ? 'Available on npm under the rc dist-tag.'
+    ? 'Published at 1.0.0; the Agent Kit remains experimental.'
     : 'Candidate workflow: @forge-cms/agent is not on npm yet.';
 }
 
@@ -370,6 +370,13 @@ export function formatChange(change: number): string {
 
 /** The release-status steps for the roadmap band, derived from registry truth. */
 export function releaseSteps(): { label: string; state: 'done' | 'next' | 'later' }[] {
+  if (FORGE_CHANNELS.stablePublished) {
+    return [
+      { label: '1.0 candidate certified', state: 'done' },
+      { label: '1.0 release candidate available', state: 'done' },
+      { label: 'ForgeCMS 1.0.0 published', state: 'done' }
+    ];
+  }
   return [
     { label: '1.0 candidate certified', state: 'done' },
     FORGE_CHANNELS.rcPublished

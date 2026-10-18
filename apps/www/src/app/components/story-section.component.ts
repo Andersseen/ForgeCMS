@@ -52,7 +52,7 @@ import {
           </h2>
           <p class="mt-5 max-w-[52ch] leading-7 text-muted-foreground">
             Five steps from a TypeScript file to a site your client runs. Each one is part of the
-            1.0 candidate today.
+            published 1.0 release.
           </p>
         </header>
 

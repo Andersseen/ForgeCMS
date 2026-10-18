@@ -38,7 +38,7 @@ import type { DocsNavGroup } from './docs-nav';
     <ng-template #nav>
       <p class="forge-docs-release">
         <span>Documentation</span>
-        <span class="forge-docs-release-chip">v{{ version }} stable · 1.0 candidate</span>
+        <span class="forge-docs-release-chip">v{{ version }} stable</span>
       </p>
       <nav class="mt-6 flex flex-col gap-6">
         @for (group of groups(); track group.heading) {

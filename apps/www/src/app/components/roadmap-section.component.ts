@@ -52,14 +52,13 @@ const STATUS_LABELS: Record<MilestoneStatus, string> = {
     <section id="roadmap" class="forge-roadmap" aria-labelledby="roadmap-title">
       <div class="mx-auto w-full max-w-7xl px-5 py-20 md:px-8 md:py-28">
         <div>
-          <p class="forge-section-mark">Approaching 1.0 deliberately</p>
+          <p class="forge-section-mark">ForgeCMS 1.0</p>
           <h2 id="roadmap-title" class="forge-section-title mt-5">
             Built in the open. Getting stronger.
           </h2>
           <p class="mt-5 max-w-[56ch] leading-7 text-muted-foreground">
             {{ completeCount }} of {{ milestones.length }} milestones complete.
-            {{ candidateCopy }} Until <code>1.0.0</code> ships, ForgeCMS is a 1.0 candidate, not a
-            released 1.0.
+            {{ candidateCopy }}
           </p>
           <p class="mt-3 max-w-[56ch] text-sm leading-6 text-muted-foreground">
             Card numbers are product checkpoints, not npm versions. The checkpoint 0.12 shipped as
@@ -167,9 +166,11 @@ export class RoadmapSectionComponent {
   /** The whole journey, 0.1 → 1.0. */
   protected readonly milestones = ROADMAP_MILESTONES;
   protected readonly completeCount = this.milestones.filter((m) => m.status === 'complete').length;
-  protected readonly candidateCopy = FORGE_CHANNELS.rcPublished
-    ? 'The 1.0.0-rc.2 release candidate is public on npm (the rc tag) for real-consumer validation; the stable line stays 0.13.4.'
-    : 'The 1.0 release candidate is prepared and certified; publication and real-consumer validation come next.';
+  protected readonly candidateCopy = FORGE_CHANNELS.stablePublished
+    ? 'ForgeCMS 1.0.0 is published. The accepted 1.0.0-rc.2 remains part of release history.'
+    : FORGE_CHANNELS.rcPublished
+      ? 'The 1.0.0-rc.2 release candidate is public on npm; stable publication is next.'
+      : 'The 1.0 release candidate is prepared and certified; publication is next.';
   protected readonly labels = STATUS_LABELS;
   protected readonly steps = releaseSteps();
   protected readonly reveal = { opacity: [0, 1], y: [20, 0], scale: [0.98, 1] };

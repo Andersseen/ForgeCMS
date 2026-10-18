@@ -123,7 +123,7 @@ import { bentoCards } from '../showcase-data';
         </div>
 
         <div id="architecture" class="forge-surface-list" aria-labelledby="surface-title">
-          <h3 id="surface-title">Everything in the 1.0 candidate</h3>
+          <h3 id="surface-title">The ForgeCMS 1.0 surface</h3>
           <div class="forge-surface-grid">
             @for (group of groups; track group.id) {
               <div [attr.data-capability-group]="group.id">

@@ -286,12 +286,12 @@ export const ROADMAP_MILESTONES: readonly RoadmapMilestone[] = [
       { title: 'Rehearsed deployment and consumer docs', status: 'complete' }
     ]
   },
-  // Product-facing and truthful: the candidate is prepared and certified, not yet published, and 1.0
-  // is never "complete" until `1.0.0` exists on the registry (spec 094).
+  // Product-facing status follows the stable publication channel.
   {
     version: '1.0',
-    title: FORGE_CHANNELS.rcPublished ? 'Release candidate' : 'Candidate ready, validation next',
-    status: 'next'
+    npm: '1.0.0',
+    title: FORGE_CHANNELS.stablePublished ? 'Stable release' : 'Release candidate',
+    status: FORGE_CHANNELS.stablePublished ? 'complete' : 'next'
   }
 ];
 

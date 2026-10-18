@@ -64,7 +64,7 @@ import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
             >npm</a
           >
         </nav>
-        <p class="text-xs text-muted-foreground">MIT · 1.0 candidate</p>
+        <p class="text-xs text-muted-foreground">MIT · ForgeCMS 1.0.0</p>
       </div>
     </footer>
   `
