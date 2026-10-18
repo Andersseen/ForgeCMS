@@ -97,6 +97,8 @@ packages talk to the outside world. Read [Core concepts](/docs/concepts) for the
 
 ## Where to go next
 
+- [ForgeCMS 2.0 roadmap](/docs/roadmap) — the product direction beyond the shipped 1.0 foundation.
+
 - [Server quickstart](/docs/server-quickstart) and [Angular/Analog quickstart](/docs/angular-quickstart) — the two verified starting paths.
 - [Small project guide](/docs/small-project-guide) — users, cookie auth, posts, and a working admin.
 - [Quickstart](/docs/quickstart) — the bare Local API path with in-memory adapters.

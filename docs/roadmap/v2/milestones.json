@@ -1,0 +1,62 @@
+[
+  {
+    "id": "V2-01",
+    "title": "Foundation, Security & Release Governance",
+    "status": "Next",
+    "summary": "Close 1.0 certification follow-up and strengthen release, security, and accessibility governance."
+  },
+  {
+    "id": "V2-02",
+    "title": "Developer Experience & Project Bootstrap",
+    "status": "Planned",
+    "summary": "Make it faster to start, configure, diagnose, and build a first collection."
+  },
+  {
+    "id": "V2-03",
+    "title": "Forge Admin Platform",
+    "status": "Planned",
+    "summary": "Grow the reusable Angular admin into a coherent default backoffice."
+  },
+  {
+    "id": "V2-04",
+    "title": "Professional Content Management UX",
+    "status": "Planned",
+    "summary": "Improve collection management, recovery, and editor workflows."
+  },
+  {
+    "id": "V2-05",
+    "title": "Rich Text, Media & Authoring",
+    "status": "Planned",
+    "summary": "Support everyday editorial authoring with portable rich text and usable media tools."
+  },
+  {
+    "id": "V2-06",
+    "title": "Advanced Content Modeling & Localization",
+    "status": "Planned",
+    "summary": "Expand structured and multilingual modeling while preserving adapter parity."
+  },
+  {
+    "id": "V2-07",
+    "title": "Editorial Workflows, Versions & Identity",
+    "status": "Planned",
+    "summary": "Add dependable review, scheduling, audit, and identity workflows."
+  },
+  {
+    "id": "V2-08",
+    "title": "Developer Console & API Tooling",
+    "status": "Planned",
+    "summary": "Give developers safe, truthful tools to inspect and diagnose a ForgeCMS project."
+  },
+  {
+    "id": "V2-09",
+    "title": "Production Operations & Portability",
+    "status": "Planned",
+    "summary": "Make upgrades, observability, and recovery repeatable across supported profiles."
+  },
+  {
+    "id": "V2-10",
+    "title": "Real-world Validation & 2.0 Certification",
+    "status": "Planned",
+    "summary": "Validate the product with independent consumers and a certified migration and release."
+  }
+]

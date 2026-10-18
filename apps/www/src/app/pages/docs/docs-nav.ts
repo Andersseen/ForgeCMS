@@ -38,6 +38,7 @@ export interface DocsNavGroup {
  */
 export const DOCS_GROUP_ORDER = [
   'Getting started',
+  'Project',
   'Content modelling',
   'Server APIs',
   'Client & deploy'

@@ -8,7 +8,6 @@ import {
   analyticsRanges,
   bentoCards,
   formatChange,
-  releaseSteps,
   storySnippets,
   storyStages,
   swapSnippets,
@@ -130,16 +129,5 @@ describe('Analytics preview', () => {
       'conversion'
     ])
       expect(copy).not.toContain(absent);
-  });
-});
-
-describe('release status', () => {
-  it('shows the stable release as published after the stable channel is recorded', () => {
-    const steps = releaseSteps();
-    expect(steps[0]).toEqual({ label: '1.0 candidate certified', state: 'done' });
-    if (!FORGE_CHANNELS.rcPublished) {
-      expect(steps[1]).toEqual({ label: 'Public RC next', state: 'next' });
-    }
-    expect(steps.at(-1)).toEqual({ label: 'ForgeCMS 1.0.0 published', state: 'done' });
   });
 });

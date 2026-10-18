@@ -1,5 +1,7 @@
 # ROADMAP — A small, dependable ForgeCMS 1.0
 
+> **Historical V1 roadmap.** ForgeCMS 1.0.0 has since shipped. This document preserves the original V1 checkpoint history; the current product direction is the [ForgeCMS 2.0 roadmap](roadmap/v2/README.md), with its [milestones](roadmap/v2/MILESTONES.md) and [product contract](roadmap/v2/CONTRACT.md).
+
 > **2026-10-13 (spec 091):** **Roadmap 0.12 / R04 — Consumer documentation and release dossier — is complete, and with it roadmap 0.12 (R01–R04).** A developer outside the monorepo
 > can follow two verified quickstarts (server-only; Angular/Analog + admin — each built from the packed tarballs in a clean project, `pnpm docs:verify:consumers`); the reference, field/feature/deployment
 > matrices, support/semver/deprecation policy, limitations, troubleshooting, the 0.x → 1.0 migration guide and `SECURITY.md` exist and are checked (`pnpm docs:verify`); stale pre-release claims are gone;

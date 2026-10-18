@@ -13,7 +13,7 @@
 [![npm](https://img.shields.io/npm/v/@forge-cms/runtime?style=flat-square&label=npm)](https://www.npmjs.com/package/@forge-cms/runtime)
 [![Status](https://img.shields.io/badge/status-1.0.0%20stable-22D3EE.svg?style=flat-square)](docs/1.0-RELEASE-DOSSIER.md)
 
-**[Documentation](https://forge-cms.pages.dev/docs)** · **[Server quickstart](apps/www/src/content/docs/server-quickstart.md)** · **[Angular quickstart](apps/www/src/content/docs/angular-quickstart.md)** · **[Reference](docs/REFERENCE.md)** · **[Support](docs/SUPPORT.md)** · **[Security](SECURITY.md)**
+**[Documentation](https://forge-cms.pages.dev/docs)** · **[2.0 roadmap](docs/roadmap/v2/README.md)** · **[Server quickstart](apps/www/src/content/docs/server-quickstart.md)** · **[Angular quickstart](apps/www/src/content/docs/angular-quickstart.md)** · **[Reference](docs/REFERENCE.md)** · **[Support](docs/SUPPORT.md)** · **[Security](SECURITY.md)**
 
 </div>
 

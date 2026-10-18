@@ -367,24 +367,3 @@ export function formatChange(change: number): string {
   const sign = change >= 0 ? '+' : '−';
   return `${sign}${Math.abs(change).toFixed(1)}%`;
 }
-
-/** The release-status steps for the roadmap band, derived from registry truth. */
-export function releaseSteps(): { label: string; state: 'done' | 'next' | 'later' }[] {
-  if (FORGE_CHANNELS.stablePublished) {
-    return [
-      { label: '1.0 candidate certified', state: 'done' },
-      { label: '1.0 release candidate available', state: 'done' },
-      { label: 'ForgeCMS 1.0.0 published', state: 'done' }
-    ];
-  }
-  return [
-    { label: '1.0 candidate certified', state: 'done' },
-    FORGE_CHANNELS.rcPublished
-      ? { label: '1.0 release candidate available', state: 'done' }
-      : { label: 'Public RC next', state: 'next' },
-    {
-      label: '1.0.0 after real-consumer validation',
-      state: FORGE_CHANNELS.rcPublished ? 'next' : 'later'
-    }
-  ];
-}

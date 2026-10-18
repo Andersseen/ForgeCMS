@@ -81,12 +81,6 @@ body {
   box-shadow: inset 0 -2px 0 var(--ring);
 }
 
-.forge-milestone-npm {
-  margin: 0.15rem 0 0.5rem;
-  font-size: 0.75rem;
-  color: var(--muted-foreground);
-}
-
 .forge-nav-link:focus-visible,
 .forge-mobile-link:focus-visible,
 .forge-footer-link:focus-visible {
@@ -2342,90 +2336,29 @@ body {
   font-size: 0.8rem;
   font-weight: 550;
 }
-.forge-release-steps {
-  display: grid;
-  gap: 0.6rem;
-  margin-top: 2rem;
-  font-size: 0.9rem;
-}
-.forge-release-steps li {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-.forge-release-steps li[data-state='later'] {
-  color: var(--muted-foreground);
-}
-.forge-release-dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  margin: 0 0.25rem;
-  border-radius: 999px;
-  background: var(--primary);
-}
-.forge-release-steps li[data-state='later'] .forge-release-dot {
-  background: var(--muted-foreground);
-}
-.forge-release-steps .forge-release-next {
-  border: 1px solid var(--primary);
-  border-radius: 999px;
-  padding: 0 0.5rem;
-  color: var(--primary);
-  font-size: 0.7rem;
-  font-weight: 650;
-}
 /* The shared code block fills its grid cell elsewhere; here it sits in a text column. */
 #localization .forge-code {
   min-height: 0;
 }
 
-/* --- Roadmap track ------------------------------------------------------------------------------ */
+/* --- Product roadmap --------------------------------------------------------------------------- */
 .forge-roadmap {
   border-top: 1px solid var(--border);
   background: var(--forge-raised);
 }
-.forge-roadmap-controls {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  margin-top: 3rem;
-}
-.forge-roadmap-rail {
-  flex: 1;
-}
-.forge-roadmap-track:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 3px;
-}
-.forge-roadmap-track {
+.forge-roadmap-cards {
   display: grid;
-  grid-auto-columns: minmax(16.5rem, 82%);
-  grid-auto-flow: column;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
   gap: 1rem;
-  margin: 1.25rem -0.25rem 0;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scroll-padding-inline: 0.25rem;
-  scroll-snap-type: x mandatory;
-  padding: 0.25rem 0.25rem 1.75rem;
-  scrollbar-width: thin;
-}
-@media (min-width: 640px) {
-  .forge-roadmap-track {
-    grid-auto-columns: minmax(17rem, 42%);
-  }
-}
-@media (min-width: 1024px) {
-  .forge-roadmap-track {
-    grid-auto-columns: calc((100% - 3rem) / 3.4);
-  }
+  margin-top: 2rem;
+  padding: 0;
+  list-style: none;
 }
 .forge-milestone {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
   min-height: 12.5rem;
-  scroll-snap-align: start;
   border: 1px solid var(--border);
   border-radius: 1.25rem;
   background: var(--forge-surface);
@@ -2439,10 +2372,9 @@ body {
 }
 .forge-milestone-version {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 2.25rem;
+  font-size: 0.78rem;
   font-weight: 650;
-  letter-spacing: -0.04em;
-  line-height: 1;
+  letter-spacing: 0.04em;
   color: color-mix(in srgb, var(--foreground) 42%, transparent);
 }
 .forge-milestone-status {
@@ -2450,9 +2382,9 @@ body {
   align-items: center;
   gap: 0.3rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--forge-ok) 14%, transparent);
+  background: color-mix(in srgb, var(--muted-foreground) 12%, transparent);
   padding: 0.15rem 0.6rem;
-  color: var(--forge-ok);
+  color: var(--muted-foreground);
   font-size: 0.72rem;
   font-weight: 650;
 }
@@ -2462,29 +2394,12 @@ body {
   letter-spacing: -0.02em;
   line-height: 1.25;
 }
-.forge-milestone ul {
-  display: grid;
-  gap: 0.4rem;
+.forge-milestone p {
   color: var(--muted-foreground);
   font-size: 0.85rem;
   line-height: 1.45;
 }
-.forge-milestone ul li {
-  position: relative;
-  padding-left: 1rem;
-}
-.forge-milestone ul li::before {
-  position: absolute;
-  top: 0.55em;
-  left: 0;
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 999px;
-  background: var(--forge-ok);
-  content: '';
-}
-/* The destination: 1.0 is never "complete" until 1.0.0 exists, so it reads as the next stop. */
-.forge-milestone[data-status='next'] {
+.forge-milestone[data-status='Next'] {
   border-color: transparent;
   background:
     linear-gradient(var(--forge-surface), var(--forge-surface)) padding-box,
@@ -2492,22 +2407,16 @@ body {
   border-width: 2px;
   box-shadow: 0 14px 28px -22px color-mix(in srgb, var(--primary) 70%, transparent);
 }
-.forge-milestone[data-status='next'] .forge-milestone-version {
+.forge-milestone[data-status='Next'] .forge-milestone-version {
   background: linear-gradient(135deg, #8b5cf6, #22d3ee);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
-.forge-milestone[data-status='next'] .forge-milestone-status {
-  background: var(--forge-selected);
+.forge-milestone[data-status='Next'] .forge-milestone-status {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
   color: var(--primary);
 }
-.forge-milestone .forge-release-steps {
-  margin-top: auto;
-  gap: 0.5rem;
-  font-size: 0.85rem;
-}
-
 /* --- /demo journeys: numbered step cards on a connecting line --------------------------------- */
 .forge-journey {
   --journey-accent: var(--primary);

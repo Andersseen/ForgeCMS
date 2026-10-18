@@ -78,6 +78,46 @@ test('the schema-upgrades page is in the sidebar and states availability and lim
   await expect(prose).toContainText('never at application startup');
 });
 
+test('the public roadmap is discoverable, complete, and labels intentions accurately', async ({
+  page
+}) => {
+  await page.goto('/docs/introduction');
+  const sidebar = page.locator('aside');
+  await expect(sidebar.getByRole('link', { name: 'ForgeCMS roadmap' })).toHaveAttribute(
+    'href',
+    /\/docs\/roadmap$/
+  );
+  await sidebar.getByRole('link', { name: 'ForgeCMS roadmap' }).click();
+  await page.waitForURL('**/docs/roadmap');
+
+  const article = page.locator('.forge-prose');
+  await expect(page.getByRole('heading', { name: 'ForgeCMS roadmap', level: 1 })).toBeVisible();
+  await expect(article).toContainText('ForgeCMS 1.0: shipped');
+  await expect(article).toContainText('In Progress');
+  await expect(article).toContainText('V2-01');
+  await expect(article).toContainText('V2-10');
+  await expect(article).toContainText('Next');
+  await expect(article).toContainText('Planned');
+  await expect(article).toContainText('drag-and-drop page composition');
+});
+
+test('the Project roadmap link remains reachable through the mobile docs disclosure', async ({
+  page
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/docs/introduction');
+
+  const disclosure = page
+    .locator('details')
+    .filter({ has: page.getByText('Browse documentation') });
+  await disclosure.locator('summary').click();
+  const roadmapLink = disclosure.getByRole('link', { name: 'ForgeCMS roadmap' });
+  await expect(roadmapLink).toBeVisible();
+  await roadmapLink.click();
+  await page.waitForURL('**/docs/roadmap');
+  await expect(page.getByRole('heading', { name: 'ForgeCMS roadmap', level: 1 })).toBeVisible();
+});
+
 test('the Agent Kit page leads with the one-command install and keeps the manual route', async ({
   page
 }) => {
