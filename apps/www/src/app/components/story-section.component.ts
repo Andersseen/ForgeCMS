@@ -3,11 +3,13 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  PLATFORM_ID,
   afterNextRender,
   computed,
   inject,
   signal
 } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { MoveInViewDirective, MoveStaggerDirective, MoveVariantsDirective } from 'angular-movement';
 import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
@@ -267,9 +269,11 @@ export class StorySectionComponent {
 
   constructor() {
     const destroyRef = inject(DestroyRef);
+    const platformId = inject(PLATFORM_ID);
     afterNextRender(() => {
+      if (!isPlatformBrowser(platformId)) return;
       const view = this.#host.nativeElement.ownerDocument.defaultView;
-      if (!view) return;
+      if (!view || typeof view.matchMedia !== 'function') return;
       const wide = view.matchMedia('(min-width: 1024px)');
       const reduced = view.matchMedia('(prefers-reduced-motion: reduce)');
       const syncMode = (): void => this.#storytelling.set(wide.matches && !reduced.matches);
@@ -288,6 +292,7 @@ export class StorySectionComponent {
         frame ??= view.requestAnimationFrame(measure);
       };
       // Listen only while the section is on screen; passive, so scrolling is never delayed or blocked.
+      if (typeof IntersectionObserver === 'undefined') return;
       const observer = new IntersectionObserver(([entry]) => {
         if (entry?.isIntersecting) {
           view.addEventListener('scroll', onScroll, { passive: true });

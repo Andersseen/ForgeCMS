@@ -3,11 +3,13 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  PLATFORM_ID,
   afterNextRender,
   inject,
   signal,
   viewChild
 } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { VoltNativeButton, VoltProgress } from '@voltui/components';
 import { MoveInViewDirective, MoveStaggerDirective } from 'angular-movement';
@@ -183,7 +185,9 @@ export class RoadmapSectionComponent {
 
   constructor() {
     const destroyRef = inject(DestroyRef);
+    const platformId = inject(PLATFORM_ID);
     afterNextRender(() => {
+      if (!isPlatformBrowser(platformId)) return;
       const view = this.track().nativeElement.ownerDocument.defaultView;
       this.syncEdges();
       view?.addEventListener('resize', this.#onResize, { passive: true });
@@ -196,9 +200,11 @@ export class RoadmapSectionComponent {
   /** Scroll the track by most of its visible width; instant when the reader prefers reduced motion. */
   protected page(direction: -1 | 1): void {
     const track = this.track().nativeElement;
-    const reduced = track.ownerDocument.defaultView?.matchMedia(
-      '(prefers-reduced-motion: reduce)'
-    ).matches;
+    const view = track.ownerDocument.defaultView;
+    const reduced =
+      view && typeof view.matchMedia === 'function'
+        ? view.matchMedia('(prefers-reduced-motion: reduce)').matches
+        : false;
     track.scrollBy({
       left: direction * track.clientWidth * 0.8,
       behavior: reduced ? 'auto' : 'smooth'

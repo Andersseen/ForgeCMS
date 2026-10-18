@@ -1,5 +1,15 @@
-// SSR entry point stub — required by @analogjs/platform build
-// SSR is disabled; this file is never actually used at runtime.
-export default function bootstrap() {
-  return Promise.resolve();
+/// <reference types="vite/client" />
+import '@angular/platform-server/init';
+import { bootstrapApplication, type BootstrapContext } from '@angular/platform-browser';
+import { renderApplication } from '@angular/platform-server';
+import { AppComponent } from './app/app.component';
+import { serverConfig } from './app/app.config.server';
+
+function bootstrap(context: BootstrapContext) {
+  return bootstrapApplication(AppComponent, serverConfig, context);
+}
+
+/** Public pages are source-controlled and render without a user session or CMS data. */
+export default function render(url: string, document: string): Promise<string> {
+  return renderApplication(bootstrap, { document, url });
 }
