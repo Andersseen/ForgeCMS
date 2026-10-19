@@ -6,6 +6,7 @@ import { LmnCheckIcon } from 'lumen-icons/check';
 import { LmnClipboardIcon } from 'lumen-icons/clipboard';
 import { CURRENT_FORGE_VERSION } from '../forge-release';
 import { installCommand } from '../landing-data';
+import { HeroEmberComponent } from './hero-ember.component';
 import { ProductShowcaseComponent } from './product-showcase.component';
 
 @Component({
@@ -18,6 +19,7 @@ import { ProductShowcaseComponent } from './product-showcase.component';
     LmnArrowRightIcon,
     LmnCheckIcon,
     LmnClipboardIcon,
+    HeroEmberComponent,
     ProductShowcaseComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -43,10 +45,11 @@ import { ProductShowcaseComponent } from './product-showcase.component';
             >Explore the live demo</a
           >
         </div>
-        <div class="forge-hero-platforms">
-          <span>Angular + Analog</span><span>Cloudflare D1 + R2</span
-          ><span>Portable libSQL + S3</span>
-        </div>
+      </div>
+      <forge-cms-hero-ember />
+      <div class="forge-hero-platforms">
+        <span>Angular + Analog</span><span>Cloudflare D1 + R2</span
+        ><span>Portable libSQL + S3</span>
       </div>
       <forge-cms-product-showcase />
       <div class="forge-install">
