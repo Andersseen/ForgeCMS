@@ -2,13 +2,15 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { VoltNativeButton } from '@voltui/components';
 import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
+import { ScrollTopComponent } from './scroll-top.component';
 
 @Component({
   selector: 'forge-cms-footer',
   standalone: true,
-  imports: [RouterLink, VoltNativeButton, LmnArrowRightIcon],
+  imports: [RouterLink, VoltNativeButton, LmnArrowRightIcon, ScrollTopComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
+    <forge-cms-scroll-top />
     <section class="border-t border-border bg-background px-5 py-16 md:px-8 md:py-20">
       <div
         class="mx-auto flex w-full max-w-7xl flex-col justify-between gap-8 md:flex-row md:items-center"
