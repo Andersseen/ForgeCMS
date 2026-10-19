@@ -2,6 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://forgecms.dev/</loc></url>
   <url><loc>https://forgecms.dev/demo</loc></url>
+  <url><loc>https://forgecms.dev/privacy</loc></url>
   <url><loc>https://forgecms.dev/docs/access-control</loc></url>
   <url><loc>https://forgecms.dev/docs/adapters</loc></url>
   <url><loc>https://forgecms.dev/docs/admin-ui</loc></url>

@@ -57,6 +57,6 @@ export class SiteThemeService {
     applyVoltTheme({ dark }, this.document);
     this.document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', dark ? '#0A0F1A' : '#F7F9FC');
+      ?.setAttribute('content', dark ? '#1A1920' : '#F5F4F7');
   }
 }

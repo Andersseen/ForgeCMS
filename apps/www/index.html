@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="theme-color" content="#F5F4F7" />
     <script>
       (() => {
         let theme;
@@ -13,6 +14,9 @@
           (theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
         document.documentElement.classList.toggle('dark', dark);
         document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        document
+          .querySelector('meta[name="theme-color"]')
+          ?.setAttribute('content', dark ? '#1A1920' : '#F5F4F7');
       })();
     </script>
     <title>ForgeCMS — the Angular-native headless CMS</title>
@@ -57,7 +61,6 @@
         ]
       }
     </script>
-    <meta name="theme-color" content="#0A0F1A" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
   </head>
   <body>
