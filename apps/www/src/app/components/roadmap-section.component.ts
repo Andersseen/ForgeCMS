@@ -1,6 +1,8 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
+  DOCUMENT,
   afterNextRender,
   inject,
   signal,
@@ -11,12 +13,12 @@ import { RouterLink } from '@angular/router';
 import { VoltNativeButton } from '@voltui/components';
 import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
 import { LmnChevronLeftIcon } from 'lumen-icons/chevron-left';
-import { MoveAnimator } from 'angular-movement';
 import { LmnChevronRightIcon } from 'lumen-icons/chevron-right';
 import { V2_MILESTONES } from '../roadmap-data';
 
-/** Soft, slightly underdamped spring: one clear overshoot, then rest. */
-const SPRING = { stiffness: 220, damping: 15, mass: 1 };
+/** Slightly underdamped spring: one soft overshoot between cards, then rest. */
+const STIFFNESS = 190;
+const DAMPING = 17;
 
 /**
  * A compact public summary of the canonical V2 milestone inventory as a native horizontal scroller
@@ -91,6 +93,8 @@ const SPRING = { stiffness: 220, damping: 15, mass: 1 };
           data-scroll-x
           aria-label="ForgeCMS 2.0 milestones"
           (scroll)="syncEdges()"
+          (pointerdown)="stop()"
+          (keydown)="stop()"
         >
           @for (milestone of milestones; track milestone.id) {
             <li class="forge-milestone" [attr.data-status]="milestone.status">
@@ -113,7 +117,9 @@ const SPRING = { stiffness: 220, damping: 15, mass: 1 };
   `
 })
 export class RoadmapSectionComponent {
-  private readonly animator = inject(MoveAnimator);
+  private readonly view = inject(DOCUMENT).defaultView;
+  private frame = 0;
+  private pendingTarget: number | null = null;
   private readonly track = viewChild.required<ElementRef<HTMLElement>>('track');
 
   protected readonly milestones = V2_MILESTONES;
@@ -123,12 +129,14 @@ export class RoadmapSectionComponent {
 
   constructor() {
     afterNextRender(() => this.syncEdges());
+    inject(DestroyRef).onDestroy(() => this.view?.cancelAnimationFrame(this.frame));
   }
 
   /**
-   * Moves the track exactly one card. The scroll position jumps instantly (so snap and keyboard
-   * scrolling stay native) and every card then springs from where it visibly was to its new place,
-   * which gives the step a small bounce instead of a long glide. Reduced motion skips the spring.
+   * Moves the track exactly one card with a spring that drives `scrollLeft` itself. Animating the
+   * scroll position (rather than transforming the cards) keeps the scrollable area fixed, and the
+   * browser clamps it at both ends, so the first and last card can never be pushed past their stop.
+   * Rapid clicks chain from the pending target; reduced motion jumps straight there.
    */
   protected page(direction: -1 | 1): void {
     const track = this.track().nativeElement;
@@ -137,37 +145,61 @@ export class RoadmapSectionComponent {
     if (!first) return;
 
     const step = cards[1] ? cards[1].offsetLeft - first.offsetLeft : first.offsetWidth;
-    const before = track.scrollLeft;
     const max = track.scrollWidth - track.clientWidth;
-    const target = Math.min(max, Math.max(0, (Math.round(before / step) + direction) * step));
+    const from = this.pendingTarget ?? track.scrollLeft;
+    const target = Math.min(max, Math.max(0, (Math.round(from / step) + direction) * step));
+    this.springTo(track, target, max);
+  }
 
-    // Snap areas follow the cards' transforms, so mandatory snap would re-resolve the jump to another
-    // card while they spring. Suspend it until the motion settles.
-    track.style.scrollSnapType = 'none';
-    track.scrollTo({ left: target, behavior: 'instant' });
-    const shift = track.scrollLeft - before;
-    if (Math.abs(shift) < 1) {
-      track.style.scrollSnapType = '';
+  /** Cancels a running spring and gives the scroller back to native snapping. */
+  protected stop(): void {
+    if (!this.frame) return;
+    this.view?.cancelAnimationFrame(this.frame);
+    this.frame = 0;
+    this.pendingTarget = null;
+    this.track().nativeElement.style.scrollSnapType = '';
+  }
+
+  private springTo(track: HTMLElement, target: number, max: number): void {
+    const view = this.view;
+    const reduced = view?.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? true;
+    this.stop();
+
+    if (!view || reduced) {
+      track.scrollTo({ left: target, behavior: 'instant' });
+      this.syncEdges();
       return;
     }
 
-    const lead = Math.round(track.scrollLeft / step);
-    const runs = cards.map(
-      (card, index) =>
-        this.animator.animate(
-          card,
-          { x: [shift, 0] },
-          {
-            spring: SPRING,
-            delay: Math.min(Math.abs(index - lead), 4) * 28
-          }
-        )?.finished
-    );
-    this.syncEdges();
-    void Promise.allSettled(runs).then(() => {
-      track.style.scrollSnapType = '';
-      this.syncEdges();
-    });
+    // Mandatory snap would fight the in-between positions, so suspend it while the spring runs.
+    track.style.scrollSnapType = 'none';
+    this.pendingTarget = target;
+    let position = track.scrollLeft;
+    let velocity = 0;
+    let last = view.performance.now();
+
+    const tick = (now: number): void => {
+      const dt = Math.min((now - last) / 1000, 1 / 30);
+      last = now;
+      velocity += (-STIFFNESS * (position - target) - DAMPING * velocity) * dt;
+      position += velocity * dt;
+      if (position < 0 || position > max) {
+        position = Math.min(max, Math.max(0, position));
+        velocity = 0;
+      }
+      track.scrollTo({ left: position, behavior: 'instant' });
+
+      if (Math.abs(position - target) < 0.4 && Math.abs(velocity) < 4) {
+        track.scrollTo({ left: target, behavior: 'instant' });
+        this.frame = 0;
+        this.pendingTarget = null;
+        track.style.scrollSnapType = '';
+        this.syncEdges();
+        return;
+      }
+      this.frame = view.requestAnimationFrame(tick);
+    };
+    this.frame = view.requestAnimationFrame(tick);
   }
 
   protected syncEdges(): void {
