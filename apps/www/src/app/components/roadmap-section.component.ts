@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   afterNextRender,
+  inject,
   signal,
   viewChild
 } from '@angular/core';
@@ -10,8 +11,12 @@ import { RouterLink } from '@angular/router';
 import { VoltNativeButton } from '@voltui/components';
 import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
 import { LmnChevronLeftIcon } from 'lumen-icons/chevron-left';
+import { MoveAnimator } from 'angular-movement';
 import { LmnChevronRightIcon } from 'lumen-icons/chevron-right';
 import { V2_MILESTONES } from '../roadmap-data';
+
+/** Soft, slightly underdamped spring: one clear overshoot, then rest. */
+const SPRING = { stiffness: 220, damping: 15, mass: 1 };
 
 /**
  * A compact public summary of the canonical V2 milestone inventory as a native horizontal scroller
@@ -108,6 +113,7 @@ import { V2_MILESTONES } from '../roadmap-data';
   `
 })
 export class RoadmapSectionComponent {
+  private readonly animator = inject(MoveAnimator);
   private readonly track = viewChild.required<ElementRef<HTMLElement>>('track');
 
   protected readonly milestones = V2_MILESTONES;
@@ -119,10 +125,49 @@ export class RoadmapSectionComponent {
     afterNextRender(() => this.syncEdges());
   }
 
-  /** Scroll by most of the visible width; the CSS `scroll-behavior` honours reduced motion. */
+  /**
+   * Moves the track exactly one card. The scroll position jumps instantly (so snap and keyboard
+   * scrolling stay native) and every card then springs from where it visibly was to its new place,
+   * which gives the step a small bounce instead of a long glide. Reduced motion skips the spring.
+   */
   protected page(direction: -1 | 1): void {
     const track = this.track().nativeElement;
-    track.scrollBy({ left: direction * track.clientWidth * 0.8 });
+    const cards = Array.from(track.children) as HTMLElement[];
+    const first = cards[0];
+    if (!first) return;
+
+    const step = cards[1] ? cards[1].offsetLeft - first.offsetLeft : first.offsetWidth;
+    const before = track.scrollLeft;
+    const max = track.scrollWidth - track.clientWidth;
+    const target = Math.min(max, Math.max(0, (Math.round(before / step) + direction) * step));
+
+    // Snap areas follow the cards' transforms, so mandatory snap would re-resolve the jump to another
+    // card while they spring. Suspend it until the motion settles.
+    track.style.scrollSnapType = 'none';
+    track.scrollTo({ left: target, behavior: 'instant' });
+    const shift = track.scrollLeft - before;
+    if (Math.abs(shift) < 1) {
+      track.style.scrollSnapType = '';
+      return;
+    }
+
+    const lead = Math.round(track.scrollLeft / step);
+    const runs = cards.map(
+      (card, index) =>
+        this.animator.animate(
+          card,
+          { x: [shift, 0] },
+          {
+            spring: SPRING,
+            delay: Math.min(Math.abs(index - lead), 4) * 28
+          }
+        )?.finished
+    );
+    this.syncEdges();
+    void Promise.allSettled(runs).then(() => {
+      track.style.scrollSnapType = '';
+      this.syncEdges();
+    });
   }
 
   protected syncEdges(): void {
