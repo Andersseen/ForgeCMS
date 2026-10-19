@@ -25,31 +25,37 @@ import { ProductShowcaseComponent } from './product-showcase.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section id="product" class="forge-product-hero">
-      <div class="forge-hero-intro">
-        <volt-badge variant="secondary" class="forge-release-badge"
-          >Open source · ForgeCMS {{ version }} · stable</volt-badge
-        >
-        <h1>
-          Your content.<br />Your code.<br class="forge-hero-mobile-break" />
-          Your Angular.
-        </h1>
-        <p>
-          The code-first headless CMS that feels at home in your Angular application. Model in
-          TypeScript, give editors a real Angular admin, and keep the site UI yours.
-        </p>
-        <div class="forge-hero-actions">
-          <a voltButton size="lg" routerLink="/docs/small-project-guide" class="forge-brand-button"
-            >Start building <lmn-arrow-right [size]="20"
-          /></a>
-          <a voltButton variant="outline" size="lg" routerLink="/demo" class="forge-dark-outline"
-            >Explore the live demo</a
+      <div class="forge-hero-stage">
+        <div class="forge-hero-intro">
+          <volt-badge variant="secondary" class="forge-release-badge"
+            >Open source · ForgeCMS {{ version }} · stable</volt-badge
           >
+          <h1>
+            Your content.<br />Your code.<br class="forge-hero-mobile-break" />
+            Your Angular.
+          </h1>
+          <p>
+            The code-first headless CMS that feels at home in your Angular application. Model in
+            TypeScript, give editors a real Angular admin, and keep the site UI yours.
+          </p>
+          <div class="forge-hero-actions">
+            <a
+              voltButton
+              size="lg"
+              routerLink="/docs/small-project-guide"
+              class="forge-brand-button"
+              >Start building <lmn-arrow-right [size]="20"
+            /></a>
+            <a voltButton variant="outline" size="lg" routerLink="/demo" class="forge-dark-outline"
+              >Explore the live demo</a
+            >
+          </div>
         </div>
-      </div>
-      <forge-cms-hero-ember />
-      <div class="forge-hero-platforms">
-        <span>Angular + Analog</span><span>Cloudflare D1 + R2</span
-        ><span>Portable libSQL + S3</span>
+        <forge-cms-hero-ember />
+        <div class="forge-hero-platforms">
+          <span>Angular + Analog</span><span>Cloudflare D1 + R2</span
+          ><span>Portable libSQL + S3</span>
+        </div>
       </div>
       <forge-cms-product-showcase />
       <div class="forge-install">

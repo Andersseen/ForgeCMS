@@ -8,12 +8,9 @@ const GLYPHS = ['{', '}', '<', '>', '/', '*', '+', '0', '1', ':', ';', '=', '[',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <figure class="forge-hero-ember" aria-labelledby="forge-hero-ember-caption">
-      <div class="forge-hero-ember-art">
-        <canvas #emberCanvas class="forge-hero-ember-canvas" aria-hidden="true"></canvas>
-        <span class="forge-hero-ember-kicker" aria-hidden="true">THE CONTENT FORGE</span>
-      </div>
-      <figcaption id="forge-hero-ember-caption" class="forge-hero-ember-caption">
+    <figure class="forge-hero-ember">
+      <canvas #emberCanvas class="forge-hero-ember-canvas" aria-hidden="true"></canvas>
+      <figcaption class="forge-hero-ember-caption">
         <span>Model in TypeScript</span>
         <span aria-hidden="true">→</span>
         <span>Edit in Angular</span>
@@ -132,7 +129,7 @@ export class HeroEmberComponent implements AfterViewInit, OnDestroy {
       const fraction = column / columns;
       const wave = 0.5 + 0.5 * Math.sin(fraction * Math.PI * 9 + time * 0.46);
       const detail = 0.5 + 0.5 * Math.sin(fraction * Math.PI * 23 - time * 0.82);
-      const flameHeight = 0.34 + 0.5 * wave ** 1.8 + 0.14 * detail ** 2;
+      const flameHeight = 0.2 + 0.38 * wave ** 2.2 + 0.12 * detail ** 3;
 
       for (let row = 0; row < rows; row++) {
         const rise = (rows - row - 0.5) / rows;
@@ -141,14 +138,14 @@ export class HeroEmberComponent implements AfterViewInit, OnDestroy {
 
         const seed = this.hash(column, row);
         const flicker = 0.5 + 0.5 * Math.sin(time * (3.4 + seed * 2) + seed * 15);
-        const density = Math.min(1, heat * 1.6 + 0.12 * flicker);
+        const density = Math.min(1, heat * 1.35 + 0.1 * flicker);
         if (seed > density) continue;
 
-        const nearBed = rise < 0.06;
+        const nearBed = rise < 0.075;
         context.fillStyle = nearBed ? foreground : seed > 0.91 ? cyan : primary;
         context.globalAlpha = nearBed
           ? 0.42 + 0.3 * flicker
-          : Math.min(0.9, (0.25 + 0.65 * heat) * (0.7 + 0.3 * flicker));
+          : Math.min(0.7, (0.15 + 0.5 * heat) * (0.7 + 0.3 * flicker));
         const glyph = GLYPHS[Math.floor(this.hash(row, column + 19) * GLYPHS.length)] ?? '+';
         context.fillText(glyph, x, (row + 0.5) * step);
       }

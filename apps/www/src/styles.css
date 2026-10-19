@@ -399,7 +399,7 @@ html.dark:has(.forge-public) {
 .forge-product-hero {
   background: var(--background);
   color: var(--foreground);
-  padding: 68px 32px 48px;
+  padding: 40px 32px 48px;
   scroll-margin-top: 90px;
 }
 .forge-hero-intro {
@@ -419,7 +419,7 @@ html.dark:has(.forge-public) {
   padding: 7px 10px;
 }
 .forge-hero-intro h1 {
-  font-size: clamp(2.65rem, 6.5vw, 6.4rem);
+  font-size: clamp(2.65rem, min(6.5vw, 10.5vh), 6.4rem);
   letter-spacing: -0.065em;
   font-weight: 620;
   line-height: 1.04;
@@ -463,15 +463,18 @@ html.dark:has(.forge-public) {
 .forge-product-hero .forge-dark-outline:hover {
   background: var(--forge-raised);
 }
-.forge-hero-ember {
-  max-width: 1216px;
-  margin: 8px auto 0;
+.forge-hero-stage {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100svh - 73px - 68px - 24px);
 }
-.forge-hero-ember-art {
+.forge-hero-ember {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  height: clamp(230px, 24vw, 330px);
+  flex: 1 1 auto;
+  min-height: 170px;
+  margin: 12px -32px 0;
   background:
     radial-gradient(
       ellipse 64% 38% at 50% 100%,
@@ -487,39 +490,28 @@ html.dark:has(.forge-public) {
   mask-image: linear-gradient(to bottom, transparent 0%, black 22%, black 100%);
 }
 .forge-hero-ember-canvas {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
 }
-.forge-hero-ember-kicker {
+.forge-hero-ember-caption {
   position: absolute;
-  bottom: 14px;
+  bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 3px 10px;
-  background: color-mix(in srgb, var(--background) 72%, transparent);
-  border-radius: 4px;
-  color: var(--muted-foreground);
-  font:
-    600 10px/1.3 ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    Monaco,
-    Consolas,
-    monospace;
-  letter-spacing: 0.18em;
-  white-space: nowrap;
-}
-.forge-hero-ember-caption {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 16px;
-  margin-top: 6px;
+  padding: 4px 14px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--background) 72%, transparent);
   color: var(--foreground);
   font-size: 13px;
   font-weight: 550;
-  text-align: center;
+  white-space: nowrap;
 }
 .forge-hero-ember-caption span[aria-hidden] {
   color: var(--forge-cyan);
@@ -529,7 +521,7 @@ html.dark:has(.forge-public) {
   justify-content: center;
   flex-wrap: wrap;
   gap: 8px 24px;
-  margin: 21px 0 46px;
+  margin: 16px 0 46px;
   font-size: 12px;
   color: var(--muted-foreground);
 }
@@ -962,17 +954,21 @@ html.dark:has(.forge-public) {
     gap: 8px 14px;
     margin-bottom: 34px;
   }
-  .forge-hero-ember {
-    margin-top: 14px;
+  .forge-hero-stage {
+    min-height: 0;
   }
-  .forge-hero-ember-art {
+  .forge-hero-ember {
     height: 230px;
+    flex: none;
+    margin: 14px -20px 0;
   }
   .forge-hero-ember-caption {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 5px;
+    width: calc(100% - 24px);
     font-size: 11px;
+    white-space: normal;
   }
   .forge-hero-ember-caption span[aria-hidden] {
     display: none;
