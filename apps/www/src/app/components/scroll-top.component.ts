@@ -8,8 +8,8 @@ import {
 import { VoltNativeButton } from '@voltui/components';
 import { LmnArrowUpIcon } from 'lumen-icons/arrow-up';
 
-/** Pixels of upward travel that count as "scrolling up" (ignores trackpad jitter). */
-const UP_DELTA = 6;
+/** Upward travel from the last downward peak that counts as "scrolling up" (ignores jitter). */
+const UP_TRAVEL = 24;
 
 /**
  * A back-to-top button that only exists while the reader is past the first screen and moving down.
@@ -38,14 +38,24 @@ const UP_DELTA = 6;
         size="icon"
         class="forge-scroll-top"
         aria-label="Back to top"
-        [moveInitial]="{ opacity: 0, y: 16, scale: 0.9 }"
-        [moveAnimate]="{ opacity: 1, y: 0, scale: 1 }"
-        [moveExit]="{ opacity: 0, y: 16, scale: 0.9 }"
+        [moveInitial]="{ opacity: 0, y: 28, scale: 0.7, blur: 6 }"
+        [moveAnimate]="{ opacity: 1, y: 0, scale: 1, blur: 0 }"
+        [moveExit]="{ opacity: 0, y: 14, scale: 0.85, blur: 4 }"
+        moveDuration="460"
+        moveEasing="cubic-bezier(0.34, 1.56, 0.64, 1)"
         moveWhileHover="lift"
         moveWhileTap="press"
         (click)="toTop()"
       >
-        <lmn-arrow-up [size]="20" />
+        <span
+          class="forge-scroll-top-icon"
+          [moveInitial]="{ opacity: 0, y: 10 }"
+          [moveAnimate]="{ opacity: 1, y: 0 }"
+          moveDelay="160"
+          moveDuration="380"
+        >
+          <lmn-arrow-up [size]="20" />
+        </span>
       </button>
     </ng-container>
   `
@@ -53,6 +63,8 @@ const UP_DELTA = 6;
 export class ScrollTopComponent {
   private readonly document = inject(DOCUMENT);
   private lastY = 0;
+  /** Highest scroll position reached since the reader last moved down. */
+  private peakY = 0;
 
   protected readonly visible = signal(false);
 
@@ -62,11 +74,11 @@ export class ScrollTopComponent {
     const y = view.scrollY;
     // "Past the hero": the first screen has scrolled out of view.
     const pastHero = y > view.innerHeight * 0.9;
-    const delta = y - this.lastY;
+    if (y > this.lastY) this.peakY = y;
 
     if (!pastHero) this.visible.set(false);
-    else if (delta > 0) this.visible.set(true);
-    else if (delta < -UP_DELTA) this.visible.set(false);
+    else if (y > this.lastY) this.visible.set(true);
+    else if (this.peakY - y >= UP_TRAVEL) this.visible.set(false);
 
     this.lastY = y;
   }

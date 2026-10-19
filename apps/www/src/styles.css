@@ -3026,3 +3026,6 @@ forge-cms-hero-ember {
     bottom: 0.75rem;
   }
 }
+.forge-scroll-top-icon {
+  display: inline-flex;
+}
