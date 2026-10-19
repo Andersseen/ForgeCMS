@@ -38,24 +38,16 @@ const UP_TRAVEL = 24;
         size="icon"
         class="forge-scroll-top"
         aria-label="Back to top"
-        [moveInitial]="{ opacity: 0, y: 28, scale: 0.7, blur: 6 }"
-        [moveAnimate]="{ opacity: 1, y: 0, scale: 1, blur: 0 }"
-        [moveExit]="{ opacity: 0, y: 14, scale: 0.85, blur: 4 }"
-        moveDuration="460"
-        moveEasing="cubic-bezier(0.34, 1.56, 0.64, 1)"
+        [moveInitial]="{ opacity: 0, y: 16, scale: 0.92 }"
+        [moveAnimate]="{ opacity: 1, y: 0, scale: 1 }"
+        [moveExit]="{ opacity: 0, y: 10, scale: 0.96 }"
+        moveDuration="420"
+        moveEasing="cubic-bezier(0.22, 1, 0.36, 1)"
         moveWhileHover="lift"
         moveWhileTap="press"
         (click)="toTop()"
       >
-        <span
-          class="forge-scroll-top-icon"
-          [moveInitial]="{ opacity: 0, y: 10 }"
-          [moveAnimate]="{ opacity: 1, y: 0 }"
-          moveDelay="160"
-          moveDuration="380"
-        >
-          <lmn-arrow-up [size]="20" />
-        </span>
+        <lmn-arrow-up [size]="20" />
       </button>
     </ng-container>
   `
