@@ -27,7 +27,10 @@ import { ProductShowcaseComponent } from './product-showcase.component';
         <volt-badge variant="secondary" class="forge-release-badge"
           >Open source · ForgeCMS {{ version }} · stable</volt-badge
         >
-        <h1>Your content.<br />Your code. Your Angular.</h1>
+        <h1>
+          Your content.<br />Your code.<br class="forge-hero-mobile-break" />
+          Your Angular.
+        </h1>
         <p>
           The code-first headless CMS that feels at home in your Angular application. Model in
           TypeScript, give editors a real Angular admin, and keep the site UI yours.

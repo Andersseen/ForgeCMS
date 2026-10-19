@@ -24,13 +24,13 @@ for (const mode of ['light', 'dark'] as const) {
     await page.addInitScript((theme) => localStorage.setItem('forgecms-theme', theme), mode);
     await page.goto('/');
     const label = mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
-    const background = mode === 'dark' ? 'rgb(26, 25, 32)' : 'rgb(245, 244, 247)';
+    const background = mode === 'dark' ? 'rgb(23, 24, 28)' : 'rgb(246, 247, 248)';
     await page.getByRole('tab', { name: 'Content', exact: true }).click();
     await expect
       .poll(() =>
         page.locator('.forge-content-view').evaluate((el) => getComputedStyle(el).backgroundColor)
       )
-      .toBe(mode === 'dark' ? 'rgb(38, 36, 45)' : 'rgb(255, 255, 255)');
+      .toBe(mode === 'dark' ? 'rgb(34, 36, 42)' : 'rgb(255, 255, 255)');
     for (const [destination, path] of [
       ['Product', '/'],
       ['Demo', '/demo'],
@@ -76,11 +76,58 @@ for (const mode of ['light', 'dark'] as const) {
         ].map((token) => [token, css.getPropertyValue(token).trim()])
       );
     });
-    expect(palette['--background']).toBe(mode === 'dark' ? '#1a1920' : '#f5f4f7');
+    expect(palette['--background']).toBe(mode === 'dark' ? '#17181c' : '#f6f7f8');
     expect(palette['--forge-surface']).not.toBe(palette['--background']);
     expect(palette['--forge-raised']).not.toBe(palette['--background']);
-    expect(palette['--primary']).toBeTruthy();
-    expect(palette['--forge-cyan']).toBeTruthy();
+    expect(palette['--primary']).toBe(mode === 'dark' ? '#b39afa' : '#7646dd');
+    expect(palette['--forge-cyan']).toBe(mode === 'dark' ? '#56d9e9' : '#08798a');
+
+    const primaryFill = mode === 'dark' ? 'rgb(179, 154, 250)' : 'rgb(118, 70, 221)';
+    // The prerendered link can appear before Volt applies its button classes.
+    await expect(
+      page.locator('.forge-header').getByRole('link', { name: 'Get started' })
+    ).toHaveCSS('background-color', primaryFill);
+    const buttons = await page.evaluate(() => {
+      const css = (element: Element) => {
+        const style = getComputedStyle(element);
+        return { background: style.backgroundColor, color: style.color };
+      };
+      const header = Array.from(document.querySelectorAll('.forge-header a')).find(
+        (link) => link.textContent?.trim() === 'Get started'
+      );
+      return {
+        primary: css(document.querySelector('.forge-brand-button')!),
+        header: css(header!)
+      };
+    });
+    const primaryText = mode === 'dark' ? 'rgb(33, 26, 46)' : 'rgb(255, 255, 255)';
+    expect(buttons.primary).toEqual({ background: primaryFill, color: primaryText });
+    expect(buttons.header).toEqual({ background: primaryFill, color: primaryText });
+
+    const scrollbars = await page.evaluate(() => {
+      const root = getComputedStyle(document.documentElement);
+      const page = getComputedStyle(document.querySelector('.forge-public')!);
+      return {
+        viewportTrack: root.getPropertyValue('--scrollbar-track').trim(),
+        viewportThumb: root.getPropertyValue('--scrollbar-thumb').trim(),
+        viewportHover: root.getPropertyValue('--scrollbar-thumb-hover').trim(),
+        contentTrack: page.getPropertyValue('--scrollbar-track').trim(),
+        contentThumb: page.getPropertyValue('--scrollbar-thumb').trim()
+      };
+    });
+    expect(scrollbars).toEqual({
+      viewportTrack: mode === 'dark' ? '#17181c' : '#f6f7f8',
+      viewportThumb: mode === 'dark' ? '#757985' : '#898f98',
+      viewportHover: mode === 'dark' ? '#b39afa' : '#7646dd',
+      contentTrack: mode === 'dark' ? '#22242a' : '#ffffff',
+      contentThumb: mode === 'dark' ? '#757985' : '#898f98'
+    });
+
+    await page.goto('/privacy');
+    await expect(page.getByRole('button', { name: 'Allow analytics' })).toHaveCSS(
+      'background-color',
+      primaryFill
+    );
 
     const contrast = await page.locator('.forge-public').evaluate((element) => {
       const css = getComputedStyle(element);
@@ -122,6 +169,33 @@ for (const mode of ['light', 'dark'] as const) {
     expect(contrast.accent).toBeGreaterThanOrEqual(4.5);
     expect(contrast.button).toBeGreaterThanOrEqual(4.5);
     expect(contrast.border).toBeGreaterThanOrEqual(3);
+  });
+}
+
+for (const mode of ['light', 'dark'] as const) {
+  test(`${mode} public pages use one primary button treatment`, async ({ page }) => {
+    await page.addInitScript((theme) => localStorage.setItem('forgecms-theme', theme), mode);
+    const expected = {
+      background: mode === 'dark' ? 'rgb(179, 154, 250)' : 'rgb(118, 70, 221)',
+      foreground: mode === 'dark' ? 'rgb(33, 26, 46)' : 'rgb(255, 255, 255)'
+    };
+
+    for (const path of ['/', '/demo', '/docs/introduction', '/privacy']) {
+      await page.goto(path);
+      await expect(
+        page.locator('.forge-header').getByRole('link', { name: 'Get started' })
+      ).toHaveCSS('background-color', expected.background);
+      const buttons = await page
+        .locator('.forge-public [voltButton]:not([variant])')
+        .evaluateAll((elements) =>
+          elements.map((element) => {
+            const style = getComputedStyle(element);
+            return { background: style.backgroundColor, foreground: style.color };
+          })
+        );
+      expect(buttons.length, `${path} has a primary action`).toBeGreaterThan(0);
+      for (const button of buttons) expect(button, `${path} primary action`).toEqual(expected);
+    }
   });
 }
 
@@ -196,5 +270,5 @@ test('saved theme is applied before Angular starts', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('html')).toHaveClass(/dark/);
   expect(await page.locator('html').evaluate((el) => el.style.colorScheme)).toBe('dark');
-  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#1A1920');
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#17181C');
 });

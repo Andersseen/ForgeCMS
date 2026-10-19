@@ -58,7 +58,11 @@ import { SiteAnalyticsConsentService } from '../site-analytics-consent.service';
                   Disable analytics
                 </button>
               } @else {
-                <button class="privacy-choice" type="button" (click)="analytics.accept()">
+                <button
+                  class="privacy-choice is-primary"
+                  type="button"
+                  (click)="analytics.accept()"
+                >
                   Allow analytics
                 </button>
                 <button class="privacy-choice" type="button" (click)="analytics.decline()">
