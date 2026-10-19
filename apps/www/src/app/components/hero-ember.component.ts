@@ -4,6 +4,7 @@ import {
   DOCUMENT,
   DestroyRef,
   NgZone,
+  PLATFORM_ID,
   afterNextRender,
   effect,
   inject,
@@ -11,6 +12,7 @@ import {
   viewChild
 } from '@angular/core';
 import type { ElementRef, Signal } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { fromEvent, map, startWith } from 'rxjs';
 import { SiteThemeService } from '../site-theme.service';
@@ -34,6 +36,7 @@ export class HeroEmberComponent {
   private readonly document = inject(DOCUMENT);
   private readonly zone = inject(NgZone);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   private readonly theme = inject(SiteThemeService);
   private readonly canvas = viewChild.required<ElementRef<HTMLCanvasElement>>('emberCanvas');
 
@@ -80,7 +83,9 @@ export class HeroEmberComponent {
   }
 
   private matchMedia(query: string): Signal<boolean> {
-    const media = this.document.defaultView?.matchMedia(query);
+    const view = this.document.defaultView;
+    // The prerender DOM has a window but no matchMedia.
+    const media = typeof view?.matchMedia === 'function' ? view.matchMedia(query) : null;
     if (!media) return signal(false).asReadonly();
     return toSignal(
       fromEvent<MediaQueryListEvent>(media, 'change').pipe(
@@ -92,6 +97,7 @@ export class HeroEmberComponent {
   }
 
   private init(): void {
+    if (!this.isBrowser) return;
     const canvas = this.canvas().nativeElement;
     const context = canvas.getContext('2d');
     if (!context) return;

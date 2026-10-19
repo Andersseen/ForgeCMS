@@ -83,6 +83,7 @@ import { V2_MILESTONES } from '../roadmap-data';
           #track
           class="forge-roadmap-track"
           tabindex="0"
+          data-scroll-x
           aria-label="ForgeCMS 2.0 milestones"
           (scroll)="syncEdges()"
         >
