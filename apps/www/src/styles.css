@@ -477,8 +477,9 @@ html.dark:has(.forge-public) {
 .forge-hero-ember {
   position: absolute;
   z-index: 0;
-  left: calc(50% - 50vw);
-  width: 100vw;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(100%, 1216px);
   bottom: 0;
   height: min(46%, 380px);
   pointer-events: none;
@@ -493,8 +494,14 @@ html.dark:has(.forge-public) {
       color-mix(in srgb, var(--forge-cyan) 10%, transparent),
       transparent 92%
     );
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 35%, black 100%);
-  mask-image: linear-gradient(to bottom, transparent 0%, black 35%, black 100%);
+  -webkit-mask-image:
+    linear-gradient(to bottom, transparent 0%, black 35%, black 100%),
+    linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to bottom, transparent 0%, black 35%, black 100%),
+    linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+  mask-composite: intersect;
 }
 .forge-hero-ember-canvas {
   display: block;
