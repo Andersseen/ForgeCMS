@@ -1,6 +1,6 @@
 # 100 — Refine the public website palette and add consent-gated Umami audience measurement
 
-- **Status:** in-progress
+- **Status:** done
 - **Author:** Codex, from the maintainer's explicit implementation request
 - **Date:** 2026-10-19
 - **Branch:** `feat/www-umami-brand-palette`
@@ -74,3 +74,7 @@ Umami integration with a clear privacy notice and footer link.
 - Confirm the site's controller identity/contact, Umami version and configuration, processing location/roles,
   data reuse policy, and database retention/deletion period before considering removal of the consent gate.
 - Until those facts are verified, explicit consent is required by the implementation.
+
+## Outcome
+
+Merged as PR #119 (`e7e280c8621bf115042e1b8f3d1d11eb00a2c0c7`). All acceptance criteria and automated checks passed; main CI and the Cloudflare Pages deployment job succeeded. Live DNS checks for the site and analytics endpoint were unavailable from this environment, so production page response and tracker ingestion remain unverified. Consent stays enabled while the listed service/controller/retention facts await owner confirmation.
