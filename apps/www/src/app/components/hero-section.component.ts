@@ -51,11 +51,11 @@ import { ProductShowcaseComponent } from './product-showcase.component';
             >
           </div>
         </div>
-        <forge-cms-hero-ember />
         <div class="forge-hero-platforms">
           <span>Angular + Analog</span><span>Cloudflare D1 + R2</span
           ><span>Portable libSQL + S3</span>
         </div>
+        <forge-cms-hero-ember />
       </div>
       <forge-cms-product-showcase />
       <div class="forge-install">

@@ -8,16 +8,9 @@ const GLYPHS = ['{', '}', '<', '>', '/', '*', '+', '0', '1', ':', ';', '=', '[',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <figure class="forge-hero-ember">
-      <canvas #emberCanvas class="forge-hero-ember-canvas" aria-hidden="true"></canvas>
-      <figcaption class="forge-hero-ember-caption">
-        <span>Model in TypeScript</span>
-        <span aria-hidden="true">→</span>
-        <span>Edit in Angular</span>
-        <span aria-hidden="true">→</span>
-        <span>Render it your way</span>
-      </figcaption>
-    </figure>
+    <div class="forge-hero-ember" aria-hidden="true">
+      <canvas #emberCanvas class="forge-hero-ember-canvas"></canvas>
+    </div>
   `
 })
 export class HeroEmberComponent implements AfterViewInit, OnDestroy {
