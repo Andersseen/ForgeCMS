@@ -13,6 +13,7 @@ const WIDTHS = [390, 768, 1440, 1920];
 const ROUTES = [
   '/',
   '/demo',
+  '/privacy',
   '/docs/introduction',
   '/docs/quickstart',
   '/docs/schema-upgrades',
@@ -236,10 +237,16 @@ test('robots and sitemap are real, valid public files', async ({ request }) => {
     .filter((name) => name.endsWith('.md'))
     .map((name) => `https://forgecms.dev/docs/${name.slice(0, -3)}`);
   expect(new Set(locations).size).toBe(locations.length);
-  expect(locations).toEqual(['https://forgecms.dev/', 'https://forgecms.dev/demo', ...docs]);
+  expect(locations).toEqual([
+    'https://forgecms.dev/',
+    'https://forgecms.dev/demo',
+    'https://forgecms.dev/privacy',
+    ...docs
+  ]);
   for (const path of [
     '/',
     '/demo',
+    '/privacy',
     '/docs/introduction',
     '/docs/quickstart',
     '/docs/schema-upgrades',
@@ -261,6 +268,7 @@ test('public content and route metadata are in HTTP HTML without JavaScript', as
   const pages: Array<[string, string]> = [
     ['/', 'Your content.'],
     ['/demo', 'Lumea is a clinic built from content'],
+    ['/privacy', 'Website audience measurement'],
     ['/docs/introduction', 'Introduction'],
     ['/docs/quickstart', 'Quickstart'],
     ['/docs/schema-upgrades', 'Schema upgrades'],

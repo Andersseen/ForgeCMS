@@ -50,6 +50,7 @@ import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
           <a class="forge-footer-link" routerLink="/docs/agent-kit">Agent Kit</a>
           <a class="forge-footer-link" routerLink="/docs/analytics">Analytics</a>
           <a class="forge-footer-link" routerLink="/docs/schema-upgrades">Upgrades</a>
+          <a class="forge-footer-link" routerLink="/privacy">Privacy</a>
           <a
             class="forge-footer-link"
             href="https://github.com/Andersseen/ForgeCMS"

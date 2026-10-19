@@ -20,6 +20,15 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/demo.page').then((m) => m.DemoPage)
   },
   {
+    path: 'privacy',
+    title: 'Privacy — ForgeCMS',
+    data: {
+      description:
+        'Learn about optional, consent-gated audience measurement on the ForgeCMS website and how to change your choice.'
+    },
+    loadComponent: () => import('./pages/privacy.page').then((m) => m.PrivacyPage)
+  },
+  {
     // The shell (header + sidebar) stays mounted across pages so the sidebar keeps its scroll.
     path: 'docs',
     loadComponent: () => import('./pages/docs/docs.page').then((m) => m.DocsPage),

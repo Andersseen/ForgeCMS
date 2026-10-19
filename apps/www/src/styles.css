@@ -158,42 +158,42 @@ body {
 
 /* Shared official-site palette: Home, Demo and Docs follow one user choice. */
 .forge-public {
-  --background: #f7f9fc;
-  --foreground: #0a0f1a;
+  --background: #f5f4f7;
+  --foreground: #211e27;
   --forge-surface: #ffffff;
-  --forge-raised: #edf0f8;
-  --forge-selected: #e8e1fb;
-  --muted: #edf0f8;
-  --muted-foreground: #526079;
-  --border: #d0d9e6;
-  --input: #d0d9e6;
+  --forge-raised: #eeecf1;
+  --forge-selected: #e9e2f7;
+  --muted: #eeecf1;
+  --muted-foreground: #5c5665;
+  --border: #908a96;
+  --input: #908a96;
   --primary: #7646dd;
   --primary-foreground: #ffffff;
   --forge-primary-hover: #6634c9;
-  --forge-cyan: #087d91;
+  --forge-cyan: #08798a;
   --accent: #e8e1fb;
-  --accent-foreground: #0a0f1a;
+  --accent-foreground: #211e27;
   --ring: #7646dd;
   background: var(--background);
   color: var(--foreground);
 }
 .dark .forge-public {
-  --background: #0a0f1a;
-  --foreground: #f2f5fb;
-  --forge-surface: #111a2b;
-  --forge-raised: #172033;
-  --forge-selected: #2b2546;
-  --muted: #172033;
-  --muted-foreground: #b6c2d8;
-  --border: #35405a;
-  --input: #35405a;
-  --primary: #a88af9;
-  --primary-foreground: #0a0f1a;
-  --forge-primary-hover: #bca5ff;
-  --forge-cyan: #22d3ee;
-  --accent: #2b2546;
-  --accent-foreground: #f2f5fb;
-  --ring: #a88af9;
+  --background: #1a1920;
+  --foreground: #f6f5f8;
+  --forge-surface: #26242d;
+  --forge-raised: #302d38;
+  --forge-selected: #3b3545;
+  --muted: #302d38;
+  --muted-foreground: #c2bdc9;
+  --border: #716c79;
+  --input: #716c79;
+  --primary: #b39afa;
+  --primary-foreground: #211a2e;
+  --forge-primary-hover: #c4b2ff;
+  --forge-cyan: #56d9e9;
+  --accent: #3b3545;
+  --accent-foreground: #f6f5f8;
+  --ring: #b39afa;
 }
 .forge-public.landing-bg {
   background-color: var(--background);
@@ -236,6 +236,87 @@ body {
 }
 .forge-public .forge-header button[aria-controls='site-mobile-nav'] {
   margin-left: 8px;
+}
+
+.forge-analytics-consent {
+  position: fixed;
+  z-index: 80;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  left: max(1rem, env(safe-area-inset-left));
+  display: flex;
+  max-width: 54rem;
+  margin-inline: auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: var(--forge-surface);
+  padding: 1rem 1.1rem;
+  color: var(--foreground);
+  box-shadow: 0 12px 36px rgb(10 15 26 / 0.22);
+}
+.forge-analytics-consent h2 {
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+.forge-analytics-consent p {
+  margin-top: 0.2rem;
+  color: var(--muted-foreground);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+.forge-analytics-consent a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.forge-analytics-consent-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.forge-analytics-consent button,
+.privacy-choice {
+  min-height: 2.6rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: var(--forge-surface);
+  padding: 0.55rem 0.75rem;
+  color: var(--foreground);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.forge-analytics-consent button.is-primary {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.forge-analytics-consent button:hover,
+.privacy-choice:hover {
+  background: var(--muted);
+}
+.forge-analytics-consent button.is-primary:hover {
+  background: var(--forge-primary-hover);
+}
+.forge-analytics-consent button:focus-visible,
+.privacy-choice:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+@media (max-width: 720px) {
+  .forge-analytics-consent {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .forge-analytics-consent-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
 }
 /* Official product website. All tokens and overrides stay inside this surface. */
 .forge-marketing {
@@ -1231,17 +1312,17 @@ body {
  * ------------------------------------------------------------------------------------------- */
 
 .forge-public {
-  --forge-term-bg: #0d1424;
-  --forge-term-fg: #e6ebf5;
-  --forge-term-muted: #9aa8c2;
-  --forge-term-border: #26314a;
+  --forge-term-bg: #292730;
+  --forge-term-fg: #f6f5f8;
+  --forge-term-muted: #c2bdc9;
+  --forge-term-border: #45414d;
   --forge-ok: #0f8a5f;
 }
 .dark .forge-public {
-  --forge-term-bg: #070b14;
+  --forge-term-bg: #141319;
   --forge-term-fg: #e6ebf5;
-  --forge-term-muted: #9aa8c2;
-  --forge-term-border: #26314a;
+  --forge-term-muted: #c2bdc9;
+  --forge-term-border: #45414d;
   --forge-ok: #34d399;
 }
 

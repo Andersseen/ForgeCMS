@@ -11,7 +11,7 @@ const output = resolve(root, 'public/sitemap.xml');
 const robotsOutput = resolve(root, 'public/robots.txt');
 
 const docs = (await readdir(docsDirectory)).filter((filename) => filename.endsWith('.md')).sort();
-const urls = ['/', '/demo'];
+const urls = ['/', '/demo', '/privacy'];
 
 for (const filename of docs) {
   const source = await readFile(resolve(docsDirectory, filename), 'utf8');

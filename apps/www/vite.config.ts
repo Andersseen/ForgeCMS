@@ -12,6 +12,7 @@ const docsDirectory = resolve(import.meta.dirname, 'src/content/docs');
 const publicRoutes = [
   '/',
   '/demo',
+  '/privacy',
   '/404.html',
   ...readdirSync(docsDirectory)
     .filter((filename) => filename.endsWith('.md'))

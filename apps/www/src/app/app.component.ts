@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Meta } from '@angular/platform-browser';
 import { NavigationEnd, Router, RouterOutlet, type ActivatedRoute } from '@angular/router';
 import { SiteThemeService } from './site-theme.service';
+import { AnalyticsConsentComponent } from './components/analytics-consent.component';
 import { filter } from 'rxjs';
 import { CANONICAL_ORIGIN, DEFAULT_SITE_DESCRIPTION, SOCIAL_IMAGE_PATH } from './site-config.mjs';
 import { canonicalUrl } from './site-meta';
@@ -10,9 +11,9 @@ import { canonicalUrl } from './site-meta';
 @Component({
   selector: 'forge-cms-root',
   standalone: true,
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, AnalyticsConsentComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<router-outlet />`
+  template: `<router-outlet /><forge-analytics-consent />`
 })
 export class AppComponent {
   private readonly theme = inject(SiteThemeService);
