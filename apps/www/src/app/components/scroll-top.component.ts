@@ -5,6 +5,7 @@ import {
   MovePresenceDirective,
   MoveTapDirective
 } from 'angular-movement';
+import { VoltNativeButton } from '@voltui/components';
 import { LmnArrowUpIcon } from 'lumen-icons/arrow-up';
 
 /** Pixels of upward travel that count as "scrolling up" (ignores trackpad jitter). */
@@ -23,6 +24,7 @@ const UP_DELTA = 6;
     MoveAnimateDirective,
     MoveHoverDirective,
     MoveTapDirective,
+    VoltNativeButton,
     LmnArrowUpIcon
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -31,6 +33,9 @@ const UP_DELTA = 6;
     <ng-container *movePresence="visible()">
       <button
         type="button"
+        voltButton
+        variant="outline"
+        size="icon"
         class="forge-scroll-top"
         aria-label="Back to top"
         [moveInitial]="{ opacity: 0, y: 16, scale: 0.9 }"
