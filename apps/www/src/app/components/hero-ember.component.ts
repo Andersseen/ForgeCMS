@@ -1,89 +1,116 @@
-import { ChangeDetectionStrategy, Component, viewChild } from '@angular/core';
-import type { AfterViewInit, ElementRef, OnDestroy } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DOCUMENT,
+  DestroyRef,
+  NgZone,
+  afterNextRender,
+  effect,
+  inject,
+  signal,
+  viewChild
+} from '@angular/core';
+import type { ElementRef, Signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { fromEvent, map, startWith } from 'rxjs';
+import { SiteThemeService } from '../site-theme.service';
 
 const GLYPHS = ['{', '}', '<', '>', '/', '*', '+', '0', '1', ':', ';', '=', '[', ']'];
+const FRAME_MS = 33;
+const STILL_FRAME_TIME = 2;
 
 @Component({
   selector: 'forge-cms-hero-ember',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '(document:visibilitychange)': 'onVisibilityChange()' },
   template: `
     <div class="forge-hero-ember" aria-hidden="true">
       <canvas #emberCanvas class="forge-hero-ember-canvas"></canvas>
     </div>
   `
 })
-export class HeroEmberComponent implements AfterViewInit, OnDestroy {
+export class HeroEmberComponent {
+  private readonly document = inject(DOCUMENT);
+  private readonly zone = inject(NgZone);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly theme = inject(SiteThemeService);
   private readonly canvas = viewChild.required<ElementRef<HTMLCanvasElement>>('emberCanvas');
+
+  private readonly ready = signal(false);
+  private readonly inView = signal(false);
+  private readonly pageHidden = signal(false);
+  private readonly reducedMotion = this.matchMedia('(prefers-reduced-motion: reduce)');
+
   private context: CanvasRenderingContext2D | null = null;
-  private resizeObserver: ResizeObserver | null = null;
-  private intersectionObserver: IntersectionObserver | null = null;
-  private themeObserver: MutationObserver | null = null;
-  private motionQuery: MediaQueryList | null = null;
-  private frame = 0;
-  private lastFrame = 0;
-  private visible = false;
   private width = 0;
   private height = 0;
 
-  ngAfterViewInit(): void {
-    if (typeof window === 'undefined') return;
+  constructor() {
+    afterNextRender(() => this.init());
 
-    const canvas = this.canvas().nativeElement;
-    this.context = canvas.getContext('2d');
-    if (!this.context) return;
+    effect((onCleanup) => {
+      this.theme.isDark();
+      if (!this.ready()) return;
+      if (this.reducedMotion()) {
+        this.draw(STILL_FRAME_TIME);
+        return;
+      }
+      if (!this.inView() || this.pageHidden()) return;
 
-    this.motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    this.motionQuery.addEventListener('change', this.onMotionChange);
-    this.resizeObserver = new ResizeObserver(() => this.resize());
-    this.resizeObserver.observe(canvas);
-    this.intersectionObserver = new IntersectionObserver(([entry]) => {
-      this.visible = entry?.isIntersecting ?? false;
-      this.syncAnimation();
+      // The loop never touches the template, so keep it out of change detection.
+      this.zone.runOutsideAngular(() => {
+        let frame = 0;
+        let last = 0;
+        const tick = (now: number): void => {
+          if (now - last >= FRAME_MS) {
+            this.draw(now / 1000);
+            last = now;
+          }
+          frame = requestAnimationFrame(tick);
+        };
+        frame = requestAnimationFrame(tick);
+        onCleanup(() => cancelAnimationFrame(frame));
+      });
     });
-    this.intersectionObserver.observe(canvas);
-    this.themeObserver = new MutationObserver(() =>
-      this.draw(this.motionQuery?.matches ? 2 : performance.now() / 1000)
+  }
+
+  protected onVisibilityChange(): void {
+    this.pageHidden.set(this.document.hidden);
+  }
+
+  private matchMedia(query: string): Signal<boolean> {
+    const media = this.document.defaultView?.matchMedia(query);
+    if (!media) return signal(false).asReadonly();
+    return toSignal(
+      fromEvent<MediaQueryListEvent>(media, 'change').pipe(
+        map((event) => event.matches),
+        startWith(media.matches)
+      ),
+      { requireSync: true }
     );
-    this.themeObserver.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class']
+  }
+
+  private init(): void {
+    const canvas = this.canvas().nativeElement;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    this.context = context;
+
+    const resizeObserver = new ResizeObserver(() => this.resize());
+    const intersectionObserver = new IntersectionObserver(([entry]) =>
+      this.inView.set(entry?.isIntersecting ?? false)
+    );
+    this.zone.runOutsideAngular(() => {
+      resizeObserver.observe(canvas);
+      intersectionObserver.observe(canvas);
     });
-    document.addEventListener('visibilitychange', this.onVisibilityChange);
-    this.resize();
-  }
-
-  ngOnDestroy(): void {
-    if (this.frame) cancelAnimationFrame(this.frame);
-    this.resizeObserver?.disconnect();
-    this.intersectionObserver?.disconnect();
-    this.themeObserver?.disconnect();
-    this.motionQuery?.removeEventListener('change', this.onMotionChange);
-    if (typeof document !== 'undefined') {
-      document.removeEventListener('visibilitychange', this.onVisibilityChange);
-    }
-  }
-
-  private readonly onMotionChange = (): void => this.syncAnimation();
-  private readonly onVisibilityChange = (): void => this.syncAnimation();
-
-  private readonly animate = (now: number): void => {
-    if (now - this.lastFrame >= 33) {
-      this.draw(now / 1000);
-      this.lastFrame = now;
-    }
-    this.frame = requestAnimationFrame(this.animate);
-  };
-
-  private syncAnimation(): void {
-    if (this.frame) cancelAnimationFrame(this.frame);
-    this.frame = 0;
-    if (this.motionQuery?.matches) {
-      this.draw(2);
-    } else if (this.visible && !document.hidden) {
-      this.lastFrame = 0;
-      this.frame = requestAnimationFrame(this.animate);
-    }
+    this.destroyRef.onDestroy(() => {
+      resizeObserver.disconnect();
+      intersectionObserver.disconnect();
+    });
+    this.pageHidden.set(this.document.hidden);
+    this.ready.set(true);
   }
 
   private resize(): void {
@@ -93,11 +120,11 @@ export class HeroEmberComponent implements AfterViewInit, OnDestroy {
     this.height = rect.height;
     if (!this.width || !this.height || !this.context) return;
 
-    const scale = Math.min(window.devicePixelRatio || 1, 1.5);
+    const scale = Math.min(this.document.defaultView?.devicePixelRatio ?? 1, 1.5);
     canvas.width = Math.round(this.width * scale);
     canvas.height = Math.round(this.height * scale);
     this.context.setTransform(scale, 0, 0, scale, 0, 0);
-    this.draw(this.motionQuery?.matches ? 2 : performance.now() / 1000);
+    this.draw(this.reducedMotion() ? STILL_FRAME_TIME : performance.now() / 1000);
   }
 
   private draw(time: number): void {
