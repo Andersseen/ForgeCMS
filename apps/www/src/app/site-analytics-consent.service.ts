@@ -68,8 +68,17 @@ export function sanitizeUmamiPageview(
   payload: unknown,
   productionHost = PRODUCTION_HOST
 ): { website: string; url: string } | false {
-  if (type !== 'pageview' || typeof payload !== 'object' || payload === null) return false;
-  const candidate = (payload as Record<string, unknown>)['url'];
+  if (typeof payload !== 'object' || payload === null) return false;
+  const record = payload as Record<string, unknown>;
+
+  // Umami's tracker sends ordinary pageviews as unnamed `event` payloads.
+  // Named events carry `name` (and sometimes `data`) and are intentionally excluded.
+  const isPageview =
+    (type === 'event' && !('name' in record) && !('data' in record)) ||
+    (type === 'pageview' && !('name' in record) && !('data' in record));
+  if (!isPageview) return false;
+
+  const candidate = record['url'];
   if (typeof candidate !== 'string') return false;
 
   let url: URL;

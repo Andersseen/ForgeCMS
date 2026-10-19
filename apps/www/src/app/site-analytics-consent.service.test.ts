@@ -50,13 +50,16 @@ describe('public analytics policy', () => {
     );
   });
 
-  it('forwards only the website id and public path for pageviews', () => {
+  it('forwards the unnamed event used by Umami pageviews as only website id and public path', () => {
     expect(
-      sanitizeUmamiPageview('pageview', {
+      sanitizeUmamiPageview('event', {
+        website: '95f4f3dd-9700-4985-9753-63fe142abbeb',
+        hostname: 'forgecms.dev',
         url: 'https://forgecms.dev/docs/quickstart?token=private#secret',
         title: 'Sensitive title',
         referrer: 'https://private.example/path?email=secret',
-        screen: '1920x1080'
+        screen: '1920x1080',
+        language: 'en-US'
       })
     ).toEqual({
       website: '95f4f3dd-9700-4985-9753-63fe142abbeb',
@@ -65,9 +68,15 @@ describe('public analytics policy', () => {
   });
 
   it('rejects custom events, invalid URLs, private routes, and other hostnames', () => {
-    expect(sanitizeUmamiPageview('event', { url: 'https://forgecms.dev/' })).toBe(false);
-    expect(sanitizeUmamiPageview('pageview', { url: 'not a url %' })).toBe(false);
-    expect(sanitizeUmamiPageview('pageview', { url: 'https://forgecms.dev/admin' })).toBe(false);
-    expect(sanitizeUmamiPageview('pageview', { url: 'https://elsewhere.example/' })).toBe(false);
+    expect(
+      sanitizeUmamiPageview('event', {
+        url: 'https://forgecms.dev/',
+        name: 'signup',
+        data: { email: 'private@example.com' }
+      })
+    ).toBe(false);
+    expect(sanitizeUmamiPageview('event', { url: 'not a url %' })).toBe(false);
+    expect(sanitizeUmamiPageview('event', { url: 'https://forgecms.dev/admin' })).toBe(false);
+    expect(sanitizeUmamiPageview('event', { url: 'https://elsewhere.example/' })).toBe(false);
   });
 });
