@@ -23,22 +23,25 @@ import {
   template: `
     @if (showChoices()) {
       <aside
-        class="forge-analytics-consent"
+        class="forge-public forge-analytics-consent"
         aria-labelledby="analytics-consent-title"
         aria-describedby="analytics-consent-description"
       >
-        <div class="forge-analytics-consent-copy">
-          <h2 id="analytics-consent-title">Optional audience analytics</h2>
-          <p id="analytics-consent-description">
-            Umami can help us understand which public pages are useful. It stays off unless you
-            allow it. <a routerLink="/privacy">Read the privacy notice</a>.
-          </p>
-        </div>
-        <div class="forge-analytics-consent-actions">
-          <button type="button" (click)="analytics.decline()">Continue without analytics</button>
-          <button type="button" class="is-primary" (click)="analytics.accept()">
-            Allow analytics
-          </button>
+        <div class="forge-analytics-consent-inner">
+          <img src="/logo.svg" alt="" width="36" height="36" />
+          <div class="forge-analytics-consent-copy">
+            <h2 id="analytics-consent-title">Optional audience analytics</h2>
+            <p id="analytics-consent-description">
+              Umami helps us understand which public pages are useful. It stays off unless you allow
+              it. <a routerLink="/privacy">Read the privacy notice</a>.
+            </p>
+          </div>
+          <div class="forge-analytics-consent-actions">
+            <button type="button" (click)="analytics.decline()">Continue without analytics</button>
+            <button type="button" class="is-primary" (click)="analytics.accept()">
+              Allow analytics
+            </button>
+          </div>
         </div>
       </aside>
     }
