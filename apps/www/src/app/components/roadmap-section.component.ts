@@ -129,7 +129,10 @@ export class RoadmapSectionComponent {
 
   constructor() {
     afterNextRender(() => this.syncEdges());
-    inject(DestroyRef).onDestroy(() => this.view?.cancelAnimationFrame(this.frame));
+    inject(DestroyRef).onDestroy(() => {
+      // No spring ever runs on the server, where the prerender DOM has no animation frames.
+      if (this.frame) this.view?.cancelAnimationFrame(this.frame);
+    });
   }
 
   /**
