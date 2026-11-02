@@ -15,7 +15,8 @@ import {
   showcasePost,
   showcaseResponse
 } from './landing-data';
-import { V2_MILESTONES } from './roadmap-data';
+import { ROADMAP_CARDS, V2_MILESTONES } from './roadmap-data';
+import { englishText, inEnglish } from './i18n/english.testing';
 
 describe('landing content', () => {
   it('uses the same illustrative record for the content and item API preview', () => {
@@ -61,7 +62,7 @@ describe('landing content', () => {
   });
 
   it('describes capabilities, not a future', () => {
-    const copy = JSON.stringify(capabilityGroups);
+    const copy = JSON.stringify(inEnglish(capabilityGroups));
     expect(copy).not.toMatch(/future|0\.4\./i);
     expect(copy).not.toMatch(/production[- ]ready|payload replacement|1\.0 stable/i);
   });
@@ -73,14 +74,13 @@ describe('landing content', () => {
       'angular',
       'operations'
     ]);
-    const copy = JSON.stringify([localizationExample.points, localizationExample.limits]);
-    expect(copy).toMatch(/top-level text and textarea/i);
-    expect(copy).toMatch(/not localized/i);
+    expect(englishText('localization.lede')).toMatch(/top-level text and textarea/i);
+    expect(englishText(localizationExample.limits)).toMatch(/not localized/i);
     expect(localizationExample.schema).not.toMatch(/richtext|blocks|array|upload|relation/);
   });
 
   it('shows only the Analytics metrics that exist', () => {
-    const copy = JSON.stringify(analyticsFacts).toLowerCase();
+    const copy = JSON.stringify(inEnglish(analyticsFacts)).toLowerCase();
     for (const absent of ['unique visitor', 'session', 'funnel', 'heatmap', 'conversion'])
       expect(copy).not.toContain(absent);
     expect(analyticsFacts.ranges).toEqual(['24h', '7d', '30d', '90d']);
@@ -92,5 +92,14 @@ describe('landing content', () => {
     expect(V2_MILESTONES[0]?.id).toBe('V2-01');
     expect(V2_MILESTONES[0]?.status).toBe('Next');
     expect(V2_MILESTONES.slice(1).every((milestone) => milestone.status === 'Planned')).toBe(true);
+  });
+
+  it('shows the canonical milestone text in English, from the catalog', () => {
+    for (const [index, card] of ROADMAP_CARDS.entries()) {
+      const milestone = V2_MILESTONES[index];
+      expect(englishText(card.titleKey)).toBe(milestone?.title);
+      expect(englishText(card.summaryKey)).toBe(milestone?.summary);
+      expect(englishText(card.statusKey)).toBe(milestone?.status);
+    }
   });
 });

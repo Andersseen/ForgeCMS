@@ -1,9 +1,13 @@
 import { FORGE_CHANNELS } from './forge-release';
+import type { SiteMessageKey, SiteText } from './i18n/i18n';
 
 /**
  * Content and pure state for the spec 097 homepage sections (story, bento, swap, Agent Kit terminal,
  * Analytics preview). Every snippet uses the real 1.0 API names; every number is illustrative and
  * labelled as such on the page. Kept out of the components so it can be tested without a browser.
+ *
+ * Visible copy is a catalog key (spec 101) — the words live in Glossa, typed by `SiteMessageKey`.
+ * Code, commands, file paths and product names are not translated, so they stay literal here.
  */
 
 export type StoryStageId = 'schema' | 'runtime' | 'angular' | 'admin' | 'deploy';
@@ -11,53 +15,28 @@ export type StoryStageId = 'schema' | 'runtime' | 'angular' | 'admin' | 'deploy'
 export interface StoryStage {
   id: StoryStageId;
   index: string;
-  label: string;
-  kicker: string;
-  title: string;
-  body: string;
+  label: SiteMessageKey;
+  kicker: SiteMessageKey;
+  title: SiteMessageKey;
+  body: SiteMessageKey;
 }
 
+const stage = <const Id extends StoryStageId>(id: Id, index: string) =>
+  ({
+    id,
+    index,
+    label: `story.${id}.label`,
+    kicker: `story.${id}.kicker`,
+    title: `story.${id}.title`,
+    body: `story.${id}.body`
+  }) as const satisfies StoryStage;
+
 export const storyStages: readonly StoryStage[] = [
-  {
-    id: 'schema',
-    index: '01',
-    label: 'Schema',
-    kicker: 'TypeScript-first',
-    title: 'Model the content once, in code.',
-    body: 'A collection is plain TypeScript in your repository: fields, drafts, locales and access rules, reviewed like any other change.'
-  },
-  {
-    id: 'runtime',
-    index: '02',
-    label: 'Runtime',
-    kicker: 'Local API + REST',
-    title: 'One pipeline for every read and write.',
-    body: 'Server code calls the Local API with no HTTP hop; browsers use REST. Both run the same access, hooks, drafts and validation.'
-  },
-  {
-    id: 'angular',
-    index: '03',
-    label: 'Angular',
-    kicker: 'Typed client + SSR',
-    title: 'Your components read typed signals.',
-    body: 'The Angular client turns a collection into a signal resource typed from your schema, rendered on the server with Analog and hydrated.'
-  },
-  {
-    id: 'admin',
-    index: '04',
-    label: 'Admin',
-    kicker: 'Give editors control',
-    title: 'Your client gets a real editor.',
-    body: 'The reusable Angular admin mounts under your own routes: content, drafts, media, users and both languages, with nothing to hand-build.'
-  },
-  {
-    id: 'deploy',
-    index: '05',
-    label: 'Deploy',
-    kicker: 'Certified profiles',
-    title: 'Ship it where it fits.',
-    body: 'Cloudflare Pages with D1 and R2, or any Node host with libSQL and S3-compatible storage. Both profiles are certified from packed artifacts.'
-  }
+  stage('schema', '01'),
+  stage('runtime', '02'),
+  stage('angular', '03'),
+  stage('admin', '04'),
+  stage('deploy', '05')
 ];
 
 /**
@@ -105,80 +84,114 @@ export class ServicesPage {
 } as const;
 
 /** The runtime pipeline every Local API and REST call runs through (stage 02). */
-export const runtimePipeline = ['Access', 'Hooks', 'Drafts', 'Validation'] as const;
+export const runtimePipeline = [
+  'story.pipeline.0',
+  'story.pipeline.1',
+  'story.pipeline.2',
+  'story.pipeline.3'
+] as const satisfies readonly SiteMessageKey[];
+
+export interface DeployProfile {
+  id: 'cloudflare' | 'portable';
+  name: SiteText;
+  host: SiteText;
+  database: SiteText;
+  storage: SiteText;
+}
 
 /** Stage 05: the two certified deployment profiles. */
-export const deployProfiles = [
-  { name: 'Cloudflare', host: 'Pages', database: 'D1', storage: 'R2' },
-  { name: 'Portable', host: 'Any Node host', database: 'libSQL', storage: 'S3-compatible' }
-] as const;
+export const deployProfiles: readonly DeployProfile[] = [
+  {
+    id: 'cloudflare',
+    name: { literal: 'Cloudflare' },
+    host: { literal: 'Pages' },
+    database: { literal: 'D1' },
+    storage: { literal: 'R2' }
+  },
+  {
+    id: 'portable',
+    name: { key: 'story.portable' },
+    host: { key: 'story.anyNodeHost' },
+    database: { literal: 'libSQL' },
+    storage: { key: 'story.s3Compatible' }
+  }
+];
 
 /** Stage 04 and the swap section: a believable slice of the Forge admin. */
 export const adminRows = [
-  { title: 'Facial treatments', status: 'Published' },
-  { title: 'Laser hair removal', status: 'Published' },
-  { title: 'Skin consultation', status: 'Draft' }
-] as const;
+  { title: 'sample.facial', status: 'published' },
+  { title: 'sample.laser', status: 'published' },
+  { title: 'sample.consultation', status: 'draft' }
+] as const satisfies readonly { title: SiteMessageKey; status: 'published' | 'draft' }[];
 
 /** The four homepage arguments, in bento order (spans are set in the template). */
 export const bentoCards = {
   angular: {
-    title: 'Angular native',
-    body: 'Built for Angular and Analog, typed from your schema to your template, server-rendered and hydrated.',
-    points: ['Angular + Analog', 'Typed end to end', 'SSR + hydration']
+    title: 'bento.angular.title',
+    body: 'bento.angular.body',
+    points: ['bento.angular.points.0', 'bento.angular.points.1', 'bento.angular.points.2']
   },
   client: {
-    title: 'Client ready',
-    body: 'A reusable admin your client can actually use, mounted inside your app.',
+    title: 'bento.client.title',
+    body: 'bento.client.body',
     points: [
-      'Drafts and publishing',
-      'Media library',
-      'ES / EN content',
-      'Users and roles',
-      'Analytics'
+      { id: 'drafts', label: 'bento.client.points.drafts' },
+      { id: 'media', label: 'bento.client.points.media' },
+      { id: 'locales', label: 'bento.client.points.locales' },
+      { id: 'users', label: 'bento.client.points.users' },
+      { id: 'analytics', label: 'bento.client.points.analytics' }
     ]
   },
   deploy: {
-    title: 'Deploy your way',
-    body: 'Edge-native on Cloudflare, or portable anywhere Node runs.',
-    points: ['Cloudflare D1 + R2', 'Portable libSQL + S3']
+    title: 'bento.deploy.title',
+    body: 'bento.deploy.body',
+    points: ['bento.deploy.points.0', 'bento.deploy.points.1']
   },
   agent: {
-    title: 'Agent ready',
-    body: 'Optional developer tooling so coding agents follow the supported Forge patterns.',
-    points: ['Read-only MCP', 'Eight official skills', 'Version-matched docs', 'One-command init']
+    title: 'bento.agent.title',
+    body: 'bento.agent.body',
+    points: [
+      'bento.agent.points.0',
+      'bento.agent.points.1',
+      'bento.agent.points.2',
+      'bento.agent.points.3'
+    ]
   }
-} as const;
+} as const satisfies Record<
+  string,
+  {
+    title: SiteMessageKey;
+    body: SiteMessageKey;
+    points: readonly (SiteMessageKey | { id: string; label: SiteMessageKey })[];
+  }
+>;
 
 export type SwapStateId = 'model' | 'build' | 'publish';
 
 export interface SwapState {
   id: SwapStateId;
-  tab: string;
+  tab: SiteMessageKey;
   /** Which side leads: the developer's work, or the client's action. */
   lead: 'developer' | 'client';
-  caption: string;
+  caption: SiteMessageKey;
+  developer: SiteMessageKey;
+  client: SiteMessageKey;
 }
 
+const swapState = <const Id extends SwapStateId>(id: Id, lead: SwapState['lead']) =>
+  ({
+    id,
+    tab: `flow.${id}.tab`,
+    lead,
+    caption: `flow.${id}.caption`,
+    developer: `flow.${id}.developer`,
+    client: `flow.${id}.client`
+  }) as const satisfies SwapState;
+
 export const swapStates: readonly SwapState[] = [
-  {
-    id: 'model',
-    tab: 'Model',
-    lead: 'developer',
-    caption: 'You declare the fields once. Forge renders the form your client edits.'
-  },
-  {
-    id: 'build',
-    tab: 'Build',
-    lead: 'developer',
-    caption: 'Your components own the layout. The admin owns the content behind them.'
-  },
-  {
-    id: 'publish',
-    tab: 'Publish',
-    lead: 'client',
-    caption: 'The client publishes a draft. Your site renders it through the typed client.'
-  }
+  swapState('model', 'developer'),
+  swapState('build', 'developer'),
+  swapState('publish', 'client')
 ];
 
 export const swapSnippets = {
@@ -204,59 +217,77 @@ export const swapSnippets = {
 } as const;
 
 export const developerRole = [
-  'Builds the Angular UI',
-  'Defines the Forge schema',
-  'Owns every component',
-  'Deploys the app'
-] as const;
+  'flow.developerRole.0',
+  'flow.developerRole.1',
+  'flow.developerRole.2',
+  'flow.developerRole.3'
+] as const satisfies readonly SiteMessageKey[];
 
 export const clientRole = [
-  'Opens Forge Admin',
-  'Edits titles and descriptions',
-  'Writes ES and EN content',
-  'Uploads media and publishes',
-  'Sees Analytics'
-] as const;
+  { id: 'opens', label: 'flow.clientRole.opens' },
+  { id: 'edits', label: 'flow.clientRole.edits' },
+  { id: 'writes', label: 'flow.clientRole.writes' },
+  { id: 'uploads', label: 'flow.clientRole.uploads' },
+  { id: 'analytics', label: 'flow.clientRole.analytics' }
+] as const satisfies readonly { id: string; label: SiteMessageKey }[];
 
 /** The Agent Kit terminal (spec 096 `forge-cms-agent init`), as staged rows. */
 export interface TerminalRow {
   kind: 'command' | 'ok' | 'note' | 'prompt' | 'tool' | 'result';
-  text: string;
-  detail?: string;
+  text: SiteText;
+  detail?: SiteText;
 }
 
 export const agentTerminal: readonly TerminalRow[] = [
-  { kind: 'command', text: 'pnpm exec forge-cms-agent init' },
-  { kind: 'ok', text: 'MCP configured', detail: '.mcp.json · forge-cms (read-only)' },
-  { kind: 'ok', text: '8 ForgeCMS skills installed', detail: '.claude/skills/' },
-  { kind: 'ok', text: 'Version-matched docs ready', detail: 'bundled, offline' },
-  { kind: 'ok', text: 'Project doctor available', detail: 'forge_project_doctor' },
-  { kind: 'prompt', text: 'Make Services editable in Spanish and English.' },
+  { kind: 'command', text: { literal: 'pnpm exec forge-cms-agent init' } },
+  {
+    kind: 'ok',
+    text: { key: 'agentKit.terminal.mcp' },
+    detail: { key: 'agentKit.terminal.mcpDetail' }
+  },
+  { kind: 'ok', text: { key: 'agentKit.terminal.skills' }, detail: { literal: '.claude/skills/' } },
+  {
+    kind: 'ok',
+    text: { key: 'agentKit.terminal.docs' },
+    detail: { key: 'agentKit.terminal.docsDetail' }
+  },
+  {
+    kind: 'ok',
+    text: { key: 'agentKit.terminal.doctor' },
+    detail: { literal: 'forge_project_doctor' }
+  },
+  { kind: 'prompt', text: { key: 'agentKit.terminal.prompt' } },
   {
     kind: 'tool',
-    text: 'forge_project_detect',
-    detail: 'Analog · Cloudflare profile · no locales yet'
+    text: { literal: 'forge_project_detect' },
+    detail: { key: 'agentKit.terminal.detect' }
   },
-  { kind: 'tool', text: 'forge_docs_search', detail: '"localization" in the installed version' },
-  { kind: 'tool', text: 'forgecms-localization', detail: 'skill: the supported pattern' },
+  {
+    kind: 'tool',
+    text: { literal: 'forge_docs_search' },
+    detail: { key: 'agentKit.terminal.search' }
+  },
+  {
+    kind: 'tool',
+    text: { literal: 'forgecms-localization' },
+    detail: { key: 'agentKit.terminal.skill' }
+  },
   {
     kind: 'result',
-    text: 'Supported Forge implementation',
-    detail: 'written by your agent with its own tools, reviewed by you'
+    text: { key: 'agentKit.terminal.result' },
+    detail: { key: 'agentKit.terminal.resultDetail' }
   }
 ];
 
 export const agentRoles = [
-  { name: 'MCP', role: 'Read-only project knowledge' },
-  { name: 'Skills', role: 'Procedural Forge guidance' },
-  { name: 'Your agent', role: 'Edits code with its normal tools' }
-] as const;
+  { name: { literal: 'MCP' }, role: 'agentKit.roles.mcp' },
+  { name: { key: 'agentKit.skills' }, role: 'agentKit.roles.skills' },
+  { name: { key: 'agentKit.roles.agent' }, role: 'agentKit.roles.agentRole' }
+] as const satisfies readonly { name: SiteText; role: SiteMessageKey }[];
 
 /** What the Agent Kit section says about availability. Derived from registry truth only. */
-export function agentAvailabilityNote(): string {
-  return FORGE_CHANNELS.agentPublished
-    ? 'Published at 1.0.0; the Agent Kit remains experimental.'
-    : 'Candidate workflow: @forge-cms/agent is not on npm yet.';
+export function agentAvailabilityNote(): 'agentKit.published' | 'agentKit.candidate' {
+  return FORGE_CHANNELS.agentPublished ? 'agentKit.published' : 'agentKit.candidate';
 }
 
 export type AnalyticsRange = '24h' | '7d' | '30d' | '90d';
@@ -362,8 +393,16 @@ export const analyticsPreview: Record<AnalyticsRange, AnalyticsPreview> = {
 
 export const analyticsRanges: readonly AnalyticsRange[] = ['24h', '7d', '30d', '90d'];
 
-/** "+18.4%" / "−3.2%" — the comparison label the preview shows next to pageviews. */
-export function formatChange(change: number): string {
+/**
+ * "+18.4%" / "−3.2%" — the comparison label the preview shows next to pageviews. Spanish and
+ * Ukrainian write a decimal comma and a (non-breaking) space before the percent sign.
+ */
+export function formatChange(change: number, locale = 'en'): string {
   const sign = change >= 0 ? '+' : '−';
-  return `${sign}${Math.abs(change).toFixed(1)}%`;
+  const value = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  }).format(Math.abs(change));
+  const space = locale === 'en' ? '' : '\u00a0';
+  return `${sign}${value}${space}%`;
 }

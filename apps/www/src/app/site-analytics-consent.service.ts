@@ -37,7 +37,11 @@ type UmamiWindow = Window & {
 };
 
 export function isPublicAnalyticsPath(pathname: string): boolean {
-  const path = pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname;
+  const trimmed = pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname;
+  // Spec 101: `/es/...` and `/uk/...` are the same public pages; any other prefix (`/en`, `/admin`,
+  // an unknown locale) is not stripped, so it stays ineligible.
+  const localized = /^\/(es|uk)(\/.*)?$/.exec(trimmed);
+  const path = localized ? localized[2] || '/' : trimmed;
   return (
     path === '/' ||
     path === '/demo' ||

@@ -228,19 +228,41 @@ test('robots and sitemap are real, valid public files', async ({ request }) => {
   expect(sitemap.headers()['content-type']).toContain('application/xml');
   const xml = await sitemap.text();
   expect(xml).toMatch(/^<\?xml version="1\.0" encoding="UTF-8"\?>/);
-  expect(xml).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
+  expect(xml).toContain(
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">'
+  );
   const locations = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)]
     .map((match) => match[1])
     .filter((location): location is string => location !== undefined);
   const root = dirname(fileURLToPath(import.meta.url));
-  const docs = (await readdir(resolve(root, '../src/content/docs')))
-    .filter((name) => name.endsWith('.md'))
-    .map((name) => `https://forgecms.dev/docs/${name.slice(0, -3)}`);
+  const slugs = async (directory: string): Promise<string[]> =>
+    (await readdir(resolve(root, directory)))
+      .filter((name) => name.endsWith('.md'))
+      .map((name) => name.slice(0, -3))
+      .sort();
+  // Spec 101: every page in every locale it really exists in — marketing pages in all three, a docs
+  // article in English plus each locale that has `src/content/<locale>/docs/<slug>.md`.
+  const translated = {
+    es: await slugs('../src/content/es/docs'),
+    uk: await slugs('../src/content/uk/docs')
+  };
+  const docs = (await slugs('../src/content/docs')).flatMap((slug) => [
+    `https://forgecms.dev/docs/${slug}`,
+    ...(['es', 'uk'] as const)
+      .filter((locale) => translated[locale].includes(slug))
+      .map((locale) => `https://forgecms.dev/${locale}/docs/${slug}`)
+  ]);
   expect(new Set(locations).size).toBe(locations.length);
   expect(locations).toEqual([
     'https://forgecms.dev/',
+    'https://forgecms.dev/es',
+    'https://forgecms.dev/uk',
     'https://forgecms.dev/demo',
+    'https://forgecms.dev/es/demo',
+    'https://forgecms.dev/uk/demo',
     'https://forgecms.dev/privacy',
+    'https://forgecms.dev/es/privacy',
+    'https://forgecms.dev/uk/privacy',
     ...docs
   ]);
   for (const path of [

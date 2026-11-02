@@ -25,6 +25,10 @@ export interface DocsNavLink {
   slug: string;
   title: string;
   description?: string;
+  /** In-app path of this entry in the reader's locale (spec 101); absent in the English-only model. */
+  path?: string;
+  /** The reader's locale has no translation, so the entry links to the English article. */
+  englishOnly?: boolean;
 }
 
 export interface DocsNavGroup {
@@ -49,6 +53,41 @@ const UNGROUPED = 'Guides';
 /** Only pages under `src/content/docs/` — the content glob covers all of `src/content`. */
 export function isDocsFile(file: DocsContentFile): boolean {
   return file.filename.includes('/content/docs/');
+}
+
+/**
+ * Translated articles live in `src/content/<locale>/docs/<slug>.md` (spec 101): a separate directory
+ * per locale, so a translation never shares a content id with — or replaces — the English article.
+ */
+export function isLocalizedDocsFile(file: DocsContentFile, locale: string): boolean {
+  return file.filename.includes(`/content/${locale}/docs/`);
+}
+
+/**
+ * The English nav in the reader's locale: same groups and order, the translated title and path for
+ * every article that has a translation, and the English article (flagged `englishOnly`) for the rest.
+ * `localize(slug, translated)` builds the in-app path.
+ */
+export function localizeDocsNav(
+  groups: readonly DocsNavGroup[],
+  translations: readonly DocsContentFile[],
+  localize: (slug: string, translated: boolean) => string
+): DocsNavGroup[] {
+  const bySlug = new Map(translations.map((file) => [file.slug, file.attributes]));
+  return groups.map((group) => ({
+    heading: group.heading,
+    links: group.links.map((link) => {
+      const translated = bySlug.get(link.slug);
+      const description = translated?.description ?? (translated ? undefined : link.description);
+      return {
+        slug: link.slug,
+        title: translated?.title ?? link.title,
+        ...(description !== undefined && { description }),
+        path: localize(link.slug, translated !== undefined),
+        englishOnly: translated === undefined
+      };
+    })
+  }));
 }
 
 function groupRank(heading: string): number {

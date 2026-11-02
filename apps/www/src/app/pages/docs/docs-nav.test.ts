@@ -4,6 +4,8 @@ import {
   findAdjacent,
   flattenDocsNav,
   isDocsFile,
+  isLocalizedDocsFile,
+  localizeDocsNav,
   type DocsContentFile
 } from './docs-nav';
 
@@ -115,5 +117,50 @@ describe('isDocsFile', () => {
   it('ignores content outside src/content/docs', () => {
     expect(isDocsFile(file('introduction', {}))).toBe(true);
     expect(isDocsFile(file('post', {}, '/src/content/blog/post.md'))).toBe(false);
+  });
+});
+
+describe('localizeDocsNav (spec 101)', () => {
+  const groups = buildDocsNav([
+    {
+      slug: 'introduction',
+      filename: '/src/content/docs/introduction.md',
+      attributes: { title: 'Introduction', group: 'Getting started', order: 1 }
+    },
+    {
+      slug: 'fields',
+      filename: '/src/content/docs/fields.md',
+      attributes: { title: 'Fields', group: 'Content modelling', order: 1 }
+    }
+  ]);
+  const spanish = [
+    {
+      slug: 'introduction',
+      filename: '/src/content/es/docs/introduction.md',
+      attributes: { title: 'Introducción', description: 'Qué es.' }
+    }
+  ];
+
+  it('keeps the English order, uses translated titles, and links English-only pages to English', () => {
+    const nav = localizeDocsNav(groups, spanish, (slug, translated) =>
+      translated ? `/es/docs/${slug}` : `/docs/${slug}`
+    );
+    expect(nav.map((g) => g.heading)).toEqual(['Getting started', 'Content modelling']);
+    expect(nav.flatMap((g) => g.links)).toEqual([
+      {
+        slug: 'introduction',
+        title: 'Introducción',
+        description: 'Qué es.',
+        path: '/es/docs/introduction',
+        englishOnly: false
+      },
+      { slug: 'fields', title: 'Fields', path: '/docs/fields', englishOnly: true }
+    ]);
+  });
+
+  it('tells translated files apart by their locale directory', () => {
+    expect(isLocalizedDocsFile(spanish[0]!, 'es')).toBe(true);
+    expect(isLocalizedDocsFile(spanish[0]!, 'uk')).toBe(false);
+    expect(isDocsFile(spanish[0]!)).toBe(false);
   });
 });

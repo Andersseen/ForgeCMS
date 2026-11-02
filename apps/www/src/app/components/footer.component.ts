@@ -1,8 +1,12 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { VoltNativeButton } from '@voltui/components';
 import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
+import { injectT } from '@etyma/angular';
 import { ScrollTopComponent } from './scroll-top.component';
+import { CURRENT_FORGE_VERSION } from '../forge-release';
+import { i18n } from '../i18n/i18n';
+import { SiteLocaleService } from '../i18n/site-locale.service';
 
 @Component({
   selector: 'forge-cms-footer',
@@ -19,19 +23,20 @@ import { ScrollTopComponent } from './scroll-top.component';
           <h2
             class="max-w-[16ch] text-3xl font-semibold leading-tight tracking-[-0.04em] md:text-4xl"
           >
-            Your next project starts with your content.
+            {{ t('footer.title') }}
           </h2>
           <p class="mt-3 max-w-xl leading-7 text-muted-foreground">
-            Get to know the model, explore a working project, and build a content system that
-            belongs in your Angular application.
+            {{ t('footer.body') }}
           </p>
         </div>
         <div class="flex flex-col gap-3 sm:flex-row">
-          <a voltButton size="lg" routerLink="/demo">
-            Explore the demo
+          <a voltButton size="lg" [routerLink]="site.path('/demo')">
+            {{ t('footer.exploreDemo') }}
             <lmn-arrow-right [size]="16" />
           </a>
-          <a voltButton variant="outline" size="lg" routerLink="/docs">Read the docs</a>
+          <a voltButton variant="outline" size="lg" [routerLink]="site.path('/docs')">{{
+            t('footer.readDocs')
+          }}</a>
         </div>
       </div>
     </section>
@@ -40,19 +45,41 @@ import { ScrollTopComponent } from './scroll-top.component';
       <div
         class="mx-auto flex w-full max-w-7xl flex-col gap-7 md:flex-row md:items-center md:justify-between"
       >
-        <a class="inline-flex items-center gap-3 font-semibold text-foreground" routerLink="/">
+        <a
+          class="inline-flex items-center gap-3 font-semibold text-foreground"
+          [routerLink]="site.path('/')"
+        >
           <img class="size-8 rounded-md" src="/logo.svg" alt="" width="32" height="32" />
           <span>ForgeCMS</span>
         </a>
-        <nav class="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-muted-foreground">
-          <a class="forge-footer-link" routerLink="/">Product</a>
-          <a class="forge-footer-link" routerLink="/demo">Demo</a>
-          <a class="forge-footer-link" routerLink="/docs">Docs</a>
-          <a class="forge-footer-link" routerLink="/docs/roadmap">Roadmap</a>
-          <a class="forge-footer-link" routerLink="/docs/agent-kit">Agent Kit</a>
-          <a class="forge-footer-link" routerLink="/docs/analytics">Analytics</a>
-          <a class="forge-footer-link" routerLink="/docs/schema-upgrades">Upgrades</a>
-          <a class="forge-footer-link" routerLink="/privacy">Privacy</a>
+        <nav
+          class="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-muted-foreground"
+          [attr.aria-label]="t('footer.nav')"
+        >
+          <a class="forge-footer-link" [routerLink]="site.path('/')">{{
+            t('navigation.product')
+          }}</a>
+          <a class="forge-footer-link" [routerLink]="site.path('/demo')">{{
+            t('navigation.demo')
+          }}</a>
+          <a class="forge-footer-link" [routerLink]="site.path('/docs')">{{
+            t('navigation.docs')
+          }}</a>
+          <a class="forge-footer-link" [routerLink]="site.docsPath('roadmap')">{{
+            t('footer.roadmap')
+          }}</a>
+          <a class="forge-footer-link" [routerLink]="site.docsPath('agent-kit')">{{
+            t('footer.agentKit')
+          }}</a>
+          <a class="forge-footer-link" [routerLink]="site.docsPath('analytics')">{{
+            t('footer.analytics')
+          }}</a>
+          <a class="forge-footer-link" [routerLink]="site.docsPath('schema-upgrades')">{{
+            t('footer.upgrades')
+          }}</a>
+          <a class="forge-footer-link" [routerLink]="site.path('/privacy')">{{
+            t('footer.privacy')
+          }}</a>
           <a
             class="forge-footer-link"
             href="https://github.com/Andersseen/ForgeCMS"
@@ -68,9 +95,15 @@ import { ScrollTopComponent } from './scroll-top.component';
             >npm</a
           >
         </nav>
-        <p class="text-xs text-muted-foreground">MIT · ForgeCMS 1.0.0</p>
+        <p class="text-xs text-muted-foreground">
+          {{ t('footer.legal', { version: version }) }}
+        </p>
       </div>
     </footer>
   `
 })
-export class FooterComponent {}
+export class FooterComponent {
+  protected readonly site = inject(SiteLocaleService);
+  protected readonly t = injectT(i18n);
+  protected readonly version = CURRENT_FORGE_VERSION;
+}

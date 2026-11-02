@@ -14,7 +14,10 @@ import { VoltNativeButton } from '@voltui/components';
 import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
 import { LmnChevronLeftIcon } from 'lumen-icons/chevron-left';
 import { LmnChevronRightIcon } from 'lumen-icons/chevron-right';
-import { V2_MILESTONES } from '../roadmap-data';
+import { injectT } from '@etyma/angular';
+import { i18n } from '../i18n/i18n';
+import { SiteLocaleService } from '../i18n/site-locale.service';
+import { ROADMAP_CARDS, V2_MILESTONES } from '../roadmap-data';
 
 /** Slightly underdamped spring: one soft overshoot between cards, then rest. */
 const STIFFNESS = 190;
@@ -42,23 +45,21 @@ const DAMPING = 17;
     <section id="roadmap" class="forge-roadmap" aria-labelledby="roadmap-title">
       <div class="mx-auto w-full max-w-7xl px-5 py-20 md:px-8 md:py-28">
         <div>
-          <p class="forge-section-mark">ForgeCMS 1.0 → 2.0</p>
+          <p class="forge-section-mark">{{ t('roadmap.mark') }}</p>
           <h2 id="roadmap-title" class="forge-section-title mt-5">
-            A shipped foundation. A clear next direction.
+            {{ t('roadmap.title') }}
           </h2>
           <p class="mt-5 max-w-[56ch] leading-7 text-muted-foreground">
-            ForgeCMS 1.0.0 is shipped. The V2 roadmap focuses on stronger editorial workflows,
-            developer experience, and production operations.
+            {{ t('roadmap.lede') }}
           </p>
           <p class="mt-3 max-w-[56ch] text-sm leading-6 text-muted-foreground">
-            These are product milestones, not npm versions or delivery dates. V2 features are
-            roadmap intentions until shipped and documented.
+            {{ t('roadmap.note') }}
           </p>
         </div>
 
         <div class="forge-roadmap-controls">
           <p class="forge-roadmap-count">
-            {{ milestones.length }} milestones · {{ nextMilestone?.id }} is next
+            {{ t('roadmap.count', { count: milestones.length, next: nextMilestone?.id ?? '' }) }}
           </p>
           <div class="flex gap-2">
             <button
@@ -66,7 +67,7 @@ const DAMPING = 17;
               voltButton
               variant="outline"
               size="icon"
-              aria-label="Previous milestones"
+              [attr.aria-label]="t('roadmap.previous')"
               [disabled]="atStart()"
               (click)="page(-1)"
             >
@@ -77,7 +78,7 @@ const DAMPING = 17;
               voltButton
               variant="outline"
               size="icon"
-              aria-label="Next milestones"
+              [attr.aria-label]="t('roadmap.next')"
               [disabled]="atEnd()"
               (click)="page(1)"
             >
@@ -91,7 +92,7 @@ const DAMPING = 17;
           class="forge-roadmap-track"
           tabindex="0"
           data-scroll-x
-          aria-label="ForgeCMS 2.0 milestones"
+          [attr.aria-label]="t('roadmap.track')"
           (scroll)="syncEdges()"
           (pointerdown)="stop()"
           (keydown)="stop()"
@@ -100,16 +101,16 @@ const DAMPING = 17;
             <li class="forge-milestone" [attr.data-status]="milestone.status">
               <div class="forge-milestone-top">
                 <span class="forge-milestone-version">{{ milestone.id }}</span>
-                <span class="forge-milestone-status">{{ milestone.status }}</span>
+                <span class="forge-milestone-status">{{ t(milestone.statusKey) }}</span>
               </div>
-              <h3>{{ milestone.title }}</h3>
-              <p>{{ milestone.summary }}</p>
+              <h3>{{ t(milestone.titleKey) }}</h3>
+              <p>{{ t(milestone.summaryKey) }}</p>
             </li>
           }
         </ol>
 
-        <a voltButton variant="outline" class="mt-10" routerLink="/docs/roadmap">
-          Read the full roadmap
+        <a voltButton variant="outline" class="mt-10" [routerLink]="site.docsPath('roadmap')">
+          {{ t('roadmap.readFull') }}
           <lmn-arrow-right [size]="16" />
         </a>
       </div>
@@ -122,7 +123,9 @@ export class RoadmapSectionComponent {
   private pendingTarget: number | null = null;
   private readonly track = viewChild.required<ElementRef<HTMLElement>>('track');
 
-  protected readonly milestones = V2_MILESTONES;
+  protected readonly t = injectT(i18n);
+  protected readonly site = inject(SiteLocaleService);
+  protected readonly milestones = ROADMAP_CARDS;
   protected readonly nextMilestone = V2_MILESTONES.find((m) => m.status === 'Next');
   protected readonly atStart = signal(true);
   protected readonly atEnd = signal(false);

@@ -4,20 +4,12 @@ import { defineConfig } from 'vitest/config';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import { angularLinker } from '@forge-cms/admin/vite';
 import { escapeCodespans } from './vite-plugins/escape-codespans';
-import { readdirSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { CANONICAL_ORIGIN } from './src/app/site-config.mjs';
+import { prerenderRoutes } from './scripts/public-routes.mjs';
 
-const docsDirectory = resolve(import.meta.dirname, 'src/content/docs');
-const publicRoutes = [
-  '/',
-  '/demo',
-  '/privacy',
-  '/404.html',
-  ...readdirSync(docsDirectory)
-    .filter((filename) => filename.endsWith('.md'))
-    .map((filename) => `/docs/${filename.slice(0, -3)}`)
-];
+// Spec 101: every public page once per locale it really exists in (translated docs only where a
+// `src/content/<locale>/docs/<slug>.md` exists), plus the English 404 page.
+const publicRoutes = [...prerenderRoutes(import.meta.dirname), '/404.html'];
 
 export default defineConfig(({ mode }) => ({
   plugins: [
@@ -61,6 +53,9 @@ export default defineConfig(({ mode }) => ({
   },
   test: {
     include: ['src/**/*.test.ts', 'vite-plugins/**/*.test.ts'],
-    environment: 'jsdom'
+    environment: 'jsdom',
+    // `@angular/**` is inlined (ssr.noExternal above); Etyma's Angular bindings must share that one
+    // `@angular/core` instance, or DI sees two cores in the router tests (spec 101).
+    server: { deps: { inline: [/@etyma\/angular/] } }
   }
 }));

@@ -1,2 +1,9 @@
 /docs /docs/introduction 301
 /docs/ /docs/introduction 301
+/es/docs /es/docs/introduction 301
+/es/docs/ /es/docs/introduction 301
+/uk/docs /uk/docs/introduction 301
+/uk/docs/ /uk/docs/introduction 301
+/en / 301
+/en/ / 301
+/en/* /:splat 301

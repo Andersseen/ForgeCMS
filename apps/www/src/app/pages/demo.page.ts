@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { injectT } from '@etyma/angular';
 import { VoltBadge, VoltNativeButton } from '@voltui/components';
 import { MoveInViewDirective, MoveStaggerDirective } from 'angular-movement';
 import { LmnArrowTopRightOnSquareIcon } from 'lumen-icons/arrow-top-right-on-square';
@@ -16,6 +17,7 @@ import {
   EDITOR_STEPS
 } from '../demo-access';
 import { FooterComponent } from '../components/footer.component';
+import { i18n, textOf, type SiteText } from '../i18n/i18n';
 import { HeaderComponent } from '../components/header.component';
 
 @Component({
@@ -41,21 +43,19 @@ import { HeaderComponent } from '../components/header.component';
 
       <main>
         <section class="mx-auto w-full max-w-7xl px-5 pb-16 pt-14 md:px-8 md:pb-22 md:pt-20">
-          <volt-badge variant="secondary">Live demo</volt-badge>
+          <volt-badge variant="secondary">{{ t('demo.badge') }}</volt-badge>
           <div class="mt-6 grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
             <div>
               <h1 class="forge-display max-w-[16ch] text-5xl md:text-7xl">
-                Lumea is a clinic built from content, not a screenshot.
+                {{ t('demo.title') }}
               </h1>
               <p class="mt-6 max-w-[65ch] text-lg leading-8 text-muted-foreground">
-                Treatments, prices, staff, journal, bookings and the homepage layout all live in
-                ForgeCMS. Visit the public site, then sign in and change the content that produced
-                it.
+                {{ t('demo.lede') }}
               </p>
             </div>
             <div class="flex flex-col gap-3 sm:flex-row lg:flex-col">
               <a voltButton size="lg" [href]="demoUrl" target="_blank" rel="noreferrer">
-                Open the clinic
+                {{ t('demo.openClinic') }}
                 <lmn-arrow-top-right-on-square [size]="16" />
               </a>
               <a
@@ -66,7 +66,7 @@ import { HeaderComponent } from '../components/header.component';
                 target="_blank"
                 rel="noreferrer"
               >
-                Sign in to the CMS
+                {{ t('demo.signIn') }}
               </a>
             </div>
           </div>
@@ -76,22 +76,26 @@ import { HeaderComponent } from '../components/header.component';
           class="mx-auto w-full max-w-7xl px-5 pb-14 md:px-8"
           aria-labelledby="explore-title"
         >
-          <p class="forge-section-mark">What to explore</p>
+          <p class="forge-section-mark">{{ t('demo.exploreMark') }}</p>
           <h2 id="explore-title" class="mt-4 text-2xl font-semibold tracking-[-0.03em]">
-            Everything listed here is running in the live demo.
+            {{ t('demo.exploreTitle') }}
           </h2>
           <div class="mt-8 grid gap-4 md:grid-cols-2">
             @for (group of explore; track group.audience) {
               <div class="forge-flow-card">
-                <p class="forge-flow-role">{{ group.audience }}</p>
+                <p class="forge-flow-role">{{ t(group.audience) }}</p>
                 <ul class="mt-3 divide-y divide-border text-sm">
                   @for (item of group.items; track item.label) {
                     <li class="py-2.5">
-                      <span class="font-medium">{{ item.label }}</span>
+                      <span class="font-medium">{{ t(item.label) }}</span>
                       @if (item.experimental) {
-                        <span class="forge-experimental-badge ml-2">Experimental</span>
+                        <span class="forge-experimental-badge ml-2">{{
+                          t('common.experimental')
+                        }}</span>
                       }
-                      <span class="block text-xs text-muted-foreground">{{ item.where }}</span>
+                      <span class="block text-xs text-muted-foreground">{{
+                        text(item.where)
+                      }}</span>
                     </li>
                   }
                 </ul>
@@ -112,9 +116,11 @@ import { HeaderComponent } from '../components/header.component';
                   [size]="20"
                 />
                 <div>
-                  <h2 class="text-xl font-semibold tracking-[-0.025em]">See it as an editor</h2>
+                  <h2 class="text-xl font-semibold tracking-[-0.025em]">
+                    {{ t('demo.editorTitle') }}
+                  </h2>
                   <p class="mt-1 text-sm text-muted-foreground">
-                    Publish something and watch it move.
+                    {{ t('demo.editorLede') }}
                   </p>
                 </div>
               </div>
@@ -125,8 +131,8 @@ import { HeaderComponent } from '../components/header.component';
                       (index + 1).toString().padStart(2, '0')
                     }}</span>
                     <div class="forge-journey-card">
-                      <h3>{{ step.title }}</h3>
-                      <p>{{ step.detail }}</p>
+                      <h3>{{ t(step.title) }}</h3>
+                      <p>{{ t(step.detail) }}</p>
                     </div>
                   </li>
                 }
@@ -144,10 +150,10 @@ import { HeaderComponent } from '../components/header.component';
                 />
                 <div>
                   <h2 class="text-xl font-semibold tracking-[-0.025em]">
-                    Inspect it as an Angular developer
+                    {{ t('demo.developerTitle') }}
                   </h2>
                   <p class="mt-1 text-sm text-muted-foreground">
-                    Follow the model into the runtime and UI.
+                    {{ t('demo.developerLede') }}
                   </p>
                 </div>
               </div>
@@ -158,8 +164,8 @@ import { HeaderComponent } from '../components/header.component';
                       (index + 1).toString().padStart(2, '0')
                     }}</span>
                     <div class="forge-journey-card">
-                      <h3>{{ step.title }}</h3>
-                      <p>{{ step.detail }}</p>
+                      <h3>{{ t(step.title) }}</h3>
+                      <p>{{ t(step.detail) }}</p>
                     </div>
                   </li>
                 }
@@ -172,15 +178,12 @@ import { HeaderComponent } from '../components/header.component';
           class="mx-auto grid w-full max-w-7xl gap-12 px-5 py-18 md:px-8 md:py-24 lg:grid-cols-2"
         >
           <div>
-            <p class="forge-section-mark">Shared demo accounts</p>
+            <p class="forge-section-mark">{{ t('demo.accountsMark') }}</p>
             <h2 class="mt-5 text-3xl font-semibold tracking-[-0.04em]">
-              Use the same CMS the clinic uses.
+              {{ t('demo.accountsTitle') }}
             </h2>
             <p class="mt-4 max-w-[56ch] leading-7 text-muted-foreground">
-              Try the real admin. Everyone shares the database, so the hosted demo limits
-              destructive and storage-heavy actions &mdash; you can edit and publish the localized
-              notices and send a booking &mdash; to keep the example available for the next visitor.
-              Your own ForgeCMS project does not have these shared-demo limits.
+              {{ t('demo.accountsBody') }}
             </p>
             <div class="mt-8 overflow-hidden rounded-xl border border-border bg-background">
               @for (account of credentials; track account.email) {
@@ -188,7 +191,7 @@ import { HeaderComponent } from '../components/header.component';
                   class="grid gap-4 border-b border-border p-5 last:border-b-0 sm:grid-cols-[1fr_auto] sm:items-center"
                 >
                   <div>
-                    <p class="font-semibold">{{ account.role }}</p>
+                    <p class="font-semibold">{{ t(account.role) }}</p>
                     <p class="mt-1 break-all font-mono text-sm text-muted-foreground">
                       {{ account.email }} / {{ account.password }}
                     </p>
@@ -198,15 +201,15 @@ import { HeaderComponent } from '../components/header.component';
                     variant="outline"
                     size="sm"
                     type="button"
-                    [attr.aria-label]="'Copy credentials for ' + account.role"
+                    [attr.aria-label]="t('demo.copyCredentials', { role: t(account.role) })"
                     (click)="copy(account.email, account.password)"
                   >
                     @if (copied() === account.email) {
                       <lmn-check tone="success" [size]="16" />
-                      Copied
+                      {{ t('common.copied') }}
                     } @else {
                       <lmn-clipboard [size]="16" />
-                      Copy
+                      {{ t('common.copy') }}
                     }
                   </button>
                 </div>
@@ -215,13 +218,12 @@ import { HeaderComponent } from '../components/header.component';
           </div>
 
           <aside class="forge-themed-panel self-start rounded-[1.25rem] p-7 md:p-9">
-            <p class="text-sm font-medium text-primary">Read the implementation</p>
+            <p class="text-sm font-medium text-primary">{{ t('demo.sourceMark') }}</p>
             <h2 class="mt-4 text-3xl font-semibold tracking-[-0.04em]">
-              The source is part of the demo.
+              {{ t('demo.sourceTitle') }}
             </h2>
             <p class="mt-4 leading-7 text-muted-foreground">
-              The content model, Local API composition and app-side findings are public. The rough
-              edges are documented alongside the working paths.
+              {{ t('demo.sourceBody') }}
             </p>
             <ul class="mt-7 space-y-3 font-mono text-sm text-muted-foreground">
               <li>server/api/collections.ts</li>
@@ -236,7 +238,7 @@ import { HeaderComponent } from '../components/header.component';
               target="_blank"
               rel="noreferrer"
             >
-              Browse the demo source
+              {{ t('demo.browseSource') }}
               <lmn-arrow-top-right-on-square [size]="16" />
             </a>
           </aside>
@@ -247,6 +249,8 @@ import { HeaderComponent } from '../components/header.component';
   `
 })
 export class DemoPage {
+  protected readonly t = injectT(i18n);
+  protected readonly text = (value: SiteText): string => textOf(this.t, value);
   protected readonly demoUrl = DEMO_APP_URL;
   protected readonly adminUrl = DEMO_ADMIN_URL;
   protected readonly sourceUrl = DEMO_SOURCE_URL;

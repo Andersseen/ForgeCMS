@@ -1,31 +1,195 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://forgecms.dev/</loc></url>
-  <url><loc>https://forgecms.dev/demo</loc></url>
-  <url><loc>https://forgecms.dev/privacy</loc></url>
-  <url><loc>https://forgecms.dev/docs/access-control</loc></url>
-  <url><loc>https://forgecms.dev/docs/adapters</loc></url>
-  <url><loc>https://forgecms.dev/docs/admin-ui</loc></url>
-  <url><loc>https://forgecms.dev/docs/agent-kit</loc></url>
-  <url><loc>https://forgecms.dev/docs/analytics</loc></url>
-  <url><loc>https://forgecms.dev/docs/angular-client</loc></url>
-  <url><loc>https://forgecms.dev/docs/angular-quickstart</loc></url>
-  <url><loc>https://forgecms.dev/docs/browser-auth</loc></url>
-  <url><loc>https://forgecms.dev/docs/collections</loc></url>
-  <url><loc>https://forgecms.dev/docs/concepts</loc></url>
-  <url><loc>https://forgecms.dev/docs/deployment</loc></url>
-  <url><loc>https://forgecms.dev/docs/fields</loc></url>
-  <url><loc>https://forgecms.dev/docs/hooks</loc></url>
-  <url><loc>https://forgecms.dev/docs/introduction</loc></url>
-  <url><loc>https://forgecms.dev/docs/local-api</loc></url>
-  <url><loc>https://forgecms.dev/docs/machine-auth</loc></url>
-  <url><loc>https://forgecms.dev/docs/quickstart</loc></url>
-  <url><loc>https://forgecms.dev/docs/rest-api</loc></url>
-  <url><loc>https://forgecms.dev/docs/roadmap</loc></url>
-  <url><loc>https://forgecms.dev/docs/schema-upgrades</loc></url>
-  <url><loc>https://forgecms.dev/docs/server-quickstart</loc></url>
-  <url><loc>https://forgecms.dev/docs/small-project-guide</loc></url>
-  <url><loc>https://forgecms.dev/docs/ssr</loc></url>
-  <url><loc>https://forgecms.dev/docs/troubleshooting</loc></url>
-  <url><loc>https://forgecms.dev/docs/uploads</loc></url>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://forgecms.dev/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://forgecms.dev/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://forgecms.dev/es"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://forgecms.dev/uk"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://forgecms.dev/"/>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/es</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://forgecms.dev/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://forgecms.dev/es"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://forgecms.dev/uk"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://forgecms.dev/"/>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/uk</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://forgecms.dev/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://forgecms.dev/es"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://forgecms.dev/uk"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://forgecms.dev/"/>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/demo</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://forgecms.dev/demo"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://forgecms.dev/es/demo"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://forgecms.dev/uk/demo"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://forgecms.dev/demo"/>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/es/demo</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://forgecms.dev/demo"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://forgecms.dev/es/demo"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://forgecms.dev/uk/demo"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://forgecms.dev/demo"/>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/uk/demo</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://forgecms.dev/demo"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://forgecms.dev/es/demo"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://forgecms.dev/uk/demo"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://forgecms.dev/demo"/>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://forgecms.dev/privacy"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://forgecms.dev/es/privacy"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://forgecms.dev/uk/privacy"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://forgecms.dev/privacy"/>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/es/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://forgecms.dev/privacy"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://forgecms.dev/es/privacy"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://forgecms.dev/uk/privacy"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://forgecms.dev/privacy"/>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/uk/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://forgecms.dev/privacy"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://forgecms.dev/es/privacy"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://forgecms.dev/uk/privacy"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://forgecms.dev/privacy"/>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/access-control</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/adapters</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/admin-ui</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/agent-kit</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/analytics</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/angular-client</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/angular-quickstart</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/browser-auth</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/collections</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/concepts</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/deployment</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/fields</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/hooks</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/introduction</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://forgecms.dev/docs/introduction"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://forgecms.dev/es/docs/introduction"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://forgecms.dev/uk/docs/introduction"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://forgecms.dev/docs/introduction"/>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/es/docs/introduction</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://forgecms.dev/docs/introduction"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://forgecms.dev/es/docs/introduction"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://forgecms.dev/uk/docs/introduction"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://forgecms.dev/docs/introduction"/>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/uk/docs/introduction</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://forgecms.dev/docs/introduction"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://forgecms.dev/es/docs/introduction"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://forgecms.dev/uk/docs/introduction"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://forgecms.dev/docs/introduction"/>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/local-api</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/machine-auth</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/quickstart</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://forgecms.dev/docs/quickstart"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://forgecms.dev/es/docs/quickstart"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://forgecms.dev/uk/docs/quickstart"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://forgecms.dev/docs/quickstart"/>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/es/docs/quickstart</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://forgecms.dev/docs/quickstart"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://forgecms.dev/es/docs/quickstart"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://forgecms.dev/uk/docs/quickstart"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://forgecms.dev/docs/quickstart"/>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/uk/docs/quickstart</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://forgecms.dev/docs/quickstart"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://forgecms.dev/es/docs/quickstart"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://forgecms.dev/uk/docs/quickstart"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://forgecms.dev/docs/quickstart"/>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/rest-api</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/roadmap</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/schema-upgrades</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/server-quickstart</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/small-project-guide</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://forgecms.dev/docs/small-project-guide"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://forgecms.dev/es/docs/small-project-guide"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://forgecms.dev/uk/docs/small-project-guide"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://forgecms.dev/docs/small-project-guide"/>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/es/docs/small-project-guide</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://forgecms.dev/docs/small-project-guide"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://forgecms.dev/es/docs/small-project-guide"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://forgecms.dev/uk/docs/small-project-guide"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://forgecms.dev/docs/small-project-guide"/>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/uk/docs/small-project-guide</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://forgecms.dev/docs/small-project-guide"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://forgecms.dev/es/docs/small-project-guide"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://forgecms.dev/uk/docs/small-project-guide"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://forgecms.dev/docs/small-project-guide"/>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/ssr</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/troubleshooting</loc>
+  </url>
+  <url>
+    <loc>https://forgecms.dev/docs/uploads</loc>
+  </url>
 </urlset>

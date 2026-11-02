@@ -7,18 +7,20 @@ import {
   signal
 } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
-import { NavigationEnd, Router, RouterLink } from '@angular/router';
+import { NavigationEnd, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { filter } from 'rxjs';
 import {
   shouldShowAnalyticsChoices,
   SiteAnalyticsConsentService
 } from '../site-analytics-consent.service';
+import { SiteLocaleService } from '../i18n/site-locale.service';
+import { RichMessageComponent } from './rich-message.component';
 
 @Component({
   selector: 'forge-analytics-consent',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RichMessageComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (showChoices()) {
@@ -30,16 +32,15 @@ import {
         <div class="forge-analytics-consent-inner">
           <img src="/logo.svg" alt="" width="36" height="36" />
           <div class="forge-analytics-consent-copy">
-            <h2 id="analytics-consent-title">Optional audience analytics</h2>
+            <h2 id="analytics-consent-title">{{ t('consent.title') }}</h2>
             <p id="analytics-consent-description">
-              Umami helps us understand which public pages are useful. It stays off unless you allow
-              it. <a routerLink="/privacy">Read the privacy notice</a>.
+              <forge-cms-rich-message [parts]="i18n.parts('consent.body')" [link]="privacyPath()" />
             </p>
           </div>
           <div class="forge-analytics-consent-actions">
-            <button type="button" (click)="analytics.decline()">Continue without analytics</button>
+            <button type="button" (click)="analytics.decline()">{{ t('consent.decline') }}</button>
             <button type="button" class="is-primary" (click)="analytics.accept()">
-              Allow analytics
+              {{ t('consent.allow') }}
             </button>
           </div>
         </div>
@@ -49,6 +50,10 @@ import {
 })
 export class AnalyticsConsentComponent {
   protected readonly analytics = inject(SiteAnalyticsConsentService);
+  private readonly site = inject(SiteLocaleService);
+  protected readonly i18n = this.site.i18n;
+  protected readonly t = this.i18n.t;
+  protected readonly privacyPath = computed(() => this.site.path('/privacy'));
   private readonly router = inject(Router);
   private readonly document = inject(DOCUMENT);
   private readonly currentUrl = signal(this.router.url);

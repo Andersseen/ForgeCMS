@@ -13,10 +13,11 @@ import {
   swapSnippets,
   swapStates
 } from './showcase-data';
+import { englishText, inEnglish } from './i18n/english.testing';
 
 describe('story stages (spec 097)', () => {
   it('tells Schema → Runtime → Angular → Admin → Deploy, in that order', () => {
-    expect(storyStages.map((stage) => stage.label)).toEqual([
+    expect(storyStages.map((stage) => englishText(stage.label))).toEqual([
       'Schema',
       'Runtime',
       'Angular',
@@ -76,25 +77,28 @@ describe('developer ↔ client swap', () => {
   });
 
   it('never claims a page builder or a future server-component feature', () => {
-    const copy = JSON.stringify([swapStates, swapSnippets, bentoCards]).toLowerCase();
+    const copy = JSON.stringify(inEnglish([swapStates, swapSnippets, bentoCards])).toLowerCase();
     expect(copy).not.toMatch(/page builder|drag and drop|server component|strata/);
   });
 });
 
 describe('Agent Kit terminal', () => {
   it('leads with the spec 096 one-command init and stays read-only', () => {
-    expect(agentTerminal[0]).toEqual({ kind: 'command', text: 'pnpm exec forge-cms-agent init' });
-    expect(agentTerminal.some((row) => row.text.includes('8 ForgeCMS skills'))).toBe(true);
-    const copy = JSON.stringify(agentTerminal).toLowerCase();
+    const rows = inEnglish(agentTerminal) as { kind: string; text: string; detail?: string }[];
+    expect(rows[0]).toEqual({ kind: 'command', text: 'pnpm exec forge-cms-agent init' });
+    expect(rows.some((row) => row.text.includes('8 ForgeCMS skills'))).toBe(true);
+    const copy = JSON.stringify(rows).toLowerCase();
     // The MCP never writes, creates or publishes CMS content.
     expect(copy).not.toMatch(/forge_(create|update|write|publish|delete)/);
-    expect(agentTerminal.at(-1)?.detail).toMatch(/reviewed by you/);
+    expect(rows.at(-1)?.detail).toMatch(/reviewed by you/);
   });
 
   it('labels availability from registry truth only', () => {
-    expect(agentAvailabilityNote().includes('not on npm yet')).toBe(!FORGE_CHANNELS.agentPublished);
+    expect(englishText(agentAvailabilityNote()).includes('not on npm yet')).toBe(
+      !FORGE_CHANNELS.agentPublished
+    );
     // The terminal never shows an install of the package itself.
-    expect(JSON.stringify(agentTerminal)).not.toMatch(/pnpm add|npm install/);
+    expect(JSON.stringify(inEnglish(agentTerminal))).not.toMatch(/pnpm add|npm install/);
     expect(agentInstallCommand() === null).toBe(!FORGE_CHANNELS.agentPublished);
   });
 });
@@ -111,6 +115,9 @@ describe('Analytics preview', () => {
     expect(analyticsPreview['7d'].pageviews).toBe(1284);
     expect(formatChange(18.4)).toBe('+18.4%');
     expect(formatChange(-3.2)).toBe('−3.2%');
+    // Spanish and Ukrainian: decimal comma and a non-breaking space before the percent sign.
+    expect(formatChange(18.4, 'es')).toBe('+18,4\u00a0%');
+    expect(formatChange(-3.2, 'uk')).toBe('−3,2\u00a0%');
   });
 
   it('only has metrics the Analytics vertical really has', () => {

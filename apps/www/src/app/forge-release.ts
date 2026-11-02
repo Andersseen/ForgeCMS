@@ -1,3 +1,5 @@
+import type { SiteMessageKey } from './i18n/i18n';
+
 /**
  * The one place the website states which ForgeCMS release is current.
  *
@@ -37,13 +39,17 @@ export type ForgeAvailability = 'stable' | 'experimental';
 export interface ForgePackage {
   /** The name after `@forge-cms/`. */
   name: string;
-  purpose: string;
+  /** Catalog key of the one-line purpose (spec 101). */
+  purpose: SiteMessageKey;
   availability: ForgeAvailability;
 }
 
-/** The version label a package card shows: the stable line, or the honest channel for newer packages. */
-export function packageVersionLabel(pkg: Pick<ForgePackage, 'name'>): string {
-  if (pkg.name === 'agent' && !FORGE_CHANNELS.agentPublished) return 'not yet published';
+/**
+ * The version a package card shows: the stable line, or `null` for a package not on npm yet (the card
+ * then says so in the reader's language).
+ */
+export function packageVersionLabel(pkg: Pick<ForgePackage, 'name'>): string | null {
+  if (pkg.name === 'agent' && !FORGE_CHANNELS.agentPublished) return null;
   return CURRENT_FORGE_VERSION;
 }
 
@@ -58,42 +64,42 @@ export function agentInstallCommand(): string | null {
 export const FORGE_PACKAGES: readonly ForgePackage[] = [
   {
     name: 'core',
-    purpose: 'Schema DSL, validation, collection and global definitions',
+    purpose: 'packages.purpose.core',
     availability: 'stable'
   },
   {
     name: 'db',
-    purpose: 'Database contract, InMemory and libSQL adapters, schema sync',
+    purpose: 'packages.purpose.db',
     availability: 'stable'
   },
-  { name: 'auth', purpose: 'Users collection auth, sessions, API keys', availability: 'stable' },
-  { name: 'storage', purpose: 'Storage contract and InMemory adapter', availability: 'stable' },
+  { name: 'auth', purpose: 'packages.purpose.auth', availability: 'stable' },
+  { name: 'storage', purpose: 'packages.purpose.storage', availability: 'stable' },
   {
     name: 's3',
-    purpose: 'S3-compatible StorageAdapter for portable durable file storage',
+    purpose: 'packages.purpose.s3',
     availability: 'stable'
   },
-  { name: 'api', purpose: 'ApiContext and HTTP handler contracts', availability: 'stable' },
+  { name: 'api', purpose: 'packages.purpose.api', availability: 'stable' },
   {
     name: 'runtime',
-    purpose: 'Local API, access, hooks, drafts, HTTP handlers',
+    purpose: 'packages.purpose.runtime',
     availability: 'stable'
   },
-  { name: 'cloudflare', purpose: 'D1 database and R2 storage adapters', availability: 'stable' },
+  { name: 'cloudflare', purpose: 'packages.purpose.cloudflare', availability: 'stable' },
   {
     name: 'angular',
-    purpose: 'Typed client, signal resources, auth session and guard',
+    purpose: 'packages.purpose.angular',
     availability: 'stable'
   },
   {
     name: 'admin',
-    purpose: 'Embeddable Angular admin: content, users, sign-in',
+    purpose: 'packages.purpose.admin',
     availability: 'stable'
   },
-  { name: 'testing', purpose: 'Adapter contract test suites', availability: 'stable' },
+  { name: 'testing', purpose: 'packages.purpose.testing', availability: 'stable' },
   {
     name: 'agent',
-    purpose: 'Read-only MCP server and official skills for coding agents',
+    purpose: 'packages.purpose.agent',
     availability: 'experimental'
   }
 ];
