@@ -26,7 +26,7 @@ translations.
 - Translating all 25 docs articles (three are translated: `introduction`, `quickstart`,
   `small-project-guide`); the Lumea demo app's own content.
 - A translation backend in ForgeCMS, a custom i18n engine, or a custom Glossa webhook.
-- A Cloudflare deploy-hook change (needs the owner; see "Delivery").
+- A Cloudflare deploy-hook change (it would not reach this direct-upload deploy; see "Delivery").
 
 ## Design
 
@@ -128,8 +128,6 @@ Analog would not remove the last two reasons, so the site uses the extension poi
 
 ## Open questions
 
-- Owner: add `es` and `uk` to the Glossa project's locales, then `pnpm --filter @forge-cms/www i18n:push`
-  creates both catalogs; until then the deploy job's `i18n:pull` fails by design.
 - Native-speaker review of the Spanish and Ukrainian copy has not happened.
 
 ## Outcome
