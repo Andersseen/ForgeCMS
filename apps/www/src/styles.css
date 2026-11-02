@@ -220,6 +220,51 @@ html.dark:has(.forge-public) {
 .forge-public .forge-theme-toggle {
   margin-left: 12px;
 }
+
+/* Spec 101: the language menu sits where the theme toggle's gap was; the toggle follows closely. */
+.forge-public forge-cms-language-switcher {
+  margin-left: 12px;
+}
+.forge-public forge-cms-language-switcher + .forge-theme-toggle {
+  margin-left: 4px;
+}
+.forge-public .forge-language-trigger {
+  gap: 0.35rem;
+  padding-inline: 0.55rem;
+  color: var(--muted-foreground);
+}
+.forge-public .forge-language-trigger:hover,
+.forge-public .forge-language-trigger[aria-expanded='true'] {
+  color: var(--foreground);
+}
+.forge-public .forge-language-trigger:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.forge-language-code {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.forge-language-menu {
+  min-width: 11rem;
+}
+.forge-language-check {
+  display: inline-flex;
+  width: 16px;
+  color: var(--primary);
+}
+.forge-docs-lang {
+  margin-left: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0 0.3rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  color: var(--muted-foreground);
+}
 .forge-public .forge-themed-panel {
   background: var(--forge-raised);
   color: var(--foreground);
