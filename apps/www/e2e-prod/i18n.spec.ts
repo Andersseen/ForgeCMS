@@ -42,6 +42,18 @@ function consoleProblems(page: Page): string[] {
   return problems;
 }
 
+/**
+ * Opens the language menu. Its primitive attaches listeners on hydration (Angular's event replay
+ * covers template listeners only), so a click can land before the menu is live; retry until it opens.
+ */
+async function openLanguageMenu(page: Page, name: string): Promise<void> {
+  const trigger = page.getByRole('button', { name });
+  await expect(async () => {
+    await trigger.click();
+    await expect(page.getByRole('menu')).toBeVisible({ timeout: 500 });
+  }).toPass({ timeout: 10_000 });
+}
+
 test('localized pages are translated in the HTTP HTML, with lang, canonical and alternates', async ({
   browser
 }) => {
@@ -186,8 +198,7 @@ test('the language switcher keeps the page, query and fragment, and history work
   page
 }) => {
   await page.goto('/demo?ref=switcher#explore-title');
-  const trigger = page.getByRole('button', { name: 'Language: English' });
-  await trigger.click();
+  await openLanguageMenu(page, 'Language: English');
   await page.getByRole('menuitem', { name: 'Українська' }).click();
   await expect(page).toHaveURL(/\/uk\/demo\?ref=switcher#explore-title$/);
   await expect(page.locator('html')).toHaveAttribute('lang', 'uk');
@@ -200,11 +211,15 @@ test('the language switcher keeps the page, query and fragment, and history work
 test('the switcher is keyboard operable and marks the current language', async ({ page }) => {
   await page.goto('/es/privacy');
   const trigger = page.getByRole('button', { name: 'Idioma: Español' });
-  // The menu primitive attaches its listeners on hydration; its collapsed state proves it is live.
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-  await trigger.focus();
-  await page.keyboard.press('Enter');
   const current = page.getByRole('menuitem', { name: 'Español' });
+  // The menu primitive's listeners attach on hydration (Angular's event replay covers template
+  // listeners only), and the prerendered HTML already says aria-expanded="false". So a key press can
+  // land before the menu is live: press until it opens — a press that lands opens it, ending the loop.
+  await expect(async () => {
+    await trigger.focus();
+    await page.keyboard.press('Enter');
+    await expect(current).toBeVisible({ timeout: 500 });
+  }).toPass({ timeout: 10_000 });
   await expect(current).toHaveAttribute('aria-current', 'true');
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
   await page.keyboard.press('Escape');
@@ -223,7 +238,7 @@ test('from an English-only article the switcher falls back deliberately to the d
   page
 }) => {
   await page.goto('/docs/fields');
-  await page.getByRole('button', { name: 'Language: English' }).click();
+  await openLanguageMenu(page, 'Language: English');
   const spanish = page.getByRole('menuitem', { name: /Español/ });
   await expect(spanish).toContainText('Not translated yet');
   await spanish.click();
@@ -267,7 +282,7 @@ test('the theme survives a language switch', async ({ page }) => {
   await page
     .getByRole('button', { name: dark ? 'Switch to light mode' : 'Switch to dark mode' })
     .click();
-  await page.getByRole('button', { name: 'Language: English' }).click();
+  await openLanguageMenu(page, 'Language: English');
   await page.getByRole('menuitem', { name: 'Español' }).click();
   await expect(page).toHaveURL(/\/es$/);
   if (dark) await expect(html).not.toHaveClass(/dark/);
