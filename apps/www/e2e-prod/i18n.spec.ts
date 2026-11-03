@@ -235,20 +235,26 @@ test('localized docs link translated articles in-locale and the rest to English'
   page
 }) => {
   await page.goto('/es/docs/introduction');
+  await page.waitForLoadState('networkidle');
+  // Compare paths: an `href` may be serialized relative (prerender) or absolute (after hydration).
+  const pathOf = (href: string | null) => new URL(href ?? '', page.url()).pathname;
   const sidebar = page.getByRole('complementary', { name: 'Documentación' });
-  await expect(sidebar.getByRole('link', { name: /^Inicio rápido/ })).toHaveAttribute(
-    'href',
-    '/es/docs/quickstart'
-  );
+  const quickstart = sidebar.getByRole('link', { name: /^Inicio rápido/ });
+  expect(pathOf(await quickstart.getAttribute('href'))).toBe('/es/docs/quickstart');
   const fields = sidebar.getByRole('link', { name: /Fields/ });
-  await expect(fields).toHaveAttribute('href', '/docs/fields');
+  expect(pathOf(await fields.getAttribute('href'))).toBe('/docs/fields');
   await expect(fields).toContainText('EN');
-  const hrefs = await page.$$eval('a[href^="/es/docs/"]', (links) =>
-    links.map((a) => a.getAttribute('href'))
-  );
-  for (const href of hrefs) {
-    expect(href, 'no localized link without a translation').toMatch(
-      /^\/es\/docs\/(introduction|quickstart|small-project-guide)(#.*)?$/
+  const paths = (
+    await page.$$eval('a[href]', (links) => links.map((a) => (a as HTMLAnchorElement).href))
+  )
+    .map((href) => new URL(href))
+    .filter((url) => url.origin === new URL(page.url()).origin)
+    .map((url) => url.pathname)
+    .filter((path) => path.startsWith('/es/docs/'));
+  expect(paths.length).toBeGreaterThan(0);
+  for (const path of paths) {
+    expect(path, 'no localized link without a translation').toMatch(
+      /^\/es\/docs\/(introduction|quickstart|small-project-guide)\/?$/
     );
   }
   await expect(page.getByRole('heading', { level: 2, name: 'Qué funciona hoy' })).toBeVisible();

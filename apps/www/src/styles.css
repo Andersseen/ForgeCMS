@@ -246,6 +246,28 @@ html.dark:has(.forge-public) {
   font-weight: 600;
   letter-spacing: 0.04em;
 }
+/*
+ * Tablet band (md, below lg): the desktop nav and actions share ~700px, and the Spanish/Ukrainian nav
+ * labels are longer. The menu keeps its icon (its aria-label names the language) and the nav links
+ * tighten slightly, so no locale overflows at 768px.
+ */
+@media (min-width: 48rem) and (max-width: 63.999rem) {
+  .forge-public .forge-header .forge-nav-link {
+    padding-inline: 0.45rem;
+  }
+  .forge-public .forge-header nav + div {
+    gap: 0.5rem;
+  }
+  .forge-public forge-cms-language-switcher {
+    margin-left: 4px;
+  }
+  .forge-public .forge-language-trigger {
+    padding-inline: 0.4rem;
+  }
+  .forge-public .forge-language-code {
+    display: none;
+  }
+}
 .forge-language-menu {
   min-width: 11rem;
 }
