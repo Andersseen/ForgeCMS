@@ -27,6 +27,26 @@ describe('public analytics policy', () => {
     expect(isPublicAnalyticsPath('/docs-evil')).toBe(false);
   });
 
+  it('counts the localized public pages and nothing under another prefix (spec 101)', () => {
+    for (const path of [
+      '/es',
+      '/uk/',
+      '/es/demo',
+      '/uk/privacy',
+      '/es/docs',
+      '/uk/docs/quickstart'
+    ]) {
+      expect(isPublicAnalyticsPath(path), path).toBe(true);
+    }
+    for (const path of ['/en', '/en/demo', '/fr/demo', '/es/admin', '/uk/admin/users', '/esx']) {
+      expect(isPublicAnalyticsPath(path), path).toBe(false);
+    }
+    // The locale is part of the reported path (one pageview per page view), never a parameter.
+    expect(
+      sanitizeUmamiPageview('event', { website: 'x', url: 'https://forgecms.dev/es/demo?utm=1#a' })
+    ).toEqual({ website: expect.any(String), url: '/es/demo' });
+  });
+
   it('shows consent choices only on the production public site when there is no saved choice', () => {
     expect(shouldShowAnalyticsChoices('unset', 'forgecms.dev', '/')).toBe(true);
     expect(shouldShowAnalyticsChoices('accepted', 'forgecms.dev', '/')).toBe(false);

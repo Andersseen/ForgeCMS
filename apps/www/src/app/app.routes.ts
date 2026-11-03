@@ -1,31 +1,30 @@
 import type { Routes } from '@angular/router';
+import { localizedRoutes } from './i18n/locale-routing';
+import type { SeoRouteData } from './site-head.service';
 
-export const routes: Routes = [
+const seo = (page: 'landing' | 'demo' | 'privacy'): { seo: SeoRouteData } => ({
+  seo: { titleKey: `seo.${page}.title`, descriptionKey: `seo.${page}.description` }
+});
+
+/**
+ * The public pages, served once per locale by `localizedRoutes` (spec 101): `/demo`, `/es/demo` and
+ * `/uk/demo` are the same lazily loaded component. Titles and descriptions come from the catalog.
+ */
+const pages: Routes = [
   {
     path: '',
-    title: 'ForgeCMS — the Angular-native headless CMS',
-    data: {
-      description:
-        'ForgeCMS is the Angular-native, TypeScript code-first headless CMS. Model content in code, use the Local API, and give editors a reusable Angular admin. Stable 1.0.0.'
-    },
+    pathMatch: 'full',
+    data: seo('landing'),
     loadComponent: () => import('./pages/landing.page').then((m) => m.LandingPage)
   },
   {
     path: 'demo',
-    title: 'Demo — ForgeCMS',
-    data: {
-      description:
-        'Explore Lumea, a working clinic site built with ForgeCMS. Browse its content and admin workflow, including treatments, staff, bookings, and a journal.'
-    },
+    data: seo('demo'),
     loadComponent: () => import('./pages/demo.page').then((m) => m.DemoPage)
   },
   {
     path: 'privacy',
-    title: 'Privacy — ForgeCMS',
-    data: {
-      description:
-        'Learn about optional, consent-gated audience measurement on the ForgeCMS website and how to change your choice.'
-    },
+    data: seo('privacy'),
     loadComponent: () => import('./pages/privacy.page').then((m) => m.PrivacyPage)
   },
   {
@@ -41,15 +40,20 @@ export const routes: Routes = [
     ]
   },
   {
-    path: 'admin',
-    title: 'Admin — ForgeCMS',
-    data: { robots: 'noindex, nofollow' },
-    loadChildren: () => import('./admin.routes').then((m) => m.ADMIN_ROUTES)
-  },
-  {
     path: '**',
-    title: 'Page not found — ForgeCMS',
     data: { robots: 'noindex, nofollow' },
     loadComponent: () => import('./pages/not-found.page').then((m) => m.NotFoundPage)
   }
 ];
+
+/** Private routes: English-only and never prerendered (spec 101 keeps the admin out of i18n). */
+const outside: Routes = [
+  {
+    path: 'admin',
+    title: 'Admin — ForgeCMS',
+    data: { robots: 'noindex, nofollow' },
+    loadChildren: () => import('./admin.routes').then((m) => m.ADMIN_ROUTES)
+  }
+];
+
+export const routes: Routes = localizedRoutes(pages, outside);

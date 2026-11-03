@@ -1,9 +1,13 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { injectT } from '@etyma/angular';
 import { RouterLink } from '@angular/router';
 import { VoltNativeButton } from '@voltui/components';
 import { MoveInViewDirective, MoveStaggerDirective } from 'angular-movement';
 import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
-import { agentInstallCommand } from '../forge-release';
+import { CURRENT_FORGE_VERSION, agentInstallCommand } from '../forge-release';
+import { i18n, textOf, type SiteText } from '../i18n/i18n';
+import { SiteLocaleService } from '../i18n/site-locale.service';
+import { RichMessageComponent } from './rich-message.component';
 import { agentAvailabilityNote, agentRoles, agentTerminal } from '../showcase-data';
 
 /**
@@ -20,7 +24,8 @@ import { agentAvailabilityNote, agentRoles, agentTerminal } from '../showcase-da
     VoltNativeButton,
     MoveInViewDirective,
     MoveStaggerDirective,
-    LmnArrowRightIcon
+    LmnArrowRightIcon,
+    RichMessageComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -29,48 +34,49 @@ import { agentAvailabilityNote, agentRoles, agentTerminal } from '../showcase-da
         <div class="grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16">
           <div>
             <p class="forge-section-mark">
-              Agent Kit <span class="forge-experimental-badge ml-1">Experimental</span>
+              {{ t('agentKit.mark') }}
+              <span class="forge-experimental-badge ml-1">{{ t('common.experimental') }}</span>
             </p>
             <h2 id="agent-kit-title" class="forge-section-title mt-5">
-              Your coding agent shouldn’t have to guess ForgeCMS.
+              {{ t('agentKit.title') }}
             </h2>
             <p class="mt-5 max-w-[48ch] leading-7 text-muted-foreground">
-              One command connects a local, read-only MCP server and the official skills for the
-              exact version you installed. Development tooling around ForgeCMS; compatibility may
-              evolve.
+              {{ t('agentKit.lede') }}
             </p>
 
             <dl class="forge-agent-roles">
-              @for (item of roles; track item.name) {
+              @for (item of roles; track item.role) {
                 <div>
-                  <dt>{{ item.name }}</dt>
-                  <dd>{{ item.role }}</dd>
+                  <dt>{{ text(item.name) }}</dt>
+                  <dd>{{ t(item.role) }}</dd>
                 </div>
               }
             </dl>
 
-            <ul class="forge-agent-facts" aria-label="Agent Kit guarantees">
-              <li>Local</li>
-              <li>read-only</li>
-              <li>No telemetry</li>
+            <ul class="forge-agent-facts" [attr.aria-label]="t('agentKit.guarantees')">
+              <li>{{ t('agentKit.facts.0') }}</li>
+              <li>{{ t('agentKit.facts.1') }}</li>
+              <li>{{ t('agentKit.facts.2') }}</li>
             </ul>
 
             <div class="mt-8 flex flex-wrap items-center gap-4">
-              <a voltButton routerLink="/docs/agent-kit">
-                Read Agent Kit docs
+              <a voltButton [routerLink]="site.docsPath('agent-kit')">
+                {{ t('agentKit.docs') }}
                 <lmn-arrow-right [size]="16" />
               </a>
               @if (install) {
-                <code class="forge-install-inline" aria-label="Agent Kit install command">{{
-                  install
-                }}</code>
+                <code
+                  class="forge-install-inline"
+                  [attr.aria-label]="t('agentKit.installCommand')"
+                  >{{ install }}</code
+                >
               }
             </div>
             <p class="mt-4 text-sm text-muted-foreground" data-agent-availability>
               @if (install) {
-                {{ availability }}
+                <forge-cms-rich-message [parts]="availability()" />
               } @else {
-                Published in the experimental Agent Kit package
+                {{ t('agentKit.unpublished') }}
               }
             </p>
           </div>
@@ -81,31 +87,33 @@ import { agentAvailabilityNote, agentRoles, agentTerminal } from '../showcase-da
               <p>your-angular-project</p>
             </div>
             <ol class="forge-terminal-body" moveStagger="110ms">
-              @for (row of rows; track row.text) {
+              @for (row of rows; track $index) {
                 <li [class]="'forge-terminal-row is-' + row.kind" [moveInView]="reveal">
                   @switch (row.kind) {
                     @case ('command') {
                       <span class="forge-terminal-sigil" aria-hidden="true">$</span>
-                      <code>{{ row.text }}</code>
+                      <code>{{ text(row.text) }}</code>
                     }
                     @case ('prompt') {
-                      <span class="forge-terminal-label">You</span>
-                      <span class="forge-terminal-prompt">“{{ row.text }}”</span>
+                      <span class="forge-terminal-label">{{ t('agentKit.you') }}</span>
+                      <span class="forge-terminal-prompt">“{{ text(row.text) }}”</span>
                     }
                     @case ('result') {
                       <span class="forge-terminal-sigil" aria-hidden="true">→</span>
                       <span
-                        ><strong>{{ row.text }}</strong>
-                        <span class="forge-terminal-detail">{{ row.detail }}</span></span
-                      >
+                        ><strong>{{ text(row.text) }}</strong>
+                        @if (row.detail; as detail) {
+                          <span class="forge-terminal-detail">{{ text(detail) }}</span>
+                        }
+                      </span>
                     }
                     @default {
                       <span class="forge-terminal-check" aria-hidden="true">✓</span>
-                      <span class="sr-only">Done: </span>
+                      <span class="sr-only">{{ t('agentKit.done') }}&#32;</span>
                       <span
-                        ><span [class.font-mono]="row.kind === 'tool'">{{ row.text }}</span>
-                        @if (row.detail) {
-                          <span class="forge-terminal-detail">{{ row.detail }}</span>
+                        ><span [class.font-mono]="row.kind === 'tool'">{{ text(row.text) }}</span>
+                        @if (row.detail; as detail) {
+                          <span class="forge-terminal-detail">{{ text(detail) }}</span>
                         }
                       </span>
                     }
@@ -114,8 +122,13 @@ import { agentAvailabilityNote, agentRoles, agentTerminal } from '../showcase-da
               }
             </ol>
             <figcaption id="agent-terminal-caption" class="forge-terminal-caption">
-              Illustrative · {{ install ? 'Candidate workflow.' : availability }} The MCP only
-              reads; your agent edits the project with its own tools.
+              {{ t('agentKit.illustrative') }}
+              @if (install) {
+                {{ t('agentKit.candidateWorkflow') }}
+              } @else {
+                <forge-cms-rich-message [parts]="availability()" />
+              }
+              {{ t('agentKit.caption') }}
             </figcaption>
           </figure>
         </div>
@@ -127,6 +140,12 @@ export class AgentKitSectionComponent {
   protected readonly rows = agentTerminal;
   protected readonly roles = agentRoles;
   protected readonly install = agentInstallCommand();
-  protected readonly availability = agentAvailabilityNote();
+  protected readonly i18n = inject(SiteLocaleService).i18n;
+  protected readonly t = injectT(i18n);
+  protected readonly site = inject(SiteLocaleService);
+  protected readonly text = (value: SiteText): string => textOf(this.t, value);
+  /** Rendered as parts: the candidate note marks the package name as code. */
+  protected readonly availability = () =>
+    this.i18n.parts(agentAvailabilityNote(), { version: CURRENT_FORGE_VERSION });
   protected readonly reveal = { opacity: [0, 1], x: [-10, 0] };
 }

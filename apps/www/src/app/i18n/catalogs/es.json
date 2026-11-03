@@ -1,0 +1,721 @@
+{
+  "common": {
+    "experimental": "Experimental",
+    "illustrativePreview": "Vista previa ilustrativa",
+    "opensInNewTab": "Se abre en una pestaña nueva",
+    "skipToContent": "Saltar al contenido",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "logoAlt": "Logotipo de ForgeCMS",
+    "backToTop": "Volver arriba"
+  },
+  "navigation": {
+    "primary": "Principal",
+    "mobile": "Móvil",
+    "product": "Producto",
+    "demo": "Demo",
+    "docs": "Documentación",
+    "getStarted": "Empezar",
+    "switchToLight": "Cambiar a modo claro",
+    "switchToDark": "Cambiar a modo oscuro",
+    "toggle": "Abrir o cerrar la navegación"
+  },
+  "language": {
+    "label": "Idioma",
+    "trigger": "Idioma: {$language}",
+    "fallback": "Aún sin traducir: abre el inicio de la documentación en {$language}"
+  },
+  "footer": {
+    "title": "Tu próximo proyecto empieza por tu contenido.",
+    "body": "Conoce el modelo, explora un proyecto real y construye un sistema de contenidos que encaje en tu aplicación Angular.",
+    "exploreDemo": "Explorar la demo",
+    "readDocs": "Leer la documentación",
+    "nav": "Pie de página",
+    "roadmap": "Hoja de ruta",
+    "agentKit": "Agent Kit",
+    "analytics": "Analítica",
+    "upgrades": "Actualizaciones",
+    "privacy": "Privacidad",
+    "legal": "MIT · ForgeCMS {$version}"
+  },
+  "hero": {
+    "badge": "Código abierto · ForgeCMS {$version} · estable",
+    "title": {
+      "0": "Tu contenido.",
+      "1": "Tu código.",
+      "2": "Tu Angular."
+    },
+    "lede": "El CMS headless code-first que se siente como en casa en tu aplicación Angular. Modela en TypeScript, ofrece a los editores un panel de administración real en Angular y mantén la interfaz del sitio bajo tu control.",
+    "startBuilding": "Empezar a construir",
+    "exploreDemo": "Explorar la demo en vivo",
+    "platforms": {
+      "0": "Angular + Analog",
+      "1": "Cloudflare D1 + R2",
+      "2": "libSQL + S3 portable"
+    },
+    "installCommand": "Comando de instalación",
+    "copyInstall": "Copiar el comando de instalación",
+    "copyFallback": "Selecciona y copia el comando",
+    "note": "Licencia MIT. ForgeCMS {$version} está publicado. La versión candidata {$candidate} sigue en el historial de versiones; Agent Kit y Analytics son experimentales."
+  },
+  "showcase": {
+    "label": "Explora el producto ForgeCMS",
+    "project": "/ tu próximo proyecto",
+    "views": "Vistas del producto",
+    "tabs": {
+      "schema": "Esquema",
+      "content": "Contenido",
+      "api": "API"
+    },
+    "context": "Contexto de la demostración",
+    "workspace": "Tu espacio de trabajo",
+    "posts": "Entradas",
+    "media": "Medios",
+    "globals": "Globals",
+    "collectionExample": "Ejemplo de colección",
+    "schemaTitle": {
+      "0": "Defínelo una vez.",
+      "1": "Constrúyelo en todas partes."
+    },
+    "schemaBody": "Una colección se convierte en validación, persistencia, una API y una experiencia de edición en Angular.",
+    "schemaProof": "Sin un esquema aparte que mantener sincronizado.",
+    "readOnly": "Vista previa de solo lectura",
+    "published": "Publicado",
+    "fields": {
+      "title": "Título",
+      "slug": "Slug",
+      "author": "Autor"
+    },
+    "editorTitle": {
+      "0": "Hecho para las personas",
+      "1": "detrás del contenido."
+    },
+    "editorBody": "Tu modelo ofrece a los editores un lugar de trabajo familiar. El panel de administración real vive dentro de tu aplicación Angular.",
+    "exampleResponse": "Respuesta de ejemplo",
+    "exampleResponseLabel": "Respuesta de ejemplo de la API",
+    "apiTitle": {
+      "0": "Tu contenido.",
+      "1": "Listo para tu aplicación."
+    },
+    "apiBody": "Léelo mediante REST o llama a la Local API directamente desde el código de servidor. El mismo contenido, donde lo necesites.",
+    "apiProof": "Incluye un cliente Angular tipado.",
+    "flow": {
+      "schema": "Esquema TypeScript",
+      "admin": "Panel Angular",
+      "app": "Tu aplicación",
+      "caption": "Un sistema conectado"
+    }
+  },
+  "story": {
+    "mark": "Cómo encaja ForgeCMS",
+    "title": "Todo lo que hay entre tu esquema y el editor de tu cliente.",
+    "lede": "Cinco pasos desde un archivo TypeScript hasta un sitio que gestiona tu cliente. Cada uno forma parte de la versión 1.0 publicada.",
+    "stages": "Etapas del recorrido",
+    "illustration": "Ilustración: {$stage}",
+    "schema": {
+      "label": "Esquema",
+      "kicker": "TypeScript primero",
+      "title": "Modela el contenido una vez, en código.",
+      "body": "Una colección es TypeScript normal en tu repositorio: campos, borradores, idiomas y reglas de acceso, revisados como cualquier otro cambio."
+    },
+    "runtime": {
+      "label": "Runtime",
+      "kicker": "Local API + REST",
+      "title": "Un único pipeline para cada lectura y escritura.",
+      "body": "El código de servidor llama a la Local API sin pasar por HTTP; los navegadores usan REST. Ambos ejecutan el mismo control de acceso, hooks, borradores y validación."
+    },
+    "angular": {
+      "label": "Angular",
+      "kicker": "Cliente tipado + SSR",
+      "title": "Tus componentes leen signals tipados.",
+      "body": "El cliente Angular convierte una colección en un recurso de signals tipado a partir de tu esquema, renderizado en el servidor con Analog e hidratado."
+    },
+    "admin": {
+      "label": "Administración",
+      "kicker": "Da el control a los editores",
+      "title": "Tu cliente obtiene un editor de verdad.",
+      "body": "El panel de administración reutilizable en Angular se monta bajo tus propias rutas: contenido, borradores, medios, usuarios y ambos idiomas, sin nada que construir a mano."
+    },
+    "deploy": {
+      "label": "Despliegue",
+      "kicker": "Perfiles certificados",
+      "title": "Despliégalo donde encaje.",
+      "body": "Cloudflare Pages con D1 y R2, o cualquier host de Node con libSQL y almacenamiento compatible con S3. Ambos perfiles están certificados a partir de artefactos empaquetados."
+    },
+    "outputs": {
+      "0": "Validación",
+      "1": "Almacenamiento",
+      "2": "REST + Local API",
+      "3": "Formulario de administración",
+      "4": "Tipos"
+    },
+    "localApiPanel": "Local API · código de servidor",
+    "noHttpHop": "sin salto HTTP",
+    "pipelineLabel": "Pipeline compartido",
+    "pipeline": {
+      "0": "Acceso",
+      "1": "Hooks",
+      "2": "Borradores",
+      "3": "Validación"
+    },
+    "localApiGuide": "Guía de la Local API",
+    "rendered": "Renderizado en el servidor · hidratado en el navegador",
+    "adminSections": "Secciones de administración",
+    "adminNav": {
+      "0": "Servicios",
+      "1": "Medios",
+      "2": "Usuarios"
+    },
+    "host": "Host",
+    "database": "Base de datos",
+    "files": "Archivos",
+    "certified": "Certificado a partir de artefactos empaquetados",
+    "portable": "Portable",
+    "anyNodeHost": "Cualquier host de Node",
+    "s3Compatible": "Compatible con S3"
+  },
+  "sample": {
+    "facial": "Tratamientos faciales",
+    "laser": "Depilación láser",
+    "consultation": "Consulta dermatológica",
+    "published": "Publicado",
+    "draft": "Borrador"
+  },
+  "bento": {
+    "mark": "Por qué ForgeCMS",
+    "title": "Un CMS que pertenece a tu aplicación Angular.",
+    "lede": "Code-first para quien desarrolla, cómodo para el cliente y desplegable en el edge o en cualquier lugar donde se ejecute Node.",
+    "angular": {
+      "title": "Nativo de Angular",
+      "body": "Creado para Angular y Analog, tipado desde tu esquema hasta tu plantilla, renderizado en el servidor e hidratado.",
+      "typeFlow": "Los tipos fluyen del esquema a la plantilla",
+      "points": {
+        "0": "Angular + Analog",
+        "1": "Tipado de extremo a extremo",
+        "2": "SSR + hidratación"
+      },
+      "link": "Inicio rápido con Angular"
+    },
+    "client": {
+      "title": "Listo para el cliente",
+      "body": "Un panel de administración reutilizable que tu cliente realmente puede usar, montado dentro de tu aplicación.",
+      "points": {
+        "drafts": "Borradores y publicación",
+        "media": "Biblioteca de medios",
+        "locales": "Contenido en ES / EN",
+        "users": "Usuarios y roles",
+        "analytics": "Analytics"
+      },
+      "link": "Prueba el panel en la demo"
+    },
+    "deploy": {
+      "title": "Despliega a tu manera",
+      "body": "Nativo del edge en Cloudflare, o portable allí donde se ejecute Node.",
+      "points": {
+        "0": "Cloudflare D1 + R2",
+        "1": "libSQL + S3 portable"
+      },
+      "link": "Perfiles de despliegue"
+    },
+    "agent": {
+      "title": "Listo para agentes",
+      "body": "Herramientas opcionales para desarrolladores, para que los agentes de programación sigan los patrones de Forge admitidos.",
+      "points": {
+        "0": "MCP de solo lectura",
+        "1": "Ocho skills oficiales",
+        "2": "Documentación acorde a tu versión",
+        "3": "Inicialización con un comando"
+      },
+      "link": "Ver el Agent Kit"
+    },
+    "surface": "La superficie de ForgeCMS 1.0"
+  },
+  "capabilities": {
+    "content": {
+      "title": "Contenido",
+      "items": {
+        "0": "Colecciones y globals únicos",
+        "1": "Bloques, arrays y grupos para páginas compuestas",
+        "2": "Borradores, versiones y vista previa en vivo",
+        "3": "Relaciones pobladas por profundidad",
+        "4": "Localización de campos de texto",
+        "5": "Subidas a R2 o S3"
+      }
+    },
+    "backend": {
+      "title": "Backend",
+      "items": {
+        "0": "Local API sin salto HTTP interno",
+        "1": "REST con un envoltorio de respuesta estable",
+        "2": "Hooks en cada escritura",
+        "3": "Funciones de acceso por fila y por campo",
+        "4": "Sesiones de navegador con CSRF",
+        "5": "Claves de API para clientes de máquina"
+      }
+    },
+    "angular": {
+      "title": "Angular",
+      "items": {
+        "0": "Cliente tipado generado a partir de tu esquema",
+        "1": "Recursos basados en signals",
+        "2": "SSR e hidratación para Analog",
+        "3": "Un panel de administración reutilizable que montas bajo tus propias rutas",
+        "4": "Navegación y ruta de montaje del panel personalizables"
+      }
+    },
+    "operations": {
+      "title": "Operaciones",
+      "items": {
+        "0": "Detección de divergencias del esquema antes de cualquier escritura",
+        "1": "Migraciones atómicas y revisadas",
+        "2": "Ensayo de copia de seguridad y restauración",
+        "3": "Cloudflare D1 + R2, de primera clase",
+        "4": "libSQL + S3 portable",
+        "5": "Certificación de artefactos empaquetados"
+      }
+    }
+  },
+  "flow": {
+    "mark": "Desarrollador ↔ cliente",
+    "title": "Tú construyes el sitio. Ellos gestionan el contenido.",
+    "cta": "Míralo en el sitio real de una clínica",
+    "views": "Vistas de desarrollador y de cliente",
+    "model": {
+      "tab": "Modelar",
+      "caption": "Declaras los campos una vez. Forge renderiza el formulario que edita tu cliente.",
+      "developer": "Code-first · tú escribes",
+      "client": "Pensado para el cliente · ellos editan"
+    },
+    "build": {
+      "tab": "Construir",
+      "caption": "Tus componentes controlan el diseño. El panel de administración controla el contenido que hay detrás.",
+      "developer": "Sitio Angular · tú construyes",
+      "client": "Forge Admin · ellos lo gestionan"
+    },
+    "publish": {
+      "tab": "Publicar",
+      "caption": "El cliente publica un borrador. Tu sitio lo renderiza mediante el cliente tipado.",
+      "developer": "Tu sitio · lee el contenido publicado",
+      "client": "Forge Admin · ellos publican"
+    },
+    "form": {
+      "label": "Formulario de administración ilustrativo",
+      "service": "Servicio",
+      "title": "Título",
+      "summary": "Resumen",
+      "image": "Imagen",
+      "draftSaved": "Borrador guardado",
+      "publish": "Publicar"
+    },
+    "adminLabel": "Forge Admin ilustrativo",
+    "adminNav": {
+      "content": "Contenido",
+      "media": "Medios",
+      "analytics": "Analytics",
+      "users": "Usuarios"
+    },
+    "publishLabel": "Acción de publicación ilustrativa",
+    "developer": "Desarrollador",
+    "developerRole": {
+      "0": "Construye la interfaz en Angular",
+      "1": "Define el esquema de Forge",
+      "2": "Es dueño de cada componente",
+      "3": "Despliega la aplicación"
+    },
+    "client": "Cliente · Forge Admin",
+    "clientRole": {
+      "opens": "Abre Forge Admin",
+      "edits": "Edita títulos y descripciones",
+      "writes": "Escribe contenido en ES y EN",
+      "uploads": "Sube medios y publica",
+      "analytics": "Consulta Analytics"
+    },
+    "note": "Los editores cambian el contenido, no el diseño. ForgeCMS no es un constructor de páginas: tus componentes siguen siendo tuyos."
+  },
+  "localization": {
+    "mark": "Para sitios reales de clientes",
+    "title": "Español e inglés, uno al lado del otro.",
+    "lede": "Declara los idiomas en el esquema. Los campos text y textarea de primer nivel guardan un valor distinto por idioma; los slugs, las imágenes y las relaciones se comparten.",
+    "limits": "El texto enriquecido, los bloques, los arrays, las subidas y las relaciones no se localizan en 1.0.",
+    "guide": "Guía de localización",
+    "notices": "Avisos /",
+    "editingLocale": "Idioma de edición",
+    "description": "Descripción",
+    "slug": "Slug",
+    "image": "Imagen",
+    "shared": "Compartido",
+    "foot": "Ilustrativo · el panel edita un idioma cada vez",
+    "caption": "Un documento, un valor almacenado por idioma",
+    "field": "Campo",
+    "fieldTitle": "Título"
+  },
+  "agentKit": {
+    "mark": "Agent Kit",
+    "title": "Tu agente de programación no debería tener que adivinar cómo funciona ForgeCMS.",
+    "lede": "Un solo comando conecta un servidor MCP local de solo lectura y las skills oficiales para la versión exacta que instalaste. Herramientas de desarrollo en torno a ForgeCMS; la compatibilidad puede evolucionar.",
+    "roles": {
+      "mcp": "Conocimiento del proyecto de solo lectura",
+      "skills": "Guía procedimental de Forge",
+      "agent": "Tu agente",
+      "agentRole": "Edita el código con sus herramientas habituales"
+    },
+    "skills": "Skills",
+    "guarantees": "Garantías del Agent Kit",
+    "facts": {
+      "0": "Local",
+      "1": "solo lectura",
+      "2": "Sin telemetría"
+    },
+    "docs": "Leer la documentación del Agent Kit",
+    "installCommand": "Comando de instalación del Agent Kit",
+    "published": "Publicado en {$version}; el Agent Kit sigue siendo experimental.",
+    "candidate": "Flujo candidato: {#code}@forge-cms/agent{/code} aún no está en npm.",
+    "unpublished": "Publicado en el paquete experimental Agent Kit",
+    "you": "Tú",
+    "done": "Hecho:",
+    "terminal": {
+      "mcp": "MCP configurado",
+      "mcpDetail": "{{.mcp.json · forge-cms (solo lectura)}}",
+      "skills": "8 skills de ForgeCMS instaladas",
+      "docs": "Documentación acorde a tu versión lista",
+      "docsDetail": "incluida, sin conexión",
+      "doctor": "Diagnóstico del proyecto disponible",
+      "prompt": "Haz que los servicios se puedan editar en español y en inglés.",
+      "detect": "Analog · perfil de Cloudflare · aún sin idiomas",
+      "search": "\"localization\" en la versión instalada",
+      "skill": "skill: el patrón admitido",
+      "result": "Implementación de Forge admitida",
+      "resultDetail": "escrita por tu agente con sus propias herramientas, revisada por ti"
+    },
+    "illustrative": "Ilustrativo ·",
+    "candidateWorkflow": "Flujo candidato.",
+    "caption": "El MCP solo lee; tu agente edita el proyecto con sus propias herramientas."
+  },
+  "analytics": {
+    "mark": "Analytics",
+    "title": "¿Alguien visita el sitio? El cliente puede verlo.",
+    "lede": "Analítica opcional de páginas vistas dentro del mismo panel, basada en Cloudflare Analytics Engine. Privada por diseño:",
+    "guarantees": "Garantías de privacidad",
+    "privacy": {
+      "0": "Sin identificador de visitante",
+      "1": "Sin cookie de seguimiento persistente",
+      "2": "Forge no almacena la IP",
+      "3": "Sin correo electrónico ni ID de usuario",
+      "4": "Sin query string ni hash",
+      "5": "Solo el host de referencia"
+    },
+    "docs": "Documentación de Analytics",
+    "preview": "Vista previa ilustrativa · no son datos reales",
+    "range": "Intervalo de fechas",
+    "pageviews": "Páginas vistas",
+    "vsPrevious": "frente al periodo anterior de {$range}",
+    "timeline": "Evolución",
+    "topPages": "Páginas principales",
+    "referrers": "Referencias",
+    "countries": "Países",
+    "share": "Cuota de {$item}"
+  },
+  "demoInvite": {
+    "art": "Vista previa ilustrativa del proyecto Lumea",
+    "example": "Proyecto de ejemplo",
+    "artTitle": {
+      "0": "Un sitio real.",
+      "1": "Contenido real."
+    },
+    "artBody": "Un sitio web de una clínica, un flujo editorial y un panel de administración en Angular. Conectados por ForgeCMS.",
+    "poweredBy": "Con la tecnología de ForgeCMS · Vista previa ilustrativa",
+    "mark": "La prueba",
+    "title": {
+      "0": "Tú construyes la interfaz.",
+      "1": "Tu cliente obtiene el control."
+    },
+    "body": "Lumea es el sitio de una clínica construido con ForgeCMS. Todo lo anterior funciona allí, sobre un runtime real:",
+    "proof": {
+      "content": "Contenido",
+      "drafts": "Borradores",
+      "uploads": "Subidas",
+      "roles": "Roles",
+      "locales": "ES / EN",
+      "analytics": "Analytics"
+    },
+    "cta": "Explorar la demo de Lumea"
+  },
+  "packages": {
+    "mark": "Una base componible",
+    "title": "Usa las piezas que necesita tu proyecto.",
+    "lede": "Doce paquetes enfocados. Los once estables avanzan juntos en {#strong}v{$version}{/strong}; el Agent Kit experimental se publica como parte de la familia de paquetes {$version}.",
+    "total": "Paquetes",
+    "stable": "Estables",
+    "experimental": "Experimentales",
+    "layers": {
+      "angular": {
+        "label": "Experiencia Angular",
+        "description": "Consumo tipado y el panel de administración reutilizable"
+      },
+      "runtime": {
+        "label": "Runtime y plataforma",
+        "description": "Operaciones, transporte y adaptadores de despliegue"
+      },
+      "foundation": {
+        "label": "Base",
+        "description": "Modelo, datos, identidad y archivos"
+      },
+      "tooling": {
+        "label": "Calidad y herramientas",
+        "description": "Contratos de adaptadores y soporte para agentes de programación"
+      }
+    },
+    "purpose": {
+      "core": "DSL de esquemas, validación, definiciones de colecciones y globals",
+      "db": "Contrato de base de datos, adaptadores InMemory y libSQL, sincronización del esquema",
+      "auth": "Autenticación de la colección de usuarios, sesiones, claves de API",
+      "storage": "Contrato de almacenamiento y adaptador InMemory",
+      "s3": "StorageAdapter compatible con S3 para almacenamiento de archivos duradero y portable",
+      "api": "Contratos de ApiContext y de los manejadores HTTP",
+      "runtime": "Local API, acceso, hooks, borradores, manejadores HTTP",
+      "cloudflare": "Adaptadores de base de datos D1 y de almacenamiento R2",
+      "angular": "Cliente tipado, recursos de signals, sesión de autenticación y guard",
+      "admin": "Panel de administración Angular integrable: contenido, usuarios, inicio de sesión",
+      "testing": "Conjuntos de pruebas de contrato para adaptadores",
+      "agent": "Servidor MCP de solo lectura y skills oficiales para agentes de programación"
+    },
+    "notYetPublished": "aún no publicado",
+    "adapters": "Bases de datos: InMemory, libSQL y Cloudflare D1. Almacenamiento: InMemory, Cloudflare R2 y un servicio compatible con S3 (Garage es el certificado en CI; AWS S3, Backblaze B2 y Wasabi son configurables, no certificados). Hay dos perfiles duraderos certificados: Cloudflare (D1 + R2) y portable (libSQL + S3).",
+    "quickstart": "Abrir el inicio rápido"
+  },
+  "roadmap": {
+    "mark": "ForgeCMS 1.0 → 2.0",
+    "title": "Una base ya publicada. Una dirección clara para lo siguiente.",
+    "lede": "ForgeCMS 1.0.0 ya está publicado. La hoja de ruta V2 se centra en flujos editoriales más sólidos, la experiencia de desarrollo y las operaciones en producción.",
+    "note": "Son hitos de producto, no versiones de npm ni fechas de entrega. Las funcionalidades de V2 son intenciones de la hoja de ruta hasta que se publiquen y documenten.",
+    "count": ".input {$count :integer}\n.match $count\none {{{$count} hito · el siguiente es {$next}}}\n* {{{$count} hitos · el siguiente es {$next}}}",
+    "previous": "Hitos anteriores",
+    "next": "Hitos siguientes",
+    "track": "Hitos de ForgeCMS 2.0",
+    "status": {
+      "Next": "Siguiente",
+      "Planned": "Planificado"
+    },
+    "milestones": {
+      "V2-01": {
+        "title": "Base, seguridad y gobernanza de versiones",
+        "summary": "Cerrar el seguimiento de la certificación 1.0 y reforzar la gobernanza de versiones, seguridad y accesibilidad."
+      },
+      "V2-02": {
+        "title": "Experiencia de desarrollo y arranque de proyectos",
+        "summary": "Hacer más rápido empezar, configurar, diagnosticar y construir una primera colección."
+      },
+      "V2-03": {
+        "title": "Plataforma Forge Admin",
+        "summary": "Convertir el panel de administración Angular reutilizable en un backoffice predeterminado coherente."
+      },
+      "V2-04": {
+        "title": "UX profesional de gestión de contenidos",
+        "summary": "Mejorar la gestión de colecciones, la recuperación y los flujos de trabajo de los editores."
+      },
+      "V2-05": {
+        "title": "Texto enriquecido, medios y autoría",
+        "summary": "Dar soporte a la autoría editorial diaria con texto enriquecido portable y herramientas de medios útiles."
+      },
+      "V2-06": {
+        "title": "Modelado de contenido avanzado y localización",
+        "summary": "Ampliar el modelado estructurado y multilingüe manteniendo la paridad entre adaptadores."
+      },
+      "V2-07": {
+        "title": "Flujos editoriales, versiones e identidad",
+        "summary": "Añadir flujos fiables de revisión, programación, auditoría e identidad."
+      },
+      "V2-08": {
+        "title": "Consola para desarrolladores y herramientas de API",
+        "summary": "Dar a los desarrolladores herramientas seguras y fiables para inspeccionar y diagnosticar un proyecto ForgeCMS."
+      },
+      "V2-09": {
+        "title": "Operaciones en producción y portabilidad",
+        "summary": "Hacer que las actualizaciones, la observabilidad y la recuperación sean repetibles en los perfiles admitidos."
+      },
+      "V2-10": {
+        "title": "Validación en el mundo real y certificación 2.0",
+        "summary": "Validar el producto con consumidores independientes y una migración y una versión certificadas."
+      }
+    },
+    "readFull": "Leer la hoja de ruta completa"
+  },
+  "demo": {
+    "badge": "Demo en vivo",
+    "title": "Lumea es una clínica construida con contenido, no una captura de pantalla.",
+    "lede": "Tratamientos, precios, personal, blog, reservas y el diseño de la página de inicio viven en ForgeCMS. Visita el sitio público y luego inicia sesión y cambia el contenido que lo generó.",
+    "openClinic": "Abrir la clínica",
+    "signIn": "Iniciar sesión en el CMS",
+    "exploreMark": "Qué explorar",
+    "exploreTitle": "Todo lo que aparece aquí funciona en la demo en vivo.",
+    "explore": {
+      "editor": {
+        "audience": "Editor",
+        "publish": "Edita y publica contenido; los borradores siguen siendo privados",
+        "media": "Sube y reutiliza medios",
+        "roles": "Panel adaptado a cada rol con navegación personalizada",
+        "rolesWhere": "Inicia sesión como Admin y luego como Front desk",
+        "notice": "Escribe el mismo aviso en español y en inglés",
+        "traffic": "Consulta el tráfico del sitio"
+      },
+      "developer": {
+        "audience": "Desarrollador",
+        "schema": "Esquema code-first",
+        "localApi": "Composición con la Local API y control de acceso",
+        "client": "Cliente Angular tipado y panel como paquete",
+        "migrations": "Subidas, y migraciones revisadas / recuperación",
+        "analytics": "Integración de Analytics",
+        "agent": "El Agent Kit puede inspeccionar un proyecto como este (herramienta de desarrollo, no forma parte del runtime de la demo)"
+      }
+    },
+    "editorTitle": "Míralo como editor",
+    "editorLede": "Publica algo y observa cómo cambia.",
+    "editorSteps": {
+      "site": {
+        "title": "Mira primero el sitio de la clínica",
+        "detail": "Cada palabra, precio, imagen y horario de apertura es contenido, no código. La propia página de inicio es una lista de bloques que ordenó un editor."
+      },
+      "browse": {
+        "title": "Inicia sesión y explora el contenido",
+        "detail": "Abre Treatments, Team y Journal. Cada uno es una colección con sus propios campos, borradores y relaciones. La demo alojada los mantiene en solo lectura para que siga intacta para todos."
+      },
+      "locales": {
+        "title": "Cambia el sitio entre EN y ES",
+        "detail": "El aviso \"From the clinic\" de la parte superior es contenido localizado. Abre Content y luego Notices, edítalo en un idioma, cambia de idioma y edita el otro, y después publica: cada idioma conserva su propio texto y el sitio público se actualiza. Los avisos son la parte de la demo alojada que puedes editar."
+      },
+      "booking": {
+        "title": "Envíate una reserva",
+        "detail": "Rellena el formulario de reserva del sitio público y luego abre Bookings en el CMS. Llega como pendiente y solo el personal puede verla."
+      },
+      "limits": {
+        "title": "Comprueba qué limita la demo alojada",
+        "detail": "La demo alojada limita los borrados, los documentos nuevos, las subidas y los cambios de configuración para que el ejemplo siga disponible. Tu propio proyecto ForgeCMS no tiene ninguno de estos límites. Clona la demo para probar las subidas y todas las ediciones."
+      },
+      "traffic": {
+        "title": "Consulta el tráfico del sitio (experimental)",
+        "detail": "Las páginas de resumen y de Analytics muestran visitas reales de Cloudflare Analytics Engine cuando está configurado, o dicen claramente que no lo está. Nunca hay cifras de relleno."
+      }
+    },
+    "developerTitle": "Inspecciónalo como desarrollador Angular",
+    "developerLede": "Sigue el modelo hasta el runtime y la interfaz.",
+    "developerSteps": {
+      "model": {
+        "title": "El modelo de contenido es un único archivo TypeScript",
+        "detail": "apps/demo-aesthetics/src/server/api/collections.ts: doce colecciones con borradores, hooks, reglas de acceso por fila, campos compuestos y una colección localizada. Ese archivo es todo el esquema."
+      },
+      "localApi": {
+        "title": "El servidor habla con el CMS sin pasar por HTTP",
+        "detail": "src/server/routes/api/site/home.get.ts combina cinco colecciones en una sola respuesta mediante la Local API (runtime.find/create), aplicando el control de acceso y las reglas de borradores."
+      },
+      "localization": {
+        "title": "La localización usa el contrato admitido",
+        "detail": "La colección notices localiza solo los campos text y textarea de primer nivel. La lectura pública pasa un idioma y se ejecuta como visitante anónimo, así que los borradores nunca se filtran en ningún idioma."
+      },
+      "writes": {
+        "title": "Las escrituras públicas las decide la colección, no la ruta",
+        "detail": "El formulario de reserva envía datos sin usuario. La colección bookings lo permite mediante access.create, y un hook fuerza el estado de vuelta a pendiente para que una petición manipulada no pueda confirmarse sola."
+      },
+      "admin": {
+        "title": "El panel de administración es un paquete, no código de la aplicación",
+        "detail": "@forge-cms/admin incluye el diseño, la sesión de inicio de sesión, la lista de colecciones, el editor de documentos y las cuentas del personal. La aplicación monta sus rutas, define su propia navegación y solo conserva las páginas específicas de la clínica."
+      },
+      "dogfood": {
+        "title": "Analytics y el Agent Kit se usan en la propia demo",
+        "detail": "Analytics (experimental) está conectado con la receta documentada. El Agent Kit es una herramienta de desarrollo: una prueba apunta su MCP de solo lectura a este proyecto y comprueba que se detecta. No forma parte del runtime de la demo."
+      },
+      "tests": {
+        "title": "Ejecuta las pruebas para ver las reglas",
+        "detail": "pnpm test:demo recorre el modelo de contenido mediante la Local API tipada: quién puede leer una reserva, para quién es invisible un borrador, qué reescribe un hook, cómo se resuelve un aviso según el idioma."
+      }
+    },
+    "accountsMark": "Cuentas de demo compartidas",
+    "accountsTitle": "Usa el mismo CMS que usa la clínica.",
+    "accountsBody": "Prueba el panel de administración real. Todo el mundo comparte la base de datos, así que la demo alojada limita las acciones destructivas y las que consumen mucho almacenamiento —puedes editar y publicar los avisos localizados y enviar una reserva— para que el ejemplo siga disponible para el siguiente visitante. Tu propio proyecto ForgeCMS no tiene estos límites de la demo compartida.",
+    "roles": {
+      "admin": "Admin",
+      "frontDesk": "Recepción (editor)"
+    },
+    "copyCredentials": "Copiar las credenciales de {$role}",
+    "sourceMark": "Lee la implementación",
+    "sourceTitle": "El código fuente forma parte de la demo.",
+    "sourceBody": "El modelo de contenido, la composición con la Local API y los hallazgos del lado de la aplicación son públicos. Las asperezas están documentadas junto a lo que funciona.",
+    "browseSource": "Ver el código fuente de la demo"
+  },
+  "privacy": {
+    "mark": "Privacidad",
+    "title": "Medición de audiencia del sitio web",
+    "useTitle": "Qué usamos y por qué",
+    "useBody": "El sitio web de ForgeCMS ofrece estadísticas básicas y opcionales de páginas vistas mediante un servicio Umami autoalojado en {#code}{$host}{/code}. El rastreador no se carga a menos que elijas «Permitir analítica». Usamos las estadísticas para entender las visitas a las páginas públicas del sitio web.",
+    "infoTitle": "Información implicada",
+    "infoBody": "Cuando está activada, este sitio envía el identificador público del sitio web y la ruta de la página pública actual. Se excluyen las query strings, los fragmentos, los títulos de página, las referencias y los eventos de clic. La petición también expone necesariamente al servicio cabeceras de red como tu dirección IP y el User-Agent de tu navegador. La documentación publicada de Umami indica que usa la dirección IP para una ubicación aproximada sin almacenarla, y que calcula hashes de sesión rotativos a partir de valores que incluyen el User-Agent. La versión exacta de Umami desplegada y la configuración del servidor aún no se han verificado de forma independiente.",
+    "storageBody": "La documentación del rastreador de Umami indica que no usa cookies. Este sitio web guarda tu elección sobre la analítica en el almacenamiento local del navegador para poder recordarla; en esa preferencia no se guarda ningún dato analítico.",
+    "choiceTitle": "Elección, base jurídica y conservación",
+    "choiceBody": "El rastreador permanece desactivado hasta que lo aceptas expresamente; el consentimiento es la base que se usa para esta medición opcional. Puedes cambiar tu elección aquí. No se ha establecido la exención de medición de audiencia de la AEPD para este servicio porque no se han confirmado sus condiciones de tratamiento, la configuración del servidor ni el plazo de conservación. El plazo de conservación en el servidor se desconoce por ahora, así que la analítica sigue dependiendo del consentimiento.",
+    "disable": "Desactivar la analítica",
+    "allow": "Permitir analítica",
+    "keepDisabled": "Mantener la analítica desactivada",
+    "rightsTitle": "Tus derechos y contacto",
+    "rightsBody": "El proyecto no ha publicado la identidad del responsable del tratamiento ni una dirección de contacto sobre privacidad. Esos datos, que debe aportar el titular, junto con las condiciones de tratamiento de datos y de supresión del servicio, deben confirmarse antes de que este aviso pueda estar completo. Una vez identificado, contacta con el responsable para ejercer los derechos de protección de datos aplicables, incluidos el acceso, la supresión, la limitación y la oposición. También puedes dirigirte a la Agencia Española de Protección de Datos (AEPD).",
+    "references": "Referencias: {#tracker}Configuración del rastreador de Umami{/tracker}, {#metrics}Definiciones de métricas de Umami{/metrics} y {#aepd}Guía de la AEPD sobre medición de audiencia{/aepd}."
+  },
+  "consent": {
+    "title": "Analítica de audiencia opcional",
+    "body": "Umami nos ayuda a entender qué páginas públicas resultan útiles. Permanece desactivada a menos que la permitas. {#link}Lee el aviso de privacidad{/link}.",
+    "decline": "Continuar sin analítica",
+    "allow": "Permitir analítica"
+  },
+  "docs": {
+    "browse": "Explorar la documentación",
+    "sidebar": "Documentación",
+    "title": "Documentación",
+    "release": "v{$version} estable",
+    "groups": {
+      "Getting started": "Primeros pasos",
+      "Project": "Proyecto",
+      "Content modelling": "Modelado de contenido",
+      "Server APIs": "APIs de servidor",
+      "Client & deploy": "Cliente y despliegue",
+      "Guides": "Guías"
+    },
+    "englishOnly": "EN",
+    "englishOnlyLabel": "Disponible solo en inglés",
+    "breadcrumb": "Ruta de navegación",
+    "pagination": "Paginación",
+    "previous": "← Anterior",
+    "next": "Siguiente →",
+    "onThisPage": "En esta página",
+    "notFoundTitle": "Página de documentación no encontrada",
+    "notFoundBody": "Esta guía no existe o puede haberse movido.",
+    "goToIntroduction": "Ir a la introducción",
+    "untranslatedTitle": "Esta guía aún no está traducida",
+    "untranslatedBody": "Por ahora, esta guía solo está disponible en inglés.",
+    "readInEnglish": "Leerla en inglés",
+    "code": "Código",
+    "terminal": "Terminal",
+    "copyCode": "Copiar el código {$language}",
+    "copyFallback": "Selecciona para copiar"
+  },
+  "notFound": {
+    "title": "Página no encontrada",
+    "body": "Esa página no forma parte del sitio de ForgeCMS.",
+    "home": "Volver a ForgeCMS"
+  },
+  "seo": {
+    "landing": {
+      "title": "ForgeCMS — el CMS headless nativo de Angular",
+      "description": "ForgeCMS es el CMS headless nativo de Angular y code-first en TypeScript. Modela el contenido en código, usa la Local API y ofrece a los editores un panel de administración Angular reutilizable. Versión estable 1.0.0."
+    },
+    "demo": {
+      "title": "Demo — ForgeCMS",
+      "description": "Explora Lumea, el sitio real de una clínica construido con ForgeCMS. Recorre su contenido y su flujo de administración, con tratamientos, personal, reservas y un blog."
+    },
+    "privacy": {
+      "title": "Privacidad — ForgeCMS",
+      "description": "Conoce la medición de audiencia opcional, sujeta a consentimiento, del sitio web de ForgeCMS y cómo cambiar tu elección."
+    },
+    "notFound": "Página no encontrada — ForgeCMS",
+    "docsNotFound": "Página de documentación no encontrada — ForgeCMS",
+    "docsTitle": "{$title} — documentación de ForgeCMS",
+    "socialImageAlt": "ForgeCMS — modelado de contenido en TypeScript para Angular"
+  }
+}

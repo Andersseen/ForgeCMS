@@ -1,4 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { injectT } from '@etyma/angular';
+import { i18n } from '../i18n/i18n';
 import { AgentKitSectionComponent } from '../components/agent-kit-section.component';
 import { AnalyticsSectionComponent } from '../components/analytics-section.component';
 import { ClientFlowSectionComponent } from '../components/client-flow-section.component';
@@ -32,7 +34,7 @@ import { RoadmapSectionComponent } from '../components/roadmap-section.component
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="forge-public forge-marketing landing-bg">
-      <a class="forge-skip-link" href="#main-content">Skip to content</a>
+      <a class="forge-skip-link" href="#main-content">{{ t('common.skipToContent') }}</a>
       <forge-cms-header />
       <main id="main-content" tabindex="-1">
         <forge-cms-hero-section />
@@ -50,4 +52,6 @@ import { RoadmapSectionComponent } from '../components/roadmap-section.component
     </div>
   `
 })
-export class LandingPage {}
+export class LandingPage {
+  protected readonly t = injectT(i18n);
+}

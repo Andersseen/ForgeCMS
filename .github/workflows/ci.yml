@@ -477,8 +477,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [checks, e2e]
-    # Deploy only on a real push to main — never on PRs or forks.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Deploy only on a real push to main — never on PRs or forks. A manual run of this workflow on
+    # main also deploys: that is how published Glossa translations reach the site without a code
+    # change (spec 101; Glossa's deploy hook only targets Cloudflare build hooks, and this project
+    # deploys by direct upload from here).
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      github.ref == 'refs/heads/main'
     environment:
       name: production
       url: https://forge-cms.pages.dev
@@ -501,6 +506,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # Spec 101: Glossa is the source of truth for the site's translations. Its Public Delivery needs no
+      # token. The pull refuses (and so fails the deploy) on a missing locale, an invalid catalog, or
+      # source keys that no longer match the committed typed contract — never English under /es or /uk.
+      - name: Pull published translations from Glossa
+        run: pnpm --filter @forge-cms/www i18n:pull
 
       - name: Build www
         run: pnpm build:www

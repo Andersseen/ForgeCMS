@@ -1,9 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { injectT } from '@etyma/angular';
 import { RouterLink } from '@angular/router';
 import { VoltNativeButton, VoltToggleGroup, VoltToggleGroupItem } from '@voltui/components';
 import { MoveVariantsDirective } from 'angular-movement';
 import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
 import { localizationExample } from '../landing-data';
+import { i18n } from '../i18n/i18n';
+import { SiteLocaleService } from '../i18n/site-locale.service';
 
 type LocaleCode = 'ES' | 'EN';
 
@@ -33,21 +36,20 @@ type LocaleCode = 'ES' | 'EN';
     >
       <div class="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
         <div>
-          <p class="forge-section-mark">For real client sites</p>
+          <p class="forge-section-mark">{{ t('localization.mark') }}</p>
           <h2 id="localization-title" class="forge-section-title mt-5">
-            Spanish and English, side by side.
+            {{ t('localization.title') }}
           </h2>
           <p class="mt-5 max-w-[46ch] leading-7 text-muted-foreground">
-            Declare the locales in the schema. Top-level text and textarea fields keep a separate
-            value per language; slugs, images and relations stay shared.
+            {{ t('localization.lede') }}
           </p>
           <pre
             class="forge-code mt-7 hidden md:block"
             tabindex="0"
           ><code>{{ example.schema }}</code></pre>
-          <p class="mt-5 text-sm leading-6 text-muted-foreground">{{ example.limits }}</p>
-          <a voltButton variant="outline" class="mt-6" routerLink="/docs/collections">
-            Localization guide
+          <p class="mt-5 text-sm leading-6 text-muted-foreground">{{ t(example.limits) }}</p>
+          <a voltButton variant="outline" class="mt-6" [routerLink]="site.docsPath('collections')">
+            {{ t('localization.guide') }}
             <lmn-arrow-right [size]="16" />
           </a>
         </div>
@@ -56,12 +58,13 @@ type LocaleCode = 'ES' | 'EN';
           <div class="forge-l10n-editor" role="group" aria-labelledby="l10n-editor-title">
             <div class="forge-l10n-bar">
               <p id="l10n-editor-title">
-                <span class="text-muted-foreground">Notices /</span> {{ current().title }}
+                <span class="text-muted-foreground">{{ t('localization.notices') }}</span>
+                {{ current().title }}
               </p>
               <volt-toggle-group
                 class="forge-l10n-switch"
                 type="single"
-                aria-label="Editing locale"
+                [attr.aria-label]="t('localization.editingLocale')"
                 [value]="[locale()]"
                 (valueChange)="selectLocale($event)"
               >
@@ -75,7 +78,7 @@ type LocaleCode = 'ES' | 'EN';
             <div class="forge-l10n-fields">
               <div class="forge-l10n-field">
                 <span class="forge-l10n-label"
-                  >Title <em>{{ locale() }}</em></span
+                  >{{ t('localization.fieldTitle') }} <em>{{ locale() }}</em></span
                 >
                 <span
                   class="forge-l10n-value"
@@ -87,7 +90,7 @@ type LocaleCode = 'ES' | 'EN';
               </div>
               <div class="forge-l10n-field">
                 <span class="forge-l10n-label"
-                  >Description <em>{{ locale() }}</em></span
+                  >{{ t('localization.description') }} <em>{{ locale() }}</em></span
                 >
                 <span
                   class="forge-l10n-value is-multiline"
@@ -97,24 +100,30 @@ type LocaleCode = 'ES' | 'EN';
                 >
               </div>
               <div class="forge-l10n-field is-shared">
-                <span class="forge-l10n-label">Slug <em>Shared</em></span>
+                <span class="forge-l10n-label"
+                  >{{ t('localization.slug') }} <em>{{ t('localization.shared') }}</em></span
+                >
                 <span class="forge-l10n-value">tratamientos-faciales</span>
               </div>
               <div class="forge-l10n-field is-shared">
-                <span class="forge-l10n-label">Image <em>Shared</em></span>
+                <span class="forge-l10n-label"
+                  >{{ t('localization.image') }} <em>{{ t('localization.shared') }}</em></span
+                >
                 <span class="forge-l10n-value">facial.jpg</span>
               </div>
             </div>
-            <p class="forge-l10n-foot">Illustrative · the admin edits one locale at a time</p>
+            <p class="forge-l10n-foot">{{ t('localization.foot') }}</p>
           </div>
 
           <table class="forge-l10n-table">
             <caption>
-              One document, a stored value per locale
+              {{
+                t('localization.caption')
+              }}
             </caption>
             <thead>
               <tr>
-                <th scope="col">Field</th>
+                <th scope="col">{{ t('localization.field') }}</th>
                 @for (entry of example.locales; track entry.code) {
                   <th scope="col">{{ entry.code }}</th>
                 }
@@ -122,13 +131,13 @@ type LocaleCode = 'ES' | 'EN';
             </thead>
             <tbody>
               <tr>
-                <th scope="row">Title</th>
+                <th scope="row">{{ t('localization.fieldTitle') }}</th>
                 @for (entry of example.locales; track entry.code) {
                   <td [class.is-current]="entry.code === locale()">{{ entry.title }}</td>
                 }
               </tr>
               <tr>
-                <th scope="row">Description</th>
+                <th scope="row">{{ t('localization.description') }}</th>
                 @for (entry of example.locales; track entry.code) {
                   <td [class.is-current]="entry.code === locale()">{{ entry.description }}</td>
                 }
@@ -141,6 +150,8 @@ type LocaleCode = 'ES' | 'EN';
   `
 })
 export class LocalizationSectionComponent {
+  protected readonly t = injectT(i18n);
+  protected readonly site = inject(SiteLocaleService);
   protected readonly example = localizationExample;
   protected readonly codes: readonly LocaleCode[] = ['ES', 'EN'];
   protected readonly locale = signal<LocaleCode>('ES');

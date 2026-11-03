@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DOCUMENT, inject, signal } from '@angular/core';
+import { injectT } from '@etyma/angular';
 import {
   MoveAnimateDirective,
   MoveHoverDirective,
@@ -7,6 +8,7 @@ import {
 } from 'angular-movement';
 import { VoltNativeButton } from '@voltui/components';
 import { LmnArrowUpIcon } from 'lumen-icons/arrow-up';
+import { i18n } from '../i18n/i18n';
 
 /** Upward travel from the last downward peak that counts as "scrolling up" (ignores jitter). */
 const UP_TRAVEL = 24;
@@ -37,7 +39,7 @@ const UP_TRAVEL = 24;
         variant="outline"
         size="icon"
         class="forge-scroll-top"
-        aria-label="Back to top"
+        [attr.aria-label]="t('common.backToTop')"
         [moveInitial]="{ opacity: 0, y: 16, scale: 0.92 }"
         [moveAnimate]="{ opacity: 1, y: 0, scale: 1 }"
         [moveExit]="{ opacity: 0, y: 10, scale: 0.96 }"
@@ -54,6 +56,7 @@ const UP_TRAVEL = 24;
 })
 export class ScrollTopComponent {
   private readonly document = inject(DOCUMENT);
+  protected readonly t = injectT(i18n);
   private lastY = 0;
   /** Highest scroll position reached since the reader last moved down. */
   private peakY = 0;

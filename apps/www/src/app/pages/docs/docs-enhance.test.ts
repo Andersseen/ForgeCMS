@@ -65,3 +65,27 @@ describe('code blocks', () => {
     expect(button?.textContent).toBe('Select to copy');
   });
 });
+
+describe('localized code-block labels (spec 101)', () => {
+  it('uses the reader-language words for the toolbar, keeping language names', () => {
+    document.body.innerHTML =
+      '<div class="p"><pre><code class="language-bash">pnpm build</code></pre><pre><code class="language-ts">x</code></pre></div>';
+    const root = document.querySelector('.p')!;
+    enhanceCodeBlocks(root, () => Promise.resolve(), {
+      code: 'Código',
+      terminal: 'Термінал',
+      copy: 'Copiar',
+      copied: 'Copiado',
+      copyFallback: 'Selecciona para copiar',
+      copyCode: (language) => `Copiar el código ${language}`
+    });
+    const labels = Array.from(
+      root.querySelectorAll('.forge-code-bar span'),
+      (el) => el.textContent
+    );
+    expect(labels).toEqual(['Термінал', 'TypeScript']);
+    const buttons = Array.from(root.querySelectorAll('button'));
+    expect(buttons.map((b) => b.textContent)).toEqual(['Copiar', 'Copiar']);
+    expect(buttons[1]?.getAttribute('aria-label')).toBe('Copiar el código TypeScript');
+  });
+});

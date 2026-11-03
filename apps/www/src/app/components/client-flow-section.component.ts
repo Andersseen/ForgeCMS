@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { injectT } from '@etyma/angular';
 import { RouterLink } from '@angular/router';
 import {
   VoltNativeButton,
@@ -17,6 +18,8 @@ import {
   swapStates,
   type SwapStateId
 } from '../showcase-data';
+import { i18n } from '../i18n/i18n';
+import { SiteLocaleService } from '../i18n/site-locale.service';
 
 /**
  * Spec 097: developer ↔ client. Three user-chosen states pair what the developer writes with what the
@@ -42,21 +45,21 @@ import {
       <div class="mx-auto w-full max-w-7xl px-5 py-20 md:px-8 md:py-28">
         <div class="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
           <div>
-            <p class="forge-section-mark">Developer ↔ client</p>
+            <p class="forge-section-mark">{{ t('flow.mark') }}</p>
             <h2 id="client-flow-title" class="forge-section-title mt-5">
-              You build the site. They run the content.
+              {{ t('flow.title') }}
             </h2>
           </div>
-          <a voltButton variant="outline" class="w-fit" routerLink="/demo">
-            See it on a real clinic site
+          <a voltButton variant="outline" class="w-fit" [routerLink]="site.path('/demo')">
+            {{ t('flow.cta') }}
             <lmn-arrow-right [size]="16" />
           </a>
         </div>
 
         <volt-tabs class="forge-swap" [value]="selected()" (valueChange)="select($event)">
-          <volt-tabs-list aria-label="Developer and client views" class="forge-swap-tabs">
+          <volt-tabs-list [attr.aria-label]="t('flow.views')" class="forge-swap-tabs">
             @for (state of states; track state.id) {
-              <volt-tabs-trigger [value]="state.id">{{ state.tab }}</volt-tabs-trigger>
+              <volt-tabs-trigger [value]="state.id">{{ t(state.tab) }}</volt-tabs-trigger>
             }
           </volt-tabs-list>
 
@@ -69,7 +72,7 @@ import {
                     [move]="state.lead === 'client' ? fromRight : fromLeft"
                     moveDuration="380ms"
                   >
-                    <p class="forge-swap-role">{{ devLabel[state.id] }}</p>
+                    <p class="forge-swap-role">{{ t(state.developer) }}</p>
                     <pre
                       class="forge-story-code"
                       tabindex="0"
@@ -85,33 +88,35 @@ import {
                     [move]="state.lead === 'client' ? fromLeft : fromRight"
                     moveDuration="380ms"
                   >
-                    <p class="forge-swap-role">{{ clientLabel[state.id] }}</p>
+                    <p class="forge-swap-role">{{ t(state.client) }}</p>
                     @switch (state.id) {
                       @case ('model') {
                         <div
                           class="forge-swap-form"
                           role="group"
-                          aria-label="Illustrative admin form"
+                          [attr.aria-label]="t('flow.form.label')"
                         >
                           <div class="forge-swap-form-head">
-                            <span>Service</span><span class="forge-locale-chip">ES</span>
+                            <span>{{ t('flow.form.service') }}</span
+                            ><span class="forge-locale-chip">ES</span>
                           </div>
                           <div class="forge-swap-field">
-                            <span>Title</span>
+                            <span>{{ t('flow.form.title') }}</span>
                             <span class="forge-swap-input">Tratamientos faciales</span>
                           </div>
                           <div class="forge-swap-field">
-                            <span>Summary</span>
+                            <span>{{ t('flow.form.summary') }}</span>
                             <span class="forge-swap-input"
                               >Cuida tu piel con resultados naturales.</span
                             >
                           </div>
                           <div class="forge-swap-field">
-                            <span>Image</span>
+                            <span>{{ t('flow.form.image') }}</span>
                             <span class="forge-swap-input is-file">facial.jpg</span>
                           </div>
                           <div class="forge-swap-form-foot">
-                            <span>Draft saved</span><span class="forge-swap-button">Publish</span>
+                            <span>{{ t('flow.form.draftSaved') }}</span
+                            ><span class="forge-swap-button">{{ t('flow.form.publish') }}</span>
                           </div>
                         </div>
                       }
@@ -119,16 +124,19 @@ import {
                         <div
                           class="forge-swap-adminnav"
                           role="group"
-                          aria-label="Illustrative Forge admin"
+                          [attr.aria-label]="t('flow.adminLabel')"
                         >
                           <p><img src="/logo.svg" alt="" width="16" height="16" /> Forge Admin</p>
                           <ul>
-                            <li>Content</li>
-                            <li>Media</li>
+                            <li>{{ t('flow.adminNav.content') }}</li>
+                            <li>{{ t('flow.adminNav.media') }}</li>
                             <li>
-                              Analytics <span class="forge-experimental-badge">Experimental</span>
+                              {{ t('flow.adminNav.analytics') }}
+                              <span class="forge-experimental-badge">{{
+                                t('common.experimental')
+                              }}</span>
                             </li>
-                            <li>Users</li>
+                            <li>{{ t('flow.adminNav.users') }}</li>
                           </ul>
                         </div>
                       }
@@ -136,25 +144,30 @@ import {
                         <div
                           class="forge-swap-publish"
                           role="group"
-                          aria-label="Illustrative publish action"
+                          [attr.aria-label]="t('flow.publishLabel')"
                         >
                           @for (row of rows; track row.title) {
                             <div>
-                              <span>{{ row.title }}</span>
+                              <span>{{ t(row.title) }}</span>
                               <span
                                 class="forge-status"
-                                [class.is-draft]="row.status === 'Draft'"
-                                >{{ row.status }}</span
+                                [class.is-draft]="row.status === 'draft'"
+                                >{{
+                                  t(row.status === 'draft' ? 'sample.draft' : 'sample.published')
+                                }}</span
                               >
                             </div>
                           }
-                          <p>Skin consultation → <strong>Publish</strong></p>
+                          <p>
+                            {{ t('sample.consultation') }} →
+                            <strong>{{ t('flow.form.publish') }}</strong>
+                          </p>
                         </div>
                       }
                     }
                   </div>
                 </div>
-                <p class="forge-swap-caption">{{ state.caption }}</p>
+                <p class="forge-swap-caption">{{ t(state.caption) }}</p>
               }
             </volt-tabs-content>
           }
@@ -162,29 +175,30 @@ import {
 
         <div class="forge-swap-roles">
           <div>
-            <h3>Developer</h3>
+            <h3>{{ t('flow.developer') }}</h3>
             <ul>
               @for (item of developer; track item) {
-                <li>{{ item }}</li>
+                <li>{{ t(item) }}</li>
               }
             </ul>
           </div>
           <div>
-            <h3>Client · Forge Admin</h3>
+            <h3>{{ t('flow.client') }}</h3>
             <ul>
-              @for (item of client; track item) {
+              @for (item of client; track item.id) {
                 <li>
-                  {{ item }}
-                  @if (item === 'Sees Analytics') {
-                    <span class="forge-experimental-badge ml-1">Experimental</span>
+                  {{ t(item.label) }}
+                  @if (item.id === 'analytics') {
+                    <span class="forge-experimental-badge ml-1">{{
+                      t('common.experimental')
+                    }}</span>
                   }
                 </li>
               }
             </ul>
           </div>
           <p class="forge-swap-note">
-            Editors change content, not layouts. ForgeCMS is not a page builder: your components
-            stay yours.
+            {{ t('flow.note') }}
           </p>
         </div>
       </div>
@@ -200,16 +214,8 @@ export class ClientFlowSectionComponent {
   protected readonly selected = signal<SwapStateId>('model');
   protected readonly fromLeft = { opacity: [0, 1], x: [-24, 0] };
   protected readonly fromRight = { opacity: [0, 1], x: [24, 0] };
-  protected readonly devLabel: Record<SwapStateId, string> = {
-    model: 'Code-first · you write',
-    build: 'Angular site · you build',
-    publish: 'Your site · reads published content'
-  };
-  protected readonly clientLabel: Record<SwapStateId, string> = {
-    model: 'Client-friendly · they edit',
-    build: 'Forge Admin · they run',
-    publish: 'Forge Admin · they publish'
-  };
+  protected readonly t = injectT(i18n);
+  protected readonly site = inject(SiteLocaleService);
 
   protected select(value: string | undefined): void {
     const state = swapStates.find((s) => s.id === value);

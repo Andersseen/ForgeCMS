@@ -11,7 +11,9 @@ import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
 import { LmnCodeBracketIcon } from 'lumen-icons/code-bracket';
 import { LmnDocumentTextIcon } from 'lumen-icons/document-text';
 import { LmnCircleStackIcon } from 'lumen-icons/circle-stack';
+import { injectT } from '@etyma/angular';
 import { exampleCode, showcasePost, showcaseResponse } from '../landing-data';
+import { i18n } from '../i18n/i18n';
 
 @Component({
   selector: 'forge-cms-product-showcase',
@@ -32,7 +34,7 @@ import { exampleCode, showcasePost, showcaseResponse } from '../landing-data';
   template: `
     <section
       class="forge-showcase"
-      aria-label="Explore the ForgeCMS product"
+      [attr.aria-label]="t('showcase.label')"
       [move]="{ opacity: [0, 1] }"
       moveDuration="450"
     >
@@ -40,29 +42,36 @@ import { exampleCode, showcasePost, showcaseResponse } from '../landing-data';
         <div class="forge-showcase-toolbar">
           <div class="forge-showcase-brand">
             <img src="/logo.svg" alt="" width="26" height="26" /><span
-              >ForgeCMS <span class="forge-showcase-project">/ your next project</span></span
+              >ForgeCMS
+              <span class="forge-showcase-project">{{ t('showcase.project') }}</span></span
             >
           </div>
-          <volt-tabs-list aria-label="Product views" class="forge-showcase-tabs">
+          <volt-tabs-list [attr.aria-label]="t('showcase.views')" class="forge-showcase-tabs">
             <volt-tabs-trigger value="schema"
-              ><lmn-code-bracket [size]="16" /> Schema</volt-tabs-trigger
+              ><lmn-code-bracket [size]="16" /> {{ t('showcase.tabs.schema') }}</volt-tabs-trigger
             >
             <volt-tabs-trigger value="content"
-              ><lmn-document-text [size]="16" /> Content</volt-tabs-trigger
+              ><lmn-document-text [size]="16" /> {{ t('showcase.tabs.content') }}</volt-tabs-trigger
             >
-            <volt-tabs-trigger value="api"><lmn-circle-stack [size]="16" /> API</volt-tabs-trigger>
+            <volt-tabs-trigger value="api"
+              ><lmn-circle-stack [size]="16" /> {{ t('showcase.tabs.api') }}</volt-tabs-trigger
+            >
           </volt-tabs-list>
         </div>
         <div class="forge-showcase-body">
-          <aside class="forge-showcase-sidebar" aria-label="Showcase context">
-            <span class="forge-sidebar-caption">Your workspace</span>
+          <aside class="forge-showcase-sidebar" [attr.aria-label]="t('showcase.context')">
+            <span class="forge-sidebar-caption">{{ t('showcase.workspace') }}</span>
             <div class="forge-sidebar-item forge-sidebar-selected">
-              <lmn-document-text [size]="16" /> Posts <span>1</span>
+              <lmn-document-text [size]="16" /> {{ t('showcase.posts') }} <span>1</span>
             </div>
-            <div class="forge-sidebar-item"><lmn-circle-stack [size]="16" /> Media</div>
-            <div class="forge-sidebar-item"><lmn-code-bracket [size]="16" /> Globals</div>
+            <div class="forge-sidebar-item">
+              <lmn-circle-stack [size]="16" /> {{ t('showcase.media') }}
+            </div>
+            <div class="forge-sidebar-item">
+              <lmn-code-bracket [size]="16" /> {{ t('showcase.globals') }}
+            </div>
             <div class="forge-sidebar-bottom">
-              <span class="forge-preview-dot"></span> Illustrative preview
+              <span class="forge-preview-dot"></span> {{ t('common.illustrativePreview') }}
             </div>
           </aside>
           <div class="forge-showcase-panels">
@@ -73,15 +82,19 @@ import { exampleCode, showcasePost, showcaseResponse } from '../landing-data';
                     <span>collections / posts.ts</span><span>TypeScript</span>
                   </div>
                   <div class="forge-schema-view">
-                    <pre tabindex="0" aria-label="Collection example"><code>{{ code }}</code></pre>
+                    <pre
+                      tabindex="0"
+                      [attr.aria-label]="t('showcase.collectionExample')"
+                    ><code>{{ code }}</code></pre>
                     <div class="forge-schema-note">
                       <lmn-code-bracket [size]="32" />
-                      <h2>Define it once.<br />&#32;Build on it everywhere.</h2>
-                      <p>
-                        A collection becomes validation, persistence, an API and an Angular editing
-                        experience.
-                      </p>
-                      <span class="forge-inline-proof">No separate schema to keep in sync.</span>
+                      <h2>
+                        {{ t('showcase.schemaTitle.0') }}<br />&#32;{{
+                          t('showcase.schemaTitle.1')
+                        }}
+                      </h2>
+                      <p>{{ t('showcase.schemaBody') }}</p>
+                      <span class="forge-inline-proof">{{ t('showcase.schemaProof') }}</span>
                     </div>
                   </div>
                 </div>
@@ -95,38 +108,39 @@ import { exampleCode, showcasePost, showcaseResponse } from '../landing-data';
                   moveDuration="180"
                 >
                   <div class="forge-panel-heading">
-                    <span>Posts / {{ post.title }}</span
-                    ><volt-badge variant="secondary">Read-only preview</volt-badge>
+                    <span>{{ t('showcase.posts') }} / {{ post.title }}</span
+                    ><volt-badge variant="secondary">{{ t('showcase.readOnly') }}</volt-badge>
                   </div>
                   <div class="forge-content-layout">
                     <div>
                       <div class="forge-editor-heading">
                         <h2>{{ post.title }}</h2>
-                        <volt-badge variant="secondary">Published</volt-badge>
+                        <volt-badge variant="secondary">{{ t('showcase.published') }}</volt-badge>
                       </div>
                       <dl class="forge-preview-fields">
                         <div>
-                          <dt>Title</dt>
+                          <dt>{{ t('showcase.fields.title') }}</dt>
                           <dd>{{ post.title }}</dd>
                         </div>
                         <div>
-                          <dt>Slug</dt>
+                          <dt>{{ t('showcase.fields.slug') }}</dt>
                           <dd>{{ post.slug }}</dd>
                         </div>
                         <div>
-                          <dt>Author</dt>
+                          <dt>{{ t('showcase.fields.author') }}</dt>
                           <dd>{{ post.author }}</dd>
                         </div>
                       </dl>
                     </div>
                     <aside class="forge-editor-note">
                       <lmn-document-text [size]="32" />
-                      <h3>Made for the people<br />&#32;behind the content.</h3>
-                      <p>
-                        Your model gives editors a familiar place to work. The real admin lives
-                        inside your Angular app.
-                      </p>
-                      <span>Illustrative preview</span>
+                      <h3>
+                        {{ t('showcase.editorTitle.0') }}<br />&#32;{{
+                          t('showcase.editorTitle.1')
+                        }}
+                      </h3>
+                      <p>{{ t('showcase.editorBody') }}</p>
+                      <span>{{ t('common.illustrativePreview') }}</span>
                     </aside>
                   </div>
                 </div>
@@ -136,21 +150,21 @@ import { exampleCode, showcasePost, showcaseResponse } from '../landing-data';
               @if (selected() === 'api') {
                 <div class="forge-showcase-view" [move]="{ opacity: [0, 1] }" moveDuration="180">
                   <div class="forge-panel-heading">
-                    <span>GET /api/v1/posts/post_angular</span><span>Example response</span>
+                    <span>GET /api/v1/posts/post_angular</span
+                    ><span>{{ t('showcase.exampleResponse') }}</span>
                   </div>
                   <div class="forge-schema-view">
                     <pre
                       tabindex="0"
-                      aria-label="Example API response"
+                      [attr.aria-label]="t('showcase.exampleResponseLabel')"
                     ><code>{{ response }}</code></pre>
                     <div class="forge-schema-note">
                       <lmn-circle-stack [size]="32" />
-                      <h2>Your content.<br />&#32;Ready for your app.</h2>
-                      <p>
-                        Read through REST or call the Local API directly from server code. The same
-                        content, wherever you need it.
-                      </p>
-                      <span class="forge-inline-proof">A typed Angular client is included.</span>
+                      <h2>
+                        {{ t('showcase.apiTitle.0') }}<br />&#32;{{ t('showcase.apiTitle.1') }}
+                      </h2>
+                      <p>{{ t('showcase.apiBody') }}</p>
+                      <span class="forge-inline-proof">{{ t('showcase.apiProof') }}</span>
                     </div>
                   </div>
                 </div>
@@ -159,15 +173,17 @@ import { exampleCode, showcasePost, showcaseResponse } from '../landing-data';
           </div>
         </div>
         <div class="forge-showcase-flow">
-          <span>TypeScript schema</span><lmn-arrow-right [size]="16" /><span>Angular admin</span
-          ><lmn-arrow-right [size]="16" /><span>Your application</span
-          ><span class="forge-flow-caption">One connected system</span>
+          <span>{{ t('showcase.flow.schema') }}</span
+          ><lmn-arrow-right [size]="16" /><span>{{ t('showcase.flow.admin') }}</span
+          ><lmn-arrow-right [size]="16" /><span>{{ t('showcase.flow.app') }}</span
+          ><span class="forge-flow-caption">{{ t('showcase.flow.caption') }}</span>
         </div>
       </volt-tabs>
     </section>
   `
 })
 export class ProductShowcaseComponent {
+  protected readonly t = injectT(i18n);
   protected readonly selected = signal<'schema' | 'content' | 'api'>('schema');
   protected readonly code = exampleCode;
   protected readonly post = showcasePost;

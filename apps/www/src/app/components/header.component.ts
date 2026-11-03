@@ -4,7 +4,11 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 import { VoltNativeButton } from '@voltui/components';
 import { LmnArrowTopRightOnSquareIcon } from 'lumen-icons/arrow-top-right-on-square';
 import { LmnBars3Icon } from 'lumen-icons/bars-3';
+import { injectT } from '@etyma/angular';
 import { SiteThemeService } from '../site-theme.service';
+import { i18n } from '../i18n/i18n';
+import { SiteLocaleService } from '../i18n/site-locale.service';
+import { LanguageSwitcherComponent } from './language-switcher.component';
 import { LmnSunIcon } from 'lumen-icons/sun';
 import { LmnMoonIcon } from 'lumen-icons/moon';
 import { LmnXMarkIcon } from 'lumen-icons/x-mark';
@@ -20,7 +24,8 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
     LmnBars3Icon,
     LmnXMarkIcon,
     LmnSunIcon,
-    LmnMoonIcon
+    LmnMoonIcon,
+    LanguageSwitcherComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -31,42 +36,45 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
       <div class="mx-auto flex min-h-18 w-full max-w-7xl items-center justify-between px-5 md:px-8">
         <a
           class="group flex items-center gap-3 text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
-          routerLink="/"
+          [routerLink]="site.path('/')"
           (click)="close()"
         >
           <img
             class="size-9 rounded-[0.65rem] transition-transform group-hover:-rotate-2"
             src="/logo.svg"
-            alt="ForgeCMS logo"
+            [attr.alt]="t('common.logoAlt')"
             width="36"
             height="36"
           />
           <span class="text-[0.95rem] tracking-[-0.02em]">ForgeCMS</span>
         </a>
 
-        <nav class="hidden items-center gap-1 text-sm font-medium md:flex" aria-label="Primary">
+        <nav
+          class="hidden items-center gap-1 text-sm font-medium md:flex"
+          [attr.aria-label]="t('navigation.primary')"
+        >
           <a
             class="forge-nav-link"
-            routerLink="/"
+            [routerLink]="site.path('/')"
             fragment="product"
             routerLinkActive="is-active"
             [routerLinkActiveOptions]="landingMatch"
             ariaCurrentWhenActive="page"
-            >Product</a
+            >{{ t('navigation.product') }}</a
           >
           <a
             class="forge-nav-link"
-            routerLink="/demo"
+            [routerLink]="site.path('/demo')"
             routerLinkActive="is-active"
             ariaCurrentWhenActive="page"
-            >Demo</a
+            >{{ t('navigation.demo') }}</a
           >
           <a
             class="forge-nav-link"
-            routerLink="/docs"
+            [routerLink]="site.path('/docs')"
             routerLinkActive="is-active"
             ariaCurrentWhenActive="page"
-            >Docs</a
+            >{{ t('navigation.docs') }}</a
           >
         </nav>
 
@@ -80,10 +88,14 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
             target="_blank"
           >
             GitHub
-            <lmn-arrow-top-right-on-square [size]="16" ariaLabel="Opens in a new tab" />
+            <lmn-arrow-top-right-on-square [size]="16" [ariaLabel]="t('common.opensInNewTab')" />
           </a>
-          <a voltButton size="sm" routerLink="/docs/small-project-guide">Get started</a>
+          <a voltButton size="sm" [routerLink]="site.docsPath('small-project-guide')">{{
+            t('navigation.getStarted')
+          }}</a>
         </div>
+
+        <forge-cms-language-switcher />
 
         <button
           voltButton
@@ -91,7 +103,9 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
           size="icon"
           type="button"
           class="forge-theme-toggle"
-          [attr.aria-label]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
+          [attr.aria-label]="
+            theme.isDark() ? t('navigation.switchToLight') : t('navigation.switchToDark')
+          "
           (click)="theme.toggle()"
         >
           @if (theme.isDark()) {
@@ -110,7 +124,7 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
           class="md:hidden"
           [attr.aria-expanded]="open()"
           aria-controls="site-mobile-nav"
-          aria-label="Toggle navigation"
+          [attr.aria-label]="t('navigation.toggle')"
           (click)="toggle()"
         >
           @if (open()) {
@@ -125,34 +139,34 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
         <nav
           id="site-mobile-nav"
           class="border-t border-border bg-background px-5 py-4 md:hidden"
-          aria-label="Mobile"
+          [attr.aria-label]="t('navigation.mobile')"
         >
           <div class="mx-auto flex max-w-7xl flex-col gap-1">
             <a
               class="forge-mobile-link"
-              routerLink="/"
+              [routerLink]="site.path('/')"
               fragment="product"
               routerLinkActive="is-active"
               [routerLinkActiveOptions]="landingMatch"
               ariaCurrentWhenActive="page"
               (click)="close()"
-              >Product</a
+              >{{ t('navigation.product') }}</a
             >
             <a
               class="forge-mobile-link"
-              routerLink="/demo"
+              [routerLink]="site.path('/demo')"
               routerLinkActive="is-active"
               ariaCurrentWhenActive="page"
               (click)="close()"
-              >Demo</a
+              >{{ t('navigation.demo') }}</a
             >
             <a
               class="forge-mobile-link"
-              routerLink="/docs"
+              [routerLink]="site.path('/docs')"
               routerLinkActive="is-active"
               ariaCurrentWhenActive="page"
               (click)="close()"
-              >Docs</a
+              >{{ t('navigation.docs') }}</a
             >
             <a
               class="forge-mobile-link flex items-center justify-between"
@@ -172,6 +186,8 @@ import { LmnXMarkIcon } from 'lumen-icons/x-mark';
 })
 export class HeaderComponent {
   protected readonly theme = inject(SiteThemeService);
+  protected readonly site = inject(SiteLocaleService);
+  protected readonly t = injectT(i18n);
   protected readonly open = signal(false);
   /** Product is the landing page: active on `/` whatever the fragment, never on nested routes. */
   protected readonly landingMatch = {

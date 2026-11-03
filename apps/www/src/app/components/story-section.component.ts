@@ -10,6 +10,7 @@ import {
   signal
 } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
+import { injectT } from '@etyma/angular';
 import { RouterLink } from '@angular/router';
 import { MoveInViewDirective, MoveStaggerDirective, MoveVariantsDirective } from 'angular-movement';
 import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
@@ -22,6 +23,8 @@ import {
   storySnippets,
   storyStages
 } from '../showcase-data';
+import { i18n, textOf, type SiteText } from '../i18n/i18n';
+import { SiteLocaleService } from '../i18n/site-locale.service';
 
 /**
  * Spec 097: the homepage's main story — Schema → Runtime → Angular → Admin → Deploy.
@@ -48,18 +51,17 @@ import {
     <section id="how-it-works" class="forge-story" aria-labelledby="story-title">
       <div class="mx-auto w-full max-w-7xl px-5 py-20 md:px-8 md:py-28">
         <header class="max-w-3xl">
-          <p class="forge-section-mark">How ForgeCMS fits together</p>
+          <p class="forge-section-mark">{{ t('story.mark') }}</p>
           <h2 id="story-title" class="forge-section-title mt-5">
-            Everything between your schema and your client’s editor.
+            {{ t('story.title') }}
           </h2>
           <p class="mt-5 max-w-[52ch] leading-7 text-muted-foreground">
-            Five steps from a TypeScript file to a site your client runs. Each one is part of the
-            published 1.0 release.
+            {{ t('story.lede') }}
           </p>
         </header>
 
         <div class="forge-story-grid">
-          <nav class="forge-story-index" aria-label="Story stages">
+          <nav class="forge-story-index" [attr.aria-label]="t('story.stages')">
             <div class="forge-story-index-sticky">
               <ol>
                 @for (stage of stages; track stage.id; let i = $index) {
@@ -70,8 +72,8 @@ import {
                       [attr.aria-current]="active() === i ? 'step' : null"
                     >
                       <span class="forge-story-index-number">{{ stage.index }}</span>
-                      <span class="forge-story-index-label">{{ stage.label }}</span>
-                      <span class="forge-story-index-kicker">{{ stage.kicker }}</span>
+                      <span class="forge-story-index-label">{{ t(stage.label) }}</span>
+                      <span class="forge-story-index-kicker">{{ t(stage.kicker) }}</span>
                     </a>
                   </li>
                 }
@@ -96,16 +98,16 @@ import {
               >
                 <div class="forge-story-copy">
                   <p class="forge-story-kicker">
-                    <span>{{ stage.index }}</span> {{ stage.label }} · {{ stage.kicker }}
+                    <span>{{ stage.index }}</span> {{ t(stage.label) }} · {{ t(stage.kicker) }}
                   </p>
-                  <h3>{{ stage.title }}</h3>
-                  <p class="forge-story-body">{{ stage.body }}</p>
+                  <h3>{{ t(stage.title) }}</h3>
+                  <p class="forge-story-body">{{ t(stage.body) }}</p>
                 </div>
 
                 <div
                   class="forge-story-visual"
                   moveStagger="70ms"
-                  [attr.aria-label]="stage.label + ' illustration'"
+                  [attr.aria-label]="t('story.illustration', { stage: t(stage.label) })"
                   role="group"
                 >
                   @switch (stage.id) {
@@ -121,14 +123,15 @@ import {
                       </div>
                       <ul class="forge-story-chips" [moveInView]="reveal">
                         @for (out of schemaOutputs; track out) {
-                          <li>{{ out }}</li>
+                          <li>{{ t(out) }}</li>
                         }
                       </ul>
                     }
                     @case ('runtime') {
                       <div class="forge-story-panel" [moveInView]="reveal">
                         <div class="forge-story-panel-bar">
-                          <span>Local API · server code</span><span>no HTTP hop</span>
+                          <span>{{ t('story.localApiPanel') }}</span
+                          ><span>{{ t('story.noHttpHop') }}</span>
                         </div>
                         <pre
                           class="forge-story-code"
@@ -142,14 +145,14 @@ import {
                       <ol
                         class="forge-story-pipeline"
                         [moveInView]="reveal"
-                        aria-label="Shared pipeline"
+                        [attr.aria-label]="t('story.pipelineLabel')"
                       >
                         @for (step of pipeline; track step) {
-                          <li>{{ step }}</li>
+                          <li>{{ t(step) }}</li>
                         }
                       </ol>
-                      <a class="forge-story-link" routerLink="/docs/local-api"
-                        >Local API guide <lmn-arrow-right [size]="14"
+                      <a class="forge-story-link" [routerLink]="site.docsPath('local-api')"
+                        >{{ t('story.localApiGuide') }} <lmn-arrow-right [size]="14"
                       /></a>
                     }
                     @case ('angular') {
@@ -163,7 +166,7 @@ import {
                         ><code>{{ snippets.angular }}</code></pre>
                       </div>
                       <div class="forge-story-rendered" [moveInView]="reveal">
-                        <p>Rendered on the server · hydrated in the browser</p>
+                        <p>{{ t('story.rendered') }}</p>
                         <div>
                           <span>Tratamientos faciales</span>
                           <span>Depilación láser</span>
@@ -179,19 +182,24 @@ import {
                           <span class="forge-locale-chip">ES · EN</span>
                         </div>
                         <div class="forge-story-admin-body">
-                          <ul class="forge-story-admin-nav" aria-label="Admin sections">
-                            <li class="is-selected">Services</li>
-                            <li>Media</li>
-                            <li>Users</li>
+                          <ul
+                            class="forge-story-admin-nav"
+                            [attr.aria-label]="t('story.adminSections')"
+                          >
+                            <li class="is-selected">{{ t('story.adminNav.0') }}</li>
+                            <li>{{ t('story.adminNav.1') }}</li>
+                            <li>{{ t('story.adminNav.2') }}</li>
                           </ul>
                           <ul class="forge-story-admin-rows">
                             @for (row of rows; track row.title) {
                               <li>
-                                <span>{{ row.title }}</span>
+                                <span>{{ t(row.title) }}</span>
                                 <span
                                   class="forge-status"
-                                  [class.is-draft]="row.status === 'Draft'"
-                                  >{{ row.status }}</span
+                                  [class.is-draft]="row.status === 'draft'"
+                                  >{{
+                                    t(row.status === 'draft' ? 'sample.draft' : 'sample.published')
+                                  }}</span
                                 >
                               </li>
                             }
@@ -201,25 +209,25 @@ import {
                     }
                     @case ('deploy') {
                       <div class="forge-story-profiles">
-                        @for (profile of profiles; track profile.name) {
+                        @for (profile of profiles; track profile.id) {
                           <div class="forge-story-profile" [moveInView]="reveal">
-                            <p class="forge-story-profile-name">{{ profile.name }}</p>
+                            <p class="forge-story-profile-name">{{ text(profile.name) }}</p>
                             <dl>
                               <div>
-                                <dt>Host</dt>
-                                <dd>{{ profile.host }}</dd>
+                                <dt>{{ t('story.host') }}</dt>
+                                <dd>{{ text(profile.host) }}</dd>
                               </div>
                               <div>
-                                <dt>Database</dt>
-                                <dd>{{ profile.database }}</dd>
+                                <dt>{{ t('story.database') }}</dt>
+                                <dd>{{ text(profile.database) }}</dd>
                               </div>
                               <div>
-                                <dt>Files</dt>
-                                <dd>{{ profile.storage }}</dd>
+                                <dt>{{ t('story.files') }}</dt>
+                                <dd>{{ text(profile.storage) }}</dd>
                               </div>
                             </dl>
                             <p class="forge-story-certified">
-                              <lmn-check [size]="14" /> Certified from packed artifacts
+                              <lmn-check [size]="14" /> {{ t('story.certified') }}
                             </p>
                           </div>
                         }
@@ -244,12 +252,15 @@ export class StorySectionComponent {
   protected readonly rows = adminRows;
   protected readonly profiles = deployProfiles;
   protected readonly schemaOutputs = [
-    'Validation',
-    'Storage',
-    'REST + Local API',
-    'Admin form',
-    'Types'
-  ];
+    'story.outputs.0',
+    'story.outputs.1',
+    'story.outputs.2',
+    'story.outputs.3',
+    'story.outputs.4'
+  ] as const;
+  protected readonly t = injectT(i18n);
+  protected readonly site = inject(SiteLocaleService);
+  protected readonly text = (value: SiteText): string => textOf(this.t, value);
 
   /** Calm, short and precise: a receding stage is still readable, just not the subject. */
   protected readonly variants = {

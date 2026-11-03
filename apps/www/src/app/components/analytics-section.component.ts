@@ -1,5 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
-import { DecimalPipe, PercentPipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   VoltMeter,
@@ -12,6 +11,7 @@ import {
 import { MoveAnimateDirective, MoveStaggerDirective } from 'angular-movement';
 import { LmnArrowRightIcon } from 'lumen-icons/arrow-right';
 import { analyticsFacts } from '../landing-data';
+import { SiteLocaleService } from '../i18n/site-locale.service';
 import {
   analyticsPreview,
   analyticsRanges,
@@ -34,8 +34,6 @@ import {
     VoltMeterIndicator,
     VoltToggleGroup,
     VoltToggleGroupItem,
-    DecimalPipe,
-    PercentPipe,
     RouterLink,
     VoltNativeButton,
     MoveAnimateDirective,
@@ -49,22 +47,22 @@ import {
         <div class="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
           <div>
             <p class="forge-section-mark">
-              Analytics <span class="forge-experimental-badge ml-1">Experimental</span>
+              {{ t('analytics.mark') }}
+              <span class="forge-experimental-badge ml-1">{{ t('common.experimental') }}</span>
             </p>
             <h2 id="analytics-title" class="forge-section-title mt-5">
-              Is anyone visiting? The client can see.
+              {{ t('analytics.title') }}
             </h2>
             <p class="mt-5 max-w-[46ch] leading-7 text-muted-foreground">
-              Optional pageview analytics inside the same admin, built on Cloudflare Analytics
-              Engine. Private by construction:
+              {{ t('analytics.lede') }}
             </p>
-            <ul class="forge-privacy-chips" aria-label="Privacy guarantees">
+            <ul class="forge-privacy-chips" [attr.aria-label]="t('analytics.guarantees')">
               @for (item of facts.privacy; track item) {
-                <li>{{ item }}</li>
+                <li>{{ t(item) }}</li>
               }
             </ul>
-            <a voltButton class="mt-8" routerLink="/docs/analytics">
-              Analytics docs
+            <a voltButton class="mt-8" [routerLink]="site.docsPath('analytics')">
+              {{ t('analytics.docs') }}
               <lmn-arrow-right [size]="16" />
             </a>
           </div>
@@ -72,13 +70,13 @@ import {
           <div class="forge-dash" role="group" aria-labelledby="dash-title">
             <div class="forge-dash-head">
               <div>
-                <p id="dash-title" class="font-semibold">Analytics</p>
-                <p class="forge-dash-label">Illustrative preview · not live data</p>
+                <p id="dash-title" class="font-semibold">{{ t('analytics.mark') }}</p>
+                <p class="forge-dash-label">{{ t('analytics.preview') }}</p>
               </div>
               <volt-toggle-group
                 class="forge-dash-ranges"
                 type="single"
-                aria-label="Date range"
+                [attr.aria-label]="t('analytics.range')"
                 [value]="[range()]"
                 (valueChange)="selectRange($event)"
               >
@@ -92,15 +90,15 @@ import {
 
             <div class="forge-dash-grid">
               <div class="forge-dash-card forge-dash-metric">
-                <p class="forge-dash-card-title">Pageviews</p>
-                <p class="forge-dash-value">{{ data().pageviews | number }}</p>
+                <p class="forge-dash-card-title">{{ t('analytics.pageviews') }}</p>
+                <p class="forge-dash-value">{{ number(data().pageviews) }}</p>
                 <p class="forge-dash-change" [class.is-down]="data().change < 0">
-                  {{ change() }} <span>vs previous {{ range() }}</span>
+                  {{ change() }} <span>{{ t('analytics.vsPrevious', { range: range() }) }}</span>
                 </p>
               </div>
 
               <div class="forge-dash-card forge-dash-timeline">
-                <p class="forge-dash-card-title">Timeline</p>
+                <p class="forge-dash-card-title">{{ t('analytics.timeline') }}</p>
                 @for (snapshot of [data()]; track snapshot.range) {
                   <div class="forge-dash-bars" moveStagger="35ms" aria-hidden="true">
                     @for (bar of snapshot.timeline; track $index) {
@@ -111,15 +109,15 @@ import {
               </div>
 
               <div class="forge-dash-card">
-                <p class="forge-dash-card-title">Top pages</p>
+                <p class="forge-dash-card-title">{{ t('analytics.topPages') }}</p>
                 <ul class="forge-dash-list">
                   @for (page of data().topPages; track page.path) {
                     <li>
                       <span>{{ page.path }}</span
-                      ><span>{{ page.share | percent }}</span>
+                      ><span>{{ percent(page.share) }}</span>
                       <volt-meter
                         class="forge-dash-meter"
-                        [attr.aria-label]="page.path + ' share'"
+                        [attr.aria-label]="t('analytics.share', { item: page.path })"
                         [value]="page.share * 100"
                         [valueLabel]="shareLabel"
                         ><volt-meter-track><volt-meter-indicator /></volt-meter-track
@@ -130,15 +128,15 @@ import {
               </div>
 
               <div class="forge-dash-card">
-                <p class="forge-dash-card-title">Referrers</p>
+                <p class="forge-dash-card-title">{{ t('analytics.referrers') }}</p>
                 <ul class="forge-dash-list">
                   @for (ref of data().referrers; track ref.host) {
                     <li>
                       <span>{{ ref.host }}</span
-                      ><span>{{ ref.share | percent }}</span>
+                      ><span>{{ percent(ref.share) }}</span>
                       <volt-meter
                         class="forge-dash-meter"
-                        [attr.aria-label]="ref.host + ' share'"
+                        [attr.aria-label]="t('analytics.share', { item: ref.host })"
                         [value]="ref.share * 100"
                         [valueLabel]="shareLabel"
                         ><volt-meter-track><volt-meter-indicator /></volt-meter-track
@@ -149,15 +147,15 @@ import {
               </div>
 
               <div class="forge-dash-card">
-                <p class="forge-dash-card-title">Countries</p>
+                <p class="forge-dash-card-title">{{ t('analytics.countries') }}</p>
                 <ul class="forge-dash-list">
                   @for (country of data().countries; track country.code) {
                     <li>
                       <span>{{ country.code }}</span
-                      ><span>{{ country.share | percent }}</span>
+                      ><span>{{ percent(country.share) }}</span>
                       <volt-meter
                         class="forge-dash-meter"
-                        [attr.aria-label]="country.code + ' share'"
+                        [attr.aria-label]="t('analytics.share', { item: country.code })"
                         [value]="country.share * 100"
                         [valueLabel]="shareLabel"
                         ><volt-meter-track><volt-meter-indicator /></volt-meter-track
@@ -174,12 +172,20 @@ import {
   `
 })
 export class AnalyticsSectionComponent {
+  protected readonly site = inject(SiteLocaleService);
+  protected readonly t = this.site.i18n.t;
   protected readonly facts = analyticsFacts;
   protected readonly ranges = analyticsRanges;
   protected readonly range = signal<AnalyticsRange>('7d');
   protected readonly data = computed(() => analyticsPreview[this.range()]);
-  protected readonly change = computed(() => formatChange(this.data().change));
-  protected readonly shareLabel = (value: number): string => `${Math.round(value)}%`;
+  protected readonly change = computed(() => formatChange(this.data().change, this.site.locale()));
+  private readonly numbers = computed(() => new Intl.NumberFormat(this.site.locale()));
+  private readonly percents = computed(
+    () => new Intl.NumberFormat(this.site.locale(), { style: 'percent' })
+  );
+  protected readonly number = (value: number): string => this.numbers().format(value);
+  protected readonly percent = (value: number): string => this.percents().format(value);
+  protected readonly shareLabel = (value: number): string => this.percent(Math.round(value) / 100);
   protected selectRange(values: readonly string[]): void {
     const next = this.ranges.find((option) => values.includes(option));
     if (next) this.range.set(next);
