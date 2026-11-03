@@ -29,7 +29,7 @@ import { SiteLocaleService } from '../i18n/site-locale.service';
             {{ t('footer.body') }}
           </p>
         </div>
-        <div class="flex flex-col gap-3 sm:flex-row">
+        <div class="flex shrink-0 flex-col gap-3 sm:flex-row md:flex-col lg:flex-row">
           <a voltButton size="lg" [routerLink]="site.path('/demo')">
             {{ t('footer.exploreDemo') }}
             <lmn-arrow-right [size]="16" />

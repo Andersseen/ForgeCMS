@@ -281,10 +281,24 @@ for (const width of [390, 768, 1440, 1920]) {
     for (const path of ['/es', '/uk', '/uk/demo', '/es/privacy', '/uk/docs/small-project-guide']) {
       await page.goto(path);
       await page.waitForLoadState('networkidle');
-      const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
-      );
-      expect(overflow, `${path} @ ${width}px`).toBeLessThanOrEqual(0);
+      const { overflow, culprits } = await page.evaluate(() => ({
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        // Name what sticks out, so a font-dependent failure on CI explains itself.
+        culprits: Array.from(document.querySelectorAll('body *'))
+          .filter((el) => {
+            const box = el.getBoundingClientRect();
+            return (
+              box.width > 0 &&
+              box.right > innerWidth + 1 &&
+              !el.closest('pre, [data-scroll-x], table')
+            );
+          })
+          .slice(0, 4)
+          .map(
+            (el) => `${el.tagName.toLowerCase()} "${(el.textContent ?? '').trim().slice(0, 40)}"`
+          )
+      }));
+      expect(overflow, `${path} @ ${width}px: ${culprits.join(', ')}`).toBeLessThanOrEqual(0);
     }
     expect(problems).toEqual([]);
   });
