@@ -1,0 +1,10 @@
+node_modules
+dist
+.nitro
+.output
+.wrangler
+src/generated
+data/
+qualification/artifacts/
+test-results/
+playwright-report/

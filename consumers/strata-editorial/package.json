@@ -1,0 +1,59 @@
+{
+  "name": "forge-strata-editorial",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Independent ForgeCMS + Strata consumer (spec 102): an editorial desk built on PUBLISHED @forge-cms/* server packages and the PUBLISHED Strata tuple, outside the ForgeCMS pnpm workspace.",
+  "type": "module",
+  "packageManager": "pnpm@10.11.0",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:cloudflare": "BUILD_PRESET=cloudflare-pages vite build",
+    "start": "node dist/analog/server/index.mjs",
+    "seed": "node --experimental-strip-types scripts/seed.ts",
+    "typecheck": "tsc -p tsconfig.check.json",
+    "test": "vitest run",
+    "verify:tuple": "node scripts/verify-strata-tuple.mjs",
+    "qualify:node": "node --experimental-strip-types qualification/node-production.ts",
+    "qualify:leaks": "node --experimental-strip-types qualification/leak-scan.ts",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@analogjs/router": "2.7.2",
+    "@angular/common": "22.2.3",
+    "@angular/compiler": "22.2.3",
+    "@angular/core": "22.2.3",
+    "@angular/platform-browser": "22.2.3",
+    "@angular/platform-server": "22.2.3",
+    "@angular/router": "22.2.3",
+    "@forge-cms/api": "1.0.0",
+    "@forge-cms/auth": "1.0.0",
+    "@forge-cms/cloudflare": "1.0.0",
+    "@forge-cms/core": "1.0.0",
+    "@forge-cms/db": "1.0.0",
+    "@forge-cms/runtime": "1.0.0",
+    "@forge-cms/storage": "1.0.0",
+    "@strata-sc/analog": "0.12.1",
+    "@strata-sc/core": "0.2.2",
+    "@strata-sc/server-components": "0.17.0",
+    "h3": "1.15.11",
+    "rxjs": "7.8.2",
+    "tslib": "2.8.1"
+  },
+  "devDependencies": {
+    "@analogjs/platform": "2.7.2",
+    "@analogjs/vite-plugin-angular": "2.7.2",
+    "@angular/build": "22.1.8",
+    "@angular/compiler-cli": "22.2.3",
+    "@playwright/test": "1.62.1",
+    "@types/node": "22.20.3",
+    "nitropack": "2.13.4",
+    "typescript": "6.0.3",
+    "vite": "8.3.0",
+    "vitest": "4.0.18",
+    "wrangler": "4.135.0"
+  }
+}
