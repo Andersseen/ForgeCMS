@@ -5,5 +5,5 @@
     "types": ["node"],
     "experimentalDecorators": false
   },
-  "include": ["src/server/**/*.ts"]
+  "include": ["src/server/**/*.ts", "tests/strata-findings.test.ts"]
 }
