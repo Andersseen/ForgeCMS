@@ -60,10 +60,12 @@ export default defineConfig(() => ({
     analog({
       // Every document is rendered per request (no build-time prerender of `/`).
       prerender: { routes: [] },
-      nitro: {
-        // libSQL is a native Node client: Nitro must not bundle it.
-        externals: { external: ['@libsql/client'], traceInclude: libsqlNativeBindings() }
-      }
+      // Node (default `node-server`): libSQL is a native client, kept external and traced with its binding.
+      // Cloudflare Pages (`BUILD_PRESET=cloudflare-pages`): everything is bundled into the Worker; D1 is used.
+      nitro:
+        process.env['BUILD_PRESET'] === 'cloudflare-pages'
+          ? {}
+          : { externals: { external: ['@libsql/client'], traceInclude: libsqlNativeBindings() } }
     })
   ]
 }));

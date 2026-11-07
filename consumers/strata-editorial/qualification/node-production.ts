@@ -2,7 +2,8 @@
 // file. Usage (after `pnpm build`): node --experimental-strip-types qualification/node-production.ts
 //
 // Every check is an assertion with an expected value; the run fails (exit 1) on the first mismatch list.
-// Writes qualification/artifacts/node-production.json. Never retries a failed check.
+// Writes qualification/artifacts/http-<target>.json. Never retries a failed check.
+// EXTERNAL_BASE=<url> QUALIFICATION_TARGET=workerd runs the HTTP matrix against local workerd (see README).
 import { spawn, spawnSync } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -102,18 +103,23 @@ const percentile = (values: number[], p: number) => {
   return sorted[Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length))] ?? NaN;
 };
 
+class SkipProcessSections extends Error {}
+
 const work = mkdtempSync(join(tmpdir(), 'editorial-node-'));
 const databaseUrl = `file:${join(work, 'editorial.db')}`;
 const PORT = 4521;
-const base = `http://127.0.0.1:${PORT}`;
-const evidence: Record<string, unknown> = { startedAt: new Date().toISOString() };
+// EXTERNAL_BASE: run the HTTP matrix against an already-running, freshly seeded server (local workerd).
+// Process-level sections (RSS, logs, SIGTERM, database-down, missing profile) are Node-only and skipped.
+const EXTERNAL = process.env['EXTERNAL_BASE'];
+const TARGET = process.env['QUALIFICATION_TARGET'] ?? (EXTERNAL ? 'external' : 'node');
+const base = EXTERNAL ?? `http://127.0.0.1:${PORT}`;
+const evidence: Record<string, unknown> = { startedAt: new Date().toISOString(), target: TARGET };
 
 try {
-  seed(databaseUrl);
-  const { child, log } = await startServer(PORT, {
-    DATABASE_URL: databaseUrl,
-    AUTH_SECRET: SECRET
-  });
+  if (!EXTERNAL) seed(databaseUrl);
+  const { child, log } = EXTERNAL
+    ? { child: undefined, log: [] as string[] }
+    : await startServer(PORT, { DATABASE_URL: databaseUrl, AUTH_SECRET: SECRET });
 
   // --- Identity and isolation -------------------------------------------------------------------
   const ana = await login(base, 'ana');
@@ -343,6 +349,8 @@ try {
   };
   evidence['harnessRssDeltaBytes'] = process.memoryUsage().rss - rssBefore;
 
+  if (child === undefined) throw new SkipProcessSections();
+
   // --- Server memory: steady state after a burst (observation, not a budget) ----------------------
   const serverRss = async () => {
     const ps = spawn('ps', ['-o', 'rss=', '-p', String(child.pid)]);
@@ -425,6 +433,9 @@ try {
     noProfileHealth.status === 503 && noProfileApi.status === 500
   );
   await stopServer(noProfile.child);
+} catch (error) {
+  if (!(error instanceof SkipProcessSections)) throw error;
+  console.log('(external target: process-level sections skipped)');
 } finally {
   const failed = results.filter((r) => !r.ok);
   evidence['finishedAt'] = new Date().toISOString();
@@ -432,7 +443,7 @@ try {
   evidence['verdict'] = failed.length === 0 && results.length > 0 ? 'PASS' : 'FAIL';
   mkdirSync(join(ROOT, 'qualification/artifacts'), { recursive: true });
   writeFileSync(
-    join(ROOT, 'qualification/artifacts/node-production.json'),
+    join(ROOT, `qualification/artifacts/http-${TARGET}.json`),
     JSON.stringify(evidence, null, 2)
   );
   rmSync(work, { recursive: true, force: true });
