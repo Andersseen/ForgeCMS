@@ -19,7 +19,10 @@
     "verify:tuple": "node scripts/verify-strata-tuple.mjs",
     "qualify:node": "node --experimental-strip-types qualification/node-production.ts",
     "qualify:leaks": "node --experimental-strip-types qualification/leak-scan.ts",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "qualify:workerd": "node --experimental-strip-types qualification/workerd-http.ts",
+    "qualify:upgrade": "node --experimental-strip-types qualification/upgrade-rollback.ts",
+    "e2e:workerd": "E2E_TARGET=workerd playwright test"
   },
   "dependencies": {
     "@analogjs/router": "2.7.2",
