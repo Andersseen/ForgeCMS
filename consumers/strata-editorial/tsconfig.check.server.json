@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "experimentalDecorators": false
+  },
+  "include": ["src/server/**/*.ts", "tests/strata-findings.test.ts"]
+}

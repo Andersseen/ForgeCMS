@@ -1,0 +1,10 @@
+# Deliberately its own workspace root: this consumer is NOT part of the ForgeCMS monorepo
+# (Angular 22 / Vite 8 here vs Angular 21 / Vite 7 there). See ADOPTION-REPORT.md.
+packages:
+  - '.'
+onlyBuiltDependencies:
+  - esbuild
+  - workerd
+  - '@parcel/watcher'
+  - lmdb
+  - msgpackr-extract

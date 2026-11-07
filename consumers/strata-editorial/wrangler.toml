@@ -1,0 +1,11 @@
+# Local workerd qualification of the Cloudflare Pages build (BUILD_PRESET=cloudflare-pages).
+# Pinned to Strata's RC support contract: compatibility date 2026-09-21, no compatibility flags.
+# The database id below is a LOCAL placeholder: nothing here creates or targets a remote resource.
+name = "forge-strata-editorial"
+pages_build_output_dir = "dist/analog/public"
+compatibility_date = "2026-09-21"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "forge-strata-editorial-local"
+database_id = "00000000-0000-0000-0000-000000000000"

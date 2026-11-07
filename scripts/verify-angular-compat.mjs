@@ -214,8 +214,20 @@ function manifest(combination, tarballs) {
     type: 'module',
     dependencies,
     devDependencies,
-    // Forge's internal dependency (`admin` → `angular` → `core`) must resolve to the tarballs too.
-    pnpm: { overrides: forge }
+    pnpm: {
+      // Forge's internal dependency (`admin` → `angular` → `core`) must resolve to the tarballs too.
+      overrides: forge,
+      // Same WebAssembly fallback as above, one level deeper: @oxc-parser/binding-wasm32-wasi (via
+      // @angular/build 22) ships its own @emnapi 2.0.0-alpha.3, outside @napi-rs/wasm-runtime's peer
+      // range. Tolerate exactly that version for exactly that peer; every other peer stays strict and
+      // nothing installed changes.
+      peerDependencyRules: {
+        allowedVersions: {
+          '@napi-rs/wasm-runtime>@emnapi/core': '2.0.0-alpha.3',
+          '@napi-rs/wasm-runtime>@emnapi/runtime': '2.0.0-alpha.3'
+        }
+      }
+    }
   };
 }
 

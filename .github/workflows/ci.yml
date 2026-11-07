@@ -26,10 +26,14 @@ concurrency:
 permissions:
   contents: read
 
+# Runner image pinned to ubuntu-24.04: `ubuntu-latest` moved to Ubuntu 26.04 (actions/runner-images#14748), where
+# the repository's Playwright 1.60 refuses to install Chromium ("does not support chromium on ubuntu26.04-x64").
+# Remove the pin together with a Playwright upgrade that supports 26.04.
+
 jobs:
   checks:
     name: Lint · Typecheck · Test · Build · Pack · E2E
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Measured 2026-10-07: 13.5–14 min with the S03 journey inside this job. Spec 088 moved every packed
     # verifier (release:verify/compat/ssr, test:s3, test:upgrade) into the parallel `certify` job; 25 stays as
     # headroom for the remaining repository gates and app e2e suites (the job name is unchanged on purpose:
@@ -99,7 +103,7 @@ jobs:
   # 2026-10-16: `checks` alone was 11.6 min). Same commands, same build, nothing skipped or retried.
   e2e:
     name: E2E · apps (www, tiny-project, demo)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
 
     steps:
@@ -165,7 +169,7 @@ jobs:
   # path filter, so a package change can never publish without it.
   certify:
     name: Certify packed artifacts · durable profiles
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     steps:
@@ -219,7 +223,7 @@ jobs:
   # is no path filter: a package change can never publish without it. Retries are never used to hide a failure.
   reliability:
     name: Reliability · Coverage · Performance
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
 
     steps:
@@ -286,7 +290,7 @@ jobs:
   # first-attempt record. Adding a journey to scripts/quality/stability.mjs means adding its id here.
   stability:
     name: Stability · ${{ matrix.shard }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -340,7 +344,7 @@ jobs:
 
   changeset-check:
     name: Changeset required for packages/* changes
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
@@ -381,7 +385,7 @@ jobs:
 
   release:
     name: Release packages to npm
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     needs: [checks, e2e, certify, reliability, stability]
     # Same guard as deploy/deploy-demo: real pushes to main only, never PRs or forks.
@@ -474,7 +478,7 @@ jobs:
 
   deploy:
     name: Deploy to Cloudflare Pages
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     needs: [checks, e2e]
     # Deploy only on a real push to main — never on PRs or forks. A manual run of this workflow on
@@ -552,7 +556,7 @@ jobs:
 
   deploy-demo:
     name: Deploy the demo app to Cloudflare Pages
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     needs: [checks, e2e]
     # Same guard as `deploy`: real pushes to main only, never PRs or forks.

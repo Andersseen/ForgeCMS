@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "types": ["node"] },
+  "include": ["src/app/cms/**/*.ts", "tests/**/*.ts"],
+  "exclude": ["tests/strata-findings.test.ts"]
+}

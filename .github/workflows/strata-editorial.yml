@@ -1,0 +1,106 @@
+name: Strata editorial consumer
+
+# Qualification of the independent ForgeCMS + Strata consumer (spec 102, consumers/strata-editorial).
+# Isolated from the monorepo build: its own lockfile, Angular 22 / Vite 8 toolchain. Runs only when the consumer
+# changes. No deploy, no secrets, nothing remote: Node production + local workerd + Chromium on the runner.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'consumers/strata-editorial/**'
+      - '.github/workflows/strata-editorial.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'consumers/strata-editorial/**'
+      - '.github/workflows/strata-editorial.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: consumers/strata-editorial
+
+jobs:
+  qualify:
+    name: Strata editorial · Node · workerd · Chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+          cache-dependency-path: consumers/strata-editorial/pnpm-lock.yaml
+
+      - name: Install (frozen, isolated lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Classify the installed Strata tuple (0 = published RC, 2 = pre-RC rehearsal)
+        run: |
+          set +e
+          node scripts/verify-strata-tuple.mjs
+          code=$?
+          if [ "$code" -eq 2 ]; then echo "::warning::Strata tuple is the pre-RC baseline: evidence is REHEARSAL ONLY"; exit 0; fi
+          exit $code
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests (policy matrix, negative controls, Strata repro)
+        run: pnpm test
+
+      - name: Build (Node)
+        run: pnpm build
+        env:
+          EDITORIAL_BUILD_ID: ci-${{ github.sha }}
+
+      - name: Browser-output confidentiality scan
+        run: pnpm qualify:leaks
+
+      - name: Node production qualification (durable libSQL)
+        run: pnpm qualify:node
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Chromium e2e (Node production)
+        run: pnpm e2e
+
+      - name: Upgrade / rollback rehearsal
+        run: pnpm qualify:upgrade
+
+      - name: Build (Cloudflare Pages)
+        run: pnpm build:cloudflare
+        env:
+          EDITORIAL_BUILD_ID: ci-cf-${{ github.sha }}
+
+      - name: Chromium e2e (local workerd + local D1)
+        run: pnpm e2e:workerd
+
+      - name: HTTP security matrix (local workerd + local D1)
+        run: pnpm qualify:workerd
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: strata-editorial-qualification
+          path: |
+            consumers/strata-editorial/qualification/artifacts/
+            consumers/strata-editorial/test-results/
+          if-no-files-found: ignore
