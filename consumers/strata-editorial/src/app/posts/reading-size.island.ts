@@ -20,6 +20,6 @@ export class ReadingSizeIsland {
 
   protected toggle(): void {
     this.large.update((value) => !value);
-    document.documentElement.dataset['readingSize'] = this.large() ? 'large' : 'standard';
+    document.documentElement.dataset['readerTextSize'] = this.large() ? 'large' : 'standard';
   }
 }

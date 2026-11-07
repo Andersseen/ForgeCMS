@@ -132,8 +132,8 @@ try {
 
   const pub = await doc('/posts/welcome-to-the-desk');
   check(
-    'anonymous reads a published post (200, public cache)',
-    pub.status === 200 && pub.cc.includes('public'),
+    'anonymous reads a published post (200, public but always revalidated)',
+    pub.status === 200 && pub.cc === 'public, no-cache',
     `${pub.status} ${pub.cc}`
   );
   check('anonymous document has no review island', !pub.html.includes('review-status-island'));

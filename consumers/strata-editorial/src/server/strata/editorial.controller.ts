@@ -78,8 +78,9 @@ export class EditorialController {
   @Get('/posts')
   async list() {
     const docs = await this.editorial.listPublished();
+    // Public, but always revalidated: a retracted post must leave the list immediately.
     return envelope({ data: docs, meta: { total: docs.length } }, 200, {
-      'cache-control': 'public, max-age=30'
+      'cache-control': 'public, no-cache'
     });
   }
 

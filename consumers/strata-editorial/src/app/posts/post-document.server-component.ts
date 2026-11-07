@@ -38,7 +38,7 @@ type State =
  *  - Unexpected failure (database down…): reported to Angular's `ErrorHandler`, which the opt-in Strata
  *    `/ssr` contract turns into a generic HTTP 500 document. Never a 200 with half a page.
  *  - Caching: a document rendered for a signed-in caller is `private, no-store`; only the anonymous
- *    rendering of a published post may be stored by a shared cache, and it varies on the session cookie.
+ *    rendering of a published post may be stored by a shared cache, always revalidated, varying on the cookie.
  */
 @ServerComponent()
 @Component({
@@ -126,7 +126,9 @@ export class PostDocumentServerComponent implements OnInit {
         return;
       }
       if (!editor && post.status === 'published') {
-        this.setHeader('cache-control', 'public, max-age=60');
+        // Storable by a shared cache, but ALWAYS revalidated: an unpublished (retracted) post must disappear
+        // at once, not after a TTL. (A max-age here kept a retracted post visible; see the adoption report.)
+        this.setHeader('cache-control', 'public, no-cache');
       }
       this.state.set({ kind: 'found', post, signedIn: editor !== null });
     } catch (error) {
