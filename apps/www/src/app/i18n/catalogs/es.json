@@ -23,7 +23,9 @@
   "language": {
     "label": "Idioma",
     "trigger": "Idioma: {$language}",
-    "fallback": "Aún sin traducir: abre el inicio de la documentación en {$language}"
+    "fallback": "Aún sin traducir: abre el inicio de la documentación en {$language}",
+    "loading": "Cargando {$language}…",
+    "failed": "No se pudo cargar {$language}. Comprueba tu conexión e inténtalo de nuevo."
   },
   "footer": {
     "title": "Tu próximo proyecto empieza por tu contenido.",
