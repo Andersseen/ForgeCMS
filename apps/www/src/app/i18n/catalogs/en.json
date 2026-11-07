@@ -23,7 +23,9 @@
   "language": {
     "label": "Language",
     "trigger": "Language: {$language}",
-    "fallback": "Not translated yet: opens the {$language} documentation home"
+    "fallback": "Not translated yet: opens the {$language} documentation home",
+    "loading": "Loading {$language}…",
+    "failed": "Couldn’t load {$language}. Check your connection and try again."
   },
   "footer": {
     "title": "Your next project starts with your content.",
