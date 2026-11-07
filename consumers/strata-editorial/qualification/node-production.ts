@@ -243,6 +243,20 @@ try {
   check('Ben cannot publish Ana’s draft (404, nothing revealed)', benWrite.status === 404);
   const vicWrite = await post(statusUrl, { status: 'published' }, { cookie: vic, origin: base });
   check('viewer cannot publish (404)', vicWrite.status === 404);
+  // Update access on its own: Ben can READ Ana's published post, so only ForgeCMS's update rule refuses him.
+  const anaPublishedHtml = (await doc('/posts/welcome-to-the-desk', ana)).html;
+  const anaPublishedId = /postId&quot;:&quot;([^&]+)&quot;/.exec(anaPublishedHtml)?.[1] ?? '';
+  const benUnpublish = await post(
+    `${base}/api/editorial/posts/${anaPublishedId}/status`,
+    { status: 'draft' },
+    { cookie: ben, origin: base }
+  );
+  check(
+    'Ben cannot unpublish Ana’s published post (update rule alone)',
+    anaPublishedId !== '' &&
+      benUnpublish.status === 404 &&
+      (await doc('/posts/welcome-to-the-desk')).status === 200
+  );
   const invalid = await post(statusUrl, { status: 'archived' }, { cookie: ana, origin: base });
   check('invalid status → 400', invalid.status === 400);
   const stillDraft = await doc('/posts/ana-draft-investigation');

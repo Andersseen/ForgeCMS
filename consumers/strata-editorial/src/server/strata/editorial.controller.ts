@@ -62,7 +62,18 @@ export const safeErrors: StrataAnalogInterceptor = async (_context, next) => {
  */
 @Controller('/api/editorial')
 export class EditorialController {
-  constructor(private readonly editorial: EditorialService) {}
+  private readonly editorial: EditorialService;
+
+  /**
+   * The dependency is required in practice: only the registered `controllerFactory` constructs this class.
+   * Strata types controllers as `new () => object` (finding S-2), so the parameter is optional in the
+   * signature and a construction without it fails closed instead of serving without a service.
+   */
+  constructor(editorial?: EditorialService) {
+    if (!editorial)
+      throw new Error('EditorialController is constructed only by its controllerFactory.');
+    this.editorial = editorial;
+  }
 
   @Get('/posts')
   async list() {

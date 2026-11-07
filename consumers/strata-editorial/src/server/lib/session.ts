@@ -35,7 +35,8 @@ export async function webRequest(event: H3Event): Promise<Request | null> {
   }
   const declared = Number(headers.get('content-length') ?? '0');
   if (Number.isFinite(declared) && declared > MAX_AUTH_BODY_BYTES) return null;
-  const body = (await readRawBody(event, false)) ?? new Uint8Array();
+  const raw = await readRawBody(event, false);
+  const body = raw ? new Uint8Array(raw) : new Uint8Array();
   if (body.byteLength > MAX_AUTH_BODY_BYTES) return null;
   return new Request(url, { method: event.method, headers, body });
 }

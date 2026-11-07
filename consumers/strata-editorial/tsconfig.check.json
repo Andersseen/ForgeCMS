@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "noEmit": true, "types": ["node"] },
-  "include": ["src/app/cms/**/*.ts", "src/server/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/app/cms/**/*.ts", "tests/**/*.ts"]
 }

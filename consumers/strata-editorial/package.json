@@ -14,7 +14,7 @@
     "build:cloudflare": "BUILD_PRESET=cloudflare-pages vite build",
     "start": "node dist/analog/server/index.mjs",
     "seed": "node --experimental-strip-types scripts/seed.ts",
-    "typecheck": "tsc -p tsconfig.check.json",
+    "typecheck": "tsc -p tsconfig.check.json && tsc -p tsconfig.check.server.json",
     "test": "vitest run",
     "verify:tuple": "node scripts/verify-strata-tuple.mjs",
     "qualify:node": "node --experimental-strip-types qualification/node-production.ts",
