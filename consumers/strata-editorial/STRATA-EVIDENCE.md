@@ -8,7 +8,8 @@ criterion. Full context: [ADOPTION-REPORT.md](ADOPTION-REPORT.md).
 - Consumer: `Andersseen/ForgeCMS`, `consumers/strata-editorial`, branch `feat/strata-rc-real-consumer-adoption`
   (base `main` `a57c494`). Cite the merge commit once merged; until then, the PR head.
 - Strata tuple **installed**: core 0.2.2 / analog 0.12.1 / server-components 0.17.0 (integrities identical to the
-  RC0 frozen candidate `983f7131e39574e0`). **Not `1.0.0-rc.0`** (unpublished on 2026-11-07).
+  RC0 frozen candidate `983f7131e39574e0`). **Not `1.0.0-rc.0`**: unpublished on 2026-11-07, and the RC entry
+  (#182) was reverted by #183 (Strata `main` `efff41c`, no pre mode) while this work ran.
 - Framework tuple: Angular 22.2.3 (single copy), Analog 2.7.2, Vite 8.3.0, Nitro 2.13.4, H3 1.15.11, TS 6.0.3,
   Wrangler 4.135.0, Node 22, compatibility date 2026-09-21, no flags.
 - Consumer packages: published `@forge-cms/*` 1.0.0 server packages (no Angular dependency).

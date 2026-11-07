@@ -37,7 +37,8 @@ install outside Strata's contract and a risk to deployed apps. Instead: `consume
 `pnpm-workspace.yaml` and lockfile, installing **published** `@forge-cms/{core,db,auth,runtime,storage,api,cloudflare}`
 `1.0.0` (framework-agnostic server packages, no Angular peer) and the exact Strata framework tuple.
 
-**Strata version.** `1.0.0-rc.0` is not published (2026-11-07: PR #182 merged, no Version Packages PR yet).
+**Strata version.** `1.0.0-rc.0` is not published (2026-11-07: PR #182 entered the RC line and was reverted by
+PR #183 the same morning; Strata `main` is not in pre mode).
 The consumer pins the published RC0 baseline (core 0.2.2 / analog 0.12.1 / server-components 0.17.0, the
 candidate COMPATIBILITY.md freezes for RC0) and `scripts/verify-strata-tuple.mjs` classifies the install
 (exit 0 published RC, 2 pre-RC rehearsal, 1 invalid). Moving to the RC is a three-line pin change.

@@ -16,17 +16,20 @@
 | Operational adoption (real use)       | **NOT RUN.** See [OPERATIONAL-OBSERVATION.md](OPERATIONAL-OBSERVATION.md).                                      |
 | Strata GA "real application" criteria | **Not closed.** This is integration and staging-shaped qualification only.                                      |
 
-## 1. Upstream state verified (2026-11-07, ~11:30 UTC)
+## 1. Upstream state verified (2026-11-07, re-checked ~12:15 UTC)
 
-- Strata `main` = `b40a497` (merge of PR #182 "enter the 1.0 release candidate line"; `.changeset/pre.json` mode
-  `pre`, tag `rc`; fixed group core/analog/server-components). PR #181 (`769928f`) recaptured the RC0 baseline on
-  server-components 0.17.0. The post-merge CI of #182 was still running; the last Release run (triggered by #181's CI)
-  published nothing; **no open Version Packages PR**. Per PR #182 itself, the RC is published only after that PR is
-  opened, checked (`1.0.0-rc.0` ×3) and merged, and `release:rc:check` prints GO on `main`.
-- npm (registry, not a mirror): `@strata-sc/core` 0.2.2, `@strata-sc/analog` 0.12.1, `@strata-sc/server-components`
-  0.17.0, each with SLSA v1 provenance. `@strata-sc/h3` unpublished (private, `NO-H3-V2`).
-- Strata `docs/COMPATIBILITY.md` "RC0 support contract": still **"Proposed … No RC exists yet."** Readiness gate
-  (`release:rc:check`) was not re-run here (it is Strata's gate, run by its maintainers).
+- At the start of this work Strata `main` was `b40a497`: PR #182 ("enter the 1.0 release candidate line",
+  Changesets pre mode `rc`, fixed group core/analog/server-components) merged on top of PR #181 (`769928f`, RC0
+  baseline recaptured on server-components 0.17.0).
+- **During this work PR #182 was reverted** by PR #183 (merged 11:59 UTC). Strata `main` is now `efff41c` and is
+  **not** in pre mode (`.changeset/pre.json` absent). PR #184 "chore(release): version packages (rc)", opened by the
+  Release workflow at 11:44 UTC from the pre-revert state, is still open and now stale relative to `main`. The
+  reason for the revert is not stated in PR #183 and is not assumed here.
+- npm (registry): `@strata-sc/core` 0.2.2, `@strata-sc/analog` 0.12.1, `@strata-sc/server-components` 0.17.0
+  (`latest` = `next`), each with SLSA v1 provenance. No `1.0.0-rc.*` version, no `rc` dist-tag.
+  `@strata-sc/h3` unpublished (private, `NO-H3-V2`).
+- Strata `docs/COMPATIBILITY.md` "RC0 support contract": still **"Proposed … No RC exists yet."** Strata's readiness
+  gate (`release:rc:check`) was not run here: it is Strata's gate, run by its maintainers.
 
 **Consequence.** Nothing in this report qualifies `1.0.0-rc.0`. The consumer is built so the RC can be adopted by
 changing three exact pins; `scripts/verify-strata-tuple.mjs` refuses to label anything else as RC.
