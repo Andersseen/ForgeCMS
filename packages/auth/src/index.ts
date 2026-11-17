@@ -5,6 +5,8 @@ export type { ExternalAuthConfig } from './external.adapter.js';
 export { SignedTokenAuthAdapter, DEMO_CREDENTIALS } from './signed-token.adapter.js';
 export type { SignedTokenEnv } from './signed-token.adapter.js';
 export { UsersCollectionAuthAdapter } from './users-collection.adapter.js';
+export { PASSWORD_HASHING_PRESETS } from './password-hash.js';
+export type { PasswordHashingOptions } from './password-hash.js';
 export type {
   UsersCollectionAuthEnv,
   UsersCollectionAuthAdapterOptions,

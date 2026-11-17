@@ -82,4 +82,31 @@ describe('UsersCollectionAuthAdapter — real local D1 binding: signup/login rou
     if (!second.ok) throw new Error('expected success');
     expect(second.user.role).toBe('viewer');
   });
+
+  it('spec 105: a raised work factor upgrades a 1.0-format hash on login, on workerd + D1', async () => {
+    const database = realDb();
+    const collection = 'human_auth_rehash_users';
+    await database.syncSchema([defineUsersCollection({ slug: collection })]);
+    const before = new UsersCollectionAuthAdapter({ devMode: true, collection }).init({
+      userDatabase: database
+    });
+    const created = await before.createUser({
+      email: 'rehash@example.com',
+      password: 'password123'
+    });
+    if (!created.ok) throw new Error('expected success');
+    const legacy = String((await database.findById(collection, created.user.id))?.passwordHash);
+    expect(legacy).not.toContain('$');
+
+    const after = new UsersCollectionAuthAdapter({
+      devMode: true,
+      collection,
+      passwordHashing: { iterations: 200_000 }
+    }).init({ userDatabase: database });
+    expect((await after.login('rehash@example.com', 'password123')).ok).toBe(true);
+    const upgraded = String((await database.findById(collection, created.user.id))?.passwordHash);
+    expect(upgraded).toMatch(/^\$pbkdf2-sha256\$i=200000\$/);
+    expect((await after.login('rehash@example.com', 'password123')).ok).toBe(true);
+    expect((await after.login('rehash@example.com', 'wrong-password')).ok).toBe(false);
+  });
 });

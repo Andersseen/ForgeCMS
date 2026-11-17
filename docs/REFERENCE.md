@@ -80,19 +80,20 @@ the first operation, so `init()` never opens the database and a bad URL rejects 
 
 **Main exports.** `UsersCollectionAuthAdapter`, `defineUsersCollection`, `withAuthFields`, `ApiKeyAuthAdapter`, `CompositeAuthAdapter`, `SignedTokenAuthAdapter`, `ExternalAuthAdapter`,
 `InMemoryAuthAdapter`, role/scope helpers (`hasRole`, `hasAnyRole`, `isAdmin`, `canWriteContent`, `hasScope`, `hasAllScopes`, `hasAnyScope`), cookie helpers (`buildSessionCookie`,
-`buildLogoutCookie`, `parseCookieToken`, `SESSION_COOKIE_NAME`), `extractBearerToken`, `UserMutationError`.
+`buildLogoutCookie`, `parseCookieToken`, `SESSION_COOKIE_NAME`), `extractBearerToken`, `UserMutationError`, `PASSWORD_HASHING_PRESETS` (since 1.1).
 
 **Important options.**
 
-| Option                                   | Default          | Meaning                                                                                  |
-| ---------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------- |
-| `devMode`                                | `false`          | Explicit opt-in to Forge's public dev secret; never derive it from a missing secret      |
-| `passwordPolicy.minLength` / `maxLength` | `8` / `1024`     | Integers; `maxLength` ceiling 4096; applied on create, signup, password change and login |
-| `collection`                             | `users`          | Must match the slug given to `defineUsersCollection()`/`withAuthFields()`                |
-| `AUTH_SECRET` (env)                      | required         | At least 32 bytes; signs session tokens (24-hour lifetime)                               |
-| roles                                    | `viewer` default | `admin` · `editor` · `viewer`; the very first user ever created is always `admin`        |
+| Option                                   | Default          | Meaning                                                                                            |
+| ---------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------- |
+| `devMode`                                | `false`          | Explicit opt-in to Forge's public dev secret; never derive it from a missing secret                |
+| `passwordPolicy.minLength` / `maxLength` | `8` / `1024`     | Integers; `maxLength` ceiling 4096; applied on create, signup, password change and login           |
+| `passwordHashing.iterations` (1.1)       | `100000`         | PBKDF2 work factor, `100000`–`10000000`; presets `workers` (100 000) / `node` (600 000); see below |
+| `collection`                             | `users`          | Must match the slug given to `defineUsersCollection()`/`withAuthFields()`                          |
+| `AUTH_SECRET` (env)                      | required         | At least 32 bytes; signs session tokens (24-hour lifetime)                                         |
+| roles                                    | `viewer` default | `admin` · `editor` · `viewer`; the very first user ever created is always `admin`                  |
 
-**Behaviour worth knowing.** Passwords: PBKDF2-HMAC-SHA256, 100,000 iterations. Every request re-reads the user row (role changes apply at once; a deleted user's session fails). A
+**Behaviour worth knowing.** Passwords: PBKDF2-HMAC-SHA256, 100,000 iterations by default (spec 105). A raised work factor writes versioned hashes (`$pbkdf2-sha256$i=…`); every older hash, including 1.0's, keeps verifying and is upgraded on the user's next successful login (compare-and-set; no session is revoked). At the default the 1.0 format is still written, so a rollback to 1.0 keeps every login working; a raised work factor makes upgraded rows unreadable by 1.0. Measured login cost (Apple M4): ≈ 5.7 ms at 100 000 on local workerd, ≈ 35 ms at 600 000 — only the default can fit the Workers Free plan's 10 ms CPU limit; use `node` on Node or a paid Workers plan. Every request re-reads the user row (role changes apply at once; a deleted user's session fails). A
 password change invalidates every earlier session (`_sessionVersion`). The users collection is managed by the adapter: generic create/update/delete on it is refused with
 `AUTH_MANAGED_COLLECTION`. The last admin cannot be removed or demoted, including under concurrency. API-key secrets are shown once and stored hashed.
 

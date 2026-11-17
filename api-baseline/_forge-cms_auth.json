@@ -20,6 +20,8 @@
   "ForgeAuthError",
   "InMemoryAuthAdapter",
   "ManagedDeleteGuard",
+  "PASSWORD_HASHING_PRESETS",
+  "PasswordHashingOptions",
   "PasswordPolicy",
   "PublicSignupInput",
   "SESSION_COOKIE_NAME",

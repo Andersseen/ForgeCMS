@@ -30,6 +30,14 @@ import {
 } from './token-signer.js';
 import type { UserRole } from './roles.js';
 import { hasAnyRole } from './roles.js';
+import {
+  hashPassword,
+  needsRehash,
+  resolvePasswordHashing,
+  verifyPassword,
+  type PasswordHashParams,
+  type PasswordHashingOptions
+} from './password-hash.js';
 
 export interface UsersCollectionAuthEnv {
   AUTH_SECRET?: string;
@@ -60,6 +68,13 @@ export interface UsersCollectionAuthAdapterOptions {
    */
   devMode?: boolean;
   passwordPolicy?: PasswordPolicy;
+  /**
+   * The password work factor (spec 105). Defaults to 100 000 PBKDF2-HMAC-SHA-256 iterations — the 1.0
+   * value, sized for the Cloudflare Workers Free plan. Use `PASSWORD_HASHING_PRESETS.node` (600 000) on a
+   * Node server or a paid Workers plan. Existing hashes keep verifying; a hash below the configured work
+   * factor is upgraded on the user's next successful login.
+   */
+  passwordHashing?: PasswordHashingOptions;
   /** Defaults to `'users'` — must match the slug passed to `defineUsersCollection()`/`withAuthFields()`. */
   collection?: string;
 }
@@ -87,12 +102,6 @@ const PASSWORD_LENGTH_CEILING = 4096;
 const MAX_EMAIL_LENGTH = 254;
 /** Names travel inside every session token, so they are bounded to keep tokens bounded (spec 069). */
 const MAX_NAME_LENGTH = 256;
-/**
- * A real PBKDF2 hash, in the stored format, of a random password that was discarded (spec 069). `login`
- * verifies against it when no account (or no stored hash) matches, so an unknown email performs the same
- * single verification as a wrong password instead of returning before any password work.
- */
-const DUMMY_PASSWORD_HASH = 'If6Zrfe0K5ZTX4epnsGKhynqsYCtSnGguaNkxiFer_SRG6SLXF5NOPToEpHbPR5J';
 const BOOTSTRAP_COLLECTION = '_forge_bootstrap';
 /**
  * The last-admin invariant as a storage-level precondition (spec 059): a row currently in the admin set
@@ -104,76 +113,6 @@ const LAST_ADMIN_GUARD: WriteCondition = {
 };
 /** Matches `@forge-cms/core`'s own `email` field validator (`validation.ts`'s `email_format` check). */
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const SALT_BYTES = 16;
-const ITERATIONS = 100_000;
-const KEY_BITS = 256;
-
-function base64UrlEncode(bytes: Uint8Array): string {
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function base64UrlDecode(value: string): Uint8Array<ArrayBuffer> {
-  const padded = value
-    .replace(/-/g, '+')
-    .replace(/_/g, '/')
-    .padEnd(value.length + ((4 - (value.length % 4)) % 4), '=');
-  const binary = atob(padded);
-  const bytes = new Uint8Array(new ArrayBuffer(binary.length));
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
-function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
-  if (a.length !== b.length) return false;
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a[i]! ^ b[i]!;
-  }
-  return result === 0;
-}
-
-async function hashPassword(password: string): Promise<string> {
-  const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits']
-  );
-  const derived = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: ITERATIONS, hash: 'SHA-256' },
-    key,
-    KEY_BITS
-  );
-  const hash = new Uint8Array(derived);
-  const combined = new Uint8Array(salt.length + hash.length);
-  combined.set(salt);
-  combined.set(hash, salt.length);
-  return base64UrlEncode(combined);
-}
-
-async function verifyPassword(password: string, stored: string): Promise<boolean> {
-  const combined = base64UrlDecode(stored);
-  const salt = combined.slice(0, SALT_BYTES);
-  const hash = combined.slice(SALT_BYTES);
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits']
-  );
-  const derived = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: ITERATIONS, hash: 'SHA-256' },
-    key,
-    KEY_BITS
-  );
-  return timingSafeEqual(new Uint8Array(derived), hash);
-}
 
 function sanitizeUser(record: DatabaseRecord): AuthUser {
   const { passwordHash: _ignored, _sessionVersion: _ignoredVersion, ...rest } = record;
@@ -257,10 +196,12 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
   private collection: string;
   private readonly devMode: boolean;
   private readonly passwordLimits: PasswordLimits;
+  private readonly hashParams: PasswordHashParams;
 
   constructor(options: UsersCollectionAuthAdapterOptions = {}) {
     this.devMode = options.devMode ?? false;
     this.passwordLimits = resolvePasswordLimits(options.passwordPolicy);
+    this.hashParams = resolvePasswordHashing(options.passwordHashing);
     this.collection = options.collection ?? DEFAULT_COLLECTION;
   }
 
@@ -497,8 +438,8 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
   /**
    * Every failure is the same `'invalid-credentials'` (spec 069). A password over the policy maximum is
    * refused before any lookup or hashing — whether the account exists plays no part. Otherwise exactly one
-   * PBKDF2 verification runs, against the stored hash or, when no account (or no hash) matches, against a
-   * fixed dummy hash, so an unknown email does not skip the password work a wrong password pays. That is
+   * PBKDF2 verification runs, against the stored hash or, when no account (or no valid hash) matches, at the
+   * configured work factor against a fixed salt, so an unknown email does not skip the password work a wrong password pays. That is
    * not a constant-time guarantee across database adapters; throttling stays the host's job.
    */
   async login(email: string, password: string): Promise<AuthActionResult> {
@@ -516,14 +457,47 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
         ? record.passwordHash
         : undefined;
 
-    const valid = await verifyPassword(password, storedHash ?? DUMMY_PASSWORD_HASH);
+    const valid = await verifyPassword(password, storedHash, this.hashParams);
     if (!record || storedHash === undefined || !valid) {
       return { ok: false, reason: 'invalid-credentials' };
+    }
+
+    if (needsRehash(storedHash, this.hashParams)) {
+      await this.rehash(db, record, storedHash, password);
     }
 
     const user = sanitizeUser(record);
     const token = await issueToken(this.getSecret(), user, sessionVersionOf(record));
     return { ok: true, token, user };
+  }
+
+  /**
+   * Rehash-on-login (spec 105): replaces a hash below the configured work factor with one at it. A
+   * compare-and-set on the old hash, so a password changed meanwhile is never overwritten; it does not
+   * touch `_sessionVersion` (no session is revoked). A failed or lost write is not a failed login — the
+   * old hash still verifies and the next login tries again.
+   */
+  private async rehash(
+    db: DatabaseAdapter,
+    record: DatabaseRecord,
+    storedHash: string,
+    password: string
+  ): Promise<void> {
+    try {
+      const passwordHash = await hashPassword(password, this.hashParams);
+      await db.updateIf(
+        this.collection,
+        String(record.id),
+        { passwordHash },
+        { targetMatches: { passwordHash: storedHash } }
+      );
+    } catch (error) {
+      console.warn(
+        `[forge] Password rehash on login failed; the stored hash stays valid and is retried next login (spec 105): ${
+          error instanceof Error ? error.name : 'Error'
+        }`
+      );
+    }
   }
 
   /** `true` once the users collection has at least one row — used by the first-admin bootstrap. */
@@ -555,7 +529,7 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     const existing = await db.findMany({ collection: this.collection, where: { email } });
     if (existing.length > 0) return { ok: false, reason: 'email-in-use' };
 
-    const passwordHash = await hashPassword(input.password);
+    const passwordHash = await hashPassword(input.password, this.hashParams);
     const record = await this.insertUser(
       db,
       { email, name: input.name ?? '', passwordHash },
@@ -587,7 +561,7 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
 
     // Same path as `createUser`, reachable here through a *public* endpoint — which is what makes the
     // first-admin provisioning security-sensitive. Nobody but the very first user can become admin.
-    const passwordHash = await hashPassword(input.password);
+    const passwordHash = await hashPassword(input.password, this.hashParams);
     const record = await this.insertUser(
       db,
       { email, name: input.name ?? '', passwordHash },
@@ -654,7 +628,7 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     if (input.name !== undefined) updates.name = input.name;
     if (input.role !== undefined) updates.role = input.role;
     if (input.password !== undefined) {
-      updates.passwordHash = await hashPassword(input.password);
+      updates.passwordHash = await hashPassword(input.password, this.hashParams);
       // A password change invalidates every session issued before it (spec 058 §6) — see
       // `validateSession`'s comparison against this same field.
       updates._sessionVersion = sessionVersionOf(existing) + 1;
