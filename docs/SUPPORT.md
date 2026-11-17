@@ -42,24 +42,27 @@ built and ran. We do not claim every patch inside a range was tested. If somethi
 | ---------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
 | Node.js                | `>= 22`                                          | 22 (`.nvmrc`, CI image)                                                                                           | all CI                              |
 | pnpm                   | `>= 10`                                          | 10.11.0                                                                                                           | all CI                              |
-| TypeScript             | strict ESM (not a declared peer)                 | 5.9.2; `~5.9.2` newest in the Angular 21 matrix; `~6.0.0` in the Angular 22 client-only fixture                   | `release:compat`, consumers         |
-| Angular — client       | `@angular/core`, `router` `^21.0.0 \|\| ^22.0.0` | 21.0.0 (minimum) · 21.2.10 (current) · newest 21.2.x (last recorded 21.2.25) · newest 22.x (last recorded 22.2.1) | `pnpm release:compat`               |
-| Angular — admin        | `^21.2.0` (all `@angular/*` peers)               | 21.2.0 (minimum) · 21.2.10 (current) · newest 21.2.x                                                              | `pnpm release:compat`               |
-| `@angular/cdk`         | `^21.2.0` (admin only)                           | 21.2.0 · 21.2.10 · newest 21.2.x                                                                                  | `release:compat`                    |
+| TypeScript             | strict ESM (not a declared peer)                 | 5.9.2; `~5.9.2` newest in the Angular 21 matrix; `~6.0.0` (6.0.3) in the Angular 22 client and admin fixtures     | `release:compat`, consumers         |
+| Angular — client       | `@angular/core`, `router` `^21.0.0 \|\| ^22.0.0` | 21.0.0 (minimum) · 21.2.10 (current) · newest 21.2.x (last recorded 21.2.26) · newest 22.x (last recorded 22.2.6) | `pnpm release:compat`               |
+| Angular — admin        | `^21.2.0 \|\| ^22.0.0` (all `@angular/*` peers)  | 21.2.0 (minimum) · 21.2.10 (current) · newest 21.2.x · 22.0.0 · newest 22.x (last recorded 22.2.6)                | `pnpm release:compat`               |
+| `@angular/cdk`         | `^21.2.0 \|\| ^22.0.0` (admin only)              | 21.2.0 · 21.2.10 · newest 21.2.x · 22.0.0 · newest 22.x                                                           | `release:compat`                    |
 | RxJS                   | `^7.8.0` (admin)                                 | 7.8.0 · 7.8.2                                                                                                     | `release:compat`                    |
-| `@voltui/components`   | `^1.0.1` (admin)                                 | 1.0.1 · 1.1.0 · newest 1.x                                                                                        | `release:compat`                    |
-| `lumen-icons`          | `^0.2.0` (admin)                                 | 0.2.0 · newest 0.2.x                                                                                              | `release:compat`                    |
+| `@voltui/components`   | `^1.0.1` (admin; 1.3.2+ on Angular 22)           | 1.0.1 · 1.1.0 · newest 1.x · 1.3.2 and 1.3.3 on Angular 22                                                        | `release:compat`                    |
+| `lumen-icons`          | `^0.2.0 \|\| ^0.3.0` (admin)                     | 0.2.0 · newest 0.2.x (0.3 not yet published; 0.2 on Angular 22 needs one pnpm peer rule, see below)               | `release:compat`                    |
 | Vite (linker)          | `^7.0.0 \|\| ^8.0.0` (optional peer)             | 7.0.0 · 7.1.4 · newest 8.x                                                                                        | `release:compat`                    |
-| `@babel/core` (linker) | `^7.28.0 \|\| ^8.0.0` (8 required by Angular 22) | 7.28.0 · 7.29.0 · newest 7.x · 8.x with Angular 22                                                                | `release:compat`                    |
-| Analog.js              | not a Forge peer                                 | `@analogjs/platform` 2.5.2 with `@analogjs/vite-plugin-angular` 2.4.8 (and ^2.8 for Angular 22)                   | `release:ssr`, quickstart consumers |
+| `@babel/core` (linker) | `^7.28.0 \|\| ^8.0.0` (8 from Angular 22.1)      | 7.28.0 · 7.29.0 · newest 7.x · 7.29.0 with Angular 22.0.0 · 8.x with Angular 22.1+                                | `release:compat`                    |
+| Analog.js              | not a Forge peer                                 | `@analogjs/platform` 2.5.2 with `@analogjs/vite-plugin-angular` 2.4.8; 2.9.7 with Angular 22 (admin SSR journey)  | `release:ssr`, quickstart consumers |
 | libSQL client          | pinned dependency of `@forge-cms/db`             | `@libsql/client` 0.17.3 with `drizzle-orm` 0.45.2                                                                 | `test:libsql`, `test:upgrade`       |
 | Wrangler / workerd     | operator tool                                    | Wrangler 4.91.0 (local workerd and the remote staging rehearsal)                                                  | `test:cloudflare`, spec 090         |
 | Garage (S3)            | any S3-compatible service is _configurable_      | Garage `v2.4.1` (pinned digest) — the only certified service                                                      | `test:s3`                           |
 | AWS SDK v3             | pinned dependency of `@forge-cms/s3`             | `@aws-sdk/client-s3` 3.1147.0                                                                                     | `test:s3`                           |
 | Playwright             | repository tooling only                          | 1.60.0                                                                                                            | e2e                                 |
 
-**Angular 22:** `@forge-cms/angular` is tested on Angular 22 (client only, with Babel 8). `@forge-cms/admin` is **not** supported on Angular 22 — it inherits `@voltui/components` 1.x's
-Angular 21 peer. Angular 19 and 20 are not supported.
+**Angular 22:** since 1.1.0 (spec 103) both `@forge-cms/angular` and `@forge-cms/admin` support Angular 22. The admin on 22 is gated by `release:compat` (`admin-22-min`, `admin-22`) and by the packed
+admin SSR journey (`pnpm release:ssr:admin-22`: Angular 22.2.6 + Analog 2.9.7 + Vite 8 + TypeScript 6.0, Cloudflare Pages output under local workerd + D1 + R2, WCAG 2.2 A/AA scans). On 22 install
+`@voltui/components` ≥ 1.3.2. `lumen-icons` 0.2.x declares `@angular/* ^21.0.0`; until 0.3 is published, a strict-peer pnpm install on 22 needs
+`pnpm.peerDependencyRules.allowedVersions` for `lumen-icons>@angular/core` and `lumen-icons>@angular/common` (exactly what the gates use). Angular below 21.2 is not supported by the admin (Volt's
+peer floor; `linkedSignal` and stable `provideZonelessChangeDetection`); Angular 19 and 20 are not supported at all.
 
 **Browsers and operating systems:** the admin is exercised in Chromium (Playwright) with WCAG 2.2 AA scans; CI runs on Linux. Other browsers and operating systems are expected to work but are not gated.
 

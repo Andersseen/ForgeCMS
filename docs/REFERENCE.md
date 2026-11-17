@@ -238,7 +238,7 @@ components, `DEFAULT_ADMIN_NAV`, `ForgeAdminConfig`; experimental: `forgeAdminAn
 (default: Collections + admin-only Users), `collections` (all), `signInPath` (`{basePath}/login`); `logo` and `features` are **deprecated** no-ops. The host must use
 `provideRouter(..., withComponentInputBinding())`. Full contract: [1.0-PUBLIC-SURFACE.md](1.0-PUBLIC-SURFACE.md).
 
-**Peers.** `@angular/{cdk,common,core,forms,platform-browser,router}` `^21.2.0`, `rxjs ^7.8.0`, `@voltui/components ^1.0.1`, `lumen-icons ^0.2.0`. Angular 22 is not supported for the admin.
+**Peers.** `@angular/{cdk,common,core,forms,platform-browser,router}` `^21.2.0 || ^22.0.0`, `rxjs ^7.8.0`, `@voltui/components ^1.0.1` (1.3.2+ on Angular 22), `lumen-icons ^0.2.0 || ^0.3.0`. Angular 22 since 1.1.0 (spec 103).
 
 **Stability.** Stable; Analytics experimental.
 

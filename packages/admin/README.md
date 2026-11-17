@@ -1,7 +1,7 @@
 # @forge-cms/admin
 
-**Who needs it:** an Angular 21 app that wants the reusable ForgeCMS admin. **Boundary:** browser; contains no API URL and no server code.
-**Status:** stable 1.0 candidate; Forge Analytics (`forgeAdminAnalyticsRoutes`) is experimental. Angular 22 is **not** supported by the admin yet.
+**Who needs it:** an Angular 21.2+ or 22 app that wants the reusable ForgeCMS admin. **Boundary:** browser; contains no API URL and no server code.
+**Status:** stable 1.0 candidate; Forge Analytics (`forgeAdminAnalyticsRoutes`) is experimental.
 Reference: [docs/REFERENCE.md](../../docs/REFERENCE.md#forge-cmsadmin) · start here: <https://forge-cms.pages.dev/docs/angular-quickstart>.
 
 Embeddable Angular admin for ForgeCMS: layout, collections index, collection workspace, document
@@ -16,11 +16,14 @@ Guide: https://forge-cms.pages.dev/docs/small-project-guide
 
 ## Compatibility
 
-Peers: `@angular/{cdk,common,core,forms,platform-browser,router}` `^21.2.0`, `rxjs` `^7.8.0`,
-`@voltui/components` `^1.0.1`, `lumen-icons` `^0.2.0`; optional `@angular/compiler-cli` `^21.2.0`,
-`@babel/core` `^7.28.0` and `vite` `^7.0.0 || ^8.0.0` for the linker. Proven by strict packed-consumer
-builds (`pnpm release:compat`: Angular 21.2.0, 21.2.10 and 21.2.25). Angular 22 is not supported yet:
-VoltUI 1.x peers `@angular/* ^21.2.0`. `@angular/cdk` is a direct peer since 0.12.1: the admin's modal
+Peers: `@angular/{cdk,common,core,forms,platform-browser,router}` `^21.2.0 || ^22.0.0`, `rxjs` `^7.8.0`,
+`@voltui/components` `^1.0.1` (1.3.2+ on Angular 22), `lumen-icons` `^0.2.0 || ^0.3.0`; optional
+`@angular/compiler-cli` `^21.2.0 || ^22.0.0`, `@babel/core` `^7.28.0 || ^8.0.0` (8 from Angular 22.1) and
+`vite` `^7.0.0 || ^8.0.0` for the linker. Proven by strict packed-consumer builds (`pnpm release:compat`:
+Angular 21.2.0, 21.2.10, newest 21.2.x, 22.0.0 and newest 22.x) and the packed SSR admin journey on 21 and 22.
+`lumen-icons` 0.2.x still declares an Angular 21 peer: on Angular 22 a strict-peer install needs a
+`pnpm.peerDependencyRules.allowedVersions` entry for `lumen-icons>@angular/core` and `lumen-icons>@angular/common`
+until 0.3 is published. `@angular/cdk` is a direct peer since 0.12.1: the admin's modal
 focus trap uses `@angular/cdk/a11y` (VoltUI's `ng-primitives` already required it, so most hosts have it).
 
 Vite/Analog apps must add the Angular linker (the same plugin as `@forge-cms/angular/vite`):

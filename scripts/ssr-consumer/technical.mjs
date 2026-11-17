@@ -19,6 +19,7 @@ import { countUnlinkedDeclarations, findDuplicateStoreEntries } from '../angular
 import {
   DEFAULT_INSTALL,
   NPMRC,
+  peerRules,
   TSCONFIG,
   VERSIONS,
   buildTools,
@@ -86,7 +87,7 @@ function manifest(tarballs) {
     },
     devDependencies: buildTools(),
     // Forge's internal dependencies (runtime → db/auth/…) must resolve to the tarballs too.
-    pnpm: { overrides: tarballs }
+    pnpm: { overrides: tarballs, ...peerRules() }
   };
 }
 

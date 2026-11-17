@@ -32,6 +32,8 @@ import { countUnlinkedDeclarations, findDuplicateStoreEntries } from '../angular
 import {
   DEFAULT_INSTALL,
   NPMRC,
+  expectAccessible,
+  peerRules,
   TSCONFIG,
   VERSIONS,
   buildTools,
@@ -156,7 +158,7 @@ function manifest(tarballs) {
       wrangler: VERSIONS.wrangler
     },
     // Forge's internal dependencies (admin → angular → core, runtime → db …) must resolve to the tarballs too.
-    pnpm: { overrides: tarballs }
+    pnpm: { overrides: tarballs, ...peerRules() }
   };
 }
 
@@ -669,6 +671,8 @@ async function journey({ profile, dir, outDir, s3 }) {
       if (new URL(adminPage.url()).pathname !== path) {
         fail(`refresh of ${path} ended at ${adminPage.url()}`);
       }
+      // Spec 103: WCAG 2.2 A/AA on every admin screen, on each Angular tuple this journey runs on.
+      await expectAccessible(adminPage, `${VERSIONS.angular} ${path}`);
     }
     const mountHrefs = await adminPage.$$eval('a[href]', (anchors) =>
       anchors
@@ -685,11 +689,13 @@ async function journey({ profile, dir, outDir, s3 }) {
     await adminPage.waitForURL('**/studio/login**');
     await adminPage.goto(`${origin()}/studio/collections/posts`);
     await adminPage.waitForURL('**/studio/login?returnUrl=*');
+    await hydrated(adminPage);
+    await expectAccessible(adminPage, `${VERSIONS.angular} /studio/login`);
     if (literalApis.length > 0)
       fail(`the admin called default API/admin paths: ${literalApis.join(', ')}`);
     await signIn(adminPage, origin());
     console.log(
-      '  ✓ spec 087: admin at /studio, APIs at /api/content + /api/account — refresh of nested routes, in-mount links and redirects, no /admin or /api/v1 or /api/auth'
+      `  ✓ spec 087: admin at /studio, APIs at /api/content + /api/account — refresh of nested routes, in-mount links and redirects, no /admin or /api/v1 or /api/auth; WCAG 2.2 A/AA clean (Angular ${VERSIONS.angular})`
     );
 
     // --- 3. admin creates a post: draft ---------------------------------------------------------------
@@ -1003,16 +1009,20 @@ export function buildJourneyConsumer({ workDir, tarballs, install = DEFAULT_INST
 
 /** Installs the journey consumer once, then builds and walks each profile. */
 export async function verifyJourneyConsumer({ workDir, tarballs, s3, install = DEFAULT_INSTALL }) {
-  runtimeSecrets = [s3.secretAccessKey, s3.accessKeyId].filter(Boolean);
+  runtimeSecrets = [s3?.secretAccessKey, s3?.accessKeyId].filter(Boolean);
   const dir = installJourneyConsumer({ workDir, tarballs, install });
 
-  for (const profile of PROFILES) {
+  // FORGE_SSR_PROFILES=cloudflare runs the Cloudflare half alone (it needs no Docker/Garage); default: all.
+  const only = process.env.FORGE_SSR_PROFILES?.split(',');
+  const profiles = PROFILES.filter(({ id }) => only === undefined || only.includes(id));
+  if (profiles.length === 0) fail(`FORGE_SSR_PROFILES selects no profile: ${only?.join(',')}`);
+  for (const profile of profiles) {
     console.log(`\nJourney — ${profile.label}`);
     const outDir = build(dir, profile);
     await journey({ profile, dir, outDir, s3 });
     if (profile.id === 'node') await expectProductionFailsClosed(dir, outDir, s3);
   }
   console.log(
-    `\nProduction SSR + durable-file journey passed on Node + libSQL + S3 (Garage) and on Cloudflare Pages output under local workerd + local D1 + local R2 (Angular ${VERSIONS.angular}, Analog ${VERSIONS.analog}).`
+    `\nProduction SSR + durable-file journey passed on ${profiles.map(({ label }) => label).join(' and on ')} (Angular ${VERSIONS.angular}, Analog ${VERSIONS.analog}).`
   );
 }

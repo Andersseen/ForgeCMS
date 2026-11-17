@@ -38,7 +38,7 @@ There is no GUI schema builder, no code generation step and no second language.
 - **Where it runs:** Cloudflare Pages/Workers with D1 + R2, or Node with on-disk libSQL + an S3-compatible bucket. Both profiles are built from the packed
   public packages and exercised in CI; the Cloudflare profile was also rehearsed on isolated real Cloudflare staging with a backup and an isolated restore.
   See the [deployment matrix](docs/MATRICES.md#deployment-profiles).
-- **Supported baseline:** Node >= 22, pnpm 10, TypeScript 5.9 strict, Angular 21 (client also on Angular 22), Analog.js 2 — exact ranges and the versions
+- **Supported baseline:** Node >= 22, pnpm 10, TypeScript 5.9 strict, Angular 21.2+ and 22 (client from 21.0), Analog.js 2 — exact ranges and the versions
   actually tested are in [docs/SUPPORT.md](docs/SUPPORT.md).
 
 ## Install
@@ -55,7 +55,7 @@ Add what your profile needs:
 pnpm add @forge-cms/cloudflare   # D1 + R2 (Cloudflare profile)
 pnpm add @forge-cms/s3           # S3-compatible storage (portable profile)
 pnpm add @forge-cms/angular      # typed Angular client, session, guard, signal resources
-pnpm add @forge-cms/admin        # reusable Angular admin (Angular 21)
+pnpm add @forge-cms/admin        # reusable Angular admin (Angular 21.2+ / 22)
 pnpm add -D @forge-cms/testing   # adapter contract suites, if you write an adapter
 ```
 
