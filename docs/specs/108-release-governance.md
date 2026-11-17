@@ -1,6 +1,6 @@
 # 108 — Close the 1.0 closeout, protect main and gate npm publication
 
-- **Status:** in-progress (evidence recorded; GitHub settings **awaiting maintainer confirmation**)
+- **Status:** in-progress (evidence recorded; GitHub settings **applied 2026-11-17** after maintainer confirmation; `NPM_TOKEN` move pending — maintainer)
 - **Author:** agent draft (scope approved by the maintainer's 1.1.0 / V2-01 brief, 2026-11-17)
 - **Date:** 2026-11-17
 - **Branch:** `feat/admin-angular-22` (the single 1.1.0 PR, #127)
@@ -28,7 +28,7 @@ Registry sha256 per tarball: core `914182a1…`, db `388e25f4…`, auth `5dd9da9
 
 The authorization discrepancy of #115 is unchanged history: nothing was republished, re-tagged or moved.
 
-## 2. GitHub settings — exact changes (NOT applied; apply only after the maintainer confirms)
+## 2. GitHub settings — exact changes (applied 2026-11-17 after the maintainer confirmed)
 
 Current state (read 2026-11-17): `main` has no branch protection. Ruleset `Protect main` (id 21630744) is **disabled** (rules: deletion, non_fast_forward). Environments `production` and `production-demo` have no protection rules and no branch policy. The `release` job has no environment and publishes with the **repository** secret `NPM_TOKEN` on any push to `main` that carries a version bump; that is how #115 published. Default workflow token permissions: read.
 
@@ -103,6 +103,19 @@ gh api -X POST repos/Andersseen/ForgeCMS/environments/npm-release/deployment-bra
 ### Verification after applying (recorded in the dossier)
 
 `gh api repos/Andersseen/ForgeCMS/rulesets/21630744 --jq .enforcement` → `active`; `gh api repos/Andersseen/ForgeCMS/environments/npm-release --jq '.protection_rules'` lists the reviewer and the branch policy; a direct `git push origin main` is refused; the next `main` run's `release` job shows "Waiting for review".
+
+### Applied (2026-11-17)
+
+Applied after the maintainer's confirmation in the session. Read back from the API:
+
+| Setting                                      | Read back                                                                                                                                                                                                                                                                                                                           |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ruleset `Protect main` (21630744)            | `enforcement: active`, rules `deletion`, `non_fast_forward`, `pull_request`, `required_status_checks` (the eight checks above), bypass `RepositoryRole 5 (admin)` in `pull_request` mode. `GET /rules/branches/main` returns those four rules. Classic branch protection stays unset (404), which is expected: rulesets replace it. |
+| Environment `npm-release`                    | `required_reviewers: [Andersseen]`, `branch_policy` with custom policy `main`                                                                                                                                                                                                                                                       |
+| Environments `production`, `production-demo` | `branch_policy` with custom policy `main`                                                                                                                                                                                                                                                                                           |
+| Workflows                                    | `release` (`ci.yml`), `publish-rc` and `finalize-rc` (`release-rc.yml`) declare `environment: npm-release`                                                                                                                                                                                                                          |
+
+**Pending (maintainer action):** add `NPM_TOKEN` as a secret of `npm-release` and delete the repository secret (or switch to npm trusted publishing). The repository secret remains readable from the environment job until then, so publication works either way, and approval is already required.
 
 ## 3. Security review of the 1.1 diff
 

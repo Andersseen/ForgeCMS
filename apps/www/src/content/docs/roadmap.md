@@ -20,7 +20,7 @@ The status shown for each V2 milestone is explicit:
 - **Next** identifies the next checkpoint; it does not mean implementation has started.
 - **Planned** means accepted direction with no active implementation commitment.
 
-V2-01 is Next. The latest release record says post-publication closeout verification is incomplete. No V2 feature milestone is currently marked In Progress. Product checkpoints do not map one-to-one to npm minor versions; compatible features may ship in 1.x under SemVer. V2.0 is reserved for an intentional, certified compatibility and product milestone.
+V2-01 is Next: its work (1.0 closeout verified against the published artifacts, protected `main` and npm publication approval, password and session hardening, certified throttles, admin accessibility, Angular 22 for the admin) is complete and ships with ForgeCMS 1.1.0. No V2 feature milestone is currently marked In Progress. Product checkpoints do not map one-to-one to npm minor versions; compatible features may ship in 1.x under SemVer. V2.0 is reserved for an intentional, certified compatibility and product milestone.
 
 ## V2 milestones
 

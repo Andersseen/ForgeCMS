@@ -58,6 +58,8 @@ jobs:
   publish-rc:
     name: Publish release candidate to npm (tag rc)
     if: inputs.mode != 'finalize'
+    # Spec 108: maintainer approval + `main` only; holds NPM_TOKEN.
+    environment: npm-release
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -131,6 +133,8 @@ jobs:
   finalize-rc:
     name: Finalize an already-published candidate (verify + GitHub prerelease, never publishes)
     if: inputs.mode == 'finalize'
+    # Spec 108: maintainer approval + `main` only; holds NPM_TOKEN.
+    environment: npm-release
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

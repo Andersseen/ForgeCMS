@@ -1,5 +1,23 @@
 # STATE — Current implementation status
 
+> **Last updated: 2026-11-17 (spec 108 settings applied + lumen-icons 0.3.1; 1.1.0 single PR #127).** After maintainer confirmation:
+>
+> - The `Protect main` ruleset is **active**: PR-only, the 8 CI checks required (strict), no deletion or force-push, admin bypass only through a PR for the Version Packages PR.
+> - The `npm-release` environment requires the maintainer's approval and allows `main` only. `release`, `publish-rc` and `finalize-rc` run in it.
+> - `production` and `production-demo` are `main` only.
+> - Evidence: spec 108 § Applied, and the dossier.
+> - lumen-icons 0.3.1 (Angular ^21 || ^22) is published. The temporary peer exception is removed; compat 7/7 and the admin journeys pass on 21 and 22 with it.
+>
+> V2-01 work is complete in #127 (MILESTONES.md links the evidence). Its canonical status stays "Next" until 1.1.0 is published and a `status.Shipped` label exists in the Glossa catalogs.
+>
+> **Pending (maintainer):**
+>
+> - Move `NPM_TOKEN` into `npm-release`, or use npm trusted publishing.
+> - Add the Glossa `roadmap.status.Shipped` key (en/es/uk), then flip V2-01 to Shipped and V2-02 to Next. `verify-v2-roadmap.mjs` must allow Shipped before Next.
+> - Merge #127, then approve the Version Packages run that publishes 1.1.0.
+
+> _Previous update:_
+
 > **Last updated: 2026-11-17 (spec 108 — release governance; 1.1.0 single PR #127).** **1.0 closeout verified:** a clean build of `82e4cdb` packs 12/12 content-identical to npm `@forge-cms/*@1.0.0`; SLSA provenance names `82e4cdb` / `main` / `ci.yml` for all twelve; `npm audit signatures` 148/148; dist-tags correct; `registry:consumers --version 1.0.0` (server, angular, ssr, agent) passed. `ssr-journey` was not run locally (no Docker). L03 is now RELEASED and verified (dossier). **1.1 security review:** no critical/high/medium finding (dossier). **GitHub settings NOT applied:** the exact ruleset (`Protect main` active, 8 required checks, PR-only admin bypass for the Version Packages PR), protected `npm-release` environment (maintainer reviewer, `main` only, `NPM_TOKEN` scoped to it, or npm trusted publishing) and `production*` branch policies are written in spec 108 and await maintainer confirmation. **Next:** confirm and apply spec 108's settings; V2-01 is then complete (mark it done in the roadmap).
 
 > _Previous update:_

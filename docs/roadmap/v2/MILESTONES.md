@@ -12,7 +12,12 @@ The inventory below is ordered by dependency and product value, not by release n
 - **Dependencies:** None; first V2 checkpoint.
 - **Acceptance:** Stable artifacts are verified against recorded source; release actions have enforced authorization and protected-branch checks; no unmitigated critical/high security findings remain; documented auth policies are tested; known admin accessibility issues are closed or explicitly accepted with rationale.
 - **Evidence:** Registry/artifact comparison, branch/ruleset and release workflow evidence, security review and tests, auth migration/revocation tests, accessibility scans and keyboard journey.
-- **Status:** **Next.** Evidence: [STATE.md](../../STATE.md) records main CI publication and explicitly incomplete post-publication closeout verification. The same record identifies the publication authorization discrepancy and prior admin accessibility gaps.
+- **Status:** **Next.** All acceptance work is done in the 1.1.0 PR (#127) and ships with `1.1.0`. The canonical status changes to Shipped once 1.1.0 is published and the site's status label exists in Glossa. Evidence by acceptance item:
+  - **Artifacts verified against source:** [dossier — L03 closeout completed](../../1.0-RELEASE-DOSSIER.md#l03-closeout-completed-2026-11-17-spec-108).
+  - **Enforced authorization and protected branch:** [spec 108 § applied settings](../../specs/108-release-governance.md#applied-2026-11-17).
+  - **Security review:** [dossier — 1.1.0 security review](../../1.0-RELEASE-DOSSIER.md#110-security-review-2026-11-17-spec-108), no critical/high/medium finding.
+  - **Auth policies tested:** [spec 105](../../specs/105-password-hashing-and-rehash.md) (hash migration, rehash, Workers CPU), [spec 106](../../specs/106-certified-auth-throttles.md) (throttles), [spec 107](../../specs/107-session-revocation-policy.md) (revocation).
+  - **Admin accessibility:** [spec 104](../../specs/104-admin-landmarks-and-keyboard-journey.md) (landmarks, keyboard journey, axe on Angular 21 and 22), plus [spec 103](../../specs/103-admin-angular-22.md) (Angular 22).
 
 ## V2-02 — Developer Experience & Project Bootstrap
 
