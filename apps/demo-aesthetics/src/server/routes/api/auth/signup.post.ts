@@ -3,6 +3,7 @@ import type { ApiContext } from '@forge-cms/api';
 import { handleSignup } from '@forge-cms/runtime';
 import { getServerRuntime } from '../../../api/runtime';
 import { toCancellableWebRequest } from '../../../api/auth-request';
+import { authThrottleFor } from '../../../api/auth-throttle';
 
 /**
  * POST /api/auth/signup
@@ -21,9 +22,11 @@ export default defineEventHandler(async (event) => {
   const enabled =
     event.context.cloudflare?.env?.FORGE_ENABLE_SIGNUP === '1' ||
     process.env['FORGE_ENABLE_SIGNUP'] === '1';
+  const throttle = await authThrottleFor(event.context.cloudflare?.env);
   return handleSignup(context, {
     runtime,
     enabled,
-    cookie: { secure: !!event.context.cloudflare?.env }
+    cookie: { secure: !!event.context.cloudflare?.env },
+    ...(throttle && { throttle })
   });
 });

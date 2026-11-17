@@ -120,7 +120,7 @@ export const collections = [users, media, posts];
 ```ts
 import { UsersCollectionAuthAdapter } from '@forge-cms/auth';
 import { InMemoryDatabaseAdapter } from '@forge-cms/db';
-import { ForgeCmsRuntime } from '@forge-cms/runtime';
+import { DatabaseAuthThrottle, ForgeCmsRuntime } from '@forge-cms/runtime';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import { collections } from './collections';
 
@@ -129,15 +129,30 @@ export interface ServerEnv {
   AUTH_SECRET?: string;
 }
 
-let runtimePromise: Promise<ForgeCmsRuntime<ServerEnv>> | undefined;
-
-/** Built on the first request (not at module load) and shared afterwards. */
-export function getServerRuntime(): Promise<ForgeCmsRuntime<ServerEnv>> {
-  runtimePromise ??= buildRuntime();
-  return runtimePromise;
+interface Server {
+  runtime: ForgeCmsRuntime<ServerEnv>;
+  /** Login/signup attempt limits, kept in the same database (10 per client, 30 per account, per minute). */
+  authThrottle: DatabaseAuthThrottle;
 }
 
-async function buildRuntime(): Promise<ForgeCmsRuntime<ServerEnv>> {
+let serverPromise: Promise<Server> | undefined;
+
+/** Built on the first request (not at module load) and shared afterwards. */
+export async function getServerRuntime(): Promise<ForgeCmsRuntime<ServerEnv>> {
+  return (await getServer()).runtime;
+}
+
+/** The login/signup limiter; its counters live in the runtime's own database. */
+export async function getAuthThrottle(): Promise<DatabaseAuthThrottle> {
+  return (await getServer()).authThrottle;
+}
+
+function getServer(): Promise<Server> {
+  serverPromise ??= buildServer();
+  return serverPromise;
+}
+
+async function buildServer(): Promise<Server> {
   const env: ServerEnv = {};
   const secret = process.env['AUTH_SECRET'];
   if (secret !== undefined) env.AUTH_SECRET = secret;
@@ -155,7 +170,10 @@ async function buildRuntime(): Promise<ForgeCmsRuntime<ServerEnv>> {
 
   runtime.init();
   await runtime.syncSchema();
-  return runtime;
+
+  const authThrottle = new DatabaseAuthThrottle({ database });
+  await authThrottle.syncSchema();
+  return { runtime, authThrottle };
 }
 ```
 
@@ -193,14 +211,17 @@ export const sessionCookie = { secure: process.env['NODE_ENV'] === 'production' 
 <!-- snippet: docs/examples/analog-quickstart/src/server/routes/api/auth/login.post.ts -->
 
 ```ts
-import { defineEventHandler } from 'h3';
+import { defineEventHandler, getRequestIP } from 'h3';
 import { handleLogin } from '@forge-cms/runtime';
 import { apiContext, sessionCookie } from '../../../context';
-import { getServerRuntime } from '../../../runtime';
+import { getAuthThrottle, getServerRuntime } from '../../../runtime';
 
 export default defineEventHandler(async (event) => {
   const runtime = await getServerRuntime();
-  return handleLogin(apiContext(event), { runtime, cookie: sessionCookie });
+  // The socket address. Behind a reverse proxy you trust, use getRequestIP(event, { xForwardedFor: true }).
+  const client = getRequestIP(event) ?? 'unknown';
+  const throttle = (await getAuthThrottle()).forClient(client);
+  return handleLogin(apiContext(event), { runtime, cookie: sessionCookie, throttle });
 });
 ```
 

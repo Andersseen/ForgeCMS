@@ -231,8 +231,41 @@ identifier bucket more generous than the client one, and key signup on the clien
 email every time). Forge passes `request`, so the client key is your choice: a platform header, a proxy
 header you trust, a tenant.
 
-_Cloudflare Workers_ — [Rate Limiting bindings](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/),
-one per limit (`period` is 10 or 60 seconds):
+Forge ships two tested implementations of the hook (since 1.1, spec 106). Both use the keys above:
+login per client **and** per account, signup per client. Defaults are unchanged: a handler without
+`throttle` throttles nothing.
+
+_Portable — `DatabaseAuthThrottle`._ Counters live in the database the runtime already uses (libSQL on
+Node, D1 on Cloudflare, including Pages, which has no Rate Limiting binding). They survive restarts and are
+shared by every instance on that database. Each increment is a compare-and-set, so concurrent attempts
+never exceed a budget. Keys are stored only as SHA-256 digests (no email, no address). Defaults per 60 s:
+10 logins per client, 30 per account, 10 signups per client.
+
+```ts
+import { DatabaseAuthThrottle } from '@forge-cms/runtime';
+
+const authThrottle = new DatabaseAuthThrottle({ database }); // the runtime's own adapter
+await authThrottle.syncSchema(); // once at startup: creates `_forge_auth_throttle`
+
+// Node (h3): the socket address. Behind a reverse proxy you trust: getRequestIP(event, { xForwardedFor: true }).
+const throttle = authThrottle.forClient(getRequestIP(event) ?? 'unknown');
+return handleLogin(context, { runtime, throttle });
+
+// Cloudflare: the platform header is trustworthy, so key from the request itself.
+const cfThrottle = new DatabaseAuthThrottle({
+  database,
+  clientKey: (request) => request.headers.get('cf-connecting-ip') ?? 'unknown'
+});
+return handleLogin(context, { runtime, throttle: cfThrottle.throttle });
+```
+
+Run `await authThrottle.prune()` on a schedule (a cron trigger, a timer) to delete expired windows. Budgets
+are configurable (`limits: { loginClient, loginAccount, signupClient }`, each `{ limit, windowSeconds }`). Each
+checked attempt costs one read and one write per key.
+
+_Cloudflare-native — `rateLimitBindingAuthThrottle`._ Workers
+[Rate Limiting bindings](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/), one per
+budget (`period` is 10 or 60 seconds):
 
 ```jsonc
 // wrangler.jsonc
@@ -243,44 +276,25 @@ one per limit (`period` is 10 or 60 seconds):
 ```
 
 ```ts
-function cloudflareAuthThrottle(env: Env): AuthAttemptThrottle {
-  return async ({ action, identifier, request }) => {
-    const client = request.headers.get('cf-connecting-ip') ?? 'unknown';
-    const checks = [env.AUTH_CLIENT_LIMITER.limit({ key: `${action}:client:${client}` })];
-    if (action === 'login') {
-      checks.push(env.AUTH_ACCOUNT_LIMITER.limit({ key: `login:account:${identifier}` }));
-    }
-    const results = await Promise.all(checks);
-    return results.every((r) => r.success)
-      ? { allowed: true }
-      : { allowed: false, retryAfterSeconds: 60 };
-  };
-}
+import { rateLimitBindingAuthThrottle } from '@forge-cms/runtime';
 
-return handleLogin(context, { runtime, throttle: cloudflareAuthThrottle(env) });
+const throttle = rateLimitBindingAuthThrottle({
+  client: env.AUTH_CLIENT_LIMITER,
+  account: env.AUTH_ACCOUNT_LIMITER,
+  clientKey: (request) => request.headers.get('cf-connecting-ip') ?? 'unknown'
+});
+return handleLogin(context, { runtime, throttle });
 ```
 
-Cloudflare documents these counters as local to each location and eventually consistent — a brake, not
-an exact count — and warns that IP addresses can be shared by many users; a per-client limit that is
-too tight throttles a whole office. Pages Functions do not list this binding; a Pages project can put a
-[WAF rate limiting rule](https://developers.cloudflare.com/waf/rate-limiting-rules/) on
-`/api/auth/login` and `/api/auth/signup` at the edge (per IP on the Free and Pro plans), or route auth
-through a Worker that has the binding.
+Cloudflare documents these counters as local to each location and eventually consistent: a brake, not
+an exact count. It also warns that IP addresses can be shared by many users, so a per-client limit that is
+too tight throttles a whole office. Pages Functions do not list this binding. Use `DatabaseAuthThrottle`
+on D1 there, or a [WAF rate limiting rule](https://developers.cloudflare.com/waf/rate-limiting-rules/) on
+`/api/auth/login` and `/api/auth/signup`.
 
-_Portable hosts_ — a reverse proxy or ingress limit (nginx `limit_req`, a load balancer rule) in front of
-the auth routes, framework middleware, or an external limiter service behind the same hook:
-
-```ts
-const throttle: AuthAttemptThrottle = async ({ action, identifier, request }) => {
-  const client = clientKeyFrom(request); // e.g. the address your trusted proxy forwards
-  const keys = [`${action}:client:${client}`];
-  if (action === 'login') keys.push(`login:account:${identifier}`);
-  const result = await limiterService.consumeAll(keys); // Redis, Upstash, your API…
-  return result.ok ? { allowed: true } : { allowed: false, retryAfterSeconds: result.retryAfter };
-};
-```
-
-Do not rely on an in-process counter in production: it is per instance and forgets on restart.
+_Anything else_ — a reverse proxy or ingress limit (nginx `limit_req`), or an external limiter service
+behind the same hook. Do not rely on an in-process counter in production: it is per instance and
+forgets on restart.
 
 **Failure statuses** (every body is the `{ "error": { "code", "message" } }` envelope):
 

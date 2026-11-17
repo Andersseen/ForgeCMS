@@ -1,5 +1,9 @@
 # STATE — Current implementation status
 
+> **Last updated: 2026-11-17 (spec 106 — certified auth throttles; 1.1.0 single PR #127).** `@forge-cms/runtime` exports `DatabaseAuthThrottle` (portable, counters in `_forge_auth_throttle` of the app's own database, CAS increments, SHA-256 keys, `prune()`, `forClient()`) and `rateLimitBindingAuthThrottle` (Cloudflare Rate Limiting bindings). Tested on InMemory, libSQL and workerd + local D1 (budget N admits exactly N of M concurrent attempts; 429 before any PBKDF2). Wired: the Analog quickstart (`forClient(getRequestIP(event))`, consumer-verified), the demo on its D1 profile only (local/e2e unthrottled), browser-auth docs. Defaults unchanged. **Next:** spec 107 (session revocation).
+
+> _Previous update:_
+
 > **Last updated: 2026-11-17 (spec 105 — password work factor + rehash-on-login; 1.1.0 ships as ONE PR, #127, one commit per spec, one minor changeset; #128 folded in).** `@forge-cms/auth`: `passwordHashing: { iterations }` (default 100 000 unchanged; 100 000–10 000 000) and `PASSWORD_HASHING_PRESETS` (`workers` 100 000, `node` 600 000). Versioned hashes `$pbkdf2-sha256$i=…`; the default still writes the 1.0 format (rollback-safe); older hashes upgrade on the next successful login through a compare-and-set on the old hash (no session revoked; a failed write never fails the login). Measured (`pnpm bench:password-hash`, Apple M4): 100 000 ≈ 5.7 ms on local workerd / 7.5 ms Node; 600 000 ≈ 35 / 45 ms — only the default can fit Workers Free (10 ms). Rehash proven on InMemory, libSQL and workerd + local D1. Node quickstart uses the `node` preset. **Unverified:** production Workers' PBKDF2 iteration ceiling (local workerd accepts 600 000; docs say confirm on staging). **Next:** spec 106 (throttling).
 
 > _Previous update:_

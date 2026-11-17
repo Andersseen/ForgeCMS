@@ -154,19 +154,19 @@ password change invalidates every earlier session (`_sessionVersion`). The users
 
 **Important options and defaults.**
 
-| Option                                                          | Default                               | Meaning                                                                                  |
-| --------------------------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `ForgeCmsConfig`: `collections`, `globals?`, `adapters`, `env?` | —                                     | `adapters` = `{ database, auth, storage }`                                               |
-| Local API `overrideAccess`                                      | `true`                                | Trusted server code. Pass `false` and a `user` to enforce access                         |
-| HTTP handlers                                                   | access always enforced                | A caller can never set `overrideAccess`                                                  |
-| list `limit`                                                    | `50` (max `500`)                      | Also `page`, `sort`, `where`, `depth` (only `0` or `1`), `locale`                        |
-| handler options                                                 | —                                     | `allowedRoles`, `requireAuth`, `upload.maxFileSize`, `upload.mimeTypes` (no default cap) |
-| `handleFile` `cacheControl`                                     | `public, max-age=60`                  | Anonymous hits only; authenticated hits are always `private, no-store`                   |
-| auth handlers `cookie.secure`                                   | `true`                                | `false` only for local `http://` development                                             |
-| auth handlers `maxBodyBytes`                                    | `DEFAULT_AUTH_MAX_BODY_BYTES` = 8 KiB | Integer 1–1 MiB (`413 PAYLOAD_TOO_LARGE` when exceeded)                                  |
-| auth handlers `throttle`                                        | none                                  | Your attempt limiter (`AuthAttemptThrottle`); `429 RATE_LIMITED`                         |
-| signup `enabled`                                                | required (`false` = `404`)            | Public signup is opt-in                                                                  |
-| `reconcileStorage` `uploadGraceMs` / `limit`                    | 1 hour / 100                          | Safe to run repeatedly and concurrently                                                  |
+| Option                                                          | Default                               | Meaning                                                                                                                       |
+| --------------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `ForgeCmsConfig`: `collections`, `globals?`, `adapters`, `env?` | —                                     | `adapters` = `{ database, auth, storage }`                                                                                    |
+| Local API `overrideAccess`                                      | `true`                                | Trusted server code. Pass `false` and a `user` to enforce access                                                              |
+| HTTP handlers                                                   | access always enforced                | A caller can never set `overrideAccess`                                                                                       |
+| list `limit`                                                    | `50` (max `500`)                      | Also `page`, `sort`, `where`, `depth` (only `0` or `1`), `locale`                                                             |
+| handler options                                                 | —                                     | `allowedRoles`, `requireAuth`, `upload.maxFileSize`, `upload.mimeTypes` (no default cap)                                      |
+| `handleFile` `cacheControl`                                     | `public, max-age=60`                  | Anonymous hits only; authenticated hits are always `private, no-store`                                                        |
+| auth handlers `cookie.secure`                                   | `true`                                | `false` only for local `http://` development                                                                                  |
+| auth handlers `maxBodyBytes`                                    | `DEFAULT_AUTH_MAX_BODY_BYTES` = 8 KiB | Integer 1–1 MiB (`413 PAYLOAD_TOO_LARGE` when exceeded)                                                                       |
+| auth handlers `throttle`                                        | none                                  | Your attempt limiter (`AuthAttemptThrottle`); `429 RATE_LIMITED`. 1.1: `DatabaseAuthThrottle`, `rateLimitBindingAuthThrottle` |
+| signup `enabled`                                                | required (`false` = `404`)            | Public signup is opt-in                                                                                                       |
+| `reconcileStorage` `uploadGraceMs` / `limit`                    | 1 hour / 100                          | Safe to run repeatedly and concurrently                                                                                       |
 
 **Errors.** `ForgeError` subclasses carry `status` and `code`: `NOT_FOUND` 404, `INVALID_INPUT` 400, `INVALID_QUERY` 400, `UNKNOWN_FIELD` 400, `VALIDATION_ERROR` 400 (with `details`),
 `UNAUTHORIZED` 401, `FORBIDDEN` 403 (`AccessDeniedError`, `CsrfError`), `UNIQUE_CONSTRAINT` 409, `CONCURRENT_MODIFICATION` 409, `AUTH_MANAGED_COLLECTION` 403, `PAYLOAD_TOO_LARGE` 413,
