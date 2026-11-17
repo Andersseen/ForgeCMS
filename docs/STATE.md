@@ -1,5 +1,47 @@
 # STATE — Current implementation status
 
+> **Last updated: 2026-11-17 (spec 108 settings applied + lumen-icons 0.3.1; 1.1.0 single PR #127).** After maintainer confirmation:
+>
+> - The `Protect main` ruleset is **active**: PR-only, the 8 CI checks required (strict), no deletion or force-push, admin bypass only through a PR for the Version Packages PR.
+> - The `npm-release` environment requires the maintainer's approval and allows `main` only. `release`, `publish-rc` and `finalize-rc` run in it.
+> - `production` and `production-demo` are `main` only.
+> - Evidence: spec 108 § Applied, and the dossier.
+> - lumen-icons 0.3.1 (Angular ^21 || ^22) is published. The temporary peer exception is removed; compat 7/7 and the admin journeys pass on 21 and 22 with it.
+>
+> V2-01 work is complete in #127 (MILESTONES.md links the evidence). Its canonical status stays "Next" until 1.1.0 is published and a `status.Shipped` label exists in the Glossa catalogs.
+>
+> **Pending (maintainer):**
+>
+> - Move `NPM_TOKEN` into `npm-release`, or use npm trusted publishing.
+> - Add the Glossa `roadmap.status.Shipped` key (en/es/uk), then flip V2-01 to Shipped and V2-02 to Next. `verify-v2-roadmap.mjs` must allow Shipped before Next.
+> - Merge #127, then approve the Version Packages run that publishes 1.1.0.
+
+> _Previous update:_
+
+> **Last updated: 2026-11-17 (spec 108 — release governance; 1.1.0 single PR #127).** **1.0 closeout verified:** a clean build of `82e4cdb` packs 12/12 content-identical to npm `@forge-cms/*@1.0.0`; SLSA provenance names `82e4cdb` / `main` / `ci.yml` for all twelve; `npm audit signatures` 148/148; dist-tags correct; `registry:consumers --version 1.0.0` (server, angular, ssr, agent) passed. `ssr-journey` was not run locally (no Docker). L03 is now RELEASED and verified (dossier). **1.1 security review:** no critical/high/medium finding (dossier). **GitHub settings NOT applied:** the exact ruleset (`Protect main` active, 8 required checks, PR-only admin bypass for the Version Packages PR), protected `npm-release` environment (maintainer reviewer, `main` only, `NPM_TOKEN` scoped to it, or npm trusted publishing) and `production*` branch policies are written in spec 108 and await maintainer confirmation. **Next:** confirm and apply spec 108's settings; V2-01 is then complete (mark it done in the roadmap).
+
+> _Previous update:_
+
+> **Last updated: 2026-11-17 (spec 107 — session revocation policy; 1.1.0 single PR #127).** Optional `AuthAdapter.revokeSessions(userId)`, implemented by `UsersCollectionAuthAdapter` (bumps `_sessionVersion`), and `handleLogoutEverywhere` in `@forge-cms/runtime` (CSRF → 404 if the adapter cannot revoke → 401 → revoke → 204 + cleared cookie). The 1.x policy table (plain logout / everywhere / password change / deletion / role change / rehash / secret rotation) is in browser-auth and pinned by `session-revocation.test.ts` on InMemory + libSQL. Single-session revocation, session lists and a shorter lifetime are in `docs/roadmap/v2/2.0-NOTES.md`. **Next:** spec 108 (release governance).
+
+> _Previous update:_
+
+> **Last updated: 2026-11-17 (spec 106 — certified auth throttles; 1.1.0 single PR #127).** `@forge-cms/runtime` exports `DatabaseAuthThrottle` (portable, counters in `_forge_auth_throttle` of the app's own database, CAS increments, SHA-256 keys, `prune()`, `forClient()`) and `rateLimitBindingAuthThrottle` (Cloudflare Rate Limiting bindings). Tested on InMemory, libSQL and workerd + local D1 (budget N admits exactly N of M concurrent attempts; 429 before any PBKDF2). Wired: the Analog quickstart (`forClient(getRequestIP(event))`, consumer-verified), the demo on its D1 profile only (local/e2e unthrottled), browser-auth docs. Defaults unchanged. **Next:** spec 107 (session revocation).
+
+> _Previous update:_
+
+> **Last updated: 2026-11-17 (spec 105 — password work factor + rehash-on-login; 1.1.0 ships as ONE PR, #127, one commit per spec, one minor changeset; #128 folded in).** `@forge-cms/auth`: `passwordHashing: { iterations }` (default 100 000 unchanged; 100 000–10 000 000) and `PASSWORD_HASHING_PRESETS` (`workers` 100 000, `node` 600 000). Versioned hashes `$pbkdf2-sha256$i=…`; the default still writes the 1.0 format (rollback-safe); older hashes upgrade on the next successful login through a compare-and-set on the old hash (no session revoked; a failed write never fails the login). Measured (`pnpm bench:password-hash`, Apple M4): 100 000 ≈ 5.7 ms on local workerd / 7.5 ms Node; 600 000 ≈ 35 / 45 ms — only the default can fit Workers Free (10 ms). Rehash proven on InMemory, libSQL and workerd + local D1. Node quickstart uses the `node` preset. **Unverified:** production Workers' PBKDF2 iteration ceiling (local workerd accepts 600 000; docs say confirm on staging). **Next:** spec 106 (throttling).
+
+> _Previous update:_
+
+> **Last updated: 2026-11-17 (spec 104 — admin landmarks + keyboard journey, branch `feat/admin-a11y-landmarks`, stacked on #127, PR pending).** `@forge-cms/admin` shell: skip link (first Tab stop, focuses the main region without leaving the admin), `<nav aria-label="Admin">` around the sidebar, breadcrumb `<nav><ol>` with `aria-current="page"`, `role="main"` on the page region and on sign-in/sign-up through an internal `ForgeMainLandmarkDirective` that drops the role inside a host `main` (no nested-`main` regression for 1.0 hosts), focus moved to the main region when navigation strands it, single-element "Log in"/"Exit", and `tabindex="-1"` on sidebar item hosts (`[routerLink]` also matched Angular's RouterLink: a second empty Tab stop per entry, found by the new gate). Patch changeset; no API change. The packed SSR journey gains a keyboard-only step (sign in → skip link → list → edit → save → dialog trap/Escape/restore → log out) and axe scans of the editor and an open dialog; passes on Angular 22.2.6 and 21.2.10. LIMITATIONS "Admin accessibility" row removed. Upstream (Volt): `volt-sidebar-item` lacks `ariaCurrentWhenActive`. **Next:** spec 105 (password hashing + rehash).
+
+> _Previous update:_
+
+> **Last updated: 2026-11-17 (spec 103 — admin on Angular 22, branch `feat/admin-angular-22`, PR pending). First work item of 1.1.0 (V2-01 + Angular 22).** `@forge-cms/admin` peers widen to `@angular/{cdk,common,compiler-cli,core,forms,platform-browser,router}` `^21.2.0 || ^22.0.0`, `@babel/core` `^7.28.0 || ^8.0.0`, `lumen-icons` `^0.2.0 || ^0.3.0`; `@voltui/components` stays `^1.0.1` (1.3.2 is the first Volt release that peers 22; documented, floor not raised). Minor changeset. `release:compat` gains `admin-22-min` (22.0.0, **Babel 7.29**: Angular 22.0.x's linker is still Babel 7) and `admin-22` (22.2.6, Babel 8.1.2); all seven tuples pass (2026-11-17). The packed SSR journey is tuple-parametric (`FORGE_SSR_TUPLE`, `FORGE_SSR_PROFILES`) and now runs WCAG 2.2 A/AA axe scans on the mounted admin; `pnpm release:ssr:admin-22` (Angular 22.2.6 + Analog 2.9.7 + Vite 8 + TS 6.0, workerd + D1 + R2) and the Angular 21 journey both pass locally; new `release:certify` stage `admin-22`. **Known issue:** `lumen-icons` 0.3 is not published; 0.2 declares an Angular 21 peer, so Angular 22 strict-peer installs need one documented `peerDependencyRules` entry (report upstream). The Node half of the journey was not run locally (no Docker). **Next:** specs 104–108 (admin a11y, password rehash, throttling, revocation, release governance).
+
+> _Previous update:_
+
 > **Last updated: 2026-11-07 (www i18n sync — branch `fix/www-i18n-sync-glossa-language-keys`, PR #126 pending).** `apps/www` only (no `packages/*`, no changeset). After #125 merged, the `main` www deploy (run 42377317168) failed at `i18n:pull` as designed: the Glossa `forge-cms` source catalog gained `language.loading` and `language.failed` (`{$language}` variable; en/es/uk, nothing removed or changed), which no longer matched `contract.generated.ts`. The three catalogs are re-pulled and the contract regenerated; the keys are not rendered yet. `i18n:check`, `i18n:verify-remote`, www lint/typecheck/test/build pass locally. PR #125 also pinned CI to `ubuntu-24.04` (Playwright 1.60 cannot install Chromium on Ubuntu 26.04) and allowed `@emnapi` 2.0.0-alpha.3 under `@napi-rs/wasm-runtime` in the `angular-22` compat profile. **Known issues:** the runner pin is debt until Playwright is upgraded in www/tiny-project/demo-aesthetics; spec 102's follow-ups (Strata RC0 unpublished, staging and the observation period not run) are in `consumers/strata-editorial/ADOPTION-REPORT.md`. **Next:** merge #126 → confirm the `main` deploy is green; mark spec 102 done; upgrade Playwright and drop the pin.
 
 > _Previous update:_

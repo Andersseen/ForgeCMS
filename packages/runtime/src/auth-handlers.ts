@@ -265,6 +265,51 @@ export async function handleLogout<TEnv = unknown>(
   return response;
 }
 
+/**
+ * `POST` → `204` + a cleared cookie, after ending **every** session of the signed-in user (spec 107,
+ * "sign out everywhere"): each token issued to them before this call — on any device, cookie or Bearer —
+ * is refused on its next use. `401` without a valid session, `404` when the configured auth adapter
+ * cannot revoke (`AuthAdapter.revokeSessions` is optional). Same CSRF rule as {@link handleLogout}.
+ */
+export async function handleLogoutEverywhere<TEnv = unknown>(
+  context: ApiContext<TEnv>,
+  options: AuthHandlerOptions<TEnv>
+): Promise<Response> {
+  try {
+    assertCsrfSafe(context.request);
+  } catch (err) {
+    return toErrorResponse(err, 'logout');
+  }
+  const auth = options.runtime.adapters.auth;
+  if (typeof auth.revokeSessions !== 'function') {
+    return errorResponse(
+      'NOT_FOUND',
+      'Session revocation is not supported by the configured auth adapter',
+      404
+    );
+  }
+  let userId: string;
+  try {
+    userId = (await auth.requireAuth(context.request)).id;
+  } catch (err) {
+    if (err instanceof ForgeAuthError) {
+      return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
+    }
+    return toErrorResponse(err, 'logout');
+  }
+  try {
+    await auth.revokeSessions(userId);
+  } catch (err) {
+    return toErrorResponse(err, 'logout');
+  }
+  const response = new Response(null, { status: 204 });
+  response.headers.append(
+    'set-cookie',
+    buildLogoutCookie({ secure: options.cookie?.secure ?? true })
+  );
+  return response;
+}
+
 /** `GET` → `{ data: user }` from the session (cookie or Bearer), or `401`. */
 export async function handleMe<TEnv = unknown>(
   context: ApiContext<TEnv>,

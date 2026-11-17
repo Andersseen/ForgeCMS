@@ -35,6 +35,32 @@ describe.each(adapters)('UsersCollectionAuthAdapter on %s (adapter parity)', (_n
     expect(second.user.role).toBe('viewer');
   });
 
+  it('spec 105: a raised work factor upgrades a 1.0-format hash on login (compare-and-set), sessions kept', async () => {
+    const db = createDb();
+    await db.syncSchema([defineUsersCollection()]);
+    const before = new UsersCollectionAuthAdapter({ devMode: true }).init({ userDatabase: db });
+    const created = await before.createUser({
+      email: 'rehash@example.com',
+      password: 'password123'
+    });
+    if (!created.ok) throw new Error('expected success');
+    const legacy = String((await db.findById('users', created.user.id))?.passwordHash);
+    expect(legacy).not.toContain('$'); // the default still writes the 1.0 format
+
+    const after = new UsersCollectionAuthAdapter({
+      devMode: true,
+      passwordHashing: { iterations: 200_000 }
+    }).init({ userDatabase: db });
+    const login = await after.login('rehash@example.com', 'password123');
+    expect(login.ok).toBe(true);
+    const row = await db.findById('users', created.user.id);
+    expect(String(row?.passwordHash)).toMatch(/^\$pbkdf2-sha256\$i=200000\$/);
+    expect(row?._sessionVersion ?? 0).toBe(0);
+    expect((await after.login('rehash@example.com', 'password123')).ok).toBe(true);
+    // The upgraded row still verifies under the old (default) configuration: no lock-out on rollback to 1.1.
+    expect((await before.login('rehash@example.com', 'password123')).ok).toBe(true);
+  });
+
   it('stores the normalized (lowercased) email and round-trips login', async () => {
     const db = createDb();
     await db.syncSchema([defineUsersCollection()]);

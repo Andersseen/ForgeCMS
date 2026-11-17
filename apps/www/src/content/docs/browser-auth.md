@@ -231,8 +231,41 @@ identifier bucket more generous than the client one, and key signup on the clien
 email every time). Forge passes `request`, so the client key is your choice: a platform header, a proxy
 header you trust, a tenant.
 
-_Cloudflare Workers_ — [Rate Limiting bindings](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/),
-one per limit (`period` is 10 or 60 seconds):
+Forge ships two tested implementations of the hook (since 1.1, spec 106). Both use the keys above:
+login per client **and** per account, signup per client. Defaults are unchanged: a handler without
+`throttle` throttles nothing.
+
+_Portable — `DatabaseAuthThrottle`._ Counters live in the database the runtime already uses (libSQL on
+Node, D1 on Cloudflare, including Pages, which has no Rate Limiting binding). They survive restarts and are
+shared by every instance on that database. Each increment is a compare-and-set, so concurrent attempts
+never exceed a budget. Keys are stored only as SHA-256 digests (no email, no address). Defaults per 60 s:
+10 logins per client, 30 per account, 10 signups per client.
+
+```ts
+import { DatabaseAuthThrottle } from '@forge-cms/runtime';
+
+const authThrottle = new DatabaseAuthThrottle({ database }); // the runtime's own adapter
+await authThrottle.syncSchema(); // once at startup: creates `_forge_auth_throttle`
+
+// Node (h3): the socket address. Behind a reverse proxy you trust: getRequestIP(event, { xForwardedFor: true }).
+const throttle = authThrottle.forClient(getRequestIP(event) ?? 'unknown');
+return handleLogin(context, { runtime, throttle });
+
+// Cloudflare: the platform header is trustworthy, so key from the request itself.
+const cfThrottle = new DatabaseAuthThrottle({
+  database,
+  clientKey: (request) => request.headers.get('cf-connecting-ip') ?? 'unknown'
+});
+return handleLogin(context, { runtime, throttle: cfThrottle.throttle });
+```
+
+Run `await authThrottle.prune()` on a schedule (a cron trigger, a timer) to delete expired windows. Budgets
+are configurable (`limits: { loginClient, loginAccount, signupClient }`, each `{ limit, windowSeconds }`). Each
+checked attempt costs one read and one write per key.
+
+_Cloudflare-native — `rateLimitBindingAuthThrottle`._ Workers
+[Rate Limiting bindings](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/), one per
+budget (`period` is 10 or 60 seconds):
 
 ```jsonc
 // wrangler.jsonc
@@ -243,44 +276,25 @@ one per limit (`period` is 10 or 60 seconds):
 ```
 
 ```ts
-function cloudflareAuthThrottle(env: Env): AuthAttemptThrottle {
-  return async ({ action, identifier, request }) => {
-    const client = request.headers.get('cf-connecting-ip') ?? 'unknown';
-    const checks = [env.AUTH_CLIENT_LIMITER.limit({ key: `${action}:client:${client}` })];
-    if (action === 'login') {
-      checks.push(env.AUTH_ACCOUNT_LIMITER.limit({ key: `login:account:${identifier}` }));
-    }
-    const results = await Promise.all(checks);
-    return results.every((r) => r.success)
-      ? { allowed: true }
-      : { allowed: false, retryAfterSeconds: 60 };
-  };
-}
+import { rateLimitBindingAuthThrottle } from '@forge-cms/runtime';
 
-return handleLogin(context, { runtime, throttle: cloudflareAuthThrottle(env) });
+const throttle = rateLimitBindingAuthThrottle({
+  client: env.AUTH_CLIENT_LIMITER,
+  account: env.AUTH_ACCOUNT_LIMITER,
+  clientKey: (request) => request.headers.get('cf-connecting-ip') ?? 'unknown'
+});
+return handleLogin(context, { runtime, throttle });
 ```
 
-Cloudflare documents these counters as local to each location and eventually consistent — a brake, not
-an exact count — and warns that IP addresses can be shared by many users; a per-client limit that is
-too tight throttles a whole office. Pages Functions do not list this binding; a Pages project can put a
-[WAF rate limiting rule](https://developers.cloudflare.com/waf/rate-limiting-rules/) on
-`/api/auth/login` and `/api/auth/signup` at the edge (per IP on the Free and Pro plans), or route auth
-through a Worker that has the binding.
+Cloudflare documents these counters as local to each location and eventually consistent: a brake, not
+an exact count. It also warns that IP addresses can be shared by many users, so a per-client limit that is
+too tight throttles a whole office. Pages Functions do not list this binding. Use `DatabaseAuthThrottle`
+on D1 there, or a [WAF rate limiting rule](https://developers.cloudflare.com/waf/rate-limiting-rules/) on
+`/api/auth/login` and `/api/auth/signup`.
 
-_Portable hosts_ — a reverse proxy or ingress limit (nginx `limit_req`, a load balancer rule) in front of
-the auth routes, framework middleware, or an external limiter service behind the same hook:
-
-```ts
-const throttle: AuthAttemptThrottle = async ({ action, identifier, request }) => {
-  const client = clientKeyFrom(request); // e.g. the address your trusted proxy forwards
-  const keys = [`${action}:client:${client}`];
-  if (action === 'login') keys.push(`login:account:${identifier}`);
-  const result = await limiterService.consumeAll(keys); // Redis, Upstash, your API…
-  return result.ok ? { allowed: true } : { allowed: false, retryAfterSeconds: result.retryAfter };
-};
-```
-
-Do not rely on an in-process counter in production: it is per instance and forgets on restart.
+_Anything else_ — a reverse proxy or ingress limit (nginx `limit_req`), or an external limiter service
+behind the same hook. Do not rely on an in-process counter in production: it is per instance and
+forgets on restart.
 
 **Failure statuses** (every body is the `{ "error": { "code", "message" } }` envelope):
 
@@ -320,11 +334,39 @@ return handleLogout(context, { runtime, cookie: { secure: true } });
 ```
 
 Clears the cookie and returns `204` — idempotent, and CSRF-checked like any other mutation. Tokens are
-stateless (signed, not stored), so this is client-state-only: it cannot revoke a Bearer token a
-programmatic client still holds. What does end earlier sessions is a **password change** (every session issued
-before it fails validation), a **deleted** user, and a **role change** (the current user row is re-read on every
-request, so a demotion applies immediately); otherwise a token lives for its 24 hours. Per-session revocation is not
-part of 1.0.
+stateless (signed, not stored), so a plain logout is client-state-only: it cannot revoke a Bearer token a
+programmatic client still holds, or a copied cookie.
+
+### Session revocation (1.x policy, spec 107)
+
+Every session token carries the user row's `_sessionVersion`, and every request re-reads that row. So with
+`UsersCollectionAuthAdapter` the following end sessions **on the next request**, not after 24 hours:
+
+| Event                                                    | Effect on existing sessions                                     |
+| -------------------------------------------------------- | --------------------------------------------------------------- |
+| `handleLogout`                                           | This browser's cookie is cleared; other copies stay valid       |
+| `handleLogoutEverywhere` / `auth.revokeSessions(userId)` | Every session of that user ends (all devices, cookie or Bearer) |
+| Password change (`updateUser(id, { password })`)         | Every session of that user ends                                 |
+| User deleted                                             | Every session of that user ends                                 |
+| Role change                                              | Sessions continue with the new role                             |
+| A password rehash on login (spec 105)                    | None                                                            |
+| `AUTH_SECRET` rotated                                    | Every session of every user ends                                |
+
+"Sign out everywhere" (since 1.1) is one more route:
+
+```ts
+// POST /api/auth/logout-everywhere — signed in (cookie or Bearer), CSRF-checked like logout
+return handleLogoutEverywhere(context, { runtime, cookie: { secure: true } });
+```
+
+It answers `204` and clears the cookie, `401` without a valid session, and `404` when the auth adapter
+cannot revoke. `SignedTokenAuthAdapter` and `ExternalAuthAdapter` verify tokens without a lookup, so their
+tokens live until they expire. An admin can end another user's sessions with `auth.revokeSessions(id)`
+(Local API or your own admin route).
+
+What 1.x does **not** have: revoking a single session (one device) while keeping the others, a list of
+active sessions, and a lifetime shorter than 24 hours. Each needs a stored per-session record or a changed
+documented default. They are recorded for 2.0 in [the 2.0 notes](https://github.com/Andersseen/ForgeCMS/blob/main/docs/roadmap/v2/2.0-NOTES.md).
 
 ## Angular / admin auth experience
 

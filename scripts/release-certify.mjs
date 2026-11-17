@@ -13,6 +13,8 @@
 //                release    packed manifests + runtime/S3/Cloudflare/upgrade/Angular consumers (verify-release.mjs)
 //                compat     strict Angular/admin peer matrix incl. the /studio mount (verify-angular-compat.mjs)
 //                ssr        technical SSR/hydration consumer (verify-ssr-consumer.mjs technical)
+//                admin-22   the packed admin journey (SSR, /studio mount, WCAG 2.2 A/AA) on Angular 22 + Analog 2.9 under
+//                           local workerd + D1 + R2 (spec 103; the Angular 21 journey runs in s3)
 //                s3         ONE Garage: adapter · lifecycle · packed consumer · S3 recovery · both durable
 //                           production profiles (Node+libSQL+S3, workerd+D1+R2) (test-s3.mjs)
 //                upgrade    historical upgrade + backup/restore rehearsal (forced, never a Turbo cache hit)
@@ -49,6 +51,11 @@ const STAGES = [
   { name: 'release', command: ['node', 'scripts/verify-release.mjs'] },
   { name: 'compat', command: ['node', 'scripts/verify-angular-compat.mjs'] },
   { name: 'ssr', command: ['node', 'scripts/verify-ssr-consumer.mjs', 'technical'] },
+  {
+    name: 'admin-22',
+    command: ['node', 'scripts/verify-ssr-consumer.mjs', 'journey'],
+    env: { FORGE_SSR_TUPLE: 'angular-22', FORGE_SSR_PROFILES: 'cloudflare' }
+  },
   { name: 's3', command: ['node', 'scripts/test-s3.mjs'], needsDocker: true },
   {
     name: 'upgrade',
@@ -164,7 +171,7 @@ for (const stage of selected) {
   console.log(`\n▶ release:certify stage '${stage.name}'`);
   const stageStarted = Date.now();
   const [command, ...argv] = stage.command;
-  code = await exec(command, argv, { [ARTIFACTS_ENV]: packDir });
+  code = await exec(command, argv, { ...stage.env, [ARTIFACTS_ENV]: packDir });
   const seconds = Math.round((Date.now() - stageStarted) / 1000);
   results.push({ stage: stage.name, status: code === 0 ? 'passed' : 'failed', seconds });
   console.log(`◀ stage '${stage.name}' ${code === 0 ? 'passed' : 'FAILED'} in ${seconds}s`);

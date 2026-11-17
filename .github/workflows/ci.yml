@@ -9,8 +9,8 @@ name: CI
 # `release` (push to main only) opens/updates a "Version Packages" PR when changesets are pending,
 # and publishes to npm once that PR is merged (i.e. only when packages/* actually changed — a
 # push to main with no pending changesets and no version bump is a no-op for this job). Needs the
-# `NPM_TOKEN` repo secret (an npm Automation or Granular Access Token scoped to the `forge-cms` org
-# with publish rights).
+# `NPM_TOKEN` secret of the protected `npm-release` environment (spec 108: maintainer approval, `main` only;
+# an npm Granular Access Token scoped to the `forge-cms` org with publish rights).
 
 on:
   push:
@@ -390,6 +390,9 @@ jobs:
     needs: [checks, e2e, certify, reliability, stability]
     # Same guard as deploy/deploy-demo: real pushes to main only, never PRs or forks.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Spec 108: publication authorization. `npm-release` requires the maintainer's approval and allows `main`
+    # only, and holds `NPM_TOKEN`; merging a PR alone can no longer publish (the #115 incident).
+    environment: npm-release
     permissions:
       contents: write
       pull-requests: write

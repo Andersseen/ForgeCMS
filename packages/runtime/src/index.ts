@@ -33,6 +33,7 @@ export {
   handleLogin,
   handleSignup,
   handleLogout,
+  handleLogoutEverywhere,
   handleMe,
   authFailureResponse,
   type AuthHandlerOptions,
@@ -41,6 +42,16 @@ export {
   type AuthAttemptDecision,
   type AuthAttemptThrottle
 } from './auth-handlers.js';
+// Certified login/signup throttles: portable (database) and Cloudflare Rate Limiting bindings (spec 106)
+export {
+  DatabaseAuthThrottle,
+  rateLimitBindingAuthThrottle,
+  type AuthThrottleLimit,
+  type AuthThrottleLimits,
+  type DatabaseAuthThrottleOptions,
+  type RateLimitBinding,
+  type RateLimitBindingAuthThrottleOptions
+} from './auth-throttle.js';
 export { assertCsrfSafe } from './csrf.js';
 // Bounded JSON bodies for auth routes (spec 069)
 export {

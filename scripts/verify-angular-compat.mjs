@@ -35,8 +35,9 @@ import {
 /**
  * The matrix: the boundaries of every advertised peer range, plus the repository's own versions.
  * A value ending in a range (`^…`, `~…`, `>=…`) is resolved to the newest published match at run time.
- * Admin is limited to `@angular/* ^21.2.0` by its `@voltui/components` peer (VoltUI 1.x peers
- * `@angular/* ^21.2.0`), so the `angular-*` combinations install `@forge-cms/angular` alone.
+ * Admin supports `@angular/* ^21.2.0 || ^22.0.0` (spec 103; `@voltui/components` 1.3 peers the same range).
+ * The `angular-*` combinations install `@forge-cms/angular` alone. On Angular 22 the admin needs `lumen-icons`
+ * 0.3.1+ (the first release that peers Angular 22) and `@voltui/components` 1.3.2+.
  */
 export const COMBINATIONS = [
   {
@@ -90,7 +91,36 @@ export const COMBINATIONS = [
     babel: '^7.28.0',
     cdk: '^21.2.0',
     voltui: '^1.0.1',
-    lumenIcons: '^0.2.0'
+    lumenIcons: '^0.3.0'
+  },
+  {
+    id: 'admin-22-min',
+    description: 'Angular 22.0.0 with the admin (spec 103)',
+    admin: true,
+    angular: '22.0.0',
+    typescript: '~6.0.0',
+    rxjs: '7.8.0',
+    vite: '^8.0.0',
+    vitePluginAngular: '^2.8.0',
+    // Angular 22.0.x's own linker still runs on Babel 7; Babel 8 starts at 22.1.
+    babel: '7.29.0',
+    cdk: '22.0.0',
+    voltui: '1.3.2',
+    lumenIcons: '0.3.1'
+  },
+  {
+    id: 'admin-22',
+    description: 'newest Angular 22.x with the admin and newest peers (spec 103)',
+    admin: true,
+    angular: '^22.0.0',
+    typescript: '~6.0.0',
+    rxjs: '^7.8.0',
+    vite: '^8.0.0',
+    vitePluginAngular: '^2.8.0',
+    babel: '^8.0.0',
+    cdk: '^22.0.0',
+    voltui: '^1.0.1',
+    lumenIcons: '^0.3.0'
   },
   {
     id: 'angular-22',
@@ -218,13 +248,13 @@ function manifest(combination, tarballs) {
       // Forge's internal dependency (`admin` → `angular` → `core`) must resolve to the tarballs too.
       overrides: forge,
       // Same WebAssembly fallback as above, one level deeper: @oxc-parser/binding-wasm32-wasi (via
-      // @angular/build 22) ships its own @emnapi 2.0.0-alpha.3, outside @napi-rs/wasm-runtime's peer
-      // range. Tolerate exactly that version for exactly that peer; every other peer stays strict and
+      // @angular/build 22) ships its own @emnapi 2.0.0-alpha.N (alpha.3, later alpha.6), outside @napi-rs/wasm-runtime's peer
+      // range. Tolerate exactly the 2.0.0 alphas for exactly that peer; every other peer stays strict and
       // nothing installed changes.
       peerDependencyRules: {
         allowedVersions: {
-          '@napi-rs/wasm-runtime>@emnapi/core': '2.0.0-alpha.3',
-          '@napi-rs/wasm-runtime>@emnapi/runtime': '2.0.0-alpha.3'
+          '@napi-rs/wasm-runtime>@emnapi/core': '>=2.0.0-alpha.0 <2.0.0-beta.0',
+          '@napi-rs/wasm-runtime>@emnapi/runtime': '>=2.0.0-alpha.0 <2.0.0-beta.0'
         }
       }
     }

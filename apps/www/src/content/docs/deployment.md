@@ -294,6 +294,17 @@ or CDN URL **bypasses ForgeCMS access control** entirely — anyone with the URL
 media that is public by design; never for private or draft-gated files, and never configure a public bucket
 policy for them.
 
+## Password hashing cost per profile
+
+Every login runs one PBKDF2-HMAC-SHA256 derivation, so the work factor sets each login's CPU cost. Since 1.1 it is configurable (`passwordHashing` on `UsersCollectionAuthAdapter`). Measured on an Apple M4, so treat these as lower bounds for Cloudflare's edge CPUs:
+
+| Preset                                       | Iterations | Local workerd | Node 22 | Use on                                                  |
+| -------------------------------------------- | ---------- | ------------- | ------- | ------------------------------------------------------- |
+| default / `PASSWORD_HASHING_PRESETS.workers` | 100 000    | ≈ 5.7 ms      | ≈ 7 ms  | Cloudflare Workers, including the Free plan (10 ms CPU) |
+| `PASSWORD_HASHING_PRESETS.node`              | 600 000    | ≈ 35 ms       | ≈ 45 ms | Node servers; Workers paid plans                        |
+
+Raising it is safe at any time: older hashes keep verifying and are upgraded on each user's next successful login (that login pays two derivations once). At the default, hashes keep the 1.0 format, so rolling back to 1.0 keeps working. Once you raise it, rows already upgraded can no longer be verified by 1.0. Iterations above 100 000 on Workers: check your plan's CPU limit with `pnpm bench:password-hash`, and confirm on a staging deployment before production.
+
 ## Backup, upgrade and recovery
 
 Back up **before** any schema migration, with writes quiesced. The database snapshot is the source of truth for

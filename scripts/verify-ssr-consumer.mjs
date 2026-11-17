@@ -71,7 +71,12 @@ try {
   }
   if (selected('technical')) await verifyTechnicalConsumer({ workDir, tarballs, install });
   if (selected('journey')) {
-    await verifyJourneyConsumer({ workDir, tarballs, s3: s3FromEnvironment(), install });
+    await verifyJourneyConsumer({
+      workDir,
+      tarballs,
+      s3: process.env.FORGE_SSR_PROFILES === 'cloudflare' ? undefined : s3FromEnvironment(),
+      install
+    });
   }
   console.log(
     registryVersion === undefined

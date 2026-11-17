@@ -64,7 +64,7 @@ localized field is not supported. There is no arbitrary nested or per-field-kind
 | Signal resources                  | stable 1.0            | Abort superseded requests, no stale overwrite, reset on identity change                                                          |
 | SSR, request isolation            | stable 1.0            | `provideForgeCmsServer`; explicit origin; per-render state                                                                       |
 | Public hydration transfer         | stable 1.0            | Opt-in per resource (`transfer: 'public'`), anonymous data only                                                                  |
-| Angular admin                     | stable 1.0            | Angular 21 only; no admin on Angular 22 yet                                                                                      |
+| Angular admin                     | stable 1.0            | Angular 21.2+ and 22 (since 1.1.0, spec 103)                                                                                     |
 | Schema drift detection            | stable 1.0            | `planSchema()` / `SchemaDriftError`                                                                                              |
 | Reviewed migrations               | stable 1.0            | Append-only ledger, checksums, destructive opt-in; no down migrations                                                            |
 | Backup / restore procedure        | stable 1.0            | Procedures rehearsed on both profiles; no atomic cross-store snapshot, no PITR                                                   |

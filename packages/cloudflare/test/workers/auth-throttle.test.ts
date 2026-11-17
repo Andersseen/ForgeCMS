@@ -2,7 +2,13 @@ import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { UsersCollectionAuthAdapter, defineUsersCollection } from '@forge-cms/auth';
 import type { AuthAttemptThrottle } from '@forge-cms/runtime';
-import { ForgeCmsRuntime, handleLogin, handleSignup } from '@forge-cms/runtime';
+import {
+  DatabaseAuthThrottle,
+  ForgeCmsRuntime,
+  handleLogin,
+  handleSignup,
+  rateLimitBindingAuthThrottle
+} from '@forge-cms/runtime';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
 import { D1DatabaseAdapter } from '../../src/d1.adapter.js';
 
@@ -15,18 +21,13 @@ import { D1DatabaseAdapter } from '../../src/d1.adapter.js';
  * clock-free in packages/runtime/src/auth-abuse.test.ts; here the platform's window is wall-clock, so
  * each scenario uses fresh keys and starts inside a single window (see `withinOneWindow`).
  */
+/** Spec 106: the exported Cloudflare-native option, wired exactly as the docs show. */
 function cloudflareAuthThrottle(bindings: Cloudflare.Env): AuthAttemptThrottle {
-  return async ({ action, identifier, request }) => {
-    const client = request.headers.get('cf-connecting-ip') ?? 'unknown';
-    const checks = [bindings.AUTH_CLIENT_LIMITER.limit({ key: `${action}:client:${client}` })];
-    if (action === 'login') {
-      checks.push(bindings.AUTH_ACCOUNT_LIMITER.limit({ key: `login:account:${identifier}` }));
-    }
-    const results = await Promise.all(checks);
-    return results.every((r) => r.success)
-      ? { allowed: true }
-      : { allowed: false, retryAfterSeconds: 60 };
-  };
+  return rateLimitBindingAuthThrottle({
+    client: bindings.AUTH_CLIENT_LIMITER,
+    account: bindings.AUTH_ACCOUNT_LIMITER,
+    clientKey: (request) => request.headers.get('cf-connecting-ip') ?? 'unknown'
+  });
 }
 
 /**
@@ -153,5 +154,50 @@ describe('PBKDF2 on workerd (spec 069 work-factor audit)', () => {
   // here and is false). The 100,000-iteration decision rests on CPU cost instead — see spec 069.
   it('runs the 100,000-iteration PBKDF2-SHA256 derivation Forge stores and verifies', async () => {
     expect(await derive(100_000)).toBe(32);
+  });
+});
+
+describe('DatabaseAuthThrottle on workerd + local D1 (spec 106: the portable option, also for Pages)', () => {
+  it('refuses the fourth login from one client with 429 + Retry-After, before any password work', async () => {
+    const { runtime, admin } = await buildRuntime();
+    const limiter = new DatabaseAuthThrottle({
+      database: new D1DatabaseAdapter().init(env),
+      clientKey: (request) => request.headers.get('cf-connecting-ip') ?? 'unknown',
+      limits: { loginClient: { limit: 3, windowSeconds: 3600 } }
+    });
+    await limiter.syncSchema();
+    const client = `198.51.100.${runId}`;
+    const attemptLogin = () =>
+      handleLogin(
+        {
+          request: new Request('https://forge.test/api/auth/login', {
+            method: 'POST',
+            headers: { 'cf-connecting-ip': client },
+            body: JSON.stringify({ email: admin, password: 'wrong-password' })
+          }),
+          env
+        },
+        { runtime, throttle: limiter.throttle }
+      );
+    for (let i = 0; i < 3; i += 1) expect((await attemptLogin()).status).toBe(401);
+    const refused = await attemptLogin();
+    expect(refused.status).toBe(429);
+    expect(Number(refused.headers.get('retry-after'))).toBeGreaterThan(0);
+  });
+
+  it('concurrent attempts on D1 never exceed the budget', async () => {
+    const limiter = new DatabaseAuthThrottle({
+      database: new D1DatabaseAdapter().init(env),
+      clientKey: () => `concurrent-${Date.now()}-${runId}`,
+      limits: { signupClient: { limit: 4, windowSeconds: 3600 } }
+    });
+    await limiter.syncSchema();
+    const request = new Request('https://forge.test/api/auth/signup', { method: 'POST' });
+    const results = await Promise.all(
+      Array.from({ length: 12 }, (_, i) =>
+        limiter.throttle({ action: 'signup', identifier: `u${i}@example.com`, request })
+      )
+    );
+    expect(results.filter((r) => r.allowed)).toHaveLength(4);
   });
 });

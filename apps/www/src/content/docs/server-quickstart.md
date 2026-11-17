@@ -82,7 +82,7 @@ export const collections = [users, notes];
 <!-- snippet: docs/examples/server-quickstart/src/runtime.ts -->
 
 ```ts
-import { UsersCollectionAuthAdapter } from '@forge-cms/auth';
+import { PASSWORD_HASHING_PRESETS, UsersCollectionAuthAdapter } from '@forge-cms/auth';
 import { LibSqlDatabaseAdapter } from '@forge-cms/db';
 import { ForgeCmsRuntime } from '@forge-cms/runtime';
 import { InMemoryStorageAdapter } from '@forge-cms/storage';
@@ -97,7 +97,11 @@ export interface ServerEnv {
 
 export async function createRuntime(env: ServerEnv) {
   const database = new LibSqlDatabaseAdapter(env.DATABASE_URL ?? 'file:./forge.db');
-  const auth = new UsersCollectionAuthAdapter().init({
+  // A Node server: the stronger password work factor (600 000 PBKDF2 iterations, ≈ 45 ms per login).
+  // On Cloudflare Workers keep the default (100 000), sized for the Free plan's 10 ms CPU limit.
+  const auth = new UsersCollectionAuthAdapter({
+    passwordHashing: PASSWORD_HASHING_PRESETS.node
+  }).init({
     ...(env.AUTH_SECRET !== undefined && { AUTH_SECRET: env.AUTH_SECRET }),
     userDatabase: database
   });

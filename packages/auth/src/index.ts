@@ -5,6 +5,8 @@ export type { ExternalAuthConfig } from './external.adapter.js';
 export { SignedTokenAuthAdapter, DEMO_CREDENTIALS } from './signed-token.adapter.js';
 export type { SignedTokenEnv } from './signed-token.adapter.js';
 export { UsersCollectionAuthAdapter } from './users-collection.adapter.js';
+export { PASSWORD_HASHING_PRESETS } from './password-hash.js';
+export type { PasswordHashingOptions } from './password-hash.js';
 export type {
   UsersCollectionAuthEnv,
   UsersCollectionAuthAdapterOptions,
@@ -144,6 +146,14 @@ export interface AuthAdapter<TUser extends AuthUser = AuthUser> {
    * inside a `CompositeAuthAdapter`.
    */
   canHandleToken?(token: string): boolean;
+  /**
+   * Optional (spec 107): ends every session of `userId` that exists now — "sign out everywhere". After it
+   * resolves, every token issued earlier for that user is refused on its next use; sessions started
+   * afterwards are unaffected. Resolves `false` when the user does not exist. Adapters whose tokens are
+   * verified without a server-side lookup (`SignedTokenAuthAdapter`, `ExternalAuthAdapter`) cannot
+   * implement it.
+   */
+  revokeSessions?(userId: string): Promise<boolean>;
   /** Optional: adapters that support password login implement this (spec 053). */
   login?(email: string, password: string): Promise<AuthActionResult<TUser>>;
   /**

@@ -9,25 +9,69 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { brotliCompressSync, constants as zlibConstants, gzipSync } from 'node:zlib';
 
+/**
+ * The Angular tuples a packed SSR consumer can run on (spec 103). `FORGE_SSR_TUPLE=angular-22` swaps the
+ * Angular / Analog / Vite / TypeScript / Babel / VoltUI pieces; everything else is shared. Default: 21.
+ */
+const TUPLES = {
+  'angular-21': {},
+  'angular-22': {
+    angular: '22.2.6',
+    analog: '2.9.7',
+    typescript: '6.0.3',
+    vite: '8.3.8',
+    // Angular 22.1+ links with Babel 8 (22.0.x still uses Babel 7).
+    babel: '8.1.2',
+    voltui: '1.3.3',
+    lumenIcons: '0.3.1',
+    cdk: '22.2.7'
+  }
+};
+export const TUPLE = process.env.FORGE_SSR_TUPLE ?? 'angular-21';
+if (!(TUPLE in TUPLES)) throw new Error(`unknown FORGE_SSR_TUPLE '${TUPLE}'`);
+
 /** The versions the first-party apps use (the C03 `current` combination plus the SSR pieces). */
 export const VERSIONS = {
-  angular: '21.2.10',
-  analog: '2.5.2',
-  typescript: '5.9.2',
-  rxjs: '7.8.2',
-  vite: '7.1.4',
-  babel: '7.29.0',
-  h3: '1.15.0',
-  zone: '0.15.1',
-  wrangler: '4.91.0',
-  voltui: '1.0.1',
-  lumenIcons: '0.2.0',
-  cdk: '21.2.10',
-  // Non-optional peers of `@analogjs/platform` itself (its content pipeline), not of Forge.
-  marked: '15.0.12',
-  markedGfmHeadingId: '4.1.4',
-  markedMangle: '1.1.13'
+  ...BASE_VERSIONS(),
+  ...TUPLES[TUPLE]
 };
+
+function BASE_VERSIONS() {
+  return {
+    angular: '21.2.10',
+    analog: '2.5.2',
+    typescript: '5.9.2',
+    rxjs: '7.8.2',
+    vite: '7.1.4',
+    babel: '7.29.0',
+    h3: '1.15.0',
+    zone: '0.15.1',
+    wrangler: '4.91.0',
+    voltui: '1.0.1',
+    lumenIcons: '0.2.0',
+    cdk: '21.2.10',
+    // Non-optional peers of `@analogjs/platform` itself (its content pipeline), not of Forge.
+    marked: '15.0.12',
+    markedGfmHeadingId: '4.1.4',
+    markedMangle: '1.1.13'
+  };
+}
+
+/**
+ * pnpm peer exceptions for the Angular 22 tuple only: the WebAssembly fallback of @angular/build's bundler
+ * ships `@emnapi` 2.0.0 alphas outside @napi-rs/wasm-runtime's range. Nothing else is relaxed. Empty for Angular 21.
+ */
+export function peerRules() {
+  if (TUPLE !== 'angular-22') return {};
+  return {
+    peerDependencyRules: {
+      allowedVersions: {
+        '@napi-rs/wasm-runtime>@emnapi/core': '>=2.0.0-alpha.0 <2.0.0-beta.0',
+        '@napi-rs/wasm-runtime>@emnapi/runtime': '>=2.0.0-alpha.0 <2.0.0-beta.0'
+      }
+    }
+  };
+}
 
 /** Every Forge package a packed consumer may install. Each fixture depends on the ones it uses. */
 export const FORGE_PACKAGES = [
@@ -150,6 +194,37 @@ export function freePort() {
 export async function loadChromium() {
   const require = createRequire(join(repoRoot, 'apps', 'tiny-project', 'package.json'));
   return require('@playwright/test').chromium;
+}
+
+/** `@axe-core/playwright`'s AxeBuilder, from the same app that provides Playwright (spec 103). */
+export function loadAxeBuilder() {
+  const require = createRequire(join(repoRoot, 'apps', 'tiny-project', 'package.json'));
+  const axe = require('@axe-core/playwright');
+  return axe.default ?? axe.AxeBuilder ?? axe;
+}
+
+/** WCAG 2.2 AA (with the A / 2.1 levels it includes) — the tag set of every admin scan. */
+export const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
+
+/**
+ * Scans `page` as it is now; any violation fails with its rule id and selectors. `target-size` is excluded
+ * for the same reason as tiny-project's golden path (spec 086): the fixture ships no admin stylesheet, so
+ * controls are at browser-default size. It runs unexcluded in apps/demo-aesthetics.
+ */
+export async function expectAccessible(page, state) {
+  const AxeBuilder = loadAxeBuilder();
+  const results = await new AxeBuilder({ page })
+    .withTags(WCAG_TAGS)
+    .disableRules(['target-size'])
+    .analyze();
+  if (results.violations.length > 0) {
+    const summary = results.violations.map((v) => ({
+      rule: v.id,
+      impact: v.impact,
+      targets: v.nodes.map((node) => node.target.join(' '))
+    }));
+    fail(`axe violations in ${state}: ${JSON.stringify(summary)}`);
+  }
 }
 
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

@@ -80,20 +80,21 @@ the first operation, so `init()` never opens the database and a bad URL rejects 
 
 **Main exports.** `UsersCollectionAuthAdapter`, `defineUsersCollection`, `withAuthFields`, `ApiKeyAuthAdapter`, `CompositeAuthAdapter`, `SignedTokenAuthAdapter`, `ExternalAuthAdapter`,
 `InMemoryAuthAdapter`, role/scope helpers (`hasRole`, `hasAnyRole`, `isAdmin`, `canWriteContent`, `hasScope`, `hasAllScopes`, `hasAnyScope`), cookie helpers (`buildSessionCookie`,
-`buildLogoutCookie`, `parseCookieToken`, `SESSION_COOKIE_NAME`), `extractBearerToken`, `UserMutationError`.
+`buildLogoutCookie`, `parseCookieToken`, `SESSION_COOKIE_NAME`), `extractBearerToken`, `UserMutationError`, `PASSWORD_HASHING_PRESETS` (since 1.1).
 
 **Important options.**
 
-| Option                                   | Default          | Meaning                                                                                  |
-| ---------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------- |
-| `devMode`                                | `false`          | Explicit opt-in to Forge's public dev secret; never derive it from a missing secret      |
-| `passwordPolicy.minLength` / `maxLength` | `8` / `1024`     | Integers; `maxLength` ceiling 4096; applied on create, signup, password change and login |
-| `collection`                             | `users`          | Must match the slug given to `defineUsersCollection()`/`withAuthFields()`                |
-| `AUTH_SECRET` (env)                      | required         | At least 32 bytes; signs session tokens (24-hour lifetime)                               |
-| roles                                    | `viewer` default | `admin` · `editor` · `viewer`; the very first user ever created is always `admin`        |
+| Option                                   | Default          | Meaning                                                                                            |
+| ---------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------- |
+| `devMode`                                | `false`          | Explicit opt-in to Forge's public dev secret; never derive it from a missing secret                |
+| `passwordPolicy.minLength` / `maxLength` | `8` / `1024`     | Integers; `maxLength` ceiling 4096; applied on create, signup, password change and login           |
+| `passwordHashing.iterations` (1.1)       | `100000`         | PBKDF2 work factor, `100000`–`10000000`; presets `workers` (100 000) / `node` (600 000); see below |
+| `collection`                             | `users`          | Must match the slug given to `defineUsersCollection()`/`withAuthFields()`                          |
+| `AUTH_SECRET` (env)                      | required         | At least 32 bytes; signs session tokens (24-hour lifetime)                                         |
+| roles                                    | `viewer` default | `admin` · `editor` · `viewer`; the very first user ever created is always `admin`                  |
 
-**Behaviour worth knowing.** Passwords: PBKDF2-HMAC-SHA256, 100,000 iterations. Every request re-reads the user row (role changes apply at once; a deleted user's session fails). A
-password change invalidates every earlier session (`_sessionVersion`). The users collection is managed by the adapter: generic create/update/delete on it is refused with
+**Behaviour worth knowing.** Passwords: PBKDF2-HMAC-SHA256, 100,000 iterations by default (spec 105). A raised work factor writes versioned hashes (`$pbkdf2-sha256$i=…`); every older hash, including 1.0's, keeps verifying and is upgraded on the user's next successful login (compare-and-set; no session is revoked). At the default the 1.0 format is still written, so a rollback to 1.0 keeps every login working; a raised work factor makes upgraded rows unreadable by 1.0. Measured login cost (Apple M4): ≈ 5.7 ms at 100 000 on local workerd, ≈ 35 ms at 600 000 — only the default can fit the Workers Free plan's 10 ms CPU limit; use `node` on Node or a paid Workers plan. Every request re-reads the user row (role changes apply at once; a deleted user's session fails). A
+password change invalidates every earlier session (`_sessionVersion`); so does `revokeSessions(userId)` (1.1, "sign out everywhere", spec 107), effective on the next request. The users collection is managed by the adapter: generic create/update/delete on it is refused with
 `AUTH_MANAGED_COLLECTION`. The last admin cannot be removed or demoted, including under concurrency. API-key secrets are shown once and stored hashed.
 
 **Errors.** Failed creation/updates return `AuthFailureReason` values or throw `UserMutationError` (reasons such as `referenced`, last-admin); HTTP mapping is in the runtime section.
@@ -147,25 +148,25 @@ password change invalidates every earlier session (`_sessionVersion`). The users
 
 - Class: `ForgeCmsRuntime` — `init()`, `syncSchema()`, `planSchema()`, `runMigrations()`, `reconcileStorage()`, `find`, `findOne`, `findByID`, `count`, `create`, `update`, `delete`,
   versions and globals, `preview`, `getCollections()`.
-- Handlers: `handleList`, `handleRead`, `handleCreate`, `handleUpdate`, `handleDelete`, `handleFile`, `handleLogin`, `handleSignup`, `handleLogout`, `handleMe`, `handleListVersions`,
+- Handlers: `handleList`, `handleRead`, `handleCreate`, `handleUpdate`, `handleDelete`, `handleFile`, `handleLogin`, `handleSignup`, `handleLogout`, `handleLogoutEverywhere` (1.1), `handleMe`, `handleListVersions`,
   `handleGetVersion`, `handleRestoreVersion`, `handlePreview`, `handleGlobalRead`, `handleGlobalUpdate`.
 - Helpers: `describeCollections`, `describeCollection`, `assertCsrfSafe`, `readBoundedJsonObject`, `isForgeError`, `toApiErrorBody`.
 
 **Important options and defaults.**
 
-| Option                                                          | Default                               | Meaning                                                                                  |
-| --------------------------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `ForgeCmsConfig`: `collections`, `globals?`, `adapters`, `env?` | —                                     | `adapters` = `{ database, auth, storage }`                                               |
-| Local API `overrideAccess`                                      | `true`                                | Trusted server code. Pass `false` and a `user` to enforce access                         |
-| HTTP handlers                                                   | access always enforced                | A caller can never set `overrideAccess`                                                  |
-| list `limit`                                                    | `50` (max `500`)                      | Also `page`, `sort`, `where`, `depth` (only `0` or `1`), `locale`                        |
-| handler options                                                 | —                                     | `allowedRoles`, `requireAuth`, `upload.maxFileSize`, `upload.mimeTypes` (no default cap) |
-| `handleFile` `cacheControl`                                     | `public, max-age=60`                  | Anonymous hits only; authenticated hits are always `private, no-store`                   |
-| auth handlers `cookie.secure`                                   | `true`                                | `false` only for local `http://` development                                             |
-| auth handlers `maxBodyBytes`                                    | `DEFAULT_AUTH_MAX_BODY_BYTES` = 8 KiB | Integer 1–1 MiB (`413 PAYLOAD_TOO_LARGE` when exceeded)                                  |
-| auth handlers `throttle`                                        | none                                  | Your attempt limiter (`AuthAttemptThrottle`); `429 RATE_LIMITED`                         |
-| signup `enabled`                                                | required (`false` = `404`)            | Public signup is opt-in                                                                  |
-| `reconcileStorage` `uploadGraceMs` / `limit`                    | 1 hour / 100                          | Safe to run repeatedly and concurrently                                                  |
+| Option                                                          | Default                               | Meaning                                                                                                                       |
+| --------------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `ForgeCmsConfig`: `collections`, `globals?`, `adapters`, `env?` | —                                     | `adapters` = `{ database, auth, storage }`                                                                                    |
+| Local API `overrideAccess`                                      | `true`                                | Trusted server code. Pass `false` and a `user` to enforce access                                                              |
+| HTTP handlers                                                   | access always enforced                | A caller can never set `overrideAccess`                                                                                       |
+| list `limit`                                                    | `50` (max `500`)                      | Also `page`, `sort`, `where`, `depth` (only `0` or `1`), `locale`                                                             |
+| handler options                                                 | —                                     | `allowedRoles`, `requireAuth`, `upload.maxFileSize`, `upload.mimeTypes` (no default cap)                                      |
+| `handleFile` `cacheControl`                                     | `public, max-age=60`                  | Anonymous hits only; authenticated hits are always `private, no-store`                                                        |
+| auth handlers `cookie.secure`                                   | `true`                                | `false` only for local `http://` development                                                                                  |
+| auth handlers `maxBodyBytes`                                    | `DEFAULT_AUTH_MAX_BODY_BYTES` = 8 KiB | Integer 1–1 MiB (`413 PAYLOAD_TOO_LARGE` when exceeded)                                                                       |
+| auth handlers `throttle`                                        | none                                  | Your attempt limiter (`AuthAttemptThrottle`); `429 RATE_LIMITED`. 1.1: `DatabaseAuthThrottle`, `rateLimitBindingAuthThrottle` |
+| signup `enabled`                                                | required (`false` = `404`)            | Public signup is opt-in                                                                                                       |
+| `reconcileStorage` `uploadGraceMs` / `limit`                    | 1 hour / 100                          | Safe to run repeatedly and concurrently                                                                                       |
 
 **Errors.** `ForgeError` subclasses carry `status` and `code`: `NOT_FOUND` 404, `INVALID_INPUT` 400, `INVALID_QUERY` 400, `UNKNOWN_FIELD` 400, `VALIDATION_ERROR` 400 (with `details`),
 `UNAUTHORIZED` 401, `FORBIDDEN` 403 (`AccessDeniedError`, `CsrfError`), `UNIQUE_CONSTRAINT` 409, `CONCURRENT_MODIFICATION` 409, `AUTH_MANAGED_COLLECTION` 403, `PAYLOAD_TOO_LARGE` 413,
@@ -238,7 +239,7 @@ components, `DEFAULT_ADMIN_NAV`, `ForgeAdminConfig`; experimental: `forgeAdminAn
 (default: Collections + admin-only Users), `collections` (all), `signInPath` (`{basePath}/login`); `logo` and `features` are **deprecated** no-ops. The host must use
 `provideRouter(..., withComponentInputBinding())`. Full contract: [1.0-PUBLIC-SURFACE.md](1.0-PUBLIC-SURFACE.md).
 
-**Peers.** `@angular/{cdk,common,core,forms,platform-browser,router}` `^21.2.0`, `rxjs ^7.8.0`, `@voltui/components ^1.0.1`, `lumen-icons ^0.2.0`. Angular 22 is not supported for the admin.
+**Peers.** `@angular/{cdk,common,core,forms,platform-browser,router}` `^21.2.0 || ^22.0.0`, `rxjs ^7.8.0`, `@voltui/components ^1.0.1` (1.3.2+ on Angular 22), `lumen-icons ^0.2.0 || ^0.3.0` (0.3.1+ on Angular 22). Angular 22 since 1.1.0 (spec 103).
 
 **Stability.** Stable; Analytics experimental.
 

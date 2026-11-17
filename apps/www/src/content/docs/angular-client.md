@@ -446,24 +446,27 @@ Peer ranges are the versions proven by `pnpm release:compat`: external Vite +
 `strict-peer-dependencies=true` and `auto-install-peers=false`, each checked for a single Angular
 copy, `tsc` + `ngc` with `strictTemplates`, and a fully linked production build.
 
-| Package              | Angular                | Other peers                                                                                                                   |
-| -------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `@forge-cms/angular` | `^21.0.0 \|\| ^22.0.0` | optional, for `/vite`: `@angular/compiler-cli` (same as Angular), `@babel/core` `^7.28.0 \|\| ^8.0.0`, `vite` `^7 \|\| ^8`    |
-| `@forge-cms/admin`   | `^21.2.0`              | `rxjs` `^7.8.0`, `@voltui/components` `^1.0.1`, `lumen-icons` `^0.2.0`; optional `@babel/core` `^7.28.0`, `vite` `^7 \|\| ^8` |
+| Package              | Angular                | Other peers                                                                                                                                                                                         |
+| -------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@forge-cms/angular` | `^21.0.0 \|\| ^22.0.0` | optional, for `/vite`: `@angular/compiler-cli` (same as Angular), `@babel/core` `^7.28.0 \|\| ^8.0.0`, `vite` `^7 \|\| ^8`                                                                          |
+| `@forge-cms/admin`   | `^21.2.0 \|\| ^22.0.0` | `rxjs` `^7.8.0`, `@voltui/components` `^1.0.1` (1.3.2+ on Angular 22), `lumen-icons` `^0.2.0 \|\| ^0.3.0` (0.3.1+ on Angular 22); optional `@babel/core` `^7.28.0 \|\| ^8.0.0`, `vite` `^7 \|\| ^8` |
 
-Tested combinations (2026-10-04):
+Tested combinations (2026-11-17, `pnpm release:compat`):
 
-| Combination   | Packages        | Angular | `@angular/build` | TypeScript | rxjs  | Vite  | vite-plugin-angular | Babel  | VoltUI |
-| ------------- | --------------- | ------- | ---------------- | ---------- | ----- | ----- | ------------------- | ------ | ------ |
-| `angular-min` | angular         | 21.0.0  | 21.0.0           | 5.9.2      | 7.8.0 | 7.0.0 | 2.4.8               | 7.28.0 | —      |
-| `admin-min`   | angular + admin | 21.2.0  | 21.2.0           | 5.9.2      | 7.8.0 | 7.0.0 | 2.4.8               | 7.28.0 | 1.0.1  |
-| `current`     | angular + admin | 21.2.10 | 21.2.10          | 5.9.2      | 7.8.2 | 7.1.4 | 2.4.8               | 7.29.0 | 1.1.0  |
-| `latest-21`   | angular + admin | 21.2.25 | 21.2.24          | 5.9.3      | 7.8.2 | 8.3.2 | 2.8.0               | 7.29.7 | 1.1.0  |
-| `angular-22`  | angular         | 22.2.1  | 22.2.1           | 6.0.3      | 7.8.2 | 8.3.2 | 2.8.0               | 8.0.6  | —      |
+| Combination    | Packages        | Angular | `@angular/build` | TypeScript | rxjs  | Vite  | vite-plugin-angular | Babel   | VoltUI |
+| -------------- | --------------- | ------- | ---------------- | ---------- | ----- | ----- | ------------------- | ------- | ------ |
+| `angular-min`  | angular         | 21.0.0  | 21.0.0           | 5.9.2      | 7.8.0 | 7.0.0 | 2.4.8               | 7.28.0  | —      |
+| `admin-min`    | angular + admin | 21.2.0  | 21.2.0           | 5.9.2      | 7.8.0 | 7.0.0 | 2.4.8               | 7.28.0  | 1.0.1  |
+| `current`      | angular + admin | 21.2.10 | 21.2.10          | 5.9.2      | 7.8.2 | 7.1.4 | 2.4.8               | 7.29.0  | 1.1.0  |
+| `latest-21`    | angular + admin | 21.2.26 | 21.2.26          | 5.9.3      | 7.8.2 | 8.3.8 | 2.9.7               | 7.29.13 | 1.3.3  |
+| `admin-22-min` | angular + admin | 22.0.0  | 22.0.0           | 6.0.3      | 7.8.0 | 8.3.8 | 2.9.7               | 7.29.0  | 1.3.2  |
+| `admin-22`     | angular + admin | 22.2.6  | 22.2.6           | 6.0.3      | 7.8.2 | 8.3.8 | 2.9.7               | 8.1.2   | 1.3.3  |
+| `angular-22`   | angular         | 22.2.6  | 22.2.6           | 6.0.3      | 7.8.2 | 8.3.8 | 2.9.7               | 8.1.2   | —      |
 
-- `@forge-cms/admin` stops at Angular 21 because its UI library, VoltUI 1.x, peers
-  `@angular/* ^21.2.0`; VoltUI's own dependency also needs `@angular/cdk` installed by the app.
-- Angular 22's linker requires Babel 8; Angular 21 was tested with Babel 7.
+- `@forge-cms/admin` supports Angular 21.2+ and 22 (since 1.1.0, spec 103). On Angular 22 install
+  `@voltui/components` 1.3.2 or newer (the first VoltUI release that peers Angular 22); the app also
+  installs `@angular/cdk`. Use `lumen-icons` 0.3.1 or newer on Angular 22 (0.2.x peers Angular 21 only).
+- Babel: Angular 22.1+ links with Babel 8; Angular 22.0.x and 21 link with Babel 7.
 - Angular 19/20 are not supported.
 - **Vite/Analog apps need the linker** — for `@forge-cms/angular` alone too. Forge's packages are
   partial-Ivy `ngc` output, which Analog does not link (it only links `fesm2022` packages); without
@@ -471,7 +474,8 @@ Tested combinations (2026-10-04):
 - **SSR:** the same plugin marks Forge's Angular packages `ssr.noExternal`, so the server build is
   linked too (an external, unlinked copy would fail every render with `JIT compiler unavailable`).
   `pnpm release:ssr` proves a packed Analog SSR consumer (Angular 21.2.10, Analog 2.5.2, Vite 7.1.4,
-  Nitro `node-server`) with nothing but `angularLinker()`.
+  Nitro `node-server`) with nothing but `angularLinker()`; `pnpm release:ssr:admin-22` builds, SSRs and
+  walks the mounted admin on Angular 22.2.6 + Analog 2.9.7 + Vite 8 under local workerd + D1 + R2.
 
 ```ts
 // vite.config.ts
