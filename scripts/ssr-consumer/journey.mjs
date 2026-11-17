@@ -60,6 +60,8 @@ const POST = {
   slug: 'production-journey-post',
   body: 'First version of the body. Café & coffee.'
 };
+/** The title the keyboard-only journey saves (spec 104). */
+const KEYBOARD_TITLE = 'Keyboard-edited post';
 const EDITED = {
   title: 'Production journey post (edited)',
   body: 'Edited body, served after a fresh render.'
@@ -548,6 +550,127 @@ async function open(context, { strict }) {
   return { page, log };
 }
 
+/** What has keyboard focus, as one comparable description. */
+const focusOf = (page) =>
+  page.evaluate(() => {
+    const el = document.activeElement;
+    if (!el || el === document.body) return { tag: 'body', text: '' };
+    return {
+      tag: el.tagName.toLowerCase(),
+      id: el.id,
+      role: el.getAttribute('role') ?? '',
+      href: el instanceof HTMLAnchorElement && el.href ? new URL(el.href).pathname : '',
+      text: (el.textContent ?? '').replace(/\s+/g, ' ').trim()
+    };
+  });
+
+/**
+ * Presses Tab until `matches(focus)` holds (spec 104). Fails if the target is not reachable within `max`
+ * presses: a control that cannot be reached by Tab is a keyboard defect, not a flaky selector.
+ */
+async function tabTo(page, label, matches, max = 60) {
+  const visited = [];
+  for (let i = 0; i < max; i += 1) {
+    await page.keyboard.press('Tab');
+    const focus = await focusOf(page);
+    if (matches(focus)) return focus;
+    visited.push(
+      `${focus.tag}${focus.id ? `#${focus.id}` : ''}${focus.href ? `[${focus.href}]` : ''} '${focus.text.slice(0, 40)}'`
+    );
+  }
+  fail(
+    `keyboard: '${label}' is not reachable with Tab within ${max} presses at ${page.url()}; visited: ${visited.slice(0, 25).join(' → ')}`
+  );
+}
+
+/**
+ * Spec 104: the whole admin journey with the keyboard only — sign in → skip link → list → edit → save →
+ * a dialog's focus (open, trapped, Escape, restored) → log out. No pointer event is sent.
+ */
+async function keyboardJourney(browser, origin, title) {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  try {
+    await page.goto(`${origin}/studio/login`);
+    await hydrated(page);
+    await tabTo(page, 'email field', (f) => f.id === 'forge-signin-email');
+    await page.keyboard.type(ADMIN.email);
+    await tabTo(page, 'password field', (f) => f.id === 'forge-signin-password');
+    await page.keyboard.type(ADMIN.password);
+    await page.keyboard.press('Enter');
+    await page.waitForURL('**/studio/collections**');
+    await hydrated(page);
+
+    // The skip link is the shell's first Tab stop (the host app may put its own controls before the mount).
+    await page.evaluate(
+      () => document.activeElement instanceof HTMLElement && document.activeElement.blur()
+    );
+    await tabTo(page, 'skip link', (f) => f.text === 'Skip to main content', 10);
+    await page.keyboard.press('Enter');
+    const main = await focusOf(page);
+    if (main.role !== 'main')
+      fail(`keyboard: the skip link focused '${main.tag}#${main.id}', not the main region`);
+    if (!page.url().includes('/studio/collections'))
+      fail(`keyboard: the skip link navigated to ${page.url()}`);
+
+    // From the main region, the collections index → the posts list.
+    await page.locator('a[href$="/studio/collections/posts"]').first().waitFor();
+    await tabTo(
+      page,
+      'Posts in the collections index',
+      (f) => f.tag === 'a' && f.href === '/studio/collections/posts'
+    );
+    await page.keyboard.press('Enter');
+    await page.waitForURL(/\/studio\/collections\/posts$/);
+    await page.locator('volt-table-row', { hasText: title }).waitFor();
+
+    // Edit → change the title → Save.
+    await tabTo(page, `Edit ${title}`, (f) => f.tag === 'button' && f.text === `Edit ${title}`);
+    await page.keyboard.press('Enter');
+    await page.waitForURL(/\/studio\/collections\/posts\/[^/]+$/);
+    await page.locator('input#title').waitFor();
+    await expectAccessible(page, `${VERSIONS.angular} editor`);
+    await tabTo(page, 'title field', (f) => f.id === 'title');
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type(KEYBOARD_TITLE);
+    await tabTo(page, 'Save', (f) => f.tag === 'button' && f.text === 'Save');
+    await page.keyboard.press('Enter');
+    await page.waitForURL(/\/studio\/collections\/posts$/);
+    await page.locator('volt-table-row', { hasText: KEYBOARD_TITLE }).waitFor();
+
+    // A dialog: focus moves in (to the safe choice), Tab stays inside, Escape closes, focus returns.
+    const deleteLabel = `Delete ${KEYBOARD_TITLE}`;
+    await tabTo(page, deleteLabel, (f) => f.tag === 'button' && f.text === deleteLabel);
+    await page.keyboard.press('Enter');
+    const dialog = page.getByRole('alertdialog').or(page.getByRole('dialog'));
+    await dialog.waitFor();
+    const inDialog = () =>
+      page.evaluate(
+        () => document.activeElement?.closest('[role="dialog"], [role="alertdialog"]') != null
+      );
+    if (!(await inDialog())) fail('keyboard: opening the dialog did not move focus into it');
+    await expectAccessible(page, `${VERSIONS.angular} confirm dialog open`);
+    for (let i = 0; i < 6; i += 1) {
+      await page.keyboard.press('Tab');
+      if (!(await inDialog())) fail('keyboard: Tab left the open dialog');
+    }
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'detached' });
+    const restored = await focusOf(page);
+    if (restored.text !== deleteLabel)
+      fail(`keyboard: focus after Escape is '${restored.text}', not the opener`);
+    if ((await page.locator('volt-table-row', { hasText: KEYBOARD_TITLE }).count()) !== 1)
+      fail('keyboard: Escape deleted the document');
+
+    // Log out.
+    await tabTo(page, 'Log out', (f) => f.tag === 'button' && f.text === 'Log out');
+    await page.keyboard.press('Enter');
+    await page.waitForURL('**/studio/login**');
+  } finally {
+    await context.close();
+  }
+}
+
 /** Angular removes the `ngh` annotation from a server-rendered element once it has hydrated it. */
 const hydrated = (page) => page.waitForFunction(() => document.querySelector('[ngh]') === null);
 
@@ -858,6 +981,12 @@ async function journey({ profile, dir, outDir, s3 }) {
     await publicPage.getByText('No published posts yet.').waitFor();
     console.log(
       '  ✓ unpublished: no-JS HTML, transfer state, reload and SPA navigation all hide it'
+    );
+
+    // --- 10k. spec 104: the same admin, keyboard only, on this Angular tuple ---------------------------------
+    await keyboardJourney(browser, origin(), EDITED.title);
+    console.log(
+      `  ✓ spec 104: keyboard only — sign in, skip link, collections index, edit, save, dialog focus (trap, Escape, restore), log out (Angular ${VERSIONS.angular})`
     );
 
     // --- 11. durable files: multipart upload → handleFile → restart → delete (spec 084) -----------------------

@@ -14,6 +14,7 @@ import { ForgeAuthSession } from '@forge-cms/angular';
 import { VoltButton, VoltCard, VoltInput } from '@voltui/components';
 import { LmnEyeIcon, LmnEyeSlashIcon } from 'lumen-icons';
 import { describeSessionError } from './admin-error.js';
+import { ForgeMainLandmarkDirective } from './main-landmark.directive.js';
 import { normalizeAdminBasePath } from './mount-path.js';
 
 /**
@@ -27,10 +28,17 @@ import { normalizeAdminBasePath } from './mount-path.js';
 @Component({
   selector: 'forge-sign-up',
   standalone: true,
-  imports: [VoltButton, VoltCard, VoltInput, LmnEyeIcon, LmnEyeSlashIcon],
+  imports: [
+    VoltButton,
+    VoltCard,
+    VoltInput,
+    LmnEyeIcon,
+    LmnEyeSlashIcon,
+    ForgeMainLandmarkDirective
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="flex min-h-screen items-center justify-center bg-background p-4">
+    <div forgeMainLandmark class="flex min-h-screen items-center justify-center bg-background p-4">
       <volt-card class="w-full max-w-sm space-y-5 p-6">
         <div>
           <h1 class="text-lg font-semibold">Create an account</h1>
