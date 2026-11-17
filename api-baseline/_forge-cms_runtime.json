@@ -102,6 +102,7 @@
   "handleListVersions",
   "handleLogin",
   "handleLogout",
+  "handleLogoutEverywhere",
   "handleMe",
   "handlePreview",
   "handleRead",

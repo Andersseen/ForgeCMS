@@ -334,11 +334,39 @@ return handleLogout(context, { runtime, cookie: { secure: true } });
 ```
 
 Clears the cookie and returns `204` — idempotent, and CSRF-checked like any other mutation. Tokens are
-stateless (signed, not stored), so this is client-state-only: it cannot revoke a Bearer token a
-programmatic client still holds. What does end earlier sessions is a **password change** (every session issued
-before it fails validation), a **deleted** user, and a **role change** (the current user row is re-read on every
-request, so a demotion applies immediately); otherwise a token lives for its 24 hours. Per-session revocation is not
-part of 1.0.
+stateless (signed, not stored), so a plain logout is client-state-only: it cannot revoke a Bearer token a
+programmatic client still holds, or a copied cookie.
+
+### Session revocation (1.x policy, spec 107)
+
+Every session token carries the user row's `_sessionVersion`, and every request re-reads that row. So with
+`UsersCollectionAuthAdapter` the following end sessions **on the next request**, not after 24 hours:
+
+| Event                                                    | Effect on existing sessions                                     |
+| -------------------------------------------------------- | --------------------------------------------------------------- |
+| `handleLogout`                                           | This browser's cookie is cleared; other copies stay valid       |
+| `handleLogoutEverywhere` / `auth.revokeSessions(userId)` | Every session of that user ends (all devices, cookie or Bearer) |
+| Password change (`updateUser(id, { password })`)         | Every session of that user ends                                 |
+| User deleted                                             | Every session of that user ends                                 |
+| Role change                                              | Sessions continue with the new role                             |
+| A password rehash on login (spec 105)                    | None                                                            |
+| `AUTH_SECRET` rotated                                    | Every session of every user ends                                |
+
+"Sign out everywhere" (since 1.1) is one more route:
+
+```ts
+// POST /api/auth/logout-everywhere — signed in (cookie or Bearer), CSRF-checked like logout
+return handleLogoutEverywhere(context, { runtime, cookie: { secure: true } });
+```
+
+It answers `204` and clears the cookie, `401` without a valid session, and `404` when the auth adapter
+cannot revoke. `SignedTokenAuthAdapter` and `ExternalAuthAdapter` verify tokens without a lookup, so their
+tokens live until they expire. An admin can end another user's sessions with `auth.revokeSessions(id)`
+(Local API or your own admin route).
+
+What 1.x does **not** have: revoking a single session (one device) while keeping the others, a list of
+active sessions, and a lifetime shorter than 24 hours. Each needs a stored per-session record or a changed
+documented default. They are recorded for 2.0 in [the 2.0 notes](https://github.com/Andersseen/ForgeCMS/blob/main/docs/roadmap/v2/2.0-NOTES.md).
 
 ## Angular / admin auth experience
 

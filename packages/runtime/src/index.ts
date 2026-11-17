@@ -33,6 +33,7 @@ export {
   handleLogin,
   handleSignup,
   handleLogout,
+  handleLogoutEverywhere,
   handleMe,
   authFailureResponse,
   type AuthHandlerOptions,

@@ -411,6 +411,20 @@ export class UsersCollectionAuthAdapter implements AuthAdapter {
     };
   }
 
+  /**
+   * "Sign out everywhere" (spec 107): bumps the row's `_sessionVersion`, so every token issued before it
+   * fails `validateSession` on its next use — the same mechanism a password change uses. Effective on the
+   * next request (every request re-reads the row); it does not wait for the 24-hour expiry. Concurrent
+   * bumps may both write the same next value, which still invalidates every earlier token.
+   */
+  async revokeSessions(userId: string): Promise<boolean> {
+    const db = this.getDb();
+    const existing = await db.findById(this.collection, userId);
+    if (!existing) return false;
+    await db.update(this.collection, userId, { _sessionVersion: sessionVersionOf(existing) + 1 });
+    return true;
+  }
+
   async requireAuth(request: Request): Promise<AuthUser> {
     const token = this.extractToken(request);
     if (!token) throw new ForgeAuthError('Unauthorized', 'unauthorized');

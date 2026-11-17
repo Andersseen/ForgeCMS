@@ -1,5 +1,9 @@
 # STATE — Current implementation status
 
+> **Last updated: 2026-11-17 (spec 107 — session revocation policy; 1.1.0 single PR #127).** Optional `AuthAdapter.revokeSessions(userId)`, implemented by `UsersCollectionAuthAdapter` (bumps `_sessionVersion`), and `handleLogoutEverywhere` in `@forge-cms/runtime` (CSRF → 404 if the adapter cannot revoke → 401 → revoke → 204 + cleared cookie). The 1.x policy table (plain logout / everywhere / password change / deletion / role change / rehash / secret rotation) is in browser-auth and pinned by `session-revocation.test.ts` on InMemory + libSQL. Single-session revocation, session lists and a shorter lifetime are in `docs/roadmap/v2/2.0-NOTES.md`. **Next:** spec 108 (release governance).
+
+> _Previous update:_
+
 > **Last updated: 2026-11-17 (spec 106 — certified auth throttles; 1.1.0 single PR #127).** `@forge-cms/runtime` exports `DatabaseAuthThrottle` (portable, counters in `_forge_auth_throttle` of the app's own database, CAS increments, SHA-256 keys, `prune()`, `forClient()`) and `rateLimitBindingAuthThrottle` (Cloudflare Rate Limiting bindings). Tested on InMemory, libSQL and workerd + local D1 (budget N admits exactly N of M concurrent attempts; 429 before any PBKDF2). Wired: the Analog quickstart (`forClient(getRequestIP(event))`, consumer-verified), the demo on its D1 profile only (local/e2e unthrottled), browser-auth docs. Defaults unchanged. **Next:** spec 107 (session revocation).
 
 > _Previous update:_

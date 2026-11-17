@@ -94,7 +94,7 @@ the first operation, so `init()` never opens the database and a bad URL rejects 
 | roles                                    | `viewer` default | `admin` · `editor` · `viewer`; the very first user ever created is always `admin`                  |
 
 **Behaviour worth knowing.** Passwords: PBKDF2-HMAC-SHA256, 100,000 iterations by default (spec 105). A raised work factor writes versioned hashes (`$pbkdf2-sha256$i=…`); every older hash, including 1.0's, keeps verifying and is upgraded on the user's next successful login (compare-and-set; no session is revoked). At the default the 1.0 format is still written, so a rollback to 1.0 keeps every login working; a raised work factor makes upgraded rows unreadable by 1.0. Measured login cost (Apple M4): ≈ 5.7 ms at 100 000 on local workerd, ≈ 35 ms at 600 000 — only the default can fit the Workers Free plan's 10 ms CPU limit; use `node` on Node or a paid Workers plan. Every request re-reads the user row (role changes apply at once; a deleted user's session fails). A
-password change invalidates every earlier session (`_sessionVersion`). The users collection is managed by the adapter: generic create/update/delete on it is refused with
+password change invalidates every earlier session (`_sessionVersion`); so does `revokeSessions(userId)` (1.1, "sign out everywhere", spec 107), effective on the next request. The users collection is managed by the adapter: generic create/update/delete on it is refused with
 `AUTH_MANAGED_COLLECTION`. The last admin cannot be removed or demoted, including under concurrency. API-key secrets are shown once and stored hashed.
 
 **Errors.** Failed creation/updates return `AuthFailureReason` values or throw `UserMutationError` (reasons such as `referenced`, last-admin); HTTP mapping is in the runtime section.
@@ -148,7 +148,7 @@ password change invalidates every earlier session (`_sessionVersion`). The users
 
 - Class: `ForgeCmsRuntime` — `init()`, `syncSchema()`, `planSchema()`, `runMigrations()`, `reconcileStorage()`, `find`, `findOne`, `findByID`, `count`, `create`, `update`, `delete`,
   versions and globals, `preview`, `getCollections()`.
-- Handlers: `handleList`, `handleRead`, `handleCreate`, `handleUpdate`, `handleDelete`, `handleFile`, `handleLogin`, `handleSignup`, `handleLogout`, `handleMe`, `handleListVersions`,
+- Handlers: `handleList`, `handleRead`, `handleCreate`, `handleUpdate`, `handleDelete`, `handleFile`, `handleLogin`, `handleSignup`, `handleLogout`, `handleLogoutEverywhere` (1.1), `handleMe`, `handleListVersions`,
   `handleGetVersion`, `handleRestoreVersion`, `handlePreview`, `handleGlobalRead`, `handleGlobalUpdate`.
 - Helpers: `describeCollections`, `describeCollection`, `assertCsrfSafe`, `readBoundedJsonObject`, `isForgeError`, `toApiErrorBody`.
 
