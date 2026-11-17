@@ -36,9 +36,8 @@ import {
  * The matrix: the boundaries of every advertised peer range, plus the repository's own versions.
  * A value ending in a range (`^…`, `~…`, `>=…`) is resolved to the newest published match at run time.
  * Admin supports `@angular/* ^21.2.0 || ^22.0.0` (spec 103; `@voltui/components` 1.3 peers the same range).
- * The `angular-*` combinations install `@forge-cms/angular` alone. `lumen-icons` 0.2.x only declares an
- * Angular 21 peer, so the Angular 22 admin tuples tolerate exactly that one peer (see `manifest`); drop
- * the exception once `lumen-icons` 0.3 (Angular 22 peer) is published.
+ * The `angular-*` combinations install `@forge-cms/angular` alone. On Angular 22 the admin needs `lumen-icons`
+ * 0.3.1+ (the first release that peers Angular 22) and `@voltui/components` 1.3.2+.
  */
 export const COMBINATIONS = [
   {
@@ -92,7 +91,7 @@ export const COMBINATIONS = [
     babel: '^7.28.0',
     cdk: '^21.2.0',
     voltui: '^1.0.1',
-    lumenIcons: '^0.2.0'
+    lumenIcons: '^0.3.0'
   },
   {
     id: 'admin-22-min',
@@ -107,7 +106,7 @@ export const COMBINATIONS = [
     babel: '7.29.0',
     cdk: '22.0.0',
     voltui: '1.3.2',
-    lumenIcons: '0.2.0'
+    lumenIcons: '0.3.1'
   },
   {
     id: 'admin-22',
@@ -121,7 +120,7 @@ export const COMBINATIONS = [
     babel: '^8.0.0',
     cdk: '^22.0.0',
     voltui: '^1.0.1',
-    lumenIcons: '^0.2.0'
+    lumenIcons: '^0.3.0'
   },
   {
     id: 'angular-22',
@@ -223,14 +222,6 @@ function manifest(combination, tarballs) {
     rxjs: resolveVersion('rxjs', combination.rxjs),
     tslib: '^2.3.0'
   };
-  // lumen-icons 0.2.x predates Angular 22 (peer `^21.0.0`): tolerate exactly that peer for the admin on 22.
-  const lumenIconsException =
-    combination.admin && /^\^?22\./.test(combination.angular)
-      ? {
-          'lumen-icons>@angular/core': '^21.0.0 || ^22.0.0',
-          'lumen-icons>@angular/common': '^21.0.0 || ^22.0.0'
-        }
-      : {};
   const devDependencies = {
     '@analogjs/vite-plugin-angular': resolveVersion(
       '@analogjs/vite-plugin-angular',
@@ -263,8 +254,7 @@ function manifest(combination, tarballs) {
       peerDependencyRules: {
         allowedVersions: {
           '@napi-rs/wasm-runtime>@emnapi/core': '>=2.0.0-alpha.0 <2.0.0-beta.0',
-          '@napi-rs/wasm-runtime>@emnapi/runtime': '>=2.0.0-alpha.0 <2.0.0-beta.0',
-          ...lumenIconsException
+          '@napi-rs/wasm-runtime>@emnapi/runtime': '>=2.0.0-alpha.0 <2.0.0-beta.0'
         }
       }
     }

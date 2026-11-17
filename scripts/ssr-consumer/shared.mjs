@@ -23,6 +23,7 @@ const TUPLES = {
     // Angular 22.1+ links with Babel 8 (22.0.x still uses Babel 7).
     babel: '8.1.2',
     voltui: '1.3.3',
+    lumenIcons: '0.3.1',
     cdk: '22.2.7'
   }
 };
@@ -58,8 +59,7 @@ function BASE_VERSIONS() {
 
 /**
  * pnpm peer exceptions for the Angular 22 tuple only: the WebAssembly fallback of @angular/build's bundler
- * ships `@emnapi` 2.0.0 alphas outside @napi-rs/wasm-runtime's range, and `lumen-icons` 0.2.x still peers
- * Angular 21 only (0.3 is not published yet). Nothing else is relaxed. Empty for Angular 21.
+ * ships `@emnapi` 2.0.0 alphas outside @napi-rs/wasm-runtime's range. Nothing else is relaxed. Empty for Angular 21.
  */
 export function peerRules() {
   if (TUPLE !== 'angular-22') return {};
@@ -67,9 +67,7 @@ export function peerRules() {
     peerDependencyRules: {
       allowedVersions: {
         '@napi-rs/wasm-runtime>@emnapi/core': '>=2.0.0-alpha.0 <2.0.0-beta.0',
-        '@napi-rs/wasm-runtime>@emnapi/runtime': '>=2.0.0-alpha.0 <2.0.0-beta.0',
-        'lumen-icons>@angular/core': '^21.0.0 || ^22.0.0',
-        'lumen-icons>@angular/common': '^21.0.0 || ^22.0.0'
+        '@napi-rs/wasm-runtime>@emnapi/runtime': '>=2.0.0-alpha.0 <2.0.0-beta.0'
       }
     }
   };

@@ -42,27 +42,14 @@ The packed `@forge-cms/admin` installs with strict peers, builds, server-renders
 
 ### lumen-icons
 
-`lumen-icons` 0.3.0 (Angular 22 peer) is **not published** (npm has 0.1.0 and 0.2.0; 0.2.0 peers `@angular/{core,common} ^21.0.0`). The admin works with 0.2.0 on Angular 22 (proven below). A strict-peer pnpm install on 22 reports that one peer as unmet. The gates, and the documented workaround, tolerate exactly that peer:
+**Update (2026-11-17, same PR):** `lumen-icons` **0.3.1** was published during this work, with peers `@angular/{core,common} ^21.0.0 || ^22.0.0`. The temporary peer exception was removed from both gates. On Angular 22 the documented requirement is now `lumen-icons` ≥ 0.3.1 and `@voltui/components` ≥ 1.3.2, with no workaround. The tuples now use `lumen-icons` 0.3.1 (`admin-22-min`), newest 0.3.x (`admin-22`, `latest-21`) and 0.2.0 (`admin-min`, `current`).
 
-```json
-{
-  "pnpm": {
-    "peerDependencyRules": {
-      "allowedVersions": {
-        "lumen-icons>@angular/core": "^21.0.0 || ^22.0.0",
-        "lumen-icons>@angular/common": "^21.0.0 || ^22.0.0"
-      }
-    }
-  }
-}
-```
-
-Report upstream to Lumen Icons: publish 0.3.0 with an Angular 22 peer. Then drop the exception (`lumenIconsException` in `verify-angular-compat.mjs`, `peerRules()` in `ssr-consumer/shared.mjs`) and add a 0.3 tuple.
+Before 0.3.1 existed (the first runs recorded below), 0.2.0 worked on Angular 22 behind a `pnpm.peerDependencyRules` exception for `lumen-icons>@angular/{core,common}`.
 
 ### Gates
 
 1. **`release:compat`** (`scripts/verify-angular-compat.mjs`). The existing `admin-min` (21.2.0), `current` (21.2.10) and `latest-21` (newest 21.2.x) tuples are kept. Two new tuples:
-   - `admin-22-min`: Angular 22.0.0, cdk 22.0.0, VoltUI 1.3.2, lumen-icons 0.2.0, TS ~6.0, rxjs 7.8.0, Vite ^8, vite-plugin-angular ^2.8, **Babel 7.29.0**.
+   - `admin-22-min`: Angular 22.0.0, cdk 22.0.0, VoltUI 1.3.2, lumen-icons 0.3.1, TS ~6.0, rxjs 7.8.0, Vite ^8, vite-plugin-angular ^2.8, **Babel 7.29.0**.
    - `admin-22`: newest of every range on Angular 22 (Babel ^8).
 
    The `@emnapi` WebAssembly-fallback exception (not a Forge peer) widens from the single version `2.0.0-alpha.3` to `>=2.0.0-alpha.0 <2.0.0-beta.0`, because newest `@angular/build` 22.2.6 ships alpha.6.
@@ -76,7 +63,7 @@ Report upstream to Lumen Icons: publish 0.3.0 with an Angular 22 peer. Then drop
 ## Implementation plan
 
 - [x] widen the admin peers (`packages/admin/package.json`)
-- [x] `release:compat`: `admin-22-min`, `admin-22`, the lumen-icons exception, the wider `@emnapi` alpha range
+- [x] `release:compat`: `admin-22-min`, `admin-22`, the wider `@emnapi` alpha range (the temporary lumen-icons exception was removed once 0.3.1 shipped)
 - [x] SSR consumer: `FORGE_SSR_TUPLE`, `FORGE_SSR_PROFILES`, `peerRules()`, axe scans in the journey
 - [x] `release:ssr:admin-22` script + `release:certify` stage `admin-22`
 - [x] docs: SUPPORT, LIMITATIONS "Admin framework", MATRICES "Angular admin", README baseline, admin README, REFERENCE, site docs (angular-client, angular-quickstart, troubleshooting)
@@ -105,6 +92,8 @@ Report upstream to Lumen Icons: publish 0.3.0 with an Angular 22 peer. Then drop
 | `release:compat admin-22`     | Angular 22.2.6 · build 22.2.6 · TS 6.0.3 · rxjs 7.8.2 · Vite 8.3.8 · vite-plugin-angular 2.9.7 · Babel 8.1.2 · VoltUI 1.3.3 · lumen-icons 0.2.0  | passed            |
 | `release:ssr:admin-22`        | Angular 22.2.6 · Analog 2.9.7 · workerd + D1 + R2                                                                                                | passed, axe clean |
 | journey (Cloudflare)          | Angular 21.2.10 · Analog 2.5.2                                                                                                                   | passed, axe clean |
+
+Re-run after the switch to `lumen-icons` 0.3.1 (no peer exception): `release:compat` 7/7 (`latest-21` 21.2.26 + lumen 0.3.1, `admin-22-min` 22.0.0 + VoltUI 1.3.2 + lumen 0.3.1, `admin-22` 22.2.6 + VoltUI 1.3.3 + lumen 0.3.1); the admin journey with axe and the keyboard step passes on Angular 22.2.6 and 21.2.10.
 
 Findings during implementation: (a) `@voltui/components` < 1.3.2 cannot be installed on 22 with strict peers. (b) Angular 22.0.0 requires Babel 7 in the linker; the first attempt with Babel 8 failed with `Requires Babel "^7.0.0-0"`. (c) Newest `@angular/build` 22 pulls `@emnapi` 2.0.0-alpha.6.
 

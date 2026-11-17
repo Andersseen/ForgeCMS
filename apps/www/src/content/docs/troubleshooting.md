@@ -26,7 +26,7 @@ It needs `@angular/compiler-cli`, `@babel/core` (7 for Angular 21, 8 for Angular
 ### Missing or conflicting peer dependency
 
 `pnpm` with strict peers reports the package and the range it wants. The admin needs `@angular/{cdk,common,core,forms,platform-browser,router}` `^21.2.0 || ^22.0.0`, `rxjs ^7.8.0`, `@voltui/components ^1.0.1` (1.3.2+ on Angular 22) and
-`lumen-icons ^0.2.0 || ^0.3.0`; the client needs `@angular/core` and `@angular/router` `^21 || ^22`. **`@angular/cdk` is required since `0.12.1`.** On Angular 22, `lumen-icons` 0.2.x reports an unmet Angular 21 peer until 0.3 is published: allow it with `pnpm.peerDependencyRules.allowedVersions` for `lumen-icons>@angular/core` and `lumen-icons>@angular/common`.
+`lumen-icons ^0.2.0 || ^0.3.0`; the client needs `@angular/core` and `@angular/router` `^21 || ^22`. **`@angular/cdk` is required since `0.12.1`.** On Angular 22, `lumen-icons` 0.2.x and `@voltui/components` below 1.3.2 report an unmet Angular 21 peer: install `lumen-icons` 0.3.1+ and `@voltui/components` 1.3.2+.
 Two copies of `@angular/common`/`core` in the install (check with `pnpm why @angular/core`) break the router at runtime — dedupe to one. Ranges and tested versions: [SUPPORT.md](https://github.com/Andersseen/ForgeCMS/blob/main/docs/SUPPORT.md).
 
 ### Imports that cannot resolve

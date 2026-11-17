@@ -28,7 +28,7 @@ pnpm add @angular/cdk @voltui/components lumen-icons rxjs
 pnpm add -D @angular/compiler-cli @babel/core vite @types/node
 ```
 
-The admin supports **Angular 21.2+ and 22** (`^21.2.0 || ^22.0.0`, since 1.1.0). On Angular 22 use `@voltui/components` 1.3.2+ and `@babel/core` 8 (Angular 22.1+); `lumen-icons` 0.2 still declares an Angular 21 peer — see [Angular client → compatibility](/docs/angular-client) for the one-line pnpm peer rule. `@forge-cms/angular` alone supports `^21.0.0 || ^22.0.0`.
+The admin supports **Angular 21.2+ and 22** (`^21.2.0 || ^22.0.0`, since 1.1.0). On Angular 22 use `@voltui/components` 1.3.2+ and `@babel/core` 8 (Angular 22.1+); `lumen-icons` 0.3.1+. `@forge-cms/angular` alone supports `^21.0.0 || ^22.0.0`.
 
 ## 2. Add the official linker
 

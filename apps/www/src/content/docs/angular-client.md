@@ -446,10 +446,10 @@ Peer ranges are the versions proven by `pnpm release:compat`: external Vite +
 `strict-peer-dependencies=true` and `auto-install-peers=false`, each checked for a single Angular
 copy, `tsc` + `ngc` with `strictTemplates`, and a fully linked production build.
 
-| Package              | Angular                | Other peers                                                                                                                                                                  |
-| -------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@forge-cms/angular` | `^21.0.0 \|\| ^22.0.0` | optional, for `/vite`: `@angular/compiler-cli` (same as Angular), `@babel/core` `^7.28.0 \|\| ^8.0.0`, `vite` `^7 \|\| ^8`                                                   |
-| `@forge-cms/admin`   | `^21.2.0 \|\| ^22.0.0` | `rxjs` `^7.8.0`, `@voltui/components` `^1.0.1` (1.3.2+ on Angular 22), `lumen-icons` `^0.2.0 \|\| ^0.3.0`; optional `@babel/core` `^7.28.0 \|\| ^8.0.0`, `vite` `^7 \|\| ^8` |
+| Package              | Angular                | Other peers                                                                                                                                                                                         |
+| -------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@forge-cms/angular` | `^21.0.0 \|\| ^22.0.0` | optional, for `/vite`: `@angular/compiler-cli` (same as Angular), `@babel/core` `^7.28.0 \|\| ^8.0.0`, `vite` `^7 \|\| ^8`                                                                          |
+| `@forge-cms/admin`   | `^21.2.0 \|\| ^22.0.0` | `rxjs` `^7.8.0`, `@voltui/components` `^1.0.1` (1.3.2+ on Angular 22), `lumen-icons` `^0.2.0 \|\| ^0.3.0` (0.3.1+ on Angular 22); optional `@babel/core` `^7.28.0 \|\| ^8.0.0`, `vite` `^7 \|\| ^8` |
 
 Tested combinations (2026-11-17, `pnpm release:compat`):
 
@@ -465,9 +465,7 @@ Tested combinations (2026-11-17, `pnpm release:compat`):
 
 - `@forge-cms/admin` supports Angular 21.2+ and 22 (since 1.1.0, spec 103). On Angular 22 install
   `@voltui/components` 1.3.2 or newer (the first VoltUI release that peers Angular 22); the app also
-  installs `@angular/cdk`. `lumen-icons` 0.2.x still declares an Angular 21 peer; until 0.3 is
-  published a strict-peer install on Angular 22 needs `pnpm.peerDependencyRules.allowedVersions`
-  `{ "lumen-icons>@angular/core": "^22.0.0", "lumen-icons>@angular/common": "^22.0.0" }` (the gates use exactly this).
+  installs `@angular/cdk`. Use `lumen-icons` 0.3.1 or newer on Angular 22 (0.2.x peers Angular 21 only).
 - Babel: Angular 22.1+ links with Babel 8; Angular 22.0.x and 21 link with Babel 7.
 - Angular 19/20 are not supported.
 - **Vite/Analog apps need the linker** — for `@forge-cms/angular` alone too. Forge's packages are
