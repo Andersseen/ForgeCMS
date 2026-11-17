@@ -1,5 +1,9 @@
 # STATE — Current implementation status
 
+> **Last updated: 2026-11-17 (spec 108 — release governance; 1.1.0 single PR #127).** **1.0 closeout verified:** a clean build of `82e4cdb` packs 12/12 content-identical to npm `@forge-cms/*@1.0.0`; SLSA provenance names `82e4cdb` / `main` / `ci.yml` for all twelve; `npm audit signatures` 148/148; dist-tags correct; `registry:consumers --version 1.0.0` (server, angular, ssr, agent) passed. `ssr-journey` was not run locally (no Docker). L03 is now RELEASED and verified (dossier). **1.1 security review:** no critical/high/medium finding (dossier). **GitHub settings NOT applied:** the exact ruleset (`Protect main` active, 8 required checks, PR-only admin bypass for the Version Packages PR), protected `npm-release` environment (maintainer reviewer, `main` only, `NPM_TOKEN` scoped to it, or npm trusted publishing) and `production*` branch policies are written in spec 108 and await maintainer confirmation. **Next:** confirm and apply spec 108's settings; V2-01 is then complete (mark it done in the roadmap).
+
+> _Previous update:_
+
 > **Last updated: 2026-11-17 (spec 107 — session revocation policy; 1.1.0 single PR #127).** Optional `AuthAdapter.revokeSessions(userId)`, implemented by `UsersCollectionAuthAdapter` (bumps `_sessionVersion`), and `handleLogoutEverywhere` in `@forge-cms/runtime` (CSRF → 404 if the adapter cannot revoke → 401 → revoke → 204 + cleared cookie). The 1.x policy table (plain logout / everywhere / password change / deletion / role change / rehash / secret rotation) is in browser-auth and pinned by `session-revocation.test.ts` on InMemory + libSQL. Single-session revocation, session lists and a shorter lifetime are in `docs/roadmap/v2/2.0-NOTES.md`. **Next:** spec 108 (release governance).
 
 > _Previous update:_
